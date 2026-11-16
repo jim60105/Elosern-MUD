@@ -48,9 +48,7 @@ from web.webclient.presentation.gallery_selection import (
 )
 from web.webclient.presentation.ingress import build_presentation_context
 from web.webclient.presentation.registry import build_production_registry
-from world.art.queue import ensure, record_key, settle
 from world.art.signals import asset_completed
-from world.art.store import ArtAssetStatus
 from world.art.subjects import ArtSubject, ArtSubjectKind
 from world.lore.monster_visuals import get_monster_visual_registry
 from world.rules.lore_knowledge import record_species_sighting
@@ -458,36 +456,31 @@ class ArtPushPresenterTests(EvenniaTestCase):
         )
 
     def _settle_named_portrait(self, stable_key):
-        """Settle one named character's classic asset DONE with a real file.
+        """Append one named character's real gallery card.
 
-        Returns ``(subject_key, stored_identity)``. The record is created,
-        claimed and settled through the canonical queue, so the resolution
-        chain presents the SAME runtime URL the production worker would.
+        Returns ``(subject_key, stored_identity)``. The card is written through
+        the sole writer, so the resolution chain presents the SAME runtime URL
+        the production worker would.
         """
-        from world.art.queue import claim
+        from world.art import gallery as gallery_api
 
         subject = ArtSubject(ArtSubjectKind.CHARACTER, stable_key)
-        ensure(subject, "desc")
-        claimed = claim(50)
-        token = next(
-            (
-                str(record.db.generation_token)
-                for record in claimed
-                if record.db_key == record_key(subject)
-            ),
-            None,
-        )
-        self.assertIsNotNone(token, "the portrait record must be claimed")
-        identity = f"portrait/character/{stable_key}.png"
+        image_id = str(uuid.uuid4())
+        identity = f"gallery/character/{stable_key}/{image_id}.png"
         target = self.root / identity
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(b"asset")
-        settle(
+        gallery_api.append_card(
             subject,
-            generation_token=token,
-            status=ArtAssetStatus.DONE,
-            output_identity=identity,
-            error=None,
+            image_id=image_id,
+            stored_identity=identity,
+            prompt=None,
+            seed=None,
+            checkpoint=None,
+            requested_fields=[],
+            binding=None,
+            source="generated",
+            image_size={"width": 1000, "height": 1000},
         )
         return subject.full(), identity
 

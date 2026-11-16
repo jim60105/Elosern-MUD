@@ -8,7 +8,7 @@ from unittest.mock import patch
 from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.npcs import NPC
-from world.art.store import ArtAssetRecord, ArtAssetStatus
+from world.art.store import ArtAssetStatus, GalleryJobRecord
 from world.imports.loader import ImportRejected, load_batch
 from world.imports.tests.helpers import EXAMPLE_PATH, example_record
 
@@ -85,14 +85,14 @@ class ImportPortraitSeamTests(EvenniaTestCase):
             # job, never a classic fixed-identity record.
             jobs = [
                 record
-                for record in ArtAssetRecord.objects.all()
+                for record in GalleryJobRecord.objects.all()
                 if str(record.db.gallery_image_id or "")
             ]
             self.assertEqual(len(jobs), 2)
             for job in jobs:
                 self.assertEqual(job.db.status, ArtAssetStatus.PENDING)
             self.assertFalse(
-                ArtAssetRecord.objects.filter(
+                GalleryJobRecord.objects.filter(
                     db_key=f"art:portrait:character:{entity.key}"
                 ).exists()
             )
@@ -106,7 +106,7 @@ class ImportPortraitSeamTests(EvenniaTestCase):
             with self.assertRaises(ImportRejected):
                 load_batch(paths)
         self.assertEqual(callbacks, [])
-        self.assertEqual(ArtAssetRecord.objects.count(), 0)
+        self.assertEqual(GalleryJobRecord.objects.count(), 0)
         self.assertFalse(
             NPC.objects.filter(db_key="human_reference").exists()
         )

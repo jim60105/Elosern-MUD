@@ -61,7 +61,7 @@ from world.art.official_refs import (
     PRESET_PROVENANCE_ATTRIBUTE,
     UNRESOLVED_REFERENCE_EVENT,
 )
-from world.art.store import ArtAssetRecord
+from world.art.store import GalleryJobRecord
 from world.art.subjects import ArtSubject, ArtSubjectKind
 from world.lore import monster_visuals
 
@@ -664,14 +664,14 @@ class OfficialDefaultStepTests(EvenniaTestCase):
                 stack.enter_context(tripwire)
             before = (
                 GalleryRecord.objects.count(),
-                ArtAssetRecord.objects.count(),
+                GalleryJobRecord.objects.count(),
                 sorted(path.relative_to(store).as_posix() for path in store.rglob("*")),
                 dict(entity.attributes),
             )
             facts = [official_default_for(subject, entity) for _ in range(100)]
             after = (
                 GalleryRecord.objects.count(),
-                ArtAssetRecord.objects.count(),
+                GalleryJobRecord.objects.count(),
                 sorted(path.relative_to(store).as_posix() for path in store.rglob("*")),
                 dict(entity.attributes),
             )
@@ -1042,7 +1042,7 @@ class OfficialSelectionStepTests(EvenniaTestCase):
         )
         before = (
             GalleryRecord.objects.count(),
-            ArtAssetRecord.objects.count(),
+            GalleryJobRecord.objects.count(),
             repr(record_for(subject).attributes.all()),
             sorted(path.relative_to(self.store).as_posix() for path in self.store.rglob("*")),
         )
@@ -1052,7 +1052,7 @@ class OfficialSelectionStepTests(EvenniaTestCase):
             resolutions = [resolve_display(subject, entity) for _ in range(100)]
         after = (
             GalleryRecord.objects.count(),
-            ArtAssetRecord.objects.count(),
+            GalleryJobRecord.objects.count(),
             repr(record_for(subject).attributes.all()),
             sorted(path.relative_to(self.store).as_posix() for path in self.store.rglob("*")),
         )

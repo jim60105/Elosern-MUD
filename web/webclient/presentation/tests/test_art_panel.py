@@ -53,13 +53,11 @@ from world.art.official_refs import PRESET_PROVENANCE_ATTRIBUTE
 from world.art.queue import (
     claim,
     enqueue_gallery_job,
-    ensure,
     gallery_record_key,
     record_key,
-    settle,
     settle_gallery_failed,
 )
-from world.art.store import ArtAssetRecord, ArtAssetStatus
+from world.art.store import ArtAssetStatus, GalleryJobRecord
 from world.art.subjects import ArtSubject, ArtSubjectKind
 from world.rules.dialogue import GUILD_STAFF_DIALOGUE_KEY
 from world.rules.tests._combat_session_helpers import open_synthetic_scope
@@ -966,19 +964,23 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(b"asset")
 
-    def _settle_done(self, subject, identity):
-        ensure(subject, "desc")
+    def _append_character_card(self, subject):
+        image_id = str(uuid.uuid4())
+        identity = f"gallery/character/{subject.key}/{image_id}.png"
         self._write_asset(identity)
-        from world.art.queue import claim
-
-        claimed = claim(10)
-        settle(
+        append_card(
             subject,
-            generation_token=str(claimed[0].db.generation_token),
-            status=ArtAssetStatus.DONE,
-            output_identity=identity,
-            error=None,
+            image_id=image_id,
+            stored_identity=identity,
+            prompt=None,
+            seed=None,
+            checkpoint=None,
+            requested_fields=[],
+            binding=None,
+            source="generated",
+            image_size={"width": 1000, "height": 1000},
         )
+        return identity
 
     def _append_scene_card(self, subject, *, write=True):
         """Append one real scene gallery card (its stored file optional)."""
@@ -1082,7 +1084,7 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         settle_gallery_failed(
             gallery_record_key(subject, image_id),
             generation_token=str(
-                ArtAssetRecord.objects.get(
+                GalleryJobRecord.objects.get(
                     db_key=gallery_record_key(subject, image_id)
                 ).db.generation_token
             ),
@@ -1119,7 +1121,7 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
             ],
             [],
         )
-        record = ArtAssetRecord.objects.filter(
+        record = GalleryJobRecord.objects.filter(
             db_key__startswith=f"{record_key(subject)}:gen:"
         ).first()
         self.assertEqual(record.db.status, ArtAssetStatus.IN_PROGRESS)
@@ -1142,13 +1144,13 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         )
         self.assertEqual(fault["rank"], descriptors.SCENE_RANK_TERMINAL)
 
-    def test_a_scene_card_with_a_missing_file_claims_no_generated_attempt(self):
+    def test_a_scene_card_with_a_missing_file_reports_a_generated_fault(self):
         self._append_scene_card(
             ArtSubject(ArtSubjectKind.SCENE, "t_synth_bazaar"),
             write=False,
         )
-        # The stored card cannot be presented and there is no classic fallback
-        # to reach: the generated position simply carries no attempt.
+        # The stored card cannot be presented: the generated position states
+        # the reached fault.
         payload = self._render()
         artwork = payload["scene"]["artwork"]
         generated = [
@@ -1156,7 +1158,10 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
             for attempt in artwork["attempts"]
             if attempt["rank"] == descriptors.SCENE_RANK_GENERATED
         ]
-        self.assertEqual(generated, [])
+        self.assertEqual(
+            [(attempt["type"], attempt["reason"]) for attempt in generated],
+            [("fault", descriptors.REASON_GENERATED_OUTPUT_MISSING)],
+        )
         self.assertEqual(artwork["generation_state"], descriptors.GENERATION_DONE)
         self.assertEqual(artwork["retention_sources"], [])
 
@@ -1273,17 +1278,16 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         guest = _player(key="rect guest")
         guest.location = self.room
         guest.db.portrait_policy = {"mode": "named", "stable_key": "rect-guest"}
-        self._settle_done(
-            ArtSubject(ArtSubjectKind.CHARACTER, "rect-guest"),
-            "portrait/character/rect-guest.png",
+        identity = self._append_character_card(
+            ArtSubject(ArtSubjectKind.CHARACTER, "rect-guest")
         )
         payload = self._render()
         artwork = payload["portrait_catalog"][str(guest.pk)]["artwork"]
         candidate = artwork["attempts"][0]
-        self.assertEqual(candidate["source_id"], "portrait.classic:portrait:character:rect-guest")
-        self.assertEqual(candidate["rank"], 40)
+        self.assertTrue(candidate["source_id"].startswith("portrait.default:"))
+        self.assertEqual(candidate["rank"], 30)
         resource = candidate["resource"]
-        self.assertEqual(resource["url"], "/art/portrait/character/rect-guest.png")
+        self.assertEqual(resource["url"], f"/art/{identity}")
         self.assertEqual(resource["origin"], "runtime")
         self.assertEqual(resource["geometry"]["face_rect"], dict(DEFAULT_FACE_RECT))
         self.assertEqual(artwork["generation_state"], "done")
@@ -1301,7 +1305,7 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         )
         host.sex = "female"
         host.db.apparent_age = 30
-        before = ArtAssetRecord.objects.count()
+        before = GalleryJobRecord.objects.count()
         payload = self._render()
         entry = payload["portrait_catalog"][str(host.pk)]["artwork"]
         # No real candidate and no generated subject key: the only fact is the
@@ -1315,22 +1319,21 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(terminal["url"], "/art/defaults/woman.webp")
         # The decoration installs nothing: no policy and no gallery record.
         self.assertIsNone(host.db.portrait_policy)
-        self.assertEqual(ArtAssetRecord.objects.count(), before)
+        self.assertEqual(GalleryJobRecord.objects.count(), before)
 
     @covers_requirement("webclient-art-panel::the-portrait-catalog-is-server-authored-age-checked-and-bounded")
     def test_a_resolved_row_retains_its_alpha_terminal(self):
         guest = _player(key="reference guest")
         guest.location = self.room
         guest.db.portrait_policy = {"mode": "named", "stable_key": "reference-guest"}
-        self._settle_done(
-            ArtSubject(ArtSubjectKind.CHARACTER, "reference-guest"),
-            "portrait/character/reference-guest.png",
+        identity = self._append_character_card(
+            ArtSubject(ArtSubjectKind.CHARACTER, "reference-guest")
         )
         payload = self._render()
         artwork = payload["portrait_catalog"][str(guest.pk)]["artwork"]
         candidate = artwork["attempts"][0]["resource"]
         self.assertEqual(candidate["origin"], "runtime")
-        self.assertEqual(candidate["url"], "/art/portrait/character/reference-guest.png")
+        self.assertEqual(candidate["url"], f"/art/{identity}")
         # The alpha terminal rides beside the resolved image at its own rank,
         # for a browser-side load-failure re-render, without changing the
         # subject's generation truth.
@@ -1361,9 +1364,8 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         guest = _player(key="enumeration guest")
         guest.location = self.room
         guest.db.portrait_policy = {"mode": "named", "stable_key": "enumeration-guest"}
-        self._settle_done(
-            ArtSubject(ArtSubjectKind.CHARACTER, "enumeration-guest"),
-            "portrait/character/enumeration-guest.png",
+        identity = self._append_character_card(
+            ArtSubject(ArtSubjectKind.CHARACTER, "enumeration-guest")
         )
         normalized = validate_art(self._render())
         self.assertEqual(normalized["schema_version"], ART_SCHEMA_VERSION)
@@ -1371,7 +1373,7 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         artwork = normalized["portrait_catalog"][str(guest.pk)]["artwork"]
         candidate = artwork["attempts"][0]["resource"]
         self.assertEqual(candidate["origin"], "runtime")
-        self.assertEqual(candidate["url"], "/art/portrait/character/enumeration-guest.png")
+        self.assertEqual(candidate["url"], f"/art/{identity}")
         self.assertEqual(artwork["generation_state"], "done")
         self.assertEqual(artwork["terminal"]["kind"], "alpha_mask")
         scene_artwork = normalized["scene"]["artwork"]

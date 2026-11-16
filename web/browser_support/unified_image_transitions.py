@@ -338,7 +338,7 @@ def _settle_scene(character, status: str) -> dict:
         settle_gallery_failed,
         settle_gallery_generated,
     )
-    from world.art.store import ArtAssetRecord, ArtAssetStatus
+    from world.art.store import ArtAssetStatus, GalleryJobRecord
 
     subject, image_id = _scene_job(character)
     job = {
@@ -349,7 +349,7 @@ def _settle_scene(character, status: str) -> dict:
     if job == ArtAssetStatus.PENDING:
         return {"subject_key": subject.full(), "status": job}
     job_key = gallery_record_key(subject, image_id)
-    claimed = claim(ArtAssetRecord.objects.count() + 1)
+    claimed = claim(GalleryJobRecord.objects.count() + 1)
     record = next((item for item in claimed if item.db_key == job_key), None)
     if record is None:
         raise UnsupportedTransitionError("the scene gallery job was not claimable")

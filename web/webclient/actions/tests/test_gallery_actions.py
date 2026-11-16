@@ -39,7 +39,7 @@ from world.art import official, official_refs
 from world.art import queue
 from world.art.official import current_catalog, load_catalog, reset_catalog
 from world.art.official_refs import PRESET_PROVENANCE_ATTRIBUTE
-from world.art.store import ArtAssetRecord
+from world.art.store import GalleryJobRecord
 from world.art.subjects import ArtSubject, ArtSubjectKind
 from world.maps import wilderness_provider
 from world.rules.clock import get_world_clock
@@ -482,7 +482,7 @@ class GalleryActionIntegrationTests(EvenniaTest):
             return [
                 [(record.pk, {attribute.key: deepcopy(attribute.value) for attribute in record.attributes.all()})
                  for record in model.objects.order_by("pk")]
-                for model in (api.GalleryRecord, ArtAssetRecord)
+                for model in (api.GalleryRecord, GalleryJobRecord)
             ]
         before = art_state()
         self.assertEqual(self.dispatch("gallery.category.select", {"category": "party"})["outcome"], "success")
@@ -751,7 +751,7 @@ class GalleryActionIntegrationTests(EvenniaTest):
         return [
             [(record.pk, {attribute.key: deepcopy(attribute.value) for attribute in record.attributes.all()})
              for record in model.objects.order_by("pk")]
-            for model in (api.GalleryRecord, ArtAssetRecord)
+            for model in (api.GalleryRecord, GalleryJobRecord)
         ]
 
     def refused(self, action, payload):
@@ -929,7 +929,7 @@ class GalleryActionIntegrationTests(EvenniaTest):
             return [
                 [(record.pk, {attribute.key: deepcopy(attribute.value) for attribute in record.attributes.all()})
                  for record in model.objects.order_by("pk")]
-                for model in (api.GalleryRecord, ArtAssetRecord)
+                for model in (api.GalleryRecord, GalleryJobRecord)
             ]
         before = (art_state(), api.cards_for(self.subject), queue.pending_gallery_jobs(self.companion_subject))
         with patch.dict(gallery_selection.DISABLED_REASONS, {"people": "disabled"}, clear=True), \
@@ -1110,7 +1110,7 @@ class GalleryActionIntegrationTests(EvenniaTest):
         "webclient-gallery-management-actions::seven-gallery-management-actions-are-registered-with-exact-payload-validators"
     )
     def test_malformed_payloads_never_reach_adapter_or_create_state(self):
-        before = (api.GalleryRecord.objects.count(), ArtAssetRecord.objects.count())
+        before = (api.GalleryRecord.objects.count(), GalleryJobRecord.objects.count())
         for name, action, payload, accepted in wire_cases():
             if accepted or "\\ud800" in repr(payload):
                 continue  # lone surrogate is an envelope rejection, tested by wire parity
@@ -1120,7 +1120,7 @@ class GalleryActionIntegrationTests(EvenniaTest):
                 mutate.assert_not_called()
                 select.assert_not_called()
                 self.assertEqual(len(self.sent), 1)
-        self.assertEqual(before, (api.GalleryRecord.objects.count(), ArtAssetRecord.objects.count()))
+        self.assertEqual(before, (api.GalleryRecord.objects.count(), GalleryJobRecord.objects.count()))
 
     def test_defensive_domain_error_mapping_is_bounded_and_logs_once(self):
         card = self.card()
@@ -1373,7 +1373,7 @@ class OfficialPreferenceActionTests(EvenniaTest):
             ],
             [
                 (record.pk, record.db.status)
-                for record in ArtAssetRecord.objects.order_by("pk")
+                for record in GalleryJobRecord.objects.order_by("pk")
             ],
         )
 

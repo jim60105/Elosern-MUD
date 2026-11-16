@@ -169,7 +169,7 @@ class SceneBuilderPortraitPipelineTests(SceneBuilderTestBase):
         # The retrofit settles to a gallery card, not a classic record.
         from world.art import gallery as gallery_api
         from world.art.subjects import ArtSubject
-        from world.art.store import ArtAssetRecord
+        from world.art.store import GalleryJobRecord
 
         cards = gallery_api.cards_for(ArtSubject(ArtSubjectKind.CHARACTER, "forest_bandit_chief"))
         self.assertEqual(len(cards), 1)
@@ -178,7 +178,7 @@ class SceneBuilderPortraitPipelineTests(SceneBuilderTestBase):
             (Path(self.tempdir.name) / cards[0]["stored_identity"]).is_file()
         )
         self.assertFalse(
-            ArtAssetRecord.objects.filter(
+            GalleryJobRecord.objects.filter(
                 db_key="art:portrait:character:forest_bandit_chief"
             ).exists()
         )

@@ -48,7 +48,7 @@ from web.webclient.presentation.protocol import (
 )
 from web.webclient.presentation.registry import build_production_registry
 from world.art.queue import enqueue_gallery_job, pending_gallery_jobs, settle_gallery_failed
-from world.art.store import ArtAssetRecord
+from world.art.store import GalleryJobRecord
 from world.art.subjects import ArtSubject, ArtSubjectKind
 from tools.spec_traceability import covers_requirement
 
@@ -1321,12 +1321,12 @@ class GalleryPresenterTests(EvenniaTest):
         duplicate.db.cards = []
         job = self.job(2)
         before_records = [(row.pk, repr(row.attributes.all())) for row in api.GalleryRecord.objects.all()]
-        before_jobs = [(row.pk, row.db.status, row.db.enqueued_at) for row in ArtAssetRecord.objects.all()]
+        before_jobs = [(row.pk, row.db.status, row.db.enqueued_at) for row in GalleryJobRecord.objects.all()]
         before_files = {path.relative_to(self.root): path.read_bytes() for path in self.root.rglob("*") if path.is_file()}
         first = gallery_presenter(self.context)
         self.assertEqual(gallery_presenter(self.context), first)
         self.assertEqual([(row.pk, repr(row.attributes.all())) for row in api.GalleryRecord.objects.all()], before_records)
-        self.assertEqual([(row.pk, row.db.status, row.db.enqueued_at) for row in ArtAssetRecord.objects.all()], before_jobs)
+        self.assertEqual([(row.pk, row.db.status, row.db.enqueued_at) for row in GalleryJobRecord.objects.all()], before_jobs)
         self.assertEqual({path.relative_to(self.root): path.read_bytes() for path in self.root.rglob("*") if path.is_file()}, before_files)
         self.assertEqual(job.db.status, "pending")
 
@@ -1359,7 +1359,7 @@ class GalleryPresenterTests(EvenniaTest):
         value = gallery_presenter(self.context)
         self.assertEqual(sum(row["image_id"] == image_id(10) for row in value["cards"]), 1)
         self.assertEqual(sum(row["status"] == "pending" for row in value["cards"]), 7)
-        job = ArtAssetRecord.objects.get(db_key=f"art:{self.subject.full()}:gen:{image_id(9)}")
+        job = GalleryJobRecord.objects.get(db_key=f"art:{self.subject.full()}:gen:{image_id(9)}")
         job.db.status = "in_progress"
         job.db.generation_token = "t_token"
         with patch("world.art.gallery.time.time", return_value=500):

@@ -81,7 +81,7 @@ def candidate(descriptor: dict) -> dict | None:
 def terminal(descriptor: dict) -> dict | None:
     """The descriptor's own alpha terminal resource, or ``None``."""
     return descriptor["terminal"]["resource"] if descriptor["terminal"] else None
-from world.art.store import ArtAssetRecord
+from world.art.store import GalleryJobRecord
 from world.art.subjects import (
     ArtSubject,
     ArtSubjectError,
@@ -432,7 +432,7 @@ class SpeciesPortraitChainTests(EvenniaTestCase):
                     for record in GalleryRecord.objects.all()
                 )
             ),
-            ArtAssetRecord.objects.count(),
+            GalleryJobRecord.objects.count(),
             self._tree(self.store),
             self._tree(self.official_root),
         )
@@ -461,7 +461,7 @@ class SpeciesPortraitChainTests(EvenniaTestCase):
         self.assertEqual(candidate(payload)["geometry"]["stage"], _OFFICIAL_STAGE)
         self.assertEqual(candidate(payload)["origin"], ORIGIN_OFFICIAL)
         self.assertEqual(GalleryRecord.objects.count(), 0)
-        self.assertEqual(ArtAssetRecord.objects.count(), 0)
+        self.assertEqual(GalleryJobRecord.objects.count(), 0)
 
     @covers_requirement(
         "species-portrait-identity::tier-substitution-for-a-missing-official-species-image-is-prohibited-with-honest-fall-through"
@@ -501,16 +501,21 @@ class SpeciesPortraitChainTests(EvenniaTestCase):
         unmatched = self._monster(species=_UNREGISTERED_SPECIES)
 
         matched_payload = describe_portrait(self._subject(), matched)
-        sibling_payload = describe_portrait(self._subject(), sibling)
-        unmatched_payload = describe_portrait(self._subject(), unmatched)
+        sibling_payload = describe_portrait(
+            ArtSubject(ArtSubjectKind.MONSTER, _OTHER_SPECIES), sibling
+        )
+        unmatched_payload = describe_portrait(
+            ArtSubject(ArtSubjectKind.MONSTER, _UNREGISTERED_SPECIES), unmatched
+        )
 
         # Each species presents its own bytes...
         self.assertEqual(candidate(matched_payload)["url"], current_catalog().url_for(owned))
         self.assertEqual(candidate(sibling_payload)["url"], current_catalog().url_for(other))
         # ...and a key no registry holds reaches none of them.
+        unmatched_subject = ArtSubject(ArtSubjectKind.MONSTER, _UNREGISTERED_SPECIES)
         self.assertIsNone(official_content_reference_for_entity(unmatched))
-        self.assertIsNone(official_default_for(self._subject(), unmatched))
-        self.assertIsNone(official_selection_for(self._subject(), unmatched))
+        self.assertIsNone(official_default_for(unmatched_subject, unmatched))
+        self.assertIsNone(official_selection_for(unmatched_subject, unmatched))
         self.assertIsNone(candidate(unmatched_payload))
         serialized = json.dumps(unmatched_payload, sort_keys=True)
         for forbidden in (

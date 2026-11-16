@@ -311,9 +311,9 @@ class SceneBuilderMaterializationTests(SceneBuilderTestBase):
         # (observability migration); the portrait seam's contract is that it
         # schedules NOTHING for a generic occupant.
         self.assertEqual(_portrait_callbacks(callbacks), [])
-        from world.art.store import ArtAssetRecord
+        from world.art.store import GalleryJobRecord
 
-        self.assertEqual(ArtAssetRecord.objects.count(), 0)
+        self.assertEqual(GalleryJobRecord.objects.count(), 0)
 
     @covers_requirement("scene-builder::the-occupant-spawn-path-exposes-a-post-commit-portrait-eligibility-seam-with-unchanged-atomicity")
     @covers_requirement("art-asset-lifecycle::validated-named-npc-spawn-schedules-its-portrait-ensure-after-the-spawn-transaction-commits")
@@ -333,18 +333,18 @@ class SceneBuilderMaterializationTests(SceneBuilderTestBase):
         with self.captureOnCommitCallbacks(execute=True) as callbacks:
             materialize_stage(self.player, record.quest_id, origin_room=self.anchor)
         self.assertEqual(len(_portrait_callbacks(callbacks)), 1)
-        from world.art.store import ArtAssetRecord
+        from world.art.store import GalleryJobRecord
 
         # The retrofit: the committed spawn owns one gallery job, never a
         # classic fixed-identity record.
         self.assertEqual(
-            ArtAssetRecord.objects.filter(
+            GalleryJobRecord.objects.filter(
                 db_key__startswith="art:portrait:character:forest_bandit_chief:gen:"
             ).count(),
             1,
         )
         self.assertFalse(
-            ArtAssetRecord.objects.filter(
+            GalleryJobRecord.objects.filter(
                 db_key="art:portrait:character:forest_bandit_chief"
             ).exists()
         )
@@ -376,6 +376,6 @@ class SceneBuilderMaterializationTests(SceneBuilderTestBase):
                     self.player, record.quest_id, origin_room=self.anchor
                 )
         self.assertEqual(callbacks, [])
-        from world.art.store import ArtAssetRecord
+        from world.art.store import GalleryJobRecord
 
-        self.assertEqual(ArtAssetRecord.objects.count(), 0)
+        self.assertEqual(GalleryJobRecord.objects.count(), 0)

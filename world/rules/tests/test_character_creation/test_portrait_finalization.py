@@ -96,11 +96,11 @@ class PortraitFinalizationTests(EvenniaTest):
         return f"art:portrait:character:{self.character.pk}"
 
     def _gallery_jobs(self):
-        from world.art.store import ArtAssetRecord
+        from world.art.store import GalleryJobRecord
 
         return [
             record
-            for record in ArtAssetRecord.objects.all()
+            for record in GalleryJobRecord.objects.all()
             if str(record.db.gallery_image_id or "")
         ]
 
@@ -110,7 +110,7 @@ class PortraitFinalizationTests(EvenniaTest):
         "art-gallery-autogen::automatic-character-portraits-produce-exactly-one-unbound-default-card"
     )
     def test_activation_sets_the_named_policy_and_schedules_exactly_one_ensure(self):
-        from world.art.store import ArtAssetRecord
+        from world.art.store import GalleryJobRecord
 
         with self.captureOnCommitCallbacks(execute=True) as callbacks:
             activate_player_character(
@@ -127,7 +127,7 @@ class PortraitFinalizationTests(EvenniaTest):
         self.assertEqual(len(jobs), 1)
         self.assertTrue(jobs[0].db_key.startswith(f"{self._portrait_key()}:gen:"))
         self.assertEqual(
-            ArtAssetRecord.objects.filter(db_key=self._portrait_key()).count(), 0
+            GalleryJobRecord.objects.filter(db_key=self._portrait_key()).count(), 0
         )
 
     @covers_requirement("art-asset-lifecycle::successful-player-creation-and-validated-import-schedule-an-eligible-unique-portrait-through-transaction-on-commit")
@@ -137,7 +137,7 @@ class PortraitFinalizationTests(EvenniaTest):
             _creation_activate_adapter,
             _creation_custom_adapter,
         )
-        from world.art.store import ArtAssetRecord
+        from world.art.store import GalleryJobRecord
 
         web = create_object(PlayerCharacter, key="web-shell")
         self.account.at_post_create_character(web)
@@ -168,7 +168,7 @@ class PortraitFinalizationTests(EvenniaTest):
         # classic fixed-identity record.
         self.assertEqual(len(self._gallery_jobs()), 1)
         self.assertEqual(
-            ArtAssetRecord.objects.filter(
+            GalleryJobRecord.objects.filter(
                 db_key=f"art:portrait:character:{web.pk}"
             ).count(),
             0,
@@ -176,7 +176,7 @@ class PortraitFinalizationTests(EvenniaTest):
 
     @covers_requirement("art-asset-lifecycle::every-player-activation-path-finalizes-the-portrait-lifecycle")
     def test_failed_activation_leaves_no_policy_and_no_job(self):
-        from world.art.store import ArtAssetRecord
+        from world.art.store import GalleryJobRecord
         from world.rules.creation_wizard import activate_draft, save_custom_draft
 
         save_custom_draft(self.account, self.character, self.request())
@@ -194,7 +194,7 @@ class PortraitFinalizationTests(EvenniaTest):
         self.assertFalse(self.character.attributes.has("portrait_policy"))
         self.assertIsNone(self.character.db.portrait_policy)
         self.assertEqual(
-            ArtAssetRecord.objects.filter(db_key=self._portrait_key()).count(),
+            GalleryJobRecord.objects.filter(db_key=self._portrait_key()).count(),
             0,
         )
         self.assertEqual(self._gallery_jobs(), [])

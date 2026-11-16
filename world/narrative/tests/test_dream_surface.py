@@ -931,7 +931,7 @@ class DreamSurfaceTests(EvenniaTest):
         # inherited and no generation job is enqueued for the sleeper's room),
         # and resolving it leaves the session, the authoring store, the art
         # records and the queue exactly as they were.
-        from world.art.store import ArtAssetRecord
+        from world.art.store import GalleryJobRecord
 
         self.enter()
         session = surface.associated_session(self.actor)
@@ -941,7 +941,7 @@ class DreamSurfaceTests(EvenniaTest):
             # authoritative no-job evidence.
             return sorted(
                 (record.db_key, str(record.db.status))
-                for record in ArtAssetRecord.objects.all()
+                for record in GalleryJobRecord.objects.all()
             )
 
         before = (

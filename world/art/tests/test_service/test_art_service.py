@@ -13,7 +13,7 @@ from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 from typeclasses.characters import PlayerCharacter
 from typeclasses.npcs import NPC
-from world.art.queue import ensure, record_key, source_hash
+from world.art.queue import source_hash
 from world.art import gallery as gallery_api
 from world.art.fake_sd_client import FakeSDWebUIClient
 from world.art.gallery_prompt import (
@@ -35,7 +35,7 @@ from world.art.service import (
     request_gallery_image,
     schedule_portrait_ensure,
 )
-from world.art.store import ArtAssetRecord, ArtAssetStatus
+from world.art.store import ArtAssetStatus, GalleryJobRecord
 from world.art.subjects import ArtSubject, ArtSubjectKind
 from world.lore.monster_visuals import get_monster_visual_registry
 from tools.spec_traceability import covers_requirement
@@ -64,12 +64,12 @@ class ArtServiceTests(EvenniaTestCase):
         self.player.apparent_age = 22
 
     def _records(self):
-        return {record.db_key: record for record in ArtAssetRecord.objects.all()}
+        return {record.db_key: record for record in GalleryJobRecord.objects.all()}
 
     def _scene_job_keys(self, archetype):
         return sorted(
             record.db_key
-            for record in ArtAssetRecord.objects.all()
+            for record in GalleryJobRecord.objects.all()
             if record.db_key.startswith(f"art:scene:{archetype}:gen:")
         )
 
@@ -100,7 +100,7 @@ class ArtServiceTests(EvenniaTestCase):
         self.assertEqual(classic, [])
         monster_jobs = [
             record
-            for record in ArtAssetRecord.objects.all()
+            for record in GalleryJobRecord.objects.all()
             if str(record.db.gallery_image_id or "")
             and record.db_key.startswith("art:portrait:monster:")
         ]
@@ -186,7 +186,7 @@ class ArtServiceTests(EvenniaTestCase):
     @covers_requirement(
         "art-asset-lifecycle::startup-synchronization-requests-gallery-art-for-every-registered-scene-and-species"
     )
-    def test_an_operator_scene_image_still_requests_generation(self):
+    def test_an_operator_scene_image_satisfies_automatic_generation(self):
         from world.art import official
 
         official.reset_catalog()
@@ -208,7 +208,7 @@ class ArtServiceTests(EvenniaTestCase):
             ):
                 self.assertEqual(official.load_catalog()["images"], 1)
                 art_sync_all()
-        self.assertEqual(len(self._scene_job_keys(_SYNTH_SCENE)), 1)
+        self.assertEqual(len(self._scene_job_keys(_SYNTH_SCENE)), 0)
 
     @covers_requirement("art-asset-lifecycle::startup-recovery-rescans-explicit-unique-portrait-policies")
     @covers_requirement(
@@ -219,7 +219,7 @@ class ArtServiceTests(EvenniaTestCase):
         art_sync_all()
         jobs = [
             record
-            for record in ArtAssetRecord.objects.all()
+            for record in GalleryJobRecord.objects.all()
             if str(record.db.gallery_image_id or "")
             and record.db_key.startswith(f"art:portrait:character:{self.player.pk}:gen:")
         ]
@@ -254,7 +254,7 @@ class ArtServiceTests(EvenniaTestCase):
         key = f"art:portrait:character:{self.player.pk}"
         jobs = [
             record
-            for record in ArtAssetRecord.objects.all()
+            for record in GalleryJobRecord.objects.all()
             if str(record.db.gallery_image_id or "")
         ]
         self.assertEqual(len(jobs), 1)

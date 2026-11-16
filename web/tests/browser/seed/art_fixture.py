@@ -4,6 +4,7 @@ Slice of the former ``web/tests/browser/seed.py`` module;
 every body ships verbatim."""
 
 from pathlib import Path
+import uuid
 
 from web.tests.browser.seed.identity import FIXTURE_VALID_PNG
 
@@ -35,7 +36,6 @@ def _art_fixture(character, room) -> None:
     from evennia.utils.create import create_object
     from typeclasses.monsters import Monster
     from typeclasses.rooms import GridRoom
-    from world.art.queue import ensure, settle
     from world.art.store import ArtAssetStatus
     from world.art.subjects import (
         ArtSubject,
@@ -149,47 +149,35 @@ def _art_fixture(character, room) -> None:
             source="seed",
             image_size=dict(SCENE_CARD_SIZE),
         )
-        from world.art.queue import claim, record_key
-        from world.art.store import ArtAssetRecord
-
-        # Ensure the named portrait records exist and claim every pending
-        # record (the startup sync enqueued ~10 scenes, the monster tiers,
-        # and the named portraits) so the scene and both named portraits
-        # settle as done, giving the portrait entries
-        # a URL to render.
         host_subject = character_subject_for(host)
         actor_subject = character_subject_for(character)
-        for subject in (actor_subject, host_subject):
-            if subject is not None:
-                ensure(subject, "desc")
-        claimed = claim(50)
-        tokens = {record.db_key: str(record.db.generation_token) for record in claimed}
-        (root / "portrait" / "character").mkdir(parents=True, exist_ok=True)
+        # Give every named portrait a real gallery card so the portrait entries
+        # render a URL.
         for subject, stable_key in (
             (actor_subject, f"browser-{character.pk}"),
             (host_subject, "browser-host"),
         ):
             if subject is None:
                 continue
-            # Fail loudly if the portrait record was not claimed (claim budget
-            # 50 would otherwise leave it PENDING and settle is a silent
-            # no-op), instead of a later browser timeout.
-            record = ArtAssetRecord.objects.filter(db_key=record_key(subject)).first()
-            if record is None:
-                raise RuntimeError(f"art fixture: no art record for {stable_key}")
-            if record.db.status != ArtAssetStatus.IN_PROGRESS:
-                raise RuntimeError(
-                    f"art fixture: portrait record {stable_key} not claimed "
-                    f"(status={record.db.status}); claim budget too small"
-                )
-            portrait_identity = f"portrait/character/{stable_key}.png"
+            portrait_image_id = str(uuid.uuid4())
+            portrait_identity = (
+                f"gallery/character/{stable_key}/{portrait_image_id}.png"
+            )
+            (root / "gallery" / "character" / stable_key).mkdir(
+                parents=True, exist_ok=True
+            )
             (root / portrait_identity).write_bytes(FIXTURE_VALID_PNG)
-            settle(
+            gallery_api.append_card(
                 subject,
-                generation_token=tokens[record_key(subject)],
-                status=ArtAssetStatus.DONE,
-                output_identity=portrait_identity,
-                error=None,
+                image_id=portrait_image_id,
+                stored_identity=portrait_identity,
+                prompt=None,
+                seed=None,
+                checkpoint=None,
+                requested_fields=[],
+                binding=None,
+                source="generated",
+                image_size={"width": 1000, "height": 1000},
             )
     elif mode in ("pending", "failed"):
         # One real scene gallery request: the pending journey needs an
@@ -198,13 +186,13 @@ def _art_fixture(character, room) -> None:
         # terminal so the recorded error is a reached fact.
         from world.art.queue import claim, gallery_record_key, settle_gallery_failed
         from world.art.service import request_gallery_image
-        from world.art.store import ArtAssetRecord
+        from world.art.store import GalleryJobRecord
 
         image_id = request_gallery_image(scene)
         if mode == "failed":
             claim(50)
             job_key = gallery_record_key(scene, image_id)
-            record = ArtAssetRecord.objects.filter(db_key=job_key).first()
+            record = GalleryJobRecord.objects.filter(db_key=job_key).first()
             if record is None or record.db.status != ArtAssetStatus.IN_PROGRESS:
                 raise RuntimeError(
                     f"art fixture: scene gallery job {image_id} not claimed "

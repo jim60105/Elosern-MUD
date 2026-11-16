@@ -22,9 +22,9 @@ from tools.spec_traceability import covers_requirement
 from world.art import connectivity
 from world.art.connectivity import ProbeResult, probe
 from world.art.fake_sd_client import FakeSDWebUIClient
-from world.art.queue import ensure, record_key
+from world.art import gallery as gallery_api
+from world.art.queue import enqueue_gallery_job
 from world.art.sd_worker import SDWebUIClient, SDError
-from world.art.store import ArtAssetRecord, ArtAssetStatus
 from world.art.subjects import ArtSubject, ArtSubjectKind
 from world.art.worker import drain_synchronous
 
@@ -534,7 +534,14 @@ class NeverGatingIntegrationTests(EvenniaTest):
         # File-local synthetic scene identity: never-gating is queue mechanics,
         # independent of which scene key names the record.
         subject = ArtSubject(ArtSubjectKind.SCENE, "t_synth_scene")
-        ensure(subject, "desc")
+        enqueue_gallery_job(
+            subject,
+            "desc",
+            image_id="11111111-1111-4111-8111-111111111111",
+            binding=None,
+            face_rect=None,
+            requested_fields=[],
+        )
         with (
             patch("world.art.connectivity.resolve_sd_client", return_value=fake),
             patch("world.art.worker.resolve_sd_client", return_value=fake),
@@ -545,9 +552,12 @@ class NeverGatingIntegrationTests(EvenniaTest):
             fake.recover_probe()
             dispatched = drain_synchronous(1)
         self.assertEqual(dispatched, 1)
-        record = ArtAssetRecord.objects.filter(db_key=record_key(subject)).first()
-        self.assertEqual(record.db.status, ArtAssetStatus.DONE)
-        self.assertEqual(record.db.output_identity, "scene/t_synth_scene.png")
+        cards = gallery_api.cards_for(subject)
+        self.assertEqual(len(cards), 1)
+        self.assertEqual(
+            cards[0]["stored_identity"],
+            "gallery/scene/t_synth_scene/11111111-1111-4111-8111-111111111111.png",
+        )
 
 
 if __name__ == "__main__":

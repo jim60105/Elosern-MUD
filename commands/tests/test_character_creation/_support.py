@@ -67,7 +67,6 @@ from typeclasses.accounts import Account
 from typeclasses.characters import PlayerCharacter
 
 
-from world.art.store import ArtAssetRecord, ArtAssetStatus
 
 
 from world.ai.character_creation import CharacterProposal

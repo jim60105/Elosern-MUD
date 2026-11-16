@@ -38,10 +38,9 @@ from world.art.queue import (
     claim,
     enqueue_gallery_job,
     gallery_record_key,
-    record_key as classic_record_key,
     settle_gallery_failed,
 )
-from world.art.store import ArtAssetRecord, ArtAssetStatus
+from world.art.store import GalleryJobRecord
 from world.art.subjects import (
     ArtSubject,
     ArtSubjectKind,
@@ -110,7 +109,7 @@ class UnifiedSelectionTests(EvenniaTestCase):
         prefix = f"art:{subject.full()}:gen:"
         return [
             record
-            for record in ArtAssetRecord.objects.filter(db_key__startswith=prefix)
+            for record in GalleryJobRecord.objects.filter(db_key__startswith=prefix)
             if str(record.db.gallery_image_id or "")
         ]
 
@@ -160,11 +159,6 @@ class UnifiedSelectionTests(EvenniaTestCase):
             with self.subTest(subject=subject.full()):
                 self.assertEqual(self._subject_jobs(subject), [])
                 self.assertIsNone(gallery_api.record_for(subject))
-                self.assertIsNone(
-                    ArtAssetRecord.objects.filter(
-                        db_key=classic_record_key(subject)
-                    ).first()
-                )
         prompted = [
             call.args[0]
             for call in render.call_args_list
@@ -284,7 +278,7 @@ class UnifiedSelectionTests(EvenniaTestCase):
         )
         job = next(
             record
-            for record in claim(ArtAssetRecord.objects.count() + 1)
+            for record in claim(GalleryJobRecord.objects.count() + 1)
             if record.db.gallery_image_id == image_id
         )
         settle_gallery_failed(

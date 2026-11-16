@@ -60,7 +60,7 @@ from world.art.official_refs import (
     official_content_reference_for_subject,
 )
 from world.lore import monster_visuals
-from world.art.store import ArtAssetRecord
+from world.art.store import GalleryJobRecord
 from world.art.subjects import ArtSubject, ArtSubjectKind
 from tools.spec_traceability import covers_requirement
 from world.lore.npc_card import NpcCard, NpcCardIdentity
@@ -178,7 +178,7 @@ class PresetProvenanceTests(EvenniaTest):
                 before = (
                     ObjectDB.objects.count(),
                     GalleryRecord.objects.count(),
-                    ArtAssetRecord.objects.count(),
+                    GalleryJobRecord.objects.count(),
                     sorted(entry.name for entry in Path(store).iterdir()),
                 )
                 with patch_registry("PLAYER_PRESET_REGISTRY", {_SYNTH_PRESET: object()}):
@@ -186,7 +186,7 @@ class PresetProvenanceTests(EvenniaTest):
                 after = (
                     ObjectDB.objects.count(),
                     GalleryRecord.objects.count(),
-                    ArtAssetRecord.objects.count(),
+                    GalleryJobRecord.objects.count(),
                     sorted(entry.name for entry in Path(store).iterdir()),
                 )
         self.assertEqual(reference, OfficialContentReference(OFFICIAL_KIND_PRESET, _SYNTH_PRESET))
@@ -393,7 +393,7 @@ class PlaceholderIdentityTests(EvenniaTest):
             record_for(ArtSubject(ArtSubjectKind.CHARACTER, identity))
         )
         self.assertEqual(GalleryRecord.objects.count(), 0)
-        self.assertEqual(ArtAssetRecord.objects.count(), 0)
+        self.assertEqual(GalleryJobRecord.objects.count(), 0)
 
 if __name__ == "__main__":
     unittest.main()

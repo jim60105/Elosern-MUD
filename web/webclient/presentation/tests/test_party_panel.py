@@ -17,6 +17,7 @@ import shutil
 import tempfile
 from types import SimpleNamespace
 import unittest
+import uuid
 from unittest.mock import patch
 
 from django.test import override_settings
@@ -81,8 +82,7 @@ from world.art.presenter import (
     ORIGIN_RUNTIME,
     ORIGIN_SILHOUETTE,
 )
-from world.art.queue import claim, ensure, record_key, settle
-from world.art.store import ArtAssetRecord, ArtAssetStatus
+from world.art.store import GalleryJobRecord
 from world.art.subjects import character_subject_for
 from world.rules.action import stored_gauge_pair
 from world.rules.affinity import AffinitySource, apply_affinity_change
@@ -453,10 +453,10 @@ class PartyPresenterTests(EvenniaTest):
                 (
                     asset.db_key,
                     asset.db.status,
-                    asset.db.output_identity or "",
-                    asset.db.prior_output_identity or "",
+                    asset.db.gallery_image_id or "",
+                    asset.db.last_error_code or "",
                 )
-                for asset in ArtAssetRecord.objects.all()
+                for asset in GalleryJobRecord.objects.all()
             ),
             "attributes": [
                 (attribute.key, deepcopy(attribute.value))
@@ -1034,26 +1034,26 @@ class PartyPresenterTests(EvenniaTest):
     @covers_requirement(
         "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-3-presentation-panel"
     )
-    def test_classic_runtime_asset_outranks_the_mounted_official_default(self):
+    def test_runtime_card_outranks_the_mounted_official_default(self):
         with _official_art_scope() as art:
             art.mount("hero.png")
             companion = self._official_companion()
             subject = character_subject_for(companion)
-            identity = f"portrait/character/{_COMPANION_KEY}.png"
-            art.write_store_file(identity, b"classic asset")
-            ensure(subject, "synthetic description")
-            claimed = [
-                record for record in claim(10) if record.db_key == record_key(subject)
-            ]
-            self.assertEqual(len(claimed), 1, "the pending classic job was not claimed")
-            settled = settle(
+            image_id = str(uuid.uuid4())
+            identity = f"gallery/character/{_COMPANION_KEY}/{image_id}.png"
+            art.write_store_file(identity, b"runtime card")
+            append_card(
                 subject,
-                generation_token=str(claimed[0].db.generation_token),
-                status=ArtAssetStatus.DONE,
-                output_identity=identity,
-                error=None,
+                image_id=image_id,
+                stored_identity=identity,
+                prompt=None,
+                seed=None,
+                checkpoint=None,
+                requested_fields=[],
+                binding=None,
+                source="generated",
+                image_size={"width": 1000, "height": 1000},
             )
-            self.assertIsNotNone(settled)
 
             panels = self._panels()
 
