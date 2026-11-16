@@ -12,6 +12,7 @@ from evennia.utils.test_resources import EvenniaTest
 
 from typeclasses.accounts import Account
 from typeclasses.characters import PlayerCharacter
+from typeclasses.rooms import Room
 from world.lore.sex import SEX_VALUES
 from world.lore.starting_kits import SubraceStartingKit
 from world.rules.character_creation import (
@@ -33,6 +34,7 @@ from world.rules.creation_wizard import (
     save_custom_draft,
     save_preset_draft,
 )
+from world.tests.start_room_fixture import stub_start_room
 from world.tests.synthetic_data import (
     SYNTH_PRESETS,
     SYNTH_RACES,
@@ -92,6 +94,7 @@ def balanced_allocations(race: str, subrace: str | None = None) -> dict[str, int
     "world.rules.character_creation._AFFINITY_INPUT_BOUNDS", {"t_duskmari": 2, "t_starlit": 2}
 )
 @_SCOPE
+@stub_start_room()
 class CreationWizardTests(EvenniaTest):
     def setUp(self):
         super().setUp()
@@ -370,6 +373,47 @@ class CreationWizardTests(EvenniaTest):
         self.assertTrue(self.character.creation_pending)
         self.assertEqual(read_draft(self.character), draft_before)
         self.assertEqual(self.character.traits.all(), [])
+
+    @covers_requirement(
+        "player-character-creation::activation-is-an-all-or-nothing-deterministic-core-operation"
+    )
+    def test_an_outer_commit_failure_returns_the_character_to_its_origin(self):
+        # The outer atomic rolls back AFTER the inner activation completed, so
+        # the inner except never runs; activate_draft's own except must
+        # restore the placement (subrace-start-settlements D4).
+        from contextlib import contextmanager
+        from types import SimpleNamespace
+
+        from django.db import DatabaseError, transaction
+
+        from world.rules import start_location
+
+        # Created before the outer transaction, so it survives the rollback.
+        start_room = start_location.resolve_start_room(None)
+        origin = create_object(Room, key="t_origin")
+        self.character.location = origin
+        old_home = self.character.home
+        save_custom_draft(self.account, self.character, self.custom_request())
+
+        @contextmanager
+        def failing_commit():
+            with transaction.atomic():
+                yield
+                raise DatabaseError("injected commit failure")
+
+        failing = SimpleNamespace(atomic=failing_commit, on_commit=transaction.on_commit)
+        with patch("world.rules.creation_wizard.transaction", failing), patch(
+            "world.rules.character_creation._run_start_arrival_effects"
+        ) as effects, self.captureOnCommitCallbacks(execute=True):
+            with self.assertRaisesRegex(DatabaseError, "injected commit failure"):
+                activate_draft(self.account, self.character)
+        effects.assert_not_called()
+        self.assertTrue(self.character.creation_pending)
+        self.assertIs(self.character.location, origin)
+        self.assertIn(self.character, origin.contents)
+        self.assertEqual(self.character.home, old_home)
+        self.assertFalse(self.character.attributes.has("map_knowledge"))
+        self.assertNotIn(self.character, start_room.contents)
 
     def test_preset_activation_uses_the_stored_preset_key(self):
         # The companion-free kit card: activation writes identity without a

@@ -41,6 +41,7 @@ from world.rules.character_creation import (
 from world.rules.clock import get_world_clock
 from world.rules.creation_wizard import draft_fingerprint, read_draft, save_custom_draft
 from world.rules.tests._combat_session_helpers import open_synthetic_scope
+from world.tests.start_room_fixture import stub_start_room
 from world.lore.names import FrozenDict, NamePack, NamePart
 from world.tests.synthetic_data import (
     SYNTH_PRESETS,
@@ -274,6 +275,7 @@ class FakeSession:
 class CreationActionBase(EvenniaTest):
     def setUp(self):
         _open_t_creation_scope(self)
+        self.enterContext(stub_start_room())
         super().setUp()
         self.account = create_account(
             "creator", "creator@example.test", "testpassword", typeclass=Account

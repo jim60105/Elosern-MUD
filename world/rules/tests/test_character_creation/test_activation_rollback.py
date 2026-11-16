@@ -25,11 +25,18 @@ from world.rules.character_creation import (
     resolve_starting_profile,
 )
 from world.skills.equipment import EquipmentSlot
+from world.tests.geography_fixture import (
+    publish_shipped_map_world,
+    sync_test_settlements,
+)
+from world.tests.start_room_fixture import stub_start_room
 from world.tests.synthetic_data import (
+    SYNTH_ANCHOR_PLACEMENTS,
     SYNTH_ITEMS,
     SYNTH_PRESETS,
     SYNTH_RACES,
     SYNTH_SKILLS,
+    SYNTH_START_LOCATIONS,
     SYNTH_SUBRACES,
     StaticBand,
     Vitals,
@@ -62,6 +69,18 @@ from ._support import (
 )
 
 
+# Placement runs against the synthetic start row, whose anchor placement
+# borrows a materialized node of the published map world.
+_START_SUBRACE = next(iter(SYNTH_SUBRACES))
+_START_MAP_ID = SYNTH_ANCHOR_PLACEMENTS[
+    SYNTH_START_LOCATIONS[_START_SUBRACE].anchor_key
+].zcoord
+
+
+def setUpModule():
+    publish_shipped_map_world()
+
+
 @synthetic_registries(
     "races",
     "static_tiers",
@@ -72,6 +91,8 @@ from ._support import (
     "items",
     "prices",
     "elements",
+    "start_locations",
+    "anchor_placements",
     extra={
         "races": {_STRONG_FOLK.key: _STRONG_FOLK},
         "subraces": {_STRONG_BORN.key: _STRONG_BORN},
@@ -96,6 +117,13 @@ from ._support import (
     clear=True,
 )
 class CharacterActivationTests(EvenniaTest):
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        # Runs outside the synthetic scope: the shipped registries are live
+        # while the borrowed settlement is materialized.
+        sync_test_settlements((_START_MAP_ID,))
+
     def setUp(self):
         super().setUp()
         self.account = create_account("creator", "creator@example.test", "testpassword", typeclass=Account)
@@ -165,7 +193,7 @@ class CharacterActivationTests(EvenniaTest):
             "identity", "traits", "age", "apparent_age", "race", "subrace",
             "skill_proficiency", "skills", "skill_grants",
             "equipment", "inventory", "wallet", "quest_log", "guild_rank",
-            "creation_pending", "portrait_policy",
+            "creation_pending", "start_location", "portrait_policy",
         )
         for stage in stages:
             with self.subTest(stage=stage):
@@ -182,11 +210,12 @@ class CharacterActivationTests(EvenniaTest):
                         "creation_pending", "skill_proficiency",
                         "skills", "skill_grants", "equipment", "inventory",
                         "wallet", "quest_log", "guild_rank",
-                        "portrait_policy",
+                        "portrait_policy", "map_knowledge",
                     )
                 }
                 before_traits = deepcopy(dict(character.traits.trait_data))
                 old_key, old_location = character.key, character.location
+                old_home = character.home
 
                 def fail(current, target=stage):
                     if current == target:
@@ -198,29 +227,169 @@ class CharacterActivationTests(EvenniaTest):
                         write_observer=fail,
                     )
                 self.assertEqual(character.key, old_key)
-                self.assertEqual(character.location, old_location)
+                self.assertIs(character.location, old_location)
+                self.assertEqual(character.home, old_home)
                 self.assertIn(character, self.account.characters)
                 self.assertEqual(dict(character.traits.trait_data), before_traits)
                 for key, (existed, value) in before.items():
                     self.assertEqual(character.attributes.has(key), existed, key)
                     self.assertEqual(character.attributes.get(key), value, key)
 
-    @covers_requirement("player-character-creation::activation-is-an-all-or-nothing-deterministic-core-operation")
-    def test_successful_activation_leaves_the_shell_in_place(self):
-        """Activation performs no relocation and records no arrival."""
-        from world.rules.clock import get_world_clock
+    # -- start-room placement (subrace-start-settlements) --------------------
 
-        old_location = self.character.location
-        activate_player_character(
-            self.account, self.character, self.request()
-        )
+    def _assert_unplaced(self, character, location, home):
+        """The failed activation left the shell exactly where it stood."""
+        from evennia.objects.models import ObjectDB
+
+        self.assertTrue(character.creation_pending)
+        self.assertIs(character.location, location)
+        self.assertEqual(character.home, home)
+        self.assertFalse(character.attributes.has("map_knowledge"))
+        if location is not None:
+            self.assertIn(character, location.contents)
+        # Fresh row read: the durable location and home are the originals.
+        row = ObjectDB.objects.filter(id=character.id).values(
+            "db_location_id", "db_home_id"
+        ).get()
+        self.assertEqual(row["db_location_id"], getattr(location, "id", None))
+        self.assertEqual(row["db_home_id"], getattr(home, "id", None))
+
+    @covers_requirement(
+        "player-character-creation::activation-is-an-all-or-nothing-deterministic-core-operation",
+        "map-knowledge::arrival-recording-happens-only-at-existing-successful-arrival-seams",
+    )
+    def test_successful_activation_places_the_character_in_its_start_room(self):
+        from world.rules.clock import get_world_clock
+        from world.rules.map_knowledge import encode_grid
+        from world.rules.start_location import resolve_start_room
+
+        room = resolve_start_room(_START_SUBRACE)
+        dbref = self.character.dbref
         clock = get_world_clock()
         tick_before = clock.tick
+        activate_player_character(self.account, self.character, self.request())
         self.assertFalse(self.character.creation_pending)
         self.assertIsNotNone(self.character.traits.magic_power)
-        self.assertIs(self.character.location, old_location)
+        self.assertEqual(self.character.location, room)
+        self.assertEqual(self.character.home, room)
+        self.assertIn(self.character, room.contents)
+        visited = self.character.attributes.get("map_knowledge")["visited"]
+        node = encode_grid(room.xyz[2], int(room.xyz[0]), int(room.xyz[1]))
+        self.assertEqual(list(visited), [node])
+        self.assertEqual(visited[node]["last_seen_tick"], tick_before)
+        self.assertEqual(self.character.dbref, dbref)
+        self.assertIn(self.character, self.account.characters)
         self.assertEqual(clock.tick, tick_before)
-        self.assertIsNone(self.character.attributes.get("map_knowledge"))
+
+    def test_preset_activation_lands_in_the_preset_subrace_start_room(self):
+        from world.rules.start_location import resolve_start_room
+
+        preset = self._synthetic_preset("t_start_scout")
+        self.assertEqual(preset.subrace, _START_SUBRACE)
+        character = self._activate_synthetic_preset(preset, "shell-start-preset")
+        room = resolve_start_room(_START_SUBRACE)
+        self.assertFalse(character.creation_pending)
+        self.assertEqual(character.location, room)
+        self.assertEqual(character.home, room)
+
+    def test_an_unresolvable_start_room_fails_before_any_write(self):
+        from world.rules.scene_visits import ENTERED_ARCHETYPES_ATTRIBUTE
+        from world.rules.start_location import StartLocationError
+
+        old_location, old_home = self.character.location, self.character.home
+        archetypes = deepcopy(
+            self.character.attributes.get(ENTERED_ARCHETYPES_ATTRIBUTE)
+        )
+        with patch(
+            "world.rules.character_creation._run_start_arrival_effects"
+        ) as effects, patch(
+            "world.rules.start_location.resolve_start_room",
+            side_effect=StartLocationError("t_unbuilt"),
+        ), self.captureOnCommitCallbacks(execute=True):
+            with self.assertRaisesRegex(CharacterCreationError, "t_unbuilt"):
+                activate_player_character(
+                    self.account, self.character, self.request()
+                )
+        effects.assert_not_called()
+        self._assert_unplaced(self.character, old_location, old_home)
+        self.assertEqual(self.character.key, "creator-shell")
+        self.assertEqual(self.character.traits.all(), [])
+        self.assertEqual(
+            self.character.attributes.get(ENTERED_ARCHETYPES_ATTRIBUTE), archetypes
+        )
+
+    def test_a_failure_after_the_move_returns_the_character_without_hooks(self):
+        from typeclasses.characters import Character
+        from typeclasses.rooms import LimboRoom
+        from world.rules.scene_visits import ENTERED_ARCHETYPES_ATTRIBUTE
+
+        birth = create_object(LimboRoom, key="t_birth")
+        for stage in ("start_location", "portrait_policy"):
+            with self.subTest(stage=stage):
+                # The account hook's default shell typeclass, which the birth
+                # room refuses on an ordinary arrival.
+                character = create_object(
+                    Character, key=f"shell-birth-{stage}", location=birth
+                )
+                self.account.at_post_create_character(character)
+                self.assertIs(character.location, birth)
+                # The birth room refuses an ordinary arrival of this shell.
+                self.assertTrue(birth.refuses_arrival(character))
+                old_home = character.home
+                archetypes = deepcopy(
+                    character.attributes.get(ENTERED_ARCHETYPES_ATTRIBUTE)
+                )
+
+                def fail(current, target=stage):
+                    if current == target:
+                        raise RuntimeError(target)
+
+                with stub_start_room(), patch(
+                    "world.rules.character_creation._run_start_arrival_effects"
+                ) as effects, self.captureOnCommitCallbacks(execute=True):
+                    with self.assertRaisesRegex(RuntimeError, stage):
+                        activate_player_character(
+                            self.account, character, self.request(),
+                            write_observer=fail,
+                        )
+                effects.assert_not_called()
+                self._assert_unplaced(character, birth, old_home)
+                self.assertEqual(
+                    character.attributes.get(ENTERED_ARCHETYPES_ATTRIBUTE),
+                    archetypes,
+                )
+
+    def test_a_failed_placement_of_a_location_less_shell_restores_no_location(self):
+        character = create_object(PlayerCharacter, key="shell-nowhere")
+        self.account.at_post_create_character(character)
+        character.location = None
+        old_home = character.home
+
+        def fail(current):
+            if current == "start_location":
+                raise RuntimeError("start_location")
+
+        with stub_start_room():
+            with self.assertRaisesRegex(RuntimeError, "start_location"):
+                activate_player_character(
+                    self.account, character, self.request(), write_observer=fail
+                )
+        self._assert_unplaced(character, None, old_home)
+
+    def test_arrival_effects_run_once_after_a_committed_activation(self):
+        from world.rules.start_location import resolve_start_room
+
+        origin = self.character.location
+        room = resolve_start_room(_START_SUBRACE)
+        with patch(
+            "world.rules.character_creation._run_start_arrival_effects"
+        ) as effects:
+            with self.captureOnCommitCallbacks(execute=True):
+                activate_player_character(
+                    self.account, self.character, self.request()
+                )
+                effects.assert_not_called()
+        effects.assert_called_once_with(self.character, room, origin)
 
     @covers_requirement("art-gallery-fallback::a-fallback-key-resolves-by-declaration-then-band-then-deterministic-hash")
     def test_preset_activation_persists_the_registry_provenance_attribute(self):

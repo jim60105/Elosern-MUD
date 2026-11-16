@@ -38,6 +38,7 @@ from world.rules.character_creation import (
     max_affinity_elements,
     preflight_character_creation,
     resolve_starting_profile,
+    restore_activation_placement,
     validate_affinity_elements,
 )
 from world.rules.surfaces import (
@@ -712,6 +713,7 @@ def activate_draft(
         character, _CREATION_ATTRIBUTE_KEYS + ("creation_draft",)
     )
     trait_snapshot = snapshot_traits(character)
+    origin = character.location
     try:
         with transaction.atomic():
             if not bool(getattr(character, "creation_pending", False)):
@@ -729,6 +731,9 @@ def activate_draft(
                 persona=persona, write_observer=write_observer,
             )
     except Exception:
+        # Covers the outer-commit failure, where the inner activation's own
+        # except never ran (subrace-start-settlements D4).
+        restore_activation_placement(character, origin)
         character.key = old_key
         restore_traits(character, trait_snapshot)
         restore_attributes(character, attribute_snapshots)

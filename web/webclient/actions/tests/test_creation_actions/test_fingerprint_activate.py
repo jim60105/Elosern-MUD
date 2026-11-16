@@ -151,7 +151,11 @@ class CreationActivateIntegrationTests(CreationActionBase):
 
     @covers_requirement("webclient-character-creation-ui::activation-is-all-or-nothing-and-hands-off-to-exploration")
     def test_activation_clears_draft_and_hands_off_to_exploration(self):
-        before_location = self.character.location
+        from web.webclient.presentation.context import PresentationContext
+        from web.webclient.presentation.coordinator import PresentationCoordinator
+        from world.rules import start_location
+
+        start_room = start_location.resolve_start_room(None)
         result = _creation_activate_adapter(self.character, {})
         self.assertEqual(result["outcome"], "success")
         self.assertEqual(result["code"], "activated")
@@ -160,27 +164,43 @@ class CreationActivateIntegrationTests(CreationActionBase):
         self.assertIsNone(read_draft(self.character))
         self.assertEqual(self.character.key, "新角色")
         self.assertEqual(self.character.age, 20)
-        # Activation performs no relocation: the shell stays in place.
-        self.assertIs(self.character.location, before_location)
+        # Activation places the character in its start room and homes it there.
+        self.assertEqual(self.character.location, start_room)
+        self.assertEqual(self.character.home, start_room)
+        self.assertEqual(
+            PresentationCoordinator.mode_for(
+                PresentationContext(actor=self.character, protocol_version=1)
+            ),
+            "exploration",
+        )
         self.assertIsNotNone(self.character.traits.magic_power)
 
+    @covers_requirement("webclient-character-creation-ui::activation-is-all-or-nothing-and-hands-off-to-exploration")
     def test_draft_clear_failure_rolls_back_the_whole_activation(self):
-        def fail(stage):
-            if stage == "creation_draft":
-                raise RuntimeError("injected clear failure")
-
+        # Before the start-room placement (the draft clear) and after it (the
+        # portrait policy): either way the shell keeps its location and home.
         draft_before = dict(read_draft(self.character))
+        old_location, old_home = self.character.location, self.character.home
         from world.rules.creation_wizard import activate_draft
 
-        with self.assertRaisesRegex(RuntimeError, "injected clear failure"):
-            activate_draft(
-                self.account, self.character,
-                write_observer=fail,
-            )
-        self.assertTrue(self.character.creation_pending)
-        self.assertEqual(read_draft(self.character), draft_before)
-        self.assertEqual(self.character.key, "pending-shell")
-        self.assertEqual(self.character.traits.all(), [])
+        for stage in ("creation_draft", "portrait_policy"):
+            with self.subTest(stage=stage):
+
+                def fail(current, target=stage):
+                    if current == target:
+                        raise RuntimeError(f"injected {target} failure")
+
+                with self.assertRaisesRegex(RuntimeError, f"injected {stage} failure"):
+                    activate_draft(
+                        self.account, self.character,
+                        write_observer=fail,
+                    )
+                self.assertTrue(self.character.creation_pending)
+                self.assertIs(self.character.location, old_location)
+                self.assertEqual(self.character.home, old_home)
+                self.assertEqual(read_draft(self.character), draft_before)
+                self.assertEqual(self.character.key, "pending-shell")
+                self.assertEqual(self.character.traits.all(), [])
 
     def test_concurrent_activations_apply_exactly_once(self):
         from world.rules.creation_wizard import activate_draft
