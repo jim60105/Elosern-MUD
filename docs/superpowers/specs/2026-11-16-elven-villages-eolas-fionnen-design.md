@@ -40,6 +40,12 @@ Out of scope, left for a later design:
   must exist. Today that is one: the courier station.
 - **Elements have no places.** Magic is practised in one spot per village, not
   at a site per element.
+- **No grid.** Neither map is laid out on a grid. Nodes sit at irregular
+  positions, roads differ in length, and no two roads run parallel or meet at
+  right angles by design. Roads that follow a brook, a valley wall or a line
+  of trunks carry `bends`. The diagrams below show which places connect; they
+  are drawn in text and look squarer than the maps are. The coordinate tables
+  give the shape.
 - **No elven temple.** Neither village has a building of worship. The lore
   keeps elven faith unknown to outsiders.
 - **Places are life scenes, not service buildings.** No signboards, no
@@ -67,20 +73,22 @@ northern deep forest to fight monsters.
 
 ### Nodes (9)
 
-| Node ID | Name | Content |
-| --- | --- | --- |
-| `forest_trail` | 深林獸徑 | The only way in or out, leading to the northern deep forest. Monster horns and claws the villagers brought back hang beside it. |
-| `brook_head` | 溪源 | The village's drinking water and its stone trough. The brook runs south across the valley floor. |
-| `proving_ground` | 試法坪 | All magic practice and experiment happens here. The ground is scorched, frozen and cracked in patches. Far from the dwellings, near the trail. |
-| `hot_spring` | 溫泉浴場 | An open-air hot spring under the valley wall, with stone-ringed pools. The village bathes, washes clothes and talks here. |
-| `valley_floor` | 谷底空地 | Anchor room. Where the village gathers. |
-| `silk_grove` | 蛛絲林 | Spiders kept for silk, the cloth of the white traditional dress. |
-| `cliff_dwellings` | 岩屋坡 | Dwellings cut into the valley wall, laundry at the doors. Personal homes attach here later. |
-| `terrace_gardens` | 石階菜畦 | Terraces of roots, beans and herbs. |
-| `kiln_yard` | 窯場 | The shared kiln for pottery and glass, also used to bake flatbread. |
+| Node ID | Name | `x_m`, `y_m` | Content |
+| --- | --- | --- | --- |
+| `forest_trail` | 深林獸徑 | 372, 655 | The only way in or out, leading to the northern deep forest. Monster horns and claws the villagers brought back hang beside it. |
+| `brook_head` | 溪源 | 318, 512 | The village's drinking water and its stone trough. The brook runs south across the valley floor. |
+| `proving_ground` | 試法坪 | 96, 548 | All magic practice and experiment happens here. The ground is scorched, frozen and cracked in patches. Far from the dwellings, near the trail. |
+| `hot_spring` | 溫泉浴場 | 497, 468 | An open-air hot spring under the valley wall, with stone-ringed pools. The village bathes, washes clothes and talks here. |
+| `valley_floor` | 谷底空地 | 286, 322 | Anchor room. Where the village gathers. |
+| `silk_grove` | 蛛絲林 | 72, 268 | Spiders kept for silk, the cloth of the white traditional dress. |
+| `cliff_dwellings` | 岩屋坡 | 468, 297 | Dwellings cut into the valley wall, laundry at the doors. Personal homes attach here later. |
+| `terrace_gardens` | 石階菜畦 | 241, 148 | Terraces of roots, beans and herbs. |
+| `kiln_yard` | 窯場 | 412, 121 | The shared kiln for pottery and glass, also used to bake flatbread. |
 
 `valley_floor` is the single `anchor_room` with `anchor_key:
-elven_village_eolas`. Scene archetypes: `city_street` for `valley_floor`,
+elven_village_eolas`. Coordinates are metres in the local frame, north up. If the settlement lint
+objects to a position, the implementer moves the node and keeps the layout
+irregular. Scene archetypes: `city_street` for `valley_floor`,
 `forest_path` for `forest_trail` and `silk_grove`, `mountain_path` for the
 rest.
 
@@ -101,7 +109,13 @@ All roads are two-way, written as two directed entries.
 | `valley_floor` | `kiln_yard` | se (nw) |
 
 `brook_head`, `hot_spring`, `cliff_dwellings` and `valley_floor` form one
-loop. The map spans about 600 m by 600 m, the same scale as 暗影谷村.
+loop. The map spans about 430 m by 530 m, a narrow valley running north to
+south.
+
+Bends: `brook_head` to `valley_floor` follows the brook through (338, 418);
+`hot_spring` to `cliff_dwellings` follows the valley wall through (521, 383);
+`valley_floor` to `kiln_yard` skirts the terraces through (371, 236). Each
+return road carries the same points in reverse.
 
 ### Entrance
 
@@ -143,22 +157,22 @@ practised on the same range.
 
 ### Nodes (11)
 
-| Node ID | Name | Content |
-| --- | --- | --- |
-| `leaf_veiled_path` | 葉隱小徑 | The only way in or out. Hanging boughs hide the opening. |
-| `light_court` | 林間光庭 | Anchor room. A gap in the canopy lets full sunlight down. Where the village gathers. |
-| `archery_lane` | 靶道 | Archery and light magic are both practised here. Targets nailed to trunks, swinging wooden tags further off. |
-| `blossom_garden` | 花蕊蜜園 | Beehives and flower beds, the source of candied blossom. |
-| `forest_brook` | 林溪 | Drinking water, laundry, washing vegetables. |
-| `bathing_pool` | 林泉浴場 | An open-air pool fed from the brook, ringed by sun-warmed stones. |
-| `forest_plots` | 林間菜圃 | Vegetable beds and fruit trees in the gaps between the giants. |
-| `craft_glade` | 木作空地 | The shared woodworking ground: bows, arrows, bridge repairs, weaving. |
-| `root_dwellings` | 樹根屋 | Ground-level dwellings built between buttress roots. |
-| `canopy_walk` | 樹冠吊橋 | Canopy-level dwellings, platforms joined by rope bridges. |
-| `lookout_bough` | 瞭望枝 | The top bough of the tallest tree, with a view of the eastern plain. Hunting parties read the weather here. |
+| Node ID | Name | `x_m`, `y_m` | Content |
+| --- | --- | --- | --- |
+| `leaf_veiled_path` | 葉隱小徑 | 742, 388 | The only way in or out. Hanging boughs hide the opening. |
+| `light_court` | 林間光庭 | 428, 352 | Anchor room. A gap in the canopy lets full sunlight down. Where the village gathers. |
+| `archery_lane` | 靶道 | 618, 566 | Archery and light magic are both practised here. Targets nailed to trunks, swinging wooden tags further off. |
+| `blossom_garden` | 花蕊蜜園 | 603, 196 | Beehives and flower beds, the source of candied blossom. |
+| `forest_brook` | 林溪 | 478, 178 | Drinking water, laundry, washing vegetables. |
+| `bathing_pool` | 林泉浴場 | 268, 118 | An open-air pool fed from the brook, ringed by sun-warmed stones. |
+| `forest_plots` | 林間菜圃 | 446, 38 | Vegetable beds and fruit trees in the gaps between the giants. |
+| `craft_glade` | 木作空地 | 236, 22 | The shared woodworking ground: bows, arrows, bridge repairs, weaving. |
+| `root_dwellings` | 樹根屋 | 214, 318 | Ground-level dwellings built between buttress roots. |
+| `canopy_walk` | 樹冠吊橋 | 392, 548 | Canopy-level dwellings, platforms joined by rope bridges. |
+| `lookout_bough` | 瞭望枝 | 176, 590 | The top bough of the tallest tree, with a view of the eastern plain. Hunting parties read the weather here. |
 
 `light_court` is the single `anchor_room` with `anchor_key:
-elven_village_fionnen`. Scene archetypes: `city_street` for `light_court`,
+elven_village_fionnen`. Coordinates follow the same rule as 幽月谷村. Scene archetypes: `city_street` for `light_court`,
 `forest_path` for the rest. Personal homes attach to `root_dwellings` and
 `canopy_walk` later.
 
@@ -179,7 +193,12 @@ elven_village_fionnen`. Scene archetypes: `city_street` for `light_court`,
 | `forest_plots` | `craft_glade` | w (e) |
 
 `light_court`, `forest_brook`, `bathing_pool` and `root_dwellings` form one
-loop. The map spans about 800 m by 700 m.
+loop. The map spans about 570 m by 570 m.
+
+Bends: `leaf_veiled_path` to `light_court` winds between trunks through
+(634, 412) and (531, 371); `bathing_pool` to `forest_brook` follows the water
+through (372, 131); `canopy_walk` to `lookout_bough` sags like a rope bridge
+through (287, 556). Each return road carries the same points in reverse.
 
 ### Entrance
 
@@ -205,7 +224,8 @@ All four use `tavern_interior`.
 ### Bath node in 暗影谷村
 
 Add one node to `content/maps/settlements/elven_village_ciaran.yaml`:
-`bathing_pool`, 溪池浴場, joined to `stream_bend` by one two-way road. No
+`bathing_pool`, 溪池浴場, joined to `stream_bend` by one two-way road, placed off the existing lines of
+the map. No
 existing ID, coordinate or direction changes. The existing contract test
 requires the village graph to stay a tree; a single leaf keeps that true.
 
@@ -219,9 +239,21 @@ therefore needs:
 - a `PLACE_REGISTRY` row of kind `COURIER_STATION`, joined to the interior
   room, written beside the two existing station rows.
 
-Existing tests list every place key (`world/lore/tests/test_settlements.py`,
-`world/rules/tests/test_guild_config/test_service_host_roster.py`). They are
-updated with the two new keys. The other shared interiors get no place row:
+Three existing assertions pin the registry's contents and will fail when the
+rows are added: the ordered key list and the key-to-kind table in
+`world/lore/tests/test_settlements.py`, and the host-less key set in
+`world/rules/tests/test_guild_config/test_service_host_roster.py`. These
+assert game data. The new keys are not appended to them. Each is rewritten to
+assert the logic it stands for:
+
+- order: the registry is the per-settlement slices concatenated in their
+  declared order, followed by the courier stations;
+- kind: every place's kind is a member of the closed vocabulary, and a
+  trading home is still `HOME`;
+- host-less: a place is host-less exactly when it declares none of the host
+  identity fields, and every other place declares all of them.
+
+The other shared interiors get no place row:
 a standalone interior needs none, and rows for them arrive with the host
 design.
 
@@ -249,9 +281,11 @@ where the implementer finds them stale.
 
 ## 8. Delivery
 
-The change is hand-written data, following the `map-data-authoring` skill. It
-adds no OpenSpec change, no specification and no new test: specifications and
-tests in this project define logic, not game data.
+The change is hand-written game data, following the `map-data-authoring`
+skill. It goes through OpenSpec as one proposal with no specification delta
+and no new test: specifications and tests in this project define logic, not
+game data. The only test edits are the three rewrites in section 6, which
+remove data pins.
 
 Work happens in a worktree under `.claude/worktrees/`, not the primary
 checkout. Order:
@@ -260,7 +294,8 @@ checkout. Order:
 2. 幽月谷村: settlement document, then its four interiors.
 3. 翠綠森林村: settlement document, then its four interiors.
 4. 暗影谷村: the bath node.
-5. Python rows for the two courier stations; update the listing tests.
+5. Python rows for the two courier stations; rewrite the three data-pinning
+   assertions.
 6. Regenerate the partition after the last source edit, then the reference
    context.
 7. Revise the lore document.
@@ -272,9 +307,10 @@ One commit per village, one for the courier rows, one for the documents.
 - `check_map_sources.py` exits 0.
 - `python -m tools.settlement_synthesis lint <map_id>` reports no error for
   the three village maps.
-- Captured images of both new maps are read and match the sketches above.
-- Tests that load the world and the place registry pass: the map tests, the
-  settlement lore tests and the service host roster tests.
+- Captured images of all three village maps are read. They show the
+  connections in sections 4 to 6 and no grid.
+- The existing suites that load the world and the place registry still pass.
+  No assertion names a node, room or place added by this design.
 - In a running game, each village can be entered from the wilderness, every
   node reached, every shared interior entered, and a letter sent from each
   new courier station.
