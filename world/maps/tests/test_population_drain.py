@@ -264,6 +264,10 @@ class LaggingSetTests(DrainFixture):
 class SharedGroupUnitsTests(DrainFixture):
     """Every group's units are computed once per unchanged activity record."""
 
+    @covers_requirement(
+        "population-settlement-units::"
+        "group-units-are-computed-once-per-activity-record"
+    )
     def test_lagging_sets_and_scopes_share_one_computation(self):
         self.set_world_tick(FAR_TICK)
         self.write_cursors(FAR_TICK, {self.unit_a: START})
@@ -283,6 +287,10 @@ class SharedGroupUnitsTests(DrainFixture):
             "one computation per group, however many queries read it",
         )
 
+    @covers_requirement(
+        "population-settlement-units::"
+        "group-units-are-computed-once-per-activity-record"
+    )
     def test_a_written_record_is_computed_again(self):
         first = population_units.build_scope(self.wilderness, {self.unit_a})
         self.assertNotIn(self.unit_b, first.units)
