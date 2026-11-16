@@ -59,10 +59,6 @@ class ImportPortraitSeamTests(EvenniaTestCase):
             records.append(record)
         return records
 
-    @covers_requirement("art-asset-lifecycle::successful-player-creation-and-validated-import-schedule-an-eligible-unique-portrait-through-transaction-on-commit")
-    @covers_requirement(
-        "art-gallery-autogen::automatic-character-portraits-produce-exactly-one-unbound-default-card"
-    )
     def test_committed_batch_schedules_one_post_commit_ensure_per_record(self):
         first = example_record()
         second = example_record()
@@ -97,7 +93,6 @@ class ImportPortraitSeamTests(EvenniaTestCase):
                 ).exists()
             )
 
-    @covers_requirement("art-asset-lifecycle::successful-player-creation-and-validated-import-schedule-an-eligible-unique-portrait-through-transaction-on-commit")
     def test_rejected_import_batch_emits_no_job(self):
         bad = example_record()
         bad["age"] = 10001
@@ -111,7 +106,6 @@ class ImportPortraitSeamTests(EvenniaTestCase):
             NPC.objects.filter(db_key="human_reference").exists()
         )
 
-    @covers_requirement("art-asset-lifecycle::queue-failure-never-rolls-back-gameplay")
     def test_art_callback_exception_never_surfaces_as_an_import_error(self):
         path = self.write("ok.json", example_record())
         with (

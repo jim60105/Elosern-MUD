@@ -41,9 +41,6 @@ class TranslationStageTests(WorkerStoreIsolation):
             ):
                 yield
 
-    @covers_requirement(
-        "art-prompt-translation::the-translation-stage-sits-between-the-claimed-description-and-the-generation-call"
-    )
     def test_enabled_stage_translates_scene_character_and_monster_jobs(self):
         description = "含有漢字"
         subjects = (
@@ -85,9 +82,6 @@ class TranslationStageTests(WorkerStoreIsolation):
             self.assertIsNone(self._job_for(job))
             self.assertEqual(len(gallery_api.cards_for(subject)), 1)
 
-    @covers_requirement(
-        "art-prompt-translation::the-translation-stage-sits-between-the-claimed-description-and-the-generation-call"
-    )
     def test_enabled_stage_translates_gallery_without_mutating_the_spent_job(self):
         subject = self._subject("42", ArtSubjectKind.CHARACTER)
         description = "畫像漢字"
@@ -126,9 +120,6 @@ class TranslationStageTests(WorkerStoreIsolation):
             "gallery settlement deletes only after the boundary observed source text",
         )
 
-    @covers_requirement(
-        "art-prompt-translation::the-translation-stage-sits-between-the-claimed-description-and-the-generation-call"
-    )
     @covers_requirement(
         "art-prompt-translation::the-translation-backend-is-injectable-and-tests-never-load-a-translation-library"
     )

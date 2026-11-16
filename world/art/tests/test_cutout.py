@@ -132,7 +132,6 @@ class SeamResolutionTests(unittest.TestCase):
 class BoundedEntryTests(unittest.TestCase):
     """remove_background bounds every escaping failure to one of two codes."""
 
-    @covers_requirement("art-portrait-cutout::a-background-removal-failure-is-a-bounded-terminal-non-degrading-job-failure")
     def test_an_arbitrary_backend_exception_becomes_art_cutout_error(self):
         stub = _StubBackend(error=RuntimeError("inference exploded"))
         with mock.patch.object(cutout, "resolve_cutout_backend", return_value=stub):
@@ -200,7 +199,6 @@ class BoundedEntryTests(unittest.TestCase):
         with mock.patch.object(cutout, "resolve_cutout_backend", return_value=stub):
             self.assertEqual(cutout.remove_background(_opaque_png()), payload)
 
-    @covers_requirement("art-portrait-cutout::a-background-removal-failure-is-a-bounded-terminal-non-degrading-job-failure")
     def test_a_scripted_cutout_error_propagates_unchanged(self):
         stub = _StubBackend(error=CutoutError("art_cutout_unavailable", "scripted"))
         with mock.patch.object(cutout, "resolve_cutout_backend", return_value=stub):
@@ -210,18 +208,15 @@ class BoundedEntryTests(unittest.TestCase):
 
 
 class SubjectKindScopeTests(unittest.TestCase):
-    @covers_requirement("art-portrait-cutout::character-and-monster-portraits-are-stored-with-their-background-removed")
     def test_the_allowlist_holds_exactly_the_portrait_kinds(self):
         self.assertEqual(
             CUTOUT_SUBJECT_KINDS,
             frozenset({ArtSubjectKind.CHARACTER, ArtSubjectKind.MONSTER}),
         )
 
-    @covers_requirement("art-portrait-cutout::character-and-monster-portraits-are-stored-with-their-background-removed")
     def test_scenes_are_outside_the_allowlist(self):
         self.assertFalse(applies_to(ArtSubjectKind.SCENE))
 
-    @covers_requirement("art-portrait-cutout::character-and-monster-portraits-are-stored-with-their-background-removed")
     def test_every_subject_kind_is_classified_by_the_allowlist(self):
         # Exhaustiveness contract (design D3): a NEW ArtSubjectKind member must
         # fail this suite until it is deliberately classified.
@@ -511,7 +506,6 @@ class RembgSessionTests(_RembgBackendCase):
                 backend._session()
         self.assertEqual(caught.exception.code, "art_cutout_unavailable")
 
-    @covers_requirement("art-portrait-cutout::a-background-removal-failure-is-a-bounded-terminal-non-degrading-job-failure")
     def test_a_failing_session_factory_is_art_cutout_unavailable(self):
         with mock.patch(
             "rembg.new_session", side_effect=ValueError("no session class")
@@ -550,7 +544,6 @@ class LazinessTests(_RembgBackendCase):
         finally:
             sys.modules.update(saved)
 
-    @covers_requirement("art-portrait-cutout::a-background-removal-failure-is-a-bounded-terminal-non-degrading-job-failure")
     def test_a_broken_first_use_raises_art_cutout_unavailable(self):
         real_import = builtins.__import__
 

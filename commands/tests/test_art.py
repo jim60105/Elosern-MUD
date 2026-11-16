@@ -81,7 +81,6 @@ def _fallback_text() -> str:
 
 @_ART_SCOPE
 class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
-    @covers_requirement("art-staff-commands::art-status-lists-and-filters-records-without-leaking-sensitive-data")
     def test_staff_can_list_gallery_holdings_without_persona_or_paths(self):
         gallery_api.record_error(_scene(_SCENE_KEY), "sd_connection_error")
         output = self.call(CmdArtStatus(), "scene")
@@ -91,7 +90,6 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertNotIn(".art", output)
         self.assertNotIn("persona", output)
 
-    @covers_requirement("art-staff-commands::art-status-lists-and-filters-records-without-leaking-sensitive-data")
     def test_portrait_filter_lists_gallery_holdings(self):
         subject = ArtSubject(ArtSubjectKind.MONSTER, _MONSTER_KEY)
         gallery_api.record_error(subject, "sd_connection_error")
@@ -100,7 +98,6 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         scene_output = self.call(CmdArtStatus(), "scene")
         self.assertNotIn(f"portrait:monster:{_MONSTER_KEY}", scene_output)
 
-    @covers_requirement("art-staff-commands::art-status-lists-and-filters-records-without-leaking-sensitive-data")
     @covers_requirement("art-staff-commands::players-have-no-access-to-any-art-control")
     def test_non_staff_is_denied_every_subcommand(self):
         gallery_api.record_error(_scene(), "sd_connection_error")
@@ -130,7 +127,6 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         drain.assert_called_once_with(2)
         self.assertIn("2", output)
 
-    @covers_requirement("art-staff-commands::art-retry-re-enqueues-failed-records")
     def test_retry_requests_a_scene_gallery_failure(self):
         subject = _scene(_SCENE_KEY)
         gallery_api.record_error(subject, "sd_connection_error")
@@ -142,7 +138,6 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertEqual(job.db.subject_key, _SCENE_KEY)
         self.assertIn("重新請求 1 次圖庫生成", output)
 
-    @covers_requirement("art-staff-commands::art-requeue-accepts-one-validated-full-subject-key-and-forces-regeneration-under-the-lock")
     def test_requeue_scene_key_requests_a_gallery_job_and_keeps_the_card(self):
         subject = _scene(_SCENE_KEY)
         held = str(uuid.uuid4())
@@ -169,7 +164,6 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertEqual(jobs[0].db.status, ArtAssetStatus.PENDING)
         self.assertIn(f"scene:{_SCENE_KEY}", output)
 
-    @covers_requirement("art-staff-commands::art-requeue-accepts-one-validated-full-subject-key-and-forces-regeneration-under-the-lock")
     def test_requeue_invalid_key_is_rejected_with_no_record_change(self):
         enqueue_gallery_job(
             _scene(_SCENE_KEY),
@@ -184,14 +178,12 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertIn("無效", output)
         self.assertEqual(GalleryJobRecord.objects.count(), before)
 
-    @covers_requirement("art-staff-commands::art-requeue-accepts-one-validated-full-subject-key-and-forces-regeneration-under-the-lock")
     def test_requeue_unregistered_scene_key_is_rejected_with_no_record_change(self):
         output = self.call(CmdArtRequeue(), "scene:not_registered")
         self.assertIn("無法重新排入", output)
         self.assertIn("not_registered", output)
         self.assertEqual(GalleryJobRecord.objects.count(), 0)
 
-    @covers_requirement("art-staff-commands::art-requeue-accepts-one-validated-full-subject-key-and-forces-regeneration-under-the-lock")
     def test_requeue_character_with_missing_canonical_age_is_rejected_with_no_record_change(self):
         from evennia.utils.create import create_object
 
@@ -208,10 +200,6 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertIn("無法重新排入", output)
         self.assertEqual(GalleryJobRecord.objects.count(), 0)
 
-    @covers_requirement("art-staff-commands::art-requeue-accepts-one-validated-full-subject-key-and-forces-regeneration-under-the-lock")
-    @covers_requirement(
-        "art-gallery-autogen::automatic-character-portraits-produce-exactly-one-unbound-default-card"
-    )
     def test_requeue_character_requests_a_gallery_job_without_touching_cards(self):
         from evennia.utils.create import create_object
 
@@ -251,7 +239,6 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertEqual(gallery_api.cards_for(subject), cards_before)
         self.assertEqual(seeded["image_id"], cards_before[0]["image_id"])
 
-    @covers_requirement("art-asset-lifecycle::the-age-check-runs-on-every-lifecycle-path-and-rejects-deterministically-without-a-persisted-marker")
     def test_retry_skips_a_character_portrait_with_a_non_integer_age(self):
         player = self._portrait_player("non-int-age-retry", age="twenty")
         subject = ArtSubject(ArtSubjectKind.CHARACTER, str(player.pk))
@@ -274,7 +261,6 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         player.db.portrait_policy = {"mode": "named", "stable_key": str(player.pk)}
         return player
 
-    @covers_requirement("art-staff-commands::art-requeue-accepts-one-validated-full-subject-key-and-forces-regeneration-under-the-lock")
     def test_requeue_monster_requests_a_gallery_job_without_touching_cards(self):
         key = _MONSTER_KEY
         subject = monster_subject_for(key)
@@ -286,7 +272,6 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertTrue(jobs[0].db_key.startswith(f"art:portrait:monster:{key}:gen:"))
         self.assertEqual(gallery_api.cards_for(subject), [])
 
-    @covers_requirement("art-staff-commands::art-requeue-accepts-one-validated-full-subject-key-and-forces-regeneration-under-the-lock")
     def test_requeue_monster_settles_one_card_under_the_declared_cap(self):
         key = _MONSTER_KEY
         subject = monster_subject_for(key)
@@ -327,7 +312,6 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
             cards[0]["image_id"],
         )
 
-    @covers_requirement("art-staff-commands::art-requeue-accepts-one-validated-full-subject-key-and-forces-regeneration-under-the-lock")
     def test_requeue_unregistered_monster_key_is_rejected_with_no_record_change(self):
         with self.assertRaises(ArtSubjectError):
             monster_subject_for(_RETIRED_TIER)
@@ -335,7 +319,6 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertIn("無法重新排入", output)
         self.assertEqual(GalleryJobRecord.objects.count(), 0)
 
-    @covers_requirement("art-staff-commands::art-retry-re-enqueues-failed-records")
     @covers_requirement("art-gallery-generation::one-validated-service-seam-requests-every-gallery-image")
     def test_retry_re_requests_an_erroring_monster_subject(self):
         key = _MONSTER_KEY
@@ -347,7 +330,6 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertEqual(len(jobs), 1)
         self.assertTrue(jobs[0].db_key.startswith(f"art:portrait:monster:{key}:gen:"))
 
-    @covers_requirement("art-staff-commands::art-retry-re-enqueues-failed-records")
     def test_retry_clears_a_moot_error_on_a_carded_monster_subject(self):
         key = _MONSTER_KEY
         subject = monster_subject_for(key)
@@ -370,7 +352,6 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertEqual(GalleryJobRecord.objects.count(), 0)
         self.assertEqual(gallery_api.erroring_subjects(), [])
 
-    @covers_requirement("art-staff-commands::art-retry-re-enqueues-failed-records")
     def test_retry_re_requests_an_erroring_character_exactly_once(self):
         player = self._portrait_player("retry-gallery-ok")
         subject = ArtSubject(ArtSubjectKind.CHARACTER, str(player.pk))
@@ -383,7 +364,6 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
             jobs[0].db_key.startswith(f"art:portrait:character:{player.pk}:gen:")
         )
 
-    @covers_requirement("art-staff-commands::art-retry-re-enqueues-failed-records")
     def test_retry_skips_an_ineligible_erroring_subject_without_aborting(self):
         ghost = ArtSubject(ArtSubjectKind.CHARACTER, "999999")
         gallery_api.record_error(ghost, "sd_connection_error")
@@ -394,7 +374,6 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         )
         self.assertEqual(GalleryJobRecord.objects.count(), 0)
 
-    @covers_requirement("art-staff-commands::art-retry-re-enqueues-failed-records")
     def test_retry_clears_a_moot_error_on_a_subject_that_now_has_art(self):
         player = self._portrait_player("retry-gallery-moot")
         subject = ArtSubject(ArtSubjectKind.CHARACTER, str(player.pk))
@@ -419,7 +398,6 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         status_output = self.call(CmdArtStatus(), "")
         self.assertNotIn("sd_connection_error", status_output)
 
-    @covers_requirement("art-staff-commands::art-retry-re-enqueues-failed-records")
     def test_retry_requests_nothing_when_no_gallery_record_errors(self):
         output = self.call(CmdArtRetry(), "")
         self.assertIn(_fallback_text(), output)
@@ -462,7 +440,6 @@ class ArtOptionsCommandTests(EvenniaCommandTestMixin, EvenniaTest):
 
 @_ART_SCOPE
 class ArtStatusGalleryTests(EvenniaCommandTestMixin, EvenniaTest):
-    @covers_requirement("art-staff-commands::art-status-lists-and-filters-records-without-leaking-sensitive-data")
     def test_gallery_job_records_are_invisible_to_the_status_listing(self):
         gallery_api.record_error(_scene(_SCENE_KEY), "sd_connection_error")
         enqueue_gallery_job(
@@ -479,7 +456,6 @@ class ArtStatusGalleryTests(EvenniaCommandTestMixin, EvenniaTest):
         portrait_output = self.call(CmdArtStatus(), "portrait")
         self.assertNotIn(":gen:", portrait_output)
 
-    @covers_requirement("art-staff-commands::art-status-lists-and-filters-records-without-leaking-sensitive-data")
     def test_a_failed_gallery_generation_is_visible_with_its_bounded_code(self):
         subject = ArtSubject(ArtSubjectKind.CHARACTER, "42")
         gallery_api.record_error(subject, "sd_connection_error")
@@ -503,7 +479,6 @@ class ArtStatusGalleryTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertIn("portrait:character:42", portrait_output)
         self.assertNotIn(f"scene:{_SCENE_KEY}", portrait_output)
 
-    @covers_requirement("art-staff-commands::art-status-lists-and-filters-records-without-leaking-sensitive-data")
     def test_a_healthy_gallery_line_shows_cards_and_default_with_no_error(self):
         subject = ArtSubject(ArtSubjectKind.CHARACTER, "42")
         image_id = str(uuid.uuid4())
@@ -524,7 +499,6 @@ class ArtStatusGalleryTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertIn("portrait:character:42 卡片:1 預設:是", output)
         self.assertNotIn("錯誤:", output.split("圖庫狀態:")[1])
 
-    @covers_requirement("art-staff-commands::art-status-lists-and-filters-records-without-leaking-sensitive-data")
     def test_a_gallery_only_store_still_shows_the_gallery_section(self):
         subject = ArtSubject(ArtSubjectKind.CHARACTER, "42")
         image_id = str(uuid.uuid4())
@@ -544,12 +518,10 @@ class ArtStatusGalleryTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertIn("圖庫狀態:", output)
         self.assertNotIn("沒有符合的美術資產記錄。", output)
 
-    @covers_requirement("art-staff-commands::art-status-lists-and-filters-records-without-leaking-sensitive-data")
     def test_both_surfaces_empty_keeps_the_empty_message(self):
         output = self.call(CmdArtStatus(), "")
         self.assertIn("沒有符合的美術資產記錄。", output)
 
-    @covers_requirement("art-staff-commands::art-status-lists-and-filters-records-without-leaking-sensitive-data")
     def test_the_broad_portrait_filter_lists_gallery_rows(self):
         subject = ArtSubject(ArtSubjectKind.MONSTER, _MONSTER_KEY)
         gallery_api.record_error(subject, "sd_connection_error")
@@ -583,9 +555,6 @@ class ArtHealthCommandTests(EvenniaCommandTestMixin, EvenniaTest):
             from_cache=from_cache,
         )
 
-    @covers_requirement(
-        "art-staff-commands::art-health-reports-server-reachability-scheduler-state-queue-counts-and-output-policy"
-    )
     def test_reachable_dashboard_shows_all_five_sections(self):
         enqueue_gallery_job(
             _scene(_SCENE_KEY),
@@ -604,9 +573,6 @@ class ArtHealthCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertEqual(lines[3], "gallery: records=0 cards=0 erroring=0")
         self.assertEqual(lines[4], "output: png q=80 metadata=on")
 
-    @covers_requirement(
-        "art-staff-commands::art-health-reports-server-reachability-scheduler-state-queue-counts-and-output-policy"
-    )
     def test_the_gallery_line_counts_records_cards_and_erroring_subjects(self):
         one = ArtSubject(ArtSubjectKind.CHARACTER, "42")
         image_id = str(uuid.uuid4())
@@ -628,9 +594,6 @@ class ArtHealthCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         output, _, _ = self._health(self._verdict())
         self.assertIn("gallery: records=2 cards=1 erroring=2", output)
 
-    @covers_requirement(
-        "art-staff-commands::art-health-reports-server-reachability-scheduler-state-queue-counts-and-output-policy"
-    )
     def test_a_claimed_job_is_reported_in_progress(self):
         enqueue_gallery_job(
             _scene(_SCENE_KEY),
@@ -644,9 +607,6 @@ class ArtHealthCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         output, _, _ = self._health(self._verdict())
         self.assertIn("queue: pending=0 in_progress=1", output)
 
-    @covers_requirement(
-        "art-staff-commands::art-health-reports-server-reachability-scheduler-state-queue-counts-and-output-policy"
-    )
     def test_unreachable_line_keeps_remaining_sections(self):
         output, _, probe = self._health(
             self._verdict(ok=False, code="sd_connection_error")
@@ -659,9 +619,6 @@ class ArtHealthCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertIn("output: ", output)
         probe.assert_called_once_with(force=True)
 
-    @covers_requirement(
-        "art-staff-commands::art-health-reports-server-reachability-scheduler-state-queue-counts-and-output-policy"
-    )
     def test_health_mutates_nothing(self):
         subject = ArtSubject(ArtSubjectKind.CHARACTER, "42")
         image_id = str(uuid.uuid4())
@@ -706,9 +663,6 @@ class ArtHealthCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         ]
         self.assertEqual(gallery_before, gallery_after)
 
-    @covers_requirement(
-        "art-staff-commands::art-health-reports-server-reachability-scheduler-state-queue-counts-and-output-policy"
-    )
     def test_output_leaks_no_credentials_userinfo_or_paths(self):
         with override_settings(
             ART_SD_USERNAME="operator",
@@ -719,9 +673,6 @@ class ArtHealthCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         for forbidden in ("operator", "sup3r-s3cret", "user", "password", "@", "Basic ", "/app", "server/"):
             self.assertNotIn(forbidden, output)
 
-    @covers_requirement(
-        "art-staff-commands::art-health-reports-server-reachability-scheduler-state-queue-counts-and-output-policy"
-    )
     @covers_requirement("art-staff-commands::players-have-no-access-to-any-art-control")
     def test_non_staff_denied_without_any_probe(self):
         output, dispatch, probe = self._health(self._verdict(), caller=self.char2)
@@ -729,9 +680,6 @@ class ArtHealthCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         dispatch.assert_not_called()
         probe.assert_not_called()
 
-    @covers_requirement(
-        "art-staff-commands::art-health-reports-server-reachability-scheduler-state-queue-counts-and-output-policy"
-    )
     def test_cached_verdict_line_shows_its_age(self):
         output, _, _ = self._health(
             self._verdict(ok=False, code="sd_timeout", from_cache=True, age=12.34)

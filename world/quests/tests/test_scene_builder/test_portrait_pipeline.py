@@ -149,9 +149,6 @@ class SceneBuilderPortraitPipelineTests(SceneBuilderTestBase):
         return record, client, dispatched
 
     @covers_requirement("spawn-named-portraits::a-spawned-named-occupant-completes-the-full-portrait-pipeline")
-    @covers_requirement(
-        "art-gallery-autogen::automatic-character-portraits-produce-exactly-one-unbound-default-card"
-    )
     def test_fake_worker_receives_the_story_driven_description(self):
         record, client, dispatched = self._materialize_and_drain(
             self._characterized_payload()

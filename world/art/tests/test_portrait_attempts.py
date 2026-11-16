@@ -177,9 +177,6 @@ class _PortraitAttemptCase(EvenniaTestCase):
 class PortraitAttemptOrderTests(_PortraitAttemptCase):
     """Source order, source identity, fault position and generation truth."""
 
-    @covers_requirement(
-        "art-gallery-resolution::display-resolution-is-one-deterministic-chain-from-equipment-to-fallback"
-    )
     @covers_requirement("artwork-descriptor::source-priority-and-retained-access-are-explicit")
     def test_a_bound_card_is_the_rank_ten_candidate_beside_the_alpha_terminal(self):
         subject = self._subject("bound-attempt")
@@ -217,9 +214,6 @@ class PortraitAttemptOrderTests(_PortraitAttemptCase):
         self.assertNotEqual(terminal["resource"]["resource_id"], resource["resource_id"])
 
     @covers_requirement(
-        "art-gallery-resolution::display-resolution-is-one-deterministic-chain-from-equipment-to-fallback"
-    )
-    @covers_requirement(
         "official-art-personalization::stale-official-selections-are-retained-but-ignored-for-resolution"
     )
     @covers_requirement(
@@ -256,9 +250,6 @@ class PortraitAttemptOrderTests(_PortraitAttemptCase):
         # and its origin once; the retired flat cross-check is not repeated)
         self.assertEqual(official_preferences_for(subject).selection, selection)
 
-    @covers_requirement(
-        "art-gallery-resolution::display-resolution-is-one-deterministic-chain-from-equipment-to-fallback"
-    )
     def test_a_named_default_that_cannot_resolve_is_a_bounded_fault(self):
         subject = self._subject("vanished-default")
         card = self._card(subject)
@@ -282,9 +273,6 @@ class PortraitAttemptOrderTests(_PortraitAttemptCase):
         self.assertEqual(descriptor["generation_state"], descriptors.GENERATION_DONE)
         self.assertEqual(descriptor["terminal"]["resource"]["origin"], descriptors.ORIGIN_SILHOUETTE)
 
-    @covers_requirement(
-        "art-gallery-resolution::display-resolution-is-one-deterministic-chain-from-equipment-to-fallback"
-    )
     def test_an_unset_selection_and_default_add_no_attempt(self):
         subject = self._subject("no-art")
         entity = self._character("no-art", provenance=False)
@@ -294,9 +282,6 @@ class PortraitAttemptOrderTests(_PortraitAttemptCase):
         self.assertEqual(descriptor["generation_subject"], subject.full())
         self.assertIsNotNone(descriptor["terminal"])
 
-    @covers_requirement(
-        "art-gallery-resolution::display-resolution-is-one-deterministic-chain-from-equipment-to-fallback"
-    )
     @covers_requirement("artwork-descriptor::descriptors-preserve-independent-artwork-facts")
     def test_a_recorded_failure_is_reported_without_touching_state(self):
         subject = self._subject("failed-job")
@@ -521,13 +506,7 @@ class PortraitAttemptSmokeTests(_PortraitAttemptCase):
     """The production boundary: real writers, real admission, one real selection."""
 
     @covers_requirement(
-        "art-gallery-resolution::display-resolution-is-one-deterministic-chain-from-equipment-to-fallback"
-    )
-    @covers_requirement(
         "art-source-fault-facts::faults-are-attributed-to-requested-sources"
-    )
-    @covers_requirement(
-        "art-gallery-fallback::the-fallback-seam-supplies-a-url-and-a-face-rectangle-and-reports-its-use"
     )
     def test_real_gallery_official_and_alpha_resolution(self):
         subject = self._subject("boundary")

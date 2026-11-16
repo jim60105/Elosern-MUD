@@ -410,7 +410,6 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertTrue(self.char1.creation_pending)
         self.assertEqual(self.char1.traits.all(), [])
 
-    @covers_requirement("art-asset-lifecycle::successful-player-creation-and-validated-import-schedule-an-eligible-unique-portrait-through-transaction-on-commit")
     def test_committed_creation_schedules_exactly_one_portrait_ensure(self):
         with self.captureOnCommitCallbacks(execute=True) as callbacks:
             output = self.call(CmdCharacter(), _PRESET_COMMAND)
@@ -434,7 +433,6 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         )
         self.assertEqual(jobs[0].db.status, ArtAssetStatus.PENDING)
 
-    @covers_requirement("art-asset-lifecycle::successful-player-creation-and-validated-import-schedule-an-eligible-unique-portrait-through-transaction-on-commit")
     def test_rolled_back_creation_emits_no_job(self):
         with self.captureOnCommitCallbacks(execute=True) as callbacks:
             output = self.call(
@@ -447,7 +445,6 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertIsNone(self.char1.db.portrait_policy)
         self.assertEqual(GalleryJobRecord.objects.count(), 0)
 
-    @covers_requirement("art-asset-lifecycle::queue-failure-never-rolls-back-gameplay")
     def test_art_callback_exception_still_reports_creation_success(self):
         with (
             self.captureOnCommitCallbacks(execute=True) as callbacks,

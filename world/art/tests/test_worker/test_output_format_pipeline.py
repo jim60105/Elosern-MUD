@@ -62,7 +62,6 @@ class OutputFormatPipelineTests(WorkerStoreIsolation):
             requested_fields=[],
         )
 
-    @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     def test_configured_format_drives_the_published_extension(self):
         subject = self._subject()
         job = self._record(subject)
@@ -120,7 +119,6 @@ class OutputFormatPipelineTests(WorkerStoreIsolation):
         self.assertTrue((self.root / first_identity).is_file())
         self.assertTrue((self.root / cards[1]["stored_identity"]).is_file())
 
-    @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     def test_same_extension_regeneration_publishes_one_new_card(self):
         subject = self._subject("t_synth_dungeon")
         first = self._record(subject, "one")
@@ -135,7 +133,6 @@ class OutputFormatPipelineTests(WorkerStoreIsolation):
         listing = sorted(p.name for p in (self.root / "gallery" / "scene" / subject.key).iterdir())
         self.assertEqual(listing, ["bbbbbbbb-2222-4222-8222-222222222222.png"])
 
-    @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     def test_encode_failure_sets_sd_format_error_and_keeps_prior(self):
         subject = self._subject("t_synth_dungeon")
         first = self._record(subject)
@@ -165,7 +162,6 @@ class OutputFormatPipelineTests(WorkerStoreIsolation):
         )
         self.assertIsNone(self._job_for(job))
 
-    @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     def test_reclaimed_job_never_lets_the_stale_claim_publish(self):
         subject = self._subject("t_synth_dungeon")
         job = self._record(subject)
@@ -196,7 +192,6 @@ class OutputFormatPipelineTests(WorkerStoreIsolation):
         self.assertIsNone(current.db.last_error_code)
         self.assertEqual(gallery_api.cards_for(subject), [])
 
-    @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     def test_settle_failure_before_commit_keeps_prior_card_on_disk(self):
         subject = self._subject("t_synth_dungeon")
         first = self._record(subject)
@@ -228,7 +223,6 @@ class OutputFormatPipelineTests(WorkerStoreIsolation):
             (self.root / "gallery" / "scene" / subject.key / "bbbbbbbb-2222-4222-8222-222222222222.webp").exists()
         )
 
-    @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     def test_cleanup_deletion_error_logs_and_never_reverts(self):
         subject = self._subject("t_synth_dungeon")
         first = self._record(subject)
@@ -252,7 +246,6 @@ class OutputFormatPipelineTests(WorkerStoreIsolation):
             messages,
         )
 
-    @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     def test_embedded_provenance_comes_from_the_returned_image(self):
         # The client's image provenance is what gets embedded — patching the
         # prompt library to a DIFFERENT sentinel proves the worker never
@@ -310,7 +303,6 @@ class OutputFormatPipelineTests(WorkerStoreIsolation):
         self.assertIn("Size: 512x768", text)
         self.assertIn("Model: client-model.safetensors", text)
 
-    @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     def test_lease_bound_includes_the_local_conversion_allowance(self):
         with override_settings(ART_SD_TIMEOUT_SECONDS=1, ART_SCHEDULER_LIMIT=2):
             from world.art.worker import _CONVERSION_ALLOWANCE_SECONDS, _LEASE_MARGIN_SECONDS

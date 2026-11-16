@@ -388,9 +388,6 @@ class MonsterStartupSyncTests(EvenniaTestCase):
             # Drain past every scene and monster gallery job.
             drain_synchronous(200)
 
-    @covers_requirement(
-        "art-gallery-autogen::automatic-character-portraits-produce-exactly-one-unbound-default-card"
-    )
     def test_a_fresh_startup_gives_each_tier_one_gallery_request_and_drains_to_one_card(self):
         # The monster kind declares NO age precondition: no age attribute is
         # ever read on this path.

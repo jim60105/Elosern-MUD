@@ -316,7 +316,6 @@ class SceneBuilderMaterializationTests(SceneBuilderTestBase):
         self.assertEqual(GalleryJobRecord.objects.count(), 0)
 
     @covers_requirement("scene-builder::the-occupant-spawn-path-exposes-a-post-commit-portrait-eligibility-seam-with-unchanged-atomicity")
-    @covers_requirement("art-asset-lifecycle::validated-named-npc-spawn-schedules-its-portrait-ensure-after-the-spawn-transaction-commits")
     @covers_requirement("spawn-named-portraits::the-scenebuilder-applies-blueprint-characterization-to-named-occupants")
     def test_named_policy_occupant_schedules_after_commit_only(self):
         payload = _instance_bound_payload()
@@ -350,7 +349,6 @@ class SceneBuilderMaterializationTests(SceneBuilderTestBase):
         )
 
     @covers_requirement("scene-builder::the-occupant-spawn-path-exposes-a-post-commit-portrait-eligibility-seam-with-unchanged-atomicity")
-    @covers_requirement("art-asset-lifecycle::validated-named-npc-spawn-schedules-its-portrait-ensure-after-the-spawn-transaction-commits")
     @covers_requirement("spawn-named-portraits::a-spawned-named-occupant-completes-the-full-portrait-pipeline")
     def test_rolled_back_materialization_emits_no_portrait_job(self):
         payload = _instance_bound_payload()

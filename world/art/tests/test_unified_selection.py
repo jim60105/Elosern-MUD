@@ -320,9 +320,6 @@ class UnifiedSelectionTests(EvenniaTestCase):
         )
         self.assertEqual(official_selection_for(subject)["identity"], identity)
 
-    @covers_requirement(
-        "art-gallery-resolution::monster-subjects-resolve-through-the-chain-without-the-binding-steps"
-    )
     def test_a_redeclared_kind_follows_its_declaration_not_a_kind_comparison(self):
         subject = scene_subject_for(self.scene_key)
         identity = self._index("scene", self.scene_key)

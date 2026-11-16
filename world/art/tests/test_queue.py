@@ -52,9 +52,6 @@ def _job_count() -> int:
 class GalleryJobQueueTests(EvenniaTestCase):
     """Per-image gallery jobs share the queue machinery and carry request state."""
 
-    @covers_requirement(
-        "art-queue-worker::the-queue-is-keyed-by-subject-identity-and-enqueue-is-idempotent"
-    )
     def test_two_requests_for_one_subject_produce_two_independent_jobs(self):
         subject = _character("42")
         first = _enqueue_gallery(subject, "11111111-1111-4111-8111-111111111111")
@@ -70,9 +67,6 @@ class GalleryJobQueueTests(EvenniaTestCase):
         self.assertTrue(is_gallery_job(first) and is_gallery_job(second))
         self.assertEqual(_job_count(), 2)
 
-    @covers_requirement(
-        "art-queue-worker::asset-records-carry-the-full-contract-and-never-a-live-object-reference"
-    )
     def test_a_gallery_job_carries_the_card_metadata_and_no_output_identity(self):
         subject = _character("42")
         binding = {
@@ -105,9 +99,6 @@ class GalleryJobQueueTests(EvenniaTestCase):
         # No lease was taken: a reclaim pass never disturbs a pending job.
         self.assertEqual(reclaim_expired_leases(0.001), 0)
 
-    @covers_requirement(
-        "art-queue-worker::the-queue-is-keyed-by-subject-identity-and-enqueue-is-idempotent"
-    )
     def test_enqueue_refuses_a_kind_with_no_gallery_declaration(self):
         subject = ArtSubject(ArtSubjectKind.MONSTER, "nogoblin")
         no_gallery = gallery_kinds.GALLERY_KIND_CAPABILITIES[
@@ -121,9 +112,6 @@ class GalleryJobQueueTests(EvenniaTestCase):
                 _enqueue_gallery(subject)
         self.assertEqual(_job_count(), 0)
 
-    @covers_requirement(
-        "art-queue-worker::asset-records-carry-the-full-contract-and-never-a-live-object-reference"
-    )
     def test_claim_makes_in_progress_with_a_lease_and_increments_attempts(self):
         _enqueue_gallery(_scene("t_synth_mountain"))
         claimed = claim(10)
@@ -135,9 +123,6 @@ class GalleryJobQueueTests(EvenniaTestCase):
         self.assertEqual(job.db.aspect_ratio, "16:9")
         self.assertTrue(job.db.generation_token)
 
-    @covers_requirement(
-        "art-queue-worker::asset-records-carry-the-full-contract-and-never-a-live-object-reference"
-    )
     def test_expired_lease_is_reclaimed_to_pending(self):
         _enqueue_gallery(_scene("t_synth_coast"))
         claim(10)
@@ -147,9 +132,6 @@ class GalleryJobQueueTests(EvenniaTestCase):
         self.assertEqual(job.db.status, ArtAssetStatus.PENDING)
         self.assertIsNone(job.db.claimed_at)
 
-    @covers_requirement(
-        "art-queue-worker::the-queue-is-keyed-by-subject-identity-and-enqueue-is-idempotent"
-    )
     def test_failed_keys_represent_recorded_gallery_errors(self):
         good = _scene("t_synth_forest")
         bad = _scene("t_synth_cave")
@@ -173,9 +155,6 @@ class GalleryJobQueueTests(EvenniaTestCase):
         self.assertEqual(failed_keys(), ["scene:t_synth_cave"])
         self.assertFalse(GalleryJobRecord.objects.filter(db_key=bad_job.db_key).exists())
 
-    @covers_requirement(
-        "art-queue-worker::scenes-and-portraits-share-one-serialization-lock-and-one-worker-concurrency-slot"
-    )
     def test_concurrent_drains_serialize_and_never_hold_the_lock_across_a_worker_wait(self):
         from world.art.queue import settle_gallery_failed
 
@@ -204,9 +183,6 @@ class GalleryJobQueueTests(EvenniaTestCase):
         self.assertTrue(all(lock_free_during_worker_wait))
         self.assertEqual(GalleryJobRecord.objects.count(), 1)
 
-    @covers_requirement(
-        "art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root"
-    )
     def test_a_stale_token_failure_settle_is_a_noop(self):
         from world.art.queue import settle_gallery_failed
 
@@ -230,9 +206,6 @@ class GalleryJobQueueTests(EvenniaTestCase):
         self.assertEqual(current.db.generation_token, token_b)
         self.assertIsNone(current.db.last_error_code)
 
-    @covers_requirement(
-        "art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root"
-    )
     def test_the_current_token_failure_settle_applies(self):
         from world.art.queue import settle_gallery_failed
 

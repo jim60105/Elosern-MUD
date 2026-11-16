@@ -104,11 +104,6 @@ class PortraitFinalizationTests(EvenniaTest):
             if str(record.db.gallery_image_id or "")
         ]
 
-    @covers_requirement("art-asset-lifecycle::successful-player-creation-and-validated-import-schedule-an-eligible-unique-portrait-through-transaction-on-commit")
-    @covers_requirement("art-asset-lifecycle::every-player-activation-path-finalizes-the-portrait-lifecycle")
-    @covers_requirement(
-        "art-gallery-autogen::automatic-character-portraits-produce-exactly-one-unbound-default-card"
-    )
     def test_activation_sets_the_named_policy_and_schedules_exactly_one_ensure(self):
         from world.art.store import GalleryJobRecord
 
@@ -130,8 +125,6 @@ class PortraitFinalizationTests(EvenniaTest):
             GalleryJobRecord.objects.filter(db_key=self._portrait_key()).count(), 0
         )
 
-    @covers_requirement("art-asset-lifecycle::successful-player-creation-and-validated-import-schedule-an-eligible-unique-portrait-through-transaction-on-commit")
-    @covers_requirement("art-asset-lifecycle::every-player-activation-path-finalizes-the-portrait-lifecycle")
     def test_web_activation_produces_identical_portrait_state(self):
         from web.webclient.actions.creation_actions import (
             _creation_activate_adapter,
@@ -174,7 +167,6 @@ class PortraitFinalizationTests(EvenniaTest):
             0,
         )
 
-    @covers_requirement("art-asset-lifecycle::every-player-activation-path-finalizes-the-portrait-lifecycle")
     def test_failed_activation_leaves_no_policy_and_no_job(self):
         from world.art.store import GalleryJobRecord
         from world.rules.creation_wizard import activate_draft, save_custom_draft

@@ -127,7 +127,6 @@ class GalleryOnlyCutoverTests(EvenniaTestCase):
         self.assertEqual([card["image_id"] for card in cards], [image_id])
         self.assertFalse(GalleryJobRecord.objects.filter(db_key=job.db_key).exists())
 
-    @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     def test_capped_successful_replacement_commits_new_card_then_drops_displaced_file(self):
         subject = self._monster()
         old_id, old_identity = self._card(subject)
@@ -140,7 +139,6 @@ class GalleryOnlyCutoverTests(EvenniaTestCase):
         self.assertFalse((self.root / old_identity).exists())
         self.assertFalse(GalleryJobRecord.objects.filter(db_key=job.db_key).exists())
 
-    @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     def test_capped_failed_replacement_keeps_prior_card_bytes_and_records_the_error(self):
         subject = self._monster()
         old_id, old_identity = self._card(subject)
@@ -163,7 +161,6 @@ class GalleryOnlyCutoverTests(EvenniaTestCase):
         )
         self.assertFalse(GalleryJobRecord.objects.filter(db_key=job.db_key).exists())
 
-    @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     def test_stale_success_after_reclaim_changes_nothing_and_cleans_its_temp(self):
         subject = self._character()
         job = self._enqueue(subject)
@@ -186,7 +183,6 @@ class GalleryOnlyCutoverTests(EvenniaTestCase):
         self.assertEqual(gallery_api.cards_for(subject), [])
         self.assertIsNotNone(GalleryJobRecord.objects.filter(db_key=job.db_key).first())
 
-    @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     def test_stale_failure_after_reclaim_records_no_error(self):
         subject = self._character()
         job = self._enqueue(subject)

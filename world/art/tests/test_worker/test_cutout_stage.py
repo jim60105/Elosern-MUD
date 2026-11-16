@@ -66,8 +66,6 @@ class CutoutStageTests(WorkerStoreIsolation):  # noqa: E501
             drain_synchronous(10)
         return job, self.root / identity
 
-    @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
-    @covers_requirement("art-portrait-cutout::character-and-monster-portraits-are-stored-with-their-background-removed")
     def test_a_character_portrait_is_stored_transparent(self):
         subject = self._subject("42", ArtSubjectKind.CHARACTER)
         _first, target = self._drain_once(subject, "before")
@@ -87,8 +85,6 @@ class CutoutStageTests(WorkerStoreIsolation):  # noqa: E501
         self.assertEqual(len(cards), 2)
         self.assertEqual(cards[-1]["image_id"], image_id)
 
-    @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
-    @covers_requirement("art-portrait-cutout::character-and-monster-portraits-are-stored-with-their-background-removed")
     def test_a_monster_portrait_is_stored_transparent(self):
         subject = self._subject(_SYNTH_MONSTER, ArtSubjectKind.MONSTER)
         _first, target = self._drain_once(subject, "before")
@@ -107,8 +103,6 @@ class CutoutStageTests(WorkerStoreIsolation):  # noqa: E501
         self.assertEqual(len(cards), 1)
         self.assertEqual(cards[0]["image_id"], image_id)
 
-    @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
-    @covers_requirement("art-portrait-cutout::character-and-monster-portraits-are-stored-with-their-background-removed")
     def test_gallery_portrait_jobs_are_cut_out_on_the_same_terms(self):
         monster = self._subject(_SYNTH_MONSTER, ArtSubjectKind.MONSTER)
         character_image_id = "aaaaaaaa-1111-4111-8111-111111111111"
@@ -145,8 +139,6 @@ class CutoutStageTests(WorkerStoreIsolation):  # noqa: E501
         self.assertIsNone(self._job_for(character_job))
         self.assertIsNone(self._job_for(monster_job))
 
-    @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
-    @covers_requirement("art-portrait-cutout::character-and-monster-portraits-are-stored-with-their-background-removed")
     def test_scene_art_never_reaches_the_backend(self):
         subject = self._subject()
         _first, first_path = self._drain_once(subject, "before")
@@ -165,8 +157,6 @@ class CutoutStageTests(WorkerStoreIsolation):  # noqa: E501
         self.assertEqual(len(cards), 1)
         self.assertEqual(cards[0]["image_id"], image_id)
 
-    @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
-    @covers_requirement("art-portrait-cutout::character-and-monster-portraits-are-stored-with-their-background-removed")
     def test_the_disabled_stage_records_zero_calls_for_every_kind(self):
         fake = FakeCutoutBackend()
         self._record(self._subject())
@@ -177,7 +167,6 @@ class CutoutStageTests(WorkerStoreIsolation):  # noqa: E501
                 drain_synchronous(10)
         self.assertEqual(fake.calls, [])
 
-    @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     @covers_requirement("art-portrait-cutout::the-background-removal-backend-is-an-injectable-cpu-only-seam")
     def test_the_stage_runs_between_generation_and_encoding(self):
         subject = self._subject("42", ArtSubjectKind.CHARACTER)
@@ -211,8 +200,6 @@ class CutoutStageTests(WorkerStoreIsolation):  # noqa: E501
             listing, [f"{image_id}.png"], "exactly one artifact is published"
         )
 
-    @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
-    @covers_requirement("art-portrait-cutout::character-and-monster-portraits-are-stored-with-their-background-removed")
     def test_the_disabled_stage_keeps_todays_lease_bound(self):
         from world.art.worker import _CONVERSION_ALLOWANCE_SECONDS, _LEASE_MARGIN_SECONDS
 
@@ -224,8 +211,6 @@ class CutoutStageTests(WorkerStoreIsolation):  # noqa: E501
             expected = 2 * (1 + _CONVERSION_ALLOWANCE_SECONDS) + _LEASE_MARGIN_SECONDS
             self.assertEqual(_lease_timeout(), expected)
 
-    @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
-    @covers_requirement("art-portrait-cutout::character-and-monster-portraits-are-stored-with-their-background-removed")
     def test_the_enabled_stage_widens_the_bound_by_the_cutout_allowance(self):
         from django.conf import settings as django_settings
 

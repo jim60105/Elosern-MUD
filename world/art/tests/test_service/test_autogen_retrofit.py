@@ -126,9 +126,6 @@ class AutogenRetrofitTests(EvenniaTestCase):
         with self.captureOnCommitCallbacks(execute=True):
             schedule_portrait_ensure(self.player)
 
-    @covers_requirement(
-        "art-gallery-autogen::automatic-character-portraits-produce-exactly-one-unbound-default-card"
-    )
     def test_a_committed_path_drains_to_exactly_one_unbound_default_card(self):
         self._schedule()
         self.assertEqual(len(self._gallery_jobs()), 1)
@@ -194,9 +191,6 @@ class AutogenRetrofitTests(EvenniaTestCase):
         self._schedule()
         self.assertEqual(len(self._gallery_jobs()), 2)
 
-    @covers_requirement(
-        "art-gallery-autogen::automatic-character-portraits-produce-exactly-one-unbound-default-card"
-    )
     def test_the_failed_card_path_still_asks_again_next_time(self):
         # A failed generation leaves no card and no in-flight job, so the
         # next automatic pass is allowed to request again.
@@ -208,9 +202,6 @@ class AutogenRetrofitTests(EvenniaTestCase):
         art_sync_all()
         self.assertEqual(len(self._gallery_jobs()), 2)
 
-    @covers_requirement(
-        "art-gallery-autogen::automatic-character-portraits-produce-exactly-one-unbound-default-card"
-    )
     def test_a_failing_request_never_rolls_back_gameplay_and_logs_bounded(self):
         with (
             patch(
@@ -232,9 +223,6 @@ class AutogenRetrofitTests(EvenniaTestCase):
             )
         )
 
-    @covers_requirement(
-        "art-gallery-autogen::automatic-character-portraits-produce-exactly-one-unbound-default-card"
-    )
     def test_retry_reports_truthfully_through_the_guard(self):
         from world.art.service import retry_gallery_subject
 
@@ -256,9 +244,6 @@ class AutogenRetrofitTests(EvenniaTestCase):
         # The spent FAILED job survives; no NEW job was enqueued.
         self.assertEqual(len(self._gallery_jobs()), 1)
 
-    @covers_requirement(
-        "art-gallery-autogen::automatic-character-portraits-produce-exactly-one-unbound-default-card"
-    )
     def test_requeue_forces_one_card_beyond_the_idempotency_guard(self):
         from world.art.service import requeue_gallery_subject
 
@@ -285,9 +270,6 @@ class AutogenRetrofitTests(EvenniaTestCase):
             cards[0]["image_id"],
         )
 
-    @covers_requirement(
-        "art-gallery-autogen::automatic-character-portraits-produce-exactly-one-unbound-default-card"
-    )
     def test_an_ineligible_subject_still_rejects_before_anything(self):
         self.player.attributes.remove("age")
         with patch("world.art.sd_worker.render_prompt_pair") as render:

@@ -68,7 +68,6 @@ class GalleryWorkerTests(WorkerStoreIsolation):
         key = gallery_record_key(self.character, image_id or self._IMAGE_ID)
         return GalleryJobRecord.objects.filter(db_key=key).first()
 
-    @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     def test_output_identity_for_is_the_exact_per_image_gallery_path(self):
         job = self._gallery_job()
         self.assertEqual(
@@ -81,7 +80,6 @@ class GalleryWorkerTests(WorkerStoreIsolation):
                 f"gallery/character/42/{job.db.gallery_image_id}.webp",
             )
 
-    @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     def test_a_successful_gallery_job_publishes_exactly_one_card(self):
         job = self._gallery_job()
         image_id = job.db.gallery_image_id
@@ -135,7 +133,6 @@ class GalleryWorkerTests(WorkerStoreIsolation):
         leftovers = [p for p in target.parent.iterdir() if p.name != f"{image_id}.png"]
         self.assertEqual(leftovers, [])
 
-    @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     def test_a_failed_gallery_job_appends_no_card_and_records_the_code(self):
         # A pre-existing card must survive a later failure untouched.
         gallery_api.append_card(
@@ -168,7 +165,6 @@ class GalleryWorkerTests(WorkerStoreIsolation):
         after = [p.relative_to(self.root).as_posix() for p in self.root.rglob("*") if p.is_file()]
         self.assertEqual(after, before)
 
-    @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     def test_a_stale_gallery_claim_publishes_no_card_and_removes_its_temp(self):
         job = self._gallery_job(image_id=self._IMAGE_ID)
         claimed = claim(10)
@@ -245,7 +241,6 @@ class GalleryWorkerTests(WorkerStoreIsolation):
         self.assertIsInstance(record.db.last_error_at, float)
         self.assertEqual(gallery_api.cards_for(self.character), cards_before)
 
-    @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     def test_an_unresolvable_client_still_settles_gallery_jobs_failed(self):
         # A mixed batch: a scene gallery job AND a character gallery job. The
         # client seam itself fails to resolve, so the whole batch settles

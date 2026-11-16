@@ -54,7 +54,6 @@ class WorkerStoreIsolationTests(WorkerStoreIsolation):
         )
 
     @covers_requirement(
-        "art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root",
         "internal-art-worker::the-client-is-injectable-and-tests-never-open-a-socket",
     )
     def test_successful_generation_completes_a_scene_job(self):
@@ -99,7 +98,6 @@ class WorkerStoreIsolationTests(WorkerStoreIsolation):
         self.assertIs(captured["request"]["do_not_save_grid"], True)
         self.assertEqual(len(gallery_api.cards_for(subject)), 1)
 
-    @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     def test_portrait_subject_writes_the_exact_gallery_identity(self):
         subject = self._subject(_SYNTH_MONSTER, ArtSubjectKind.MONSTER)
         job = self._record(subject)
@@ -114,7 +112,6 @@ class WorkerStoreIsolationTests(WorkerStoreIsolation):
         )
         self.assertTrue((self.root / cards[0]["stored_identity"]).is_file())
 
-    @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     def test_atomic_write_never_leaves_a_temporary_file_behind(self):
         subject = self._subject()
         job = self._record(subject)
@@ -125,7 +122,6 @@ class WorkerStoreIsolationTests(WorkerStoreIsolation):
         leftovers = [path for path in directory.iterdir() if path.name != f"{image_id}.png"]
         self.assertEqual(leftovers, [])
 
-    @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     def test_server_reported_seed_is_persisted_on_publish(self):
         subject = self._subject()
         self._record(subject)
@@ -137,7 +133,6 @@ class WorkerStoreIsolationTests(WorkerStoreIsolation):
         self.assertEqual(len(cards), 1)
         self.assertEqual(cards[0]["seed"], 42)
 
-    @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     def test_seedless_regeneration_stores_a_new_seedless_card(self):
         # A seedless regeneration must never keep advertising the old image's
         # seed: the new card carries the new (absent) seed.
@@ -157,7 +152,6 @@ class WorkerStoreIsolationTests(WorkerStoreIsolation):
         self.assertEqual(len(cards), 1)
         self.assertIsNone(cards[0]["seed"])
 
-    @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     def test_failed_regeneration_retains_prior_card_and_seed(self):
         subject = self._subject()
         self._record(subject)
@@ -180,7 +174,6 @@ class WorkerStoreIsolationTests(WorkerStoreIsolation):
 
     @covers_requirement(
         "internal-art-worker::art-generation-failures-degrade-to-bounded-named-error-codes",
-        "art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root",
     )
     def test_unreachable_server_settles_failed_and_keeps_the_placeholder(self):
         subject = self._subject()
@@ -225,7 +218,6 @@ class WorkerStoreIsolationTests(WorkerStoreIsolation):
 
     @covers_requirement(
         "internal-art-worker::art-generation-failures-degrade-to-bounded-named-error-codes",
-        "art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root",
     )
     def test_every_named_sd_error_settles_its_bounded_code(self):
         codes = (
@@ -261,7 +253,6 @@ class WorkerStoreIsolationTests(WorkerStoreIsolation):
 
     @covers_requirement(
         "internal-art-worker::art-generation-failures-degrade-to-bounded-named-error-codes",
-        "art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root",
     )
     def test_prompt_library_failure_settles_sd_prompt_error(self):
         subject = self._subject()
@@ -280,7 +271,6 @@ class WorkerStoreIsolationTests(WorkerStoreIsolation):
 
     @covers_requirement(
         "internal-art-worker::art-generation-failures-degrade-to-bounded-named-error-codes",
-        "art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root",
     )
     def test_unresolvable_client_settles_sd_client_config_error(self):
         subject = self._subject()
@@ -296,7 +286,6 @@ class WorkerStoreIsolationTests(WorkerStoreIsolation):
 
     @covers_requirement(
         "internal-art-worker::art-generation-failures-degrade-to-bounded-named-error-codes",
-        "art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root",
     )
     def test_unexpected_internal_error_settles_sd_internal_error(self):
         subject = self._subject()
@@ -312,7 +301,6 @@ class WorkerStoreIsolationTests(WorkerStoreIsolation):
             ["sd_internal_error"],
         )
 
-    @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     def test_out_of_root_store_directory_is_rejected(self):
         subject = self._subject("t_synth_mountain")
         job = self._record(subject)
@@ -329,7 +317,6 @@ class WorkerStoreIsolationTests(WorkerStoreIsolation):
             self.assertFalse((Path(outside) / image_id).exists())
         self.assertEqual(gallery_api.cards_for(subject), [])
 
-    @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     def test_atomic_write_removes_the_temp_file_when_publish_fails(self):
         subject = self._subject()
         job = self._record(subject)
@@ -354,7 +341,6 @@ class WorkerStoreIsolationTests(WorkerStoreIsolation):
             (self.root / "gallery" / "scene" / subject.key).is_dir()
         )
 
-    @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     def test_stale_claim_never_publishes_its_output_after_reclaim(self):
         subject = self._subject("t_synth_forest")
         job = self._record(subject)
@@ -382,7 +368,6 @@ class WorkerStoreIsolationTests(WorkerStoreIsolation):
             self._image_id_for(subject, image_id).exists()
         )
 
-    @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     def test_stale_claimed_job_is_skipped_by_the_batch_settler(self):
         subject = self._subject("t_synth_tavern")
         job = self._record(subject)
@@ -403,7 +388,6 @@ class WorkerStoreIsolationTests(WorkerStoreIsolation):
         self.assertEqual(self._job_for(job).db.status, ArtAssetStatus.PENDING)
         self.assertEqual(gallery_api.cards_for(subject), [])
 
-    @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     def test_failed_regeneration_never_corrupts_the_prior_card(self):
         subject = self._subject("t_synth_dungeon")
         self._record(subject)
@@ -423,7 +407,6 @@ class WorkerStoreIsolationTests(WorkerStoreIsolation):
         )
         self.assertEqual((self.root / prior[0]["stored_identity"]).read_bytes(), prior_bytes)
 
-    @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     def test_slow_batch_is_not_reclaimed_before_n_times_timeout_plus_margin(self):
         with override_settings(ART_SD_TIMEOUT_SECONDS=1, ART_SCHEDULER_LIMIT=2):
             subjects = [self._subject("t_synth_forest"), self._subject("t_synth_tavern")]
@@ -447,7 +430,6 @@ class WorkerStoreIsolationTests(WorkerStoreIsolation):
             self.assertEqual(reclaim_expired_leases(6.0), 2)
 
     @covers_requirement(
-        "art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root",
         "internal-art-worker::art-generation-failures-degrade-to-bounded-named-error-codes",
     )
     def test_mixed_batch_settles_every_job_with_none_left_in_progress(self):
@@ -482,7 +464,6 @@ class WorkerStoreIsolationTests(WorkerStoreIsolation):
         for job in jobs:
             self.assertIsNone(self._job_for(job))
 
-    @covers_requirement("art-queue-worker::scenes-and-portraits-share-one-serialization-lock-and-one-worker-concurrency-slot")
     def test_only_one_worker_runs_at_a_time(self):
         subject = self._subject("t_synth_forest")
         job = self._record(subject)
@@ -497,7 +478,6 @@ class WorkerStoreIsolationTests(WorkerStoreIsolation):
             _release_worker_slot()
         self.assertEqual(self._job_for(job).db.status, ArtAssetStatus.PENDING)
 
-    @covers_requirement("art-queue-worker::scenes-and-portraits-share-one-serialization-lock-and-one-worker-concurrency-slot")
     def test_slot_is_released_after_a_synchronous_drain(self):
         subject = self._subject("t_synth_tavern")
         self._record(subject)
@@ -532,7 +512,6 @@ class WorkerStoreIsolationTests(WorkerStoreIsolation):
         self.assertEqual(dispatched_to_thread, ["_run_and_release_slot"])
         self.assertEqual(len(gallery_api.cards_for(subject)), 1)
 
-    @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     def test_output_identity_is_exact_per_kind(self):
         for subject, directory in (
             (ArtSubject(ArtSubjectKind.SCENE, "x"), "scene"),

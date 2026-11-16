@@ -45,7 +45,6 @@ _WRITE_TOKENS = (
 
 
 class ArtOfflineAcceptanceContract(unittest.TestCase):
-    @covers_requirement("art-asset-lifecycle::world-art-service-py-is-the-sole-writer-of-asset-and-queue-records")
     def test_no_world_ai_module_writes_art_state(self):
         ai_root = REPO_ROOT / "world" / "ai"
         for path in sorted(ai_root.rglob("*.py")):

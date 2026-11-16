@@ -202,7 +202,6 @@ class ArtPresenterTests(EvenniaTestCase):
         )
         return image_id
 
-    @covers_requirement("art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root")
     def test_scene_card_resolves_to_a_same_origin_media_url(self):
         subject = _scene()
         _image_id, identity = self._append_scene_card(subject)
@@ -217,7 +216,6 @@ class ArtPresenterTests(EvenniaTestCase):
         self.assertNotIn("out_path", repr(descriptor))
         self.assertNotIn(self.root.as_posix(), repr(descriptor))
 
-    @covers_requirement("art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root")
     def test_scene_card_with_a_missing_file_reports_a_generated_output_fault(self):
         subject = _scene()
         self._append_scene_card(subject, write=False)
@@ -232,7 +230,6 @@ class ArtPresenterTests(EvenniaTestCase):
         self.assertEqual(descriptor["generation_state"], descriptors.GENERATION_DONE)
         self.assertEqual(descriptor["retention_sources"], [])
 
-    @covers_requirement("art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root")
     def test_missing_pending_and_failed_states_stay_truthful(self):
         # No record at all is factually missing: nothing is claimed, and the
         # generated position carries no attempt.
@@ -263,7 +260,6 @@ class ArtPresenterTests(EvenniaTestCase):
         self.assertEqual(len(fault), 1)
         self.assertEqual(fault[0]["reason"], descriptors.REASON_GENERATION_FAILED)
 
-    @covers_requirement("art-asset-lifecycle::rejected-prompt-content-never-reaches-the-presenter-or-browser")
     def test_malformed_subject_ages_resolve_only_to_the_unavailable_placeholder(self):
         self.player.db.portrait_policy = {"mode": "named", "stable_key": str(self.player.pk)}
         self.player.age = "twenty-two"
@@ -278,7 +274,6 @@ class ArtPresenterTests(EvenniaTestCase):
         descriptor = describe_entity(self.player)
         self.assertIsNone(candidate(descriptor))
 
-    @covers_requirement("art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root")
     def test_valid_character_portrait_resolves_to_a_same_origin_url(self):
         subject = ArtSubject(ArtSubjectKind.CHARACTER, "42")
         image_id = str(uuid.uuid4())
@@ -360,7 +355,6 @@ class ArtPresenterTests(EvenniaTestCase):
         self.assertTrue(url.startswith("/art/"))
         self.assertNotIn(".art", url)
 
-    @covers_requirement("art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root")
     def test_existing_png_asset_survives_a_switch_to_another_format(self):
         subject = ArtSubject(ArtSubjectKind.CHARACTER, "format-switch")
         image_id = str(uuid.uuid4())
@@ -388,7 +382,6 @@ class ArtPresenterTests(EvenniaTestCase):
         resource = candidate(descriptor)
         self.assertEqual(resource["url"], f"/art/{identity}")
 
-    @covers_requirement("art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root")
     def test_all_four_store_extensions_present_as_assets(self):
         for extension in (".png", ".webp", ".jpg", ".avif"):
             key = f"mixed_store_{extension[1:]}"
@@ -662,9 +655,6 @@ class StagePayloadTests(_CardPayloadCase):
 class FaceRectPayloadTests(_CardPayloadCase):
     """``face_rect`` on every payload (art-gallery-resolution)."""
 
-    @covers_requirement(
-        "art-gallery-resolution::every-resolution-payload-carries-a-face-rectangle-or-null"
-    )
     def test_a_resolved_card_payload_carries_its_own_rectangle(self):
         explicit = {"x": 0.1, "y": 0.2, "w": 0.4, "h": 0.3}
         subject, image_id, identity = self._append_card_with_file(face_rect=explicit)
@@ -673,9 +663,6 @@ class FaceRectPayloadTests(_CardPayloadCase):
         self.assertEqual(candidate(descriptor)["url"], f"/art/{identity}")
         self.assertEqual(candidate(descriptor)["geometry"]["face_rect"], explicit)
 
-    @covers_requirement(
-        "art-gallery-resolution::every-resolution-payload-carries-a-face-rectangle-or-null"
-    )
     def test_a_malformed_stored_rectangle_degrades_to_the_default_with_one_warning(self):
         subject, image_id, identity = self._append_card_with_file()
         card = dict(cards_for(subject)[0])
@@ -694,9 +681,6 @@ class FaceRectPayloadTests(_CardPayloadCase):
         events = [c for c in warn.call_args_list if c.args and c.args[0] == "art_face_rect_invalid"]
         self.assertEqual(len(events), 1, events)
 
-    @covers_requirement(
-        "art-gallery-resolution::every-resolution-payload-carries-a-face-rectangle-or-null"
-    )
     def test_a_card_payload_carries_its_shared_default_rectangle(self):
         subject = self._subject()
         image_id = str(uuid.uuid4())
@@ -720,9 +704,6 @@ class FaceRectPayloadTests(_CardPayloadCase):
         self.assertIsNotNone(candidate(descriptor))
         self.assertEqual(candidate(descriptor)["geometry"]["face_rect"], dict(DEFAULT_FACE_RECT))
 
-    @covers_requirement(
-        "art-gallery-resolution::every-resolution-payload-carries-a-face-rectangle-or-null"
-    )
     def test_every_placeholder_payload_carries_a_null_rectangle(self):
         # A scene with no recorded generation resolves no image candidate, and
         # every scene resource that DOES resolve carries the scene's own
@@ -800,9 +781,6 @@ class SilhouettePayloadTests(EvenniaTestCase):
         entity.db.portrait_policy = {"mode": "named", "stable_key": stable_key}
         return entity
 
-    @covers_requirement(
-        "art-gallery-fallback::the-fallback-seam-supplies-a-url-and-a-face-rectangle-and-reports-its-use"
-    )
     def test_a_silhouette_payload_never_claims_generation_success(self):
         missing, pending, failed = (
             "silhouette-missing",
@@ -878,9 +856,6 @@ class SilhouettePayloadTests(EvenniaTestCase):
                 else:
                     self.assertIsNone(gallery_api.record_for(subject))
 
-    @covers_requirement(
-        "art-gallery-fallback::the-fallback-seam-supplies-a-url-and-a-face-rectangle-and-reports-its-use"
-    )
     def test_a_real_image_carries_the_reference_without_reporting_a_use(self):
         entity = self._character("silhouette-card")
         subject = ArtSubject(ArtSubjectKind.CHARACTER, "silhouette-card")
@@ -1441,9 +1416,6 @@ class PersonalOfficialPayloadTests(EvenniaTestCase):
         "official-art-resolution::every-presentation-payload-distinguishes-official-runtime-and-silhouette-origin"
     )
     @covers_requirement(
-        "art-gallery-resolution::display-resolution-is-one-deterministic-chain-from-equipment-to-fallback"
-    )
-    @covers_requirement(
         "official-art-personalization::a-personal-official-selection-is-an-entity-local-art-preference"
     )
     def test_a_selected_official_image_presents_ahead_of_the_default_card(self):
@@ -1473,9 +1445,6 @@ class PersonalOfficialPayloadTests(EvenniaTestCase):
         )
         self.assertTrue((self.store / card["stored_identity"]).exists())
 
-    @covers_requirement(
-        "art-gallery-resolution::display-resolution-is-one-deterministic-chain-from-equipment-to-fallback"
-    )
     def test_an_equipment_bound_card_outranks_the_selection(self):
         identity = self._index()
         entity = self._character(equipment={"armor": "t_coat"})
@@ -1518,9 +1487,6 @@ class PersonalOfficialPayloadTests(EvenniaTestCase):
 
     # -- personal geometry ------------------------------------------------
     @covers_requirement(
-        "art-gallery-resolution::every-resolution-payload-carries-a-face-rectangle-or-null"
-    )
-    @covers_requirement(
         "official-art-personalization::official-image-geometry-overrides-are-personal-identity-keyed-and-update-tolerant"
     )
     def test_a_personal_override_beats_the_catalog_geometry_and_never_writes(self):
@@ -1546,9 +1512,6 @@ class PersonalOfficialPayloadTests(EvenniaTestCase):
         self.assertEqual(entry.face_rect, _OFFICIAL_RECT)
         self.assertEqual(entry.stage, _OFFICIAL_STAGE)
 
-    @covers_requirement(
-        "art-gallery-resolution::every-resolution-payload-carries-a-face-rectangle-or-null"
-    )
     @covers_requirement(
         "official-art-personalization::official-image-geometry-overrides-are-personal-identity-keyed-and-update-tolerant"
     )
