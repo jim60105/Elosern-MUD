@@ -447,6 +447,7 @@ class ArtOptionsCommandTests(EvenniaCommandTestMixin, EvenniaTest):
                     output = self.call(CmdArtOptions(), "models")
         return output, dispatch
 
+    @covers_requirement("art-staff-commands::art-options-lists-the-live-server-s-selectable-option-names")
     def test_models_are_listed(self):
         output, dispatch = self._options(["model-b", "model-a"])
         dispatch.assert_called_once()
