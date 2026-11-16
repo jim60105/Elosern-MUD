@@ -1,6 +1,7 @@
 """Synthetic initialized NPC for the real persona-editor browser journeys."""
 
 import os
+from unittest.mock import patch
 
 NPC_NAME = "人物設定測試員"
 NPC_SECOND_NAME = "二號人物設定測試員"
@@ -107,7 +108,13 @@ def _npc_persona_fixture(character, account=None) -> None:
                 allocations=allocs,
                 skip_portrait=True,
             )
-        activate_player_character(account, char2, req)
+        # The second character keeps its seeded room and home
+        # (subrace-start-settlements D6).
+        with patch(
+            "world.rules.start_location.resolve_start_room",
+            new=lambda subrace_key: char2.location,
+        ):
+            activate_player_character(account, char2, req)
         char2.traits.mp.rate = 0
         char2.traits.mp.current = int(char2.traits.mp.max)
         char2.save()
