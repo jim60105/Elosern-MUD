@@ -42,11 +42,13 @@ def entrance_refs(count: int) -> tuple:
     wilderness gateway face. It names no shipped key: the registry is looked up
     by attribute string, the same idiom ``synthetic_data.vocab`` uses. Every
     wilderness entry comes from a settlement document, so each ref lies on a
-    distinct settlement map.
+    distinct settlement map. Like every helper here, it publishes the shipped
+    map world first when nothing is published yet.
     """
 
     import importlib
 
+    publish_shipped_map_world()
     module = importlib.import_module(".".join(("world", "lore", "wilderness_entry")))
     registry = getattr(module, "WILDERNESS" + "_ENTRY_REGISTRY")
     return tuple(registry[key].gates[0].destination for key in sorted(registry)[:count])
@@ -57,6 +59,11 @@ def first_entrance_ref():
 
     return entrance_refs(1)[0]
 ```
+
+The publish call is needed because the old probe failed in modules that read it
+before anything published the map world (`test_node_ids` raised
+`SettlementNotLoaded` when run alone on 5db8d4d4). It is idempotent, so callers that
+already publish are unaffected.
 
 ### D2. Call sites
 
