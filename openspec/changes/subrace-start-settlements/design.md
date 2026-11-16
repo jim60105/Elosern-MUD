@@ -27,19 +27,24 @@ Facts below were checked on master at e076e764.
   as a `QualifiedRef`. `static_references.anchor_entrance_xyz(placement)` turns it into
   the current `(x, y, map_id)`. `GridRoom.objects.filter_xyz(xyz=...)` uses
   `filter_family`, so it also finds `AnchorRoom`.
-- For each of the 15 subraces in the table in D7, the anchor key equals the
+- For each of the 15 subraces in the table in `subrace-start-locations` D5, the anchor key equals the
   settlement's `location_ref` and its id. Each landing node is the document's only
   `anchor_room` node. Checked against `content/maps/settlements/*.yaml`, including the
   merged `elven_village_eolas.yaml` (`valley_floor`) and `elven_village_fionnen.yaml`
   (`light_court`).
 - `record_arrival(character)` (`world/rules/map_knowledge.py`) never raises. It writes
   the `map_knowledge` attribute for a `PlayerCharacter` standing on a representable node.
-- A hooks-enabled `PlayerCharacter.move_to` runs `at_pre_move` (combat check,
-  direct-move capture) and `at_post_move` (auto look, arrival lore, encounter dispatch).
-  It does not record map knowledge.
+- A hooks-enabled `PlayerCharacter.move_to` runs several hooks. `at_pre_move` does the
+  combat check and the direct-move capture. `at_post_move` sends the auto look, observes
+  arrival lore, dispatches encounters and registers an on-commit alignment fact.
+  `GridRoom.at_object_receive` (`typeclasses/rooms.py`, lines 144-153) calls
+  `ensure_scene_asset` and `record_scene_entry`; the latter writes the entered-archetypes
+  attribute in its own savepoint. None of these hooks records map knowledge. Several of
+  these effects are not transactional: a sent message cannot be recalled, and an attribute
+  cache written in a savepoint goes stale after an outer rollback.
 - The webclient activation adapter publishes a full `exploration` snapshot after a
   committed activation (`web/webclient/actions/creation_actions.py::_creation_activate_adapter`),
-  so no extra movement publication is needed.
+  so no movement publication is needed.
 
 ## Goals / Non-Goals
 
@@ -62,118 +67,12 @@ Non-goals:
 
 ## Decisions
 
-### D1. Registry shape: subrace to anchor key, in the lore layer
+### D1-D3. Registry, adoption closure and resolver
 
-New file `world/lore/start_locations.py`:
-
-```python
-@dataclass(frozen=True)
-class SubraceStartLocation:
-    """One subrace's start settlement, named by its anchor (location) identity."""
-
-    subrace_key: str
-    anchor_key: str
-
-
-SUBRACE_START_LOCATION_REGISTRY: dict[str, SubraceStartLocation] = {
-    row.subrace_key: row
-    for row in (
-        SubraceStartLocation("human_royal", "town_olive_ferry"),
-        # ... one row per SUBRACE_REGISTRY key, table in D7
-    )
-}
-
-
-def validate_start_locations(
-    registry: Mapping[str, object], subraces: Mapping[str, object]
-) -> None:
-    """Reject a start registry that does not cover ``subraces`` exactly once."""
-
-
-validate_start_locations(SUBRACE_START_LOCATION_REGISTRY, SUBRACE_REGISTRY)
-```
-
-`validate_start_locations` raises `ValueError` in this order:
-1. a value is not a `SubraceStartLocation`: `f"start location {key!r} must be a SubraceStartLocation"`
-2. `row.subrace_key != key`: `f"start location {key!r} declares mismatched subrace {row.subrace_key!r}"`
-3. `key not in subraces`: `f"start location {key!r} names an unknown subrace"`
-4. `anchor_key` is not a non-empty `str`: `f"start location {key!r} must name a non-empty anchor key"`
-5. after the loop, `missing = sorted(set(subraces) - set(registry))`. If it is non-empty:
-   `f"subraces without a start location: {missing}"`
-
-Why an anchor key and not a `(settlement, node)` reference? The owner wants the
-landing room to be the settlement's gathering room, which in the map data is its anchor
-room. Each settlement has exactly one, and its placement is already a qualified node
-identity. Naming only the anchor means a row cannot point at the wrong node of the
-right settlement. Moving the anchor node moves the start room with it. Whether the
-anchor exists cannot be checked when the lore module is imported, because anchors come
-from the published geography. That check runs at adoption instead (D2).
-
-A separate module, not a new `Subrace` field. `Subrace` is built positionally in
-`races.py` and in the synthetic kit, and its `home_anchor_key` means the lore homeland.
-For humans that is not where a character starts (for example `human_royal` lore points
-at the capital, while it starts in a town).
-
-Registry inventory: add
-`_spec("start_locations", "起始地點", "聚落", _attr("world.lore.start_locations", "SUBRACE_START_LOCATION_REGISTRY"), f"{_LORE}/start_locations.py", "anchor_key")`
-to `world/lore/registry_index.py`, after the `starting_kits` line. Use no `ref(...)`
-metadata.
-
-### D2. Adoption-time closure: one more StaticWorld family
-
-In `world/maps/static_references.py`:
-- `StaticWorld` gains the field `start_locations: Mapping[str, str]` (subrace key to
-  anchor key), placed after `place_rooms`.
-- `problems()`, after the place-room loop:
-
-```python
-        for subrace_key, anchor_key in self.start_locations.items():
-            placement = self.anchor_placements.get(anchor_key)
-            if placement is None:
-                problems.append(
-                    f"start location {subrace_key}: anchor {anchor_key!r} has no "
-                    "settlement placement"
-                )
-                continue
-            check_node(f"start location {subrace_key}", placement.node)
-```
-
-- `fingerprint`: append `tuple(sorted(self.start_locations.items()))` to `parts`.
-- `published_static_world()` and `static_world_for_candidate()` both pass
-  `start_locations=MappingProxyType({key: row.anchor_key for key, row in SUBRACE_START_LOCATION_REGISTRY.items()})`,
-  importing the registry inside the function as the other families do.
-- `binding_signature()` is unchanged. It keys presenter caches, and no presenter reads
-  start locations.
-
-This rejects adoption at server start (`runtime.adopt` and `sync_all`), before any
-persistent write, as the spec requires. It is the same pattern `PLACE_REGISTRY` uses.
-
-### D3. Resolver: `world/rules/start_location.py`
-
-```python
-class StartLocationError(ValueError):
-    """A subrace's start room cannot be resolved."""
-
-
-def resolve_start_room(subrace_key: str | None) -> Any:
-    """Return the materialized anchor room of ``subrace_key``'s start settlement."""
-```
-
-The body uses function-local imports (`GridRoom`, `ANCHOR_PLACEMENT_REGISTRY`,
-`SUBRACE_START_LOCATION_REGISTRY`, `anchor_entrance_xyz`,
-`elosern_map_core.references.ReferenceError`). Steps:
-1. `row = SUBRACE_START_LOCATION_REGISTRY.get(subrace_key) if subrace_key else None`.
-   If `None`, raise `StartLocationError(f"subrace {subrace_key!r} has no start location")`.
-2. `placement = ANCHOR_PLACEMENT_REGISTRY.get(row.anchor_key)`. If `None`, raise
-   `f"start settlement {row.anchor_key!r} has no map placement"`.
-3. `xyz = anchor_entrance_xyz(placement)`. Convert a `ReferenceError` to
-   `f"start settlement {row.anchor_key!r} does not resolve"`.
-4. `room = GridRoom.objects.filter_xyz(xyz=xyz).first()`. If `None`, raise
-   `f"start room of {row.anchor_key!r} is not built"`.
-
-There is no fallback room, because `world/maps/AGENTS.md` forbids reader fallbacks.
-Function-local imports matter for two reasons: the synthetic kit's swaps stay visible,
-and test patches can target one attribute, `world.rules.start_location.resolve_start_room`.
+Delivered by `subrace-start-locations`: `world/lore/start_locations.py`, the
+`StaticWorld.start_locations` family, `world/rules/start_location.py`
+(`StartLocationError`, `resolve_start_room`) and `SYNTH_START_LOCATIONS`. This change
+only calls `start_location.resolve_start_room(subrace_key)`.
 
 ### D4. Activation ordering and rollback
 
@@ -198,18 +97,56 @@ the starting-companions block:
             # Start-location placement (subrace-start-settlements D4): the
             # character moves into its subrace's start room, is homed there and
             # records the arrival, BEFORE companions are built at its location.
-            if not character.move_to(start_room, quiet=True, move_type="teleport"):
+            # The move is hook-free so the transaction holds only durable,
+            # snapshot-covered writes; arrival effects run after commit.
+            if not character.move_to(start_room, quiet=True, move_hooks=False):
                 raise CharacterCreationError("start room refused the character")
             character.home = start_room
             from world.rules.map_knowledge import record_arrival
 
             record_arrival(character)
+            transaction.on_commit(
+                lambda: _run_start_arrival_effects(character, start_room, origin)
+            )
             if write_observer:
                 write_observer("start_location")
 ```
 
-The move keeps hooks enabled. It is an ordinary direct move, so `at_post_move` sends the
-auto look (which Telnet players see), observes arrival lore and runs encounter dispatch.
+Why hook-free: the review found that the hook chain writes state that neither the
+attribute snapshot nor `restore_activation_placement` covers (the entered-archetypes
+attribute in its own savepoint, the scene-art ensure request, encounter activation). It
+also sends a look that cannot be recalled and registers an alignment fact while the
+client is still in creation mode. Inside the transaction, the hook-free move keeps only
+three writes: location, `home` and `map_knowledge`. All three are restored on rollback,
+and the rollback mirrors the forward move exactly. `transaction.on_commit` registered
+inside `activate_draft`'s outer atomic fires only when the outer block commits, so a
+rolled-back activation runs no arrival effects at all.
+
+New private helper in `character_creation.py`:
+
+```python
+def _run_start_arrival_effects(character: Any, room: Any, origin: Any) -> None:
+    """Run the arrival effects of a committed start-room placement.
+
+    They are the effects a hooks-enabled move would have run: the room's
+    receive hook (scene entry and art ensure), arrival lore, encounter
+    dispatch and the auto look. Each step is best-effort: activation has
+    already committed, so a failure is logged and never raised.
+    """
+```
+
+The body runs these four steps in order. Each step sits in its own
+`try/except Exception as error`, which calls
+`log_warn("character_start_arrival_effect_failed", exc=error, context={"char": character.key, "step": <step>})`:
+1. `room.at_object_receive(character, origin, move_type="teleport")`, step `"receive"`;
+2. `observe_arrival_lore(character, room)` from `world.quests.room_observation`, step
+   `"lore"`;
+3. `activate_for_move(character)` from `world.quests.encounter_dispatch`, step
+   `"encounters"`;
+4. `character.msg(text=(character.at_look(room), {"type": "look"}))`, step `"look"`.
+
+No alignment fact is published, because the webclient adapter's full snapshot replaces
+every panel. Telnet players get the room look from step 4.
 `creation_pending` is already `False` at this point, because the attribute loop has run.
 
 Rollback:
@@ -224,9 +161,10 @@ def restore_activation_placement(character: Any, origin: Any) -> None:
 
     The rollback reverted the durable location and home rows, but the idmapper
     object and both rooms' contents caches still hold the moved state. A
-    hook-free ``move_to`` returns the character even into a room whose entry
-    hook refuses character arrivals (the 虛境 birth room); ``home`` is re-read
-    from the rolled-back row and applied in memory only.
+    hook-free ``move_to`` (the mirror of the hook-free forward move) returns the
+    character even into a room whose entry hook refuses character arrivals (the
+    虛境 birth room); ``home`` is re-read from the rolled-back row and applied
+    in memory only.
     """
 ```
 
@@ -285,16 +223,6 @@ def stub_start_room():
   `typeclasses.rooms.Room`. If there is none, it returns
   `create_object(Room, key=STUB_START_ROOM_KEY, nohome=True)`. Pass `new=`, so no mock
   argument is injected into test methods.
-- Synthetic kit: in `world/tests/synthetic_data/data_characters.py` add
-  `SYNTH_START_LOCATIONS: dict[str, SubraceStartLocation] = {"t_duskmari_evensong": SubraceStartLocation("t_duskmari_evensong", "t_hollow_tarn")}`.
-  In `targets.py`, add it to the content table as `"start_locations": lambda: SYNTH_START_LOCATIONS`,
-  and add
-  `"start_locations": ("world.lore.start_locations", "SUBRACE_START_LOCATION" + "_REGISTRY")`
-  to `REGISTRY_TARGETS`. Export `SYNTH_START_LOCATIONS` from `__init__.py` the same way
-  as `SYNTH_STARTING_KITS`. `t_hollow_tarn` already has a synthetic placement on a
-  borrowed node that is materialized as a real room, so the real resolver works inside a
-  scope of `("subraces", "start_locations", "anchor_placements")` once
-  `sync_test_settlements((placement.node.map_id,))` has run.
 - Browser seed process (`web/tests/browser/seed/runner.py`, `seed/npc_persona_fixture.py`):
   wrap each `activate_player_character(...)` call in
   `unittest.mock.patch("world.rules.start_location.resolve_start_room", new=lambda subrace_key: <room>)`,
@@ -307,44 +235,25 @@ def stub_start_room():
   `{ANCHOR_PLACEMENT_REGISTRY[row.anchor_key].zcoord for row in SUBRACE_START_LOCATION_REGISTRY.values()}`
   to the returned set. Only creation runtimes pay the extra boot cost.
 
-### D7. Shipped mapping (game data, not spec)
-
-| Subrace | Anchor key | Anchor node (room name) |
-|---|---|---|
-| `fionnen` | `elven_village_fionnen` | `light_court` (林間光庭) |
-| `ciaran` | `elven_village_ciaran` | `village_plaza` (村中廣場) |
-| `eolas` | `elven_village_eolas` | `valley_floor` (谷底空地) |
-| `human_royal` | `town_olive_ferry` | `central_plaza` (中央廣場) |
-| `human_noble` | `town_steed_plain` | `central_plaza` (中央廣場) |
-| `human_coastal` | `port_fishers_cove` | `central_plaza` (中央廣場) |
-| `human_plains` | `town_orange_blossom` | `central_plaza` (中央廣場) |
-| `human_highland` | `town_silver_ridge` | `central_plaza` (中央廣場) |
-| `foxkin` | `city_fox_fire` | `central_plaza` (狐火石坪) |
-| `bearkin` | `city_iron_claw` | `central_plaza` (鐵砧石坪) |
-| `catkin` | `city_shadow_wood` | `central_plaza` (苔石坪) |
-| `wolfkin` | `city_moon_howl` | `central_plaza` (嚎月石坪) |
-| `bovinekin` | `city_horn_plain` | `central_plaza` (野牛石坪) |
-| `tigerkin` | `city_tiger_roar` | `central_plaza` (虎嘯石坪) |
-| `rabbitkin` | `city_swift_wind` | `central_plaza` (長風石坪) |
-
-The registry stores only the first two columns. The node column is what adoption
-derives, and it is listed for review only.
-
-### D8. Decided: 虛境 becomes a backstage holding room; split into three changes
+### D8. Decided: 虛境 becomes a backstage holding room; the batch has five changes
 
 The owner approved this: 虛境 only holds creation-pending shells. The 虛境-to-city
 bridging exits, the `CITY_GATE_REGISTRY` bridging sync and the first-gate `home`
-re-anchor are removed. That work is not in this change. It is split out for size:
-- `retire-limbo-city-gates` covers the game side: bootstrap bridging and prune, the
-  registry view, the re-anchor, the static-reference family, about 40 test and fixture
-  modules that probe the gate registry, and four main specs.
-- `drop-settlement-city-gate-field` covers the authoring side: the map-core schema, the
-  map editor backend and frontend, the synthesis tools, and one line in each of the 338
-  settlement documents. Only four of those documents carry a filled-in row; the other
-  334 have an empty `city_gate:` key.
+re-anchor are removed. For the one-engineer-day size, the work is split into five
+changes:
+1. `subrace-start-locations`: the registry, the adoption closure, the resolver and the
+   kit row. It changes no behavior.
+2. `subrace-start-settlements` (this change): activation placement plus the stub sweep
+   over the activation tests.
+3. `entrance-probe-fixtures`: moves the test probes off the gate registry. It changes no
+   behavior and has no dependency.
+4. `retire-limbo-city-gates`: the game-side removal (bootstrap, registry view,
+   re-anchor, static-reference family, gate tests, specs).
+5. `drop-settlement-city-gate-field`: the schema, the map editor, the synthesis tools
+   and the strip of one key from each of the 338 settlement documents. 334 of them hold
+   an empty key and 4 hold a populated row.
 
-Doing all of this in one change would be several engineer-days. This change alone is a
-complete, shippable behavior: no player walks out of 虛境 any more.
+This change alone is a complete, shippable behavior: no player walks out of 虛境 any more.
 
 ## Risks / Trade-offs
 
@@ -353,11 +262,8 @@ complete, shippable behavior: no player walks out of 虛境 any more.
   dedicated tests.
 - [Creation browser runtimes now materialize 15 extra settlements.] Accepted. This is
   limited to runtimes with `ELOSERN_BROWSER_CREATION=1`, and no timing gate is added.
-- [A synthetic scope that swaps `start_locations` and then adopts a fresh candidate map
-  world would reject adoption, because the candidate has no `t_hollow_tarn` placement.]
-  Mitigation: tests publish the shipped world in module or class setup, before entering
-  the scope, as `world/maps/AGENTS.md` already requires. The process-wide browser
-  install publishes a merged snapshot through `runtime.publish`, not a candidate
-  adoption. Task 6.4 runs the synthetic browser composition fixture to confirm.
-- [The auto look from `at_post_move` reaches the webclient before the full snapshot.]
-  Accepted. The snapshot replaces all panels.
+- [The post-commit arrival effects can fail after a committed activation.] Accepted and
+  logged. The character is already correctly placed and homed. The effects are the same
+  best-effort class as the lore reveals that already run after commit.
+- [The post-commit look reaches the webclient alongside the full snapshot.] Accepted.
+  The snapshot replaces all panels.

@@ -10,52 +10,44 @@ only known when activation runs. So the move has to happen during activation.
 
 ## What Changes
 
-- New lore registry `world/lore/start_locations.py`. It maps every subrace key to
-  exactly one start settlement, named by its anchor (location) identity. Import
-  fails if a subrace has no row, a row names an unknown subrace, or a row is
-  malformed.
-- The static-reference closure (`world/maps/static_references.py`) gets a
-  start-location family. Map-world adoption is rejected when a start anchor has no
-  settlement placement in the candidate world. The start room is always that
-  settlement's anchor room. It is found through the anchor placement, never through
-  a coordinate or a dbref.
-- New rules module `world/rules/start_location.py`. It resolves a subrace's start
-  room from the current settlement graph and the materialized grid room.
 - Activation (`world/rules/character_creation.py::activate_player_character`) resolves
-  the start room before any write. Inside the existing all-or-nothing transaction it
-  moves the character there, sets `home` to that room and records the arrival in map
-  knowledge. All of this happens before the preset starting companions are built, so
-  the companions appear in the start room. If activation fails, the character goes
-  back to its birth room without move hooks and its `home` and map knowledge are
-  restored. The same applies when the outer commit in `activate_draft` fails.
-- **BREAKING (spec)**: the rules "activation leaves the shell in 虛境" and
-  "activation records no map knowledge" are replaced.
+  the start room with `subrace-start-locations`' resolver before any write. Inside the
+  existing all-or-nothing transaction, it moves the character there without move hooks,
+  sets `home` to that room and records the arrival in map knowledge. All of this happens
+  before the preset starting companions are built, so the companions appear in the
+  start room.
+- The arrival effects of an ordinary move (the room's receive hook, arrival lore,
+  encounter dispatch, the room look) run only after commit, as best-effort steps.
+- On any failure, including the outer commit in `activate_draft`, the character is
+  returned to its birth room without move hooks, even though 虛境 refuses character
+  arrivals. Its `home` and map knowledge are restored as well.
+- **BREAKING (spec)**: the "activation leaves the shell in 虛境 and records no map
+  knowledge" scenarios are rewritten. The validator requires that their names stay, so
+  their bodies now describe the start-room placement as the only move.
 - Test seams. `world/tests/start_room_fixture.py` stubs start-room resolution for
-  activation tests that do not test placement. The synthetic data kit gets a
-  start-location row. The browser seed process stubs resolution so seeded characters
+  activation tests that do not test placement, and it is applied to every existing
+  activation test module. The browser seed process stubs resolution so seeded characters
   stay in their seeded room. Creation browser runtimes materialize every start
   settlement.
 
 Decided by the owner: 虛境 becomes a backstage holding room for creation-pending shells
-only. Out of scope here (follow-up changes in this batch): removing the 虛境 city-gate exits,
-the gate `home` re-anchor and the `city_gate` document field.
+only. Removing its gates is not part of this change; see the batch order below.
 
 ## Batch:
 
-- depends-on: elven-villages-eolas-fionnen (merged to master as e076e764; two of the
-  start rows need its `elven_village_eolas` and `elven_village_fionnen` documents)
-- Followed by `retire-limbo-city-gates` (depends on this change) and
-  `drop-settlement-city-gate-field` (depends on `retire-limbo-city-gates`).
-- Conflict notes: `retire-limbo-city-gates` edits `world/maps/static_references.py`,
-  `world/tests/synthetic_data/*` and `web/tests/browser/fixtures.py`, which this
-  change also edits. Apply this change first.
+- depends-on: subrace-start-locations
+- Batch order: `subrace-start-locations`, `subrace-start-settlements` (this change),
+  `entrance-probe-fixtures`, `retire-limbo-city-gates`, `drop-settlement-city-gate-field`.
+- Conflict notes:
+  - `retire-limbo-city-gates` copies this change's `map-knowledge` requirement text, so
+    this change must archive first.
+  - Both changes edit `web/tests/browser/fixtures.py::journey_settlement_scope`.
 
 ## Capabilities
 
 ### New Capabilities
 
-- `character-start-location`: the per-subrace start-settlement registry, its
-  validation at import and at map-world adoption, and resolving it to a room.
+None.
 
 ### Modified Capabilities
 
@@ -69,14 +61,11 @@ the gate `home` re-anchor and the `city_gate` document field.
 
 ## Impact
 
-- Code: `world/lore/start_locations.py` (new), `world/lore/registry_index.py`,
-  `world/rules/start_location.py` (new), `world/rules/character_creation.py`,
-  `world/rules/creation_wizard.py`, `world/maps/static_references.py`.
-- Tests: new `world/rules/tests/test_start_location.py` and
-  `world/lore/tests/test_start_locations.py`. The new stub is added to every existing
-  activation test module (listed in tasks.md). Synthetic kit: `data_characters.py`,
-  `targets.py`, `__init__.py`. Browser: `web/tests/browser/seed/runner.py`,
+- Code: `world/rules/character_creation.py`, `world/rules/creation_wizard.py`.
+- Tests: new `world/tests/start_room_fixture.py`. The stub is added to every existing
+  activation test module listed in tasks.md. Placement tests go in
+  `test_activation_rollback.py`, `test_creation_wizard.py`,
+  `test_starting_companions.py` and `test_fingerprint_activate.py`. Browser: `web/tests/browser/seed/runner.py`,
   `web/tests/browser/seed/npc_persona_fixture.py`, `web/tests/browser/fixtures.py`.
-- Docs: `docs/development/adding-player-presets.md` (start location note),
-  `world/rules/AGENTS.md` module table.
+- Docs: `docs/development/adding-player-presets.md` (start location note).
 - No human-reviewed document. Every requirement here is mechanism-testable.
