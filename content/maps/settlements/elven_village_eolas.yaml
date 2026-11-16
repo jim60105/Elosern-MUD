@@ -1,0 +1,177 @@
+# Settlement local map authored source (schema version 1).
+# Hand-authored for 幽月谷村: the graph, prototypes, options, entrances and
+# map-owned scene associations live here. `location_ref` is the only reverse
+# link: a location's local map is discovered by this field, so a new map for
+# an existing location needs no Python registration.
+version: 1
+kind: settlement
+id: elven_village_eolas
+location_ref: elven_village_eolas
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  forest_trail:
+    x_m: 372
+    y_m: 655
+    prototype_parent: grid_room
+    key: 深林獸徑
+    desc: 谷口之外就是北邊的深林，來去村子只有這一條獸徑。徑旁的老枝上掛著村民從林裡帶回的獸角與爪，一端繫著褪色的布條，風起時互相碰撞出聲。
+    anchor_key:
+    typeclass:
+    scene_archetype: forest_path
+  brook_head:
+    x_m: 318
+    y_m: 512
+    prototype_parent: grid_room
+    key: 溪源
+    desc: 石壁下湧出的泉水是全村的水源，石槽接著水流，汲水的人把木桶擱在槽邊。溪水自此往南穿過谷底，水聲終日在坡上響著。
+    anchor_key:
+    typeclass:
+    scene_archetype: mountain_path
+  proving_ground:
+    x_m: 96
+    y_m: 548
+    prototype_parent: grid_room
+    key: 試法坪
+    desc: 離住屋最遠、靠著獸徑的一塊空地，村裡的試法都在這裡。地面被燒過、凍過、裂開過，草長不齊，石上留著深淺不一的痕跡。
+    anchor_key:
+    typeclass:
+    scene_archetype: mountain_path
+  hot_spring:
+    x_m: 497
+    y_m: 468
+    prototype_parent: grid_room
+    key: 溫泉浴場
+    desc: 谷壁底下湧出溫泉，石頭圍成幾窪池子，水面上浮著一層白氣。村人在這裡洗身、洗衣，順便把一天的事說完才回家。
+    anchor_key:
+    typeclass:
+    scene_archetype: mountain_path
+  valley_floor:
+    x_m: 286
+    y_m: 322
+    prototype_parent: anchor_room
+    key: 谷底空地
+    desc: 谷底最平坦的一塊空地，被往來的腳步踩得結實。族人日常在這裡碰面，分派活計、交換消息，孩子繞著空地跑。
+    anchor_key: elven_village_eolas
+    typeclass:
+    scene_archetype: city_street
+  silk_grove:
+    x_m: 72
+    y_m: 268
+    prototype_parent: grid_room
+    key: 蛛絲林
+    desc: 林子裡養著一群蛛，蛛網結在枝間，收下來的絲織成村人身上那件白衣。走近時要放輕腳步，蛛怕震動，絲斷了就白費一季。
+    anchor_key:
+    typeclass:
+    scene_archetype: forest_path
+  cliff_dwellings:
+    x_m: 468
+    y_m: 297
+    prototype_parent: grid_room
+    key: 岩屋坡
+    desc: 住屋鑿在谷壁的岩層裡，一戶挨著一戶，門前的繩上晾著洗好的衣物。傍晚炊煙從岩縫間升起來，從谷底往上看，坡上亮起燈火。
+    anchor_key:
+    typeclass:
+    scene_archetype: mountain_path
+  terrace_gardens:
+    x_m: 241
+    y_m: 148
+    prototype_parent: grid_room
+    key: 石階菜畦
+    desc: 谷底往上的坡被砌成幾層石畦，種著塊根、豆子與香草。畦邊堆著歷年揀出來的小石，走道只容一人通過。
+    anchor_key:
+    typeclass:
+    scene_archetype: mountain_path
+  kiln_yard:
+    x_m: 412
+    y_m: 121
+    prototype_parent: grid_room
+    key: 窯場
+    desc: 村裡共用的一座窯，燒陶也燒玻璃，火門前堆著待燒的坯。窯火旺的時候，順手把麥餅貼在窯壁上一併烤熟，出窯時掰開分著吃。
+    anchor_key:
+    typeclass:
+    scene_archetype: mountain_path
+roads:
+  - source: forest_trail
+    destination: brook_head
+    direction: s
+  - source: brook_head
+    destination: forest_trail
+    direction: n
+  - source: brook_head
+    destination: proving_ground
+    direction: w
+  - source: proving_ground
+    destination: brook_head
+    direction: e
+  - source: brook_head
+    destination: hot_spring
+    direction: e
+  - source: hot_spring
+    destination: brook_head
+    direction: w
+  - source: brook_head
+    destination: valley_floor
+    direction: s
+    bends:
+      - {x_m: 338, y_m: 418}
+  - source: valley_floor
+    destination: brook_head
+    direction: n
+    bends:
+      - {x_m: 338, y_m: 418}
+  - source: hot_spring
+    destination: cliff_dwellings
+    direction: s
+    bends:
+      - {x_m: 521, y_m: 383}
+  - source: cliff_dwellings
+    destination: hot_spring
+    direction: n
+    bends:
+      - {x_m: 521, y_m: 383}
+  - source: valley_floor
+    destination: cliff_dwellings
+    direction: e
+  - source: cliff_dwellings
+    destination: valley_floor
+    direction: w
+  - source: valley_floor
+    destination: silk_grove
+    direction: w
+  - source: silk_grove
+    destination: valley_floor
+    direction: e
+  - source: valley_floor
+    destination: terrace_gardens
+    direction: s
+  - source: terrace_gardens
+    destination: valley_floor
+    direction: n
+  - source: valley_floor
+    destination: kiln_yard
+    direction: se
+    bends:
+      - {x_m: 371, y_m: 236}
+  - source: kiln_yard
+    destination: valley_floor
+    direction: nw
+    bends:
+      - {x_m: 371, y_m: 236}
+wilderness_entry:
+  shape:
+    - "#"
+  offset:
+    dx: 0
+    dy: 0
+  gates:
+    - return_direction: s
+      destination_node: forest_trail
+city_gate:
+  node: forest_trail
+  exit_key: 深林獸徑
+  exit_aliases: []
