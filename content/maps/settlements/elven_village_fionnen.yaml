@@ -1,0 +1,209 @@
+# Settlement local map authored source (schema version 1).
+# Hand-authored for 翠綠森林村: the graph, prototypes, options, entrances and
+# map-owned scene associations live here. `location_ref` is the only reverse
+# link: a location's local map is discovered by this field, so a new map for
+# an existing location needs no Python registration.
+version: 1
+kind: settlement
+id: elven_village_fionnen
+location_ref: elven_village_fionnen
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  leaf_veiled_path:
+    x_m: 742
+    y_m: 388
+    prototype_parent: grid_room
+    key: 葉隱小徑
+    desc: 枝葉低垂，遮住了進村的那道缺口，從外頭看只是一片尋常的林子。撥開枝條往裡走，腳下的路才顯出來。
+    anchor_key:
+    typeclass:
+    scene_archetype: forest_path
+  light_court:
+    x_m: 428
+    y_m: 352
+    prototype_parent: anchor_room
+    key: 林間光庭
+    desc: 巨樹的樹冠在這裡讓開一個缺口，整片陽光直落地面。村人在這塊光裡聚攏，分派活計、交換消息，孩子追著光斑跑。
+    anchor_key: elven_village_fionnen
+    typeclass:
+    scene_archetype: city_street
+  archery_lane:
+    x_m: 618
+    y_m: 566
+    prototype_parent: grid_room
+    key: 靶道
+    desc: 樹幹上釘著靶，遠處還掛著會晃動的木牌，箭術與光魔法都在這條道上練。地上散著磨禿的箭羽，靶心的樹皮早已剝落。
+    anchor_key:
+    typeclass:
+    scene_archetype: forest_path
+  blossom_garden:
+    x_m: 603
+    y_m: 196
+    prototype_parent: grid_room
+    key: 花蕊蜜園
+    desc: 花圃一畦接一畦，蜂箱擱在畦邊的樹蔭下，蜂在花間進出。採下來的蜜與花瓣一起熬煮，做成蜜漬的花瓣，是村裡常備的甜食。
+    anchor_key:
+    typeclass:
+    scene_archetype: forest_path
+  forest_brook:
+    x_m: 478
+    y_m: 178
+    prototype_parent: grid_room
+    key: 林溪
+    desc: 林間的小溪清淺見底，村人在這裡汲水。上游洗菜，下游洗衣，石頭上常年擱著一個木盆。
+    anchor_key:
+    typeclass:
+    scene_archetype: forest_path
+  bathing_pool:
+    x_m: 268
+    y_m: 118
+    prototype_parent: grid_room
+    key: 林泉浴場
+    desc: 溪水在下游聚成一汪池子，四周圍著被日頭曬暖的石頭。村人在這裡洗身、泡水，順便把一天的事說完。
+    anchor_key:
+    typeclass:
+    scene_archetype: forest_path
+  forest_plots:
+    x_m: 446
+    y_m: 38
+    prototype_parent: grid_room
+    key: 林間菜圃
+    desc: 巨樹之間的隙地開成菜圃，蔬菜成排種到樹根邊，果樹雜在其間。收成不多，夠村裡吃，多的曬乾留到冬天。
+    anchor_key:
+    typeclass:
+    scene_archetype: forest_path
+  craft_glade:
+    x_m: 236
+    y_m: 22
+    prototype_parent: grid_room
+    key: 木作空地
+    desc: 空地中央擺著幾張矮凳，木料堆在樹下，刨花落了一地。弓、箭與修橋的板材都在這裡做，織補的活也在同一塊地上。
+    anchor_key:
+    typeclass:
+    scene_archetype: forest_path
+  root_dwellings:
+    x_m: 214
+    y_m: 318
+    prototype_parent: grid_room
+    key: 樹根屋
+    desc: 住屋蓋在巨樹的板根之間，屋頂就著樹幹的走向搭起，門前踩出一小塊平地。傍晚屋裡透出燈火，樹根上晾著孩子的衣物。
+    anchor_key:
+    typeclass:
+    scene_archetype: forest_path
+  canopy_walk:
+    x_m: 392
+    y_m: 548
+    prototype_parent: grid_room
+    key: 樹冠吊橋
+    desc: 樹冠上架著木板與繩橋，一戶人家的門正對著另一戶。風大的日子繩橋會晃，走慣的人不必扶繩，屋與屋之間的往來都在半空中。
+    anchor_key:
+    typeclass:
+    scene_archetype: forest_path
+  lookout_bough:
+    x_m: 176
+    y_m: 590
+    prototype_parent: grid_room
+    key: 瞭望枝
+    desc: 村裡最高的那棵樹，頂端的粗枝伸向東方，可以望見東邊的平原。獵隊出發前會爬上來，看雲與風判斷當天的天氣。
+    anchor_key:
+    typeclass:
+    scene_archetype: forest_path
+roads:
+  - source: leaf_veiled_path
+    destination: light_court
+    direction: w
+    bends:
+      - {x_m: 634, y_m: 412}
+      - {x_m: 531, y_m: 371}
+  - source: light_court
+    destination: leaf_veiled_path
+    direction: e
+    bends:
+      - {x_m: 531, y_m: 371}
+      - {x_m: 634, y_m: 412}
+  - source: light_court
+    destination: archery_lane
+    direction: ne
+  - source: archery_lane
+    destination: light_court
+    direction: sw
+  - source: light_court
+    destination: blossom_garden
+    direction: se
+  - source: blossom_garden
+    destination: light_court
+    direction: nw
+  - source: light_court
+    destination: canopy_walk
+    direction: n
+  - source: canopy_walk
+    destination: light_court
+    direction: s
+  - source: light_court
+    destination: root_dwellings
+    direction: w
+  - source: root_dwellings
+    destination: light_court
+    direction: e
+  - source: light_court
+    destination: forest_brook
+    direction: s
+  - source: forest_brook
+    destination: light_court
+    direction: n
+  - source: canopy_walk
+    destination: lookout_bough
+    direction: w
+    bends:
+      - {x_m: 287, y_m: 556}
+  - source: lookout_bough
+    destination: canopy_walk
+    direction: e
+    bends:
+      - {x_m: 287, y_m: 556}
+  - source: root_dwellings
+    destination: bathing_pool
+    direction: s
+  - source: bathing_pool
+    destination: root_dwellings
+    direction: n
+  - source: bathing_pool
+    destination: forest_brook
+    direction: e
+    bends:
+      - {x_m: 372, y_m: 131}
+  - source: forest_brook
+    destination: bathing_pool
+    direction: w
+    bends:
+      - {x_m: 372, y_m: 131}
+  - source: forest_brook
+    destination: forest_plots
+    direction: s
+  - source: forest_plots
+    destination: forest_brook
+    direction: n
+  - source: forest_plots
+    destination: craft_glade
+    direction: w
+  - source: craft_glade
+    destination: forest_plots
+    direction: e
+wilderness_entry:
+  shape:
+    - "#"
+  offset:
+    dx: 0
+    dy: 0
+  gates:
+    - return_direction: w
+      destination_node: leaf_veiled_path
+city_gate:
+  node: leaf_veiled_path
+  exit_key: 葉隱小徑
+  exit_aliases: []

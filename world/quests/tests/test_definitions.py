@@ -4,8 +4,10 @@ Unit tests for deterministic quest definitions (tasks 2.1-2.6)."""
 from tools.spec_traceability import covers_requirement
 
 import unittest
+from unittest import mock
 
 from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY
+from world.lore.anchors import anchors
 from world.lore.monster_placement import (
     CompositionMember,
     EncounterComposition,
@@ -340,7 +342,17 @@ class DefinitionRegistrationTests(QuestRegistryIsolation, unittest.TestCase):
 
     @covers_requirement("quest-blueprint::destinations-distinguish-permanent-locations-from-future-bound-instances")
     def test_lore_known_but_unplaced_anchor_is_rejected(self):
-        self.assertNotIn("elven_village_fionnen", ANCHOR_PLACEMENT_REGISTRY)
+        # The anchor is lore-known; its placement row is removed from the
+        # registry the validator reads, so the case never depends on which
+        # locations ship a local map.
+        unplaced_key = anchor_locator().anchor_key
+        self.assertIn(unplaced_key, anchors())
+        self.assertIn(unplaced_key, ANCHOR_PLACEMENT_REGISTRY)
+        remaining = {
+            key: row
+            for key, row in ANCHOR_PLACEMENT_REGISTRY.items()
+            if key != unplaced_key
+        }
         unplaced = QuestDefinition(
             key="anchor-unplaced",
             display_name="未落錨",
@@ -349,13 +361,16 @@ class DefinitionRegistrationTests(QuestRegistryIsolation, unittest.TestCase):
             stages=(
                 QuestStage(
                     0,
-                    reach(RoomLocator(DestinationKind.ANCHOR, anchor_key="elven_village_fionnen")),
+                    reach(RoomLocator(DestinationKind.ANCHOR, anchor_key=unplaced_key)),
                 ),
             ),
         )
-        with self.assertRaises(QuestDefinitionError) as caught:
-            register(unplaced)
-        self.assertIn("elven_village_fionnen", str(caught.exception))
+        with mock.patch(
+            "world.quests.definitions.ANCHOR_PLACEMENT_REGISTRY", remaining
+        ):
+            with self.assertRaises(QuestDefinitionError) as caught:
+                register(unplaced)
+        self.assertIn(unplaced_key, str(caught.exception))
         self.assertNotIn("anchor-unplaced", QUEST_DEFINITION_REGISTRY)
 
     def test_ambiguous_and_malformed_locators_rejected(self):

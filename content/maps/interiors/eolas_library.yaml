@@ -1,0 +1,20 @@
+# Permanent interior authored source (schema version 1).
+# The sole authority for the room's identity, name, prose, scene metadata and
+# its one exterior entrance relationship. The room id is the stable place key
+# a service record joins to, so a service record declares no geometry.
+version: 1
+kind: interior
+id: eolas_library
+rooms:
+  eolas_library:
+    name_zh: 圖書館
+    desc_zh: 岩屋鑿出的兩間石室，沿牆的架上是幾百年來的實驗紀錄與抄本，紙頁被翻得發軟。沒有人管理，誰都可以進來讀，讀完把書放回原來的位置。
+    scene_archetype: tavern_interior
+connections: []
+exterior:
+  settlement: elven_village_eolas
+  node: cliff_dwellings
+  room: eolas_library
+  doorway_key: 圖書館
+  doorway_aliases:
+  - library

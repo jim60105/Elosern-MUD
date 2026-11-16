@@ -1,0 +1,21 @@
+# Permanent interior authored source (schema version 1).
+# The sole authority for the room's identity, name, prose, scene metadata and
+# its one exterior entrance relationship. The room id is the stable place key
+# a service record joins to, so a service record declares no geometry.
+version: 1
+kind: interior
+id: eolas_storehouse
+rooms:
+  eolas_storehouse:
+    name_zh: 儲糧窖
+    desc_zh: 岩壁下挖出的窖，終年陰涼，架上分門別類放著穀物、塊根與留種的籽實。進出的人自己登記拿了多少，窖裡的味道是乾土與穀殼。
+    scene_archetype: cave_interior
+connections: []
+exterior:
+  settlement: elven_village_eolas
+  node: terrace_gardens
+  room: eolas_storehouse
+  doorway_key: 儲糧窖
+  doorway_aliases:
+  - storehouse
+  - cellar

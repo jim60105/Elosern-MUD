@@ -105,6 +105,15 @@ nodes:
     anchor_key:
     typeclass:
     scene_archetype: forest_path
+  bathing_pool:
+    x_m: 781
+    y_m: 14
+    prototype_parent: grid_room
+    key: 溪池浴場
+    desc: 溪流出村之後匯成一汪淺池，岸邊的石頭被水磨得圓滑。村人在這裡洗身、洗衣，孩子在水淺處玩；傍晚水面映著谷上的燈火。
+    anchor_key:
+    typeclass:
+    scene_archetype: wilderness_path
 roads:
   - source: hidden_path
     destination: village_plaza
@@ -160,6 +169,12 @@ roads:
   - source: herb_garden
     destination: training_clearing
     direction: w
+  - source: stream_bend
+    destination: bathing_pool
+    direction: se
+  - source: bathing_pool
+    destination: stream_bend
+    direction: nw
 wilderness_entry:
   shape:
     - "#"

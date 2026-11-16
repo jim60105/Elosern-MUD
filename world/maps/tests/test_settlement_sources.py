@@ -31,9 +31,10 @@ from world.tests.geography_fixture import publish_shipped_settlements
 
 publish_shipped_settlements()
 
-#: A synthetic third settlement bound to an authored location that has no
-#: shipped local map. Its ids deliberately differ from the location it binds, so
-#: the location-derived (not identity-derived) reverse navigation is exercised.
+#: A synthetic third settlement bound to an authored location. Each candidate
+#: here is composed without the shipped settlement documents. Its ids
+#: deliberately differ from the location it binds, so the location-derived
+#: (not identity-derived) reverse navigation is exercised.
 _THIRD = """
 version: 1
 kind: settlement

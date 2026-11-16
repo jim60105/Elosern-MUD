@@ -1,0 +1,20 @@
+# Permanent interior authored source (schema version 1).
+# The sole authority for the room's identity, name, prose, scene metadata and
+# its one exterior entrance relationship. The room id is the stable place key
+# a service record joins to, so a service record declares no geometry.
+version: 1
+kind: interior
+id: fionnen_silverfeather
+rooms:
+  fionnen_silverfeather:
+    name_zh: 銀羽驛站・翠綠森林分站
+    desc_zh: 信架靠著樹幹立起，分格放著遠近各地的來信，公用信紙與封蠟擱在最下層。寄信取信都自己動手，架上從不鎖。
+    scene_archetype: tavern_interior
+connections: []
+exterior:
+  settlement: elven_village_fionnen
+  node: light_court
+  room: fionnen_silverfeather
+  doorway_key: 銀羽驛站
+  doorway_aliases:
+  - courier

@@ -1,0 +1,21 @@
+# Permanent interior authored source (schema version 1).
+# The sole authority for the room's identity, name, prose, scene metadata and
+# its one exterior entrance relationship. The room id is the stable place key
+# a service record joins to, so a service record declares no geometry.
+version: 1
+kind: interior
+id: fionnen_shelter
+rooms:
+  fionnen_shelter:
+    name_zh: 共食棚
+    desc_zh: 樹蔭下一片編枝的棚頂，底下擺著長桌，桌腳埋進土裡。村人各自帶一份過來，坐下就吃，棚裡整天有人在。
+    scene_archetype: tavern_interior
+connections: []
+exterior:
+  settlement: elven_village_fionnen
+  node: light_court
+  room: fionnen_shelter
+  doorway_key: 共食棚
+  doorway_aliases:
+  - shelter
+  - communal shelter
