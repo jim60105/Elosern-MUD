@@ -7,7 +7,7 @@ a puppeted WebSocket session, and a Telnet session.
 
 from tools.spec_traceability import covers_requirement
 
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from evennia.server.serversession import ServerSession
 from evennia.utils.test_resources import EvenniaTest
@@ -15,6 +15,7 @@ from twisted.internet.defer import Deferred, succeed
 
 from server.conf import inputfuncs
 from typeclasses.characters import PlayerCharacter
+from world.rules import player_input
 
 
 def _make_session(sessionhandler, protocol_key, account=None):
@@ -35,6 +36,8 @@ class UiSyncIntegrationTests(EvenniaTest):
 
     def setUp(self):
         super().setUp()
+        player_input.reset_player_input()
+        self.addCleanup(player_input.reset_player_input)
         self.ws_session = _make_session(evennia_session_handler(), "webclient/websocket")
         self.sessionhandler.data_out.reset_mock()
 
@@ -237,6 +240,8 @@ class TextInputFunctionTests(EvenniaTest):
 
     def setUp(self):
         super().setUp()
+        player_input.reset_player_input()
+        self.addCleanup(player_input.reset_player_input)
         self.ws_session = _make_session(evennia_session_handler(), "webclient/websocket")
         self.sessionhandler.data_out.reset_mock()
 
@@ -324,6 +329,95 @@ class TextInputFunctionTests(EvenniaTest):
             inputfuncs.text(session, "idle")
         fake.assert_not_called()
         self.sessionhandler.data_out.assert_not_called()
+
+
+class PlayerInputIngressTests(EvenniaTest):
+    """Only real player input is recorded for the periodic drain gate."""
+
+    character_typeclass = PlayerCharacter
+
+    def setUp(self):
+        super().setUp()
+        player_input.reset_player_input()
+        self.addCleanup(player_input.reset_player_input)
+        self.ws_session = _make_session(evennia_session_handler(), "webclient/websocket")
+        self.sessionhandler.data_out.reset_mock()
+
+    def tearDown(self):
+        player_input.reset_player_input()
+        self.sessionhandler.data_out.reset_mock()
+        super().tearDown()
+
+    @property
+    def sessionhandler(self):
+        import evennia
+
+        return evennia.SESSION_HANDLER
+
+    @covers_requirement(
+        "population-settlement-units::player-input-is-recorded-at-command-and-action-ingress"
+    )
+    def test_text_command_records_player_input(self):
+        with patch("server.conf.inputfuncs.cmdhandler", return_value=succeed(None)):
+            inputfuncs.text(self.ws_session, "look")
+        self.assertIsNotNone(player_input.seconds_since_player_input())
+
+    @covers_requirement(
+        "population-settlement-units::player-input-is-recorded-at-command-and-action-ingress"
+    )
+    def test_idle_keepalive_records_no_player_input(self):
+        with patch("server.conf.inputfuncs.cmdhandler") as fake:
+            inputfuncs.text(self.ws_session, "idle")
+        fake.assert_not_called()
+        self.assertIsNone(player_input.seconds_since_player_input())
+
+    @covers_requirement(
+        "population-settlement-units::player-input-is-recorded-at-command-and-action-ingress"
+    )
+    def test_puppeted_ui_action_records_player_input(self):
+        session = self.ws_session
+        session.puppet = self.char1
+        action = {
+            "protocol_version": 1,
+            "presentation_epoch": "a" * 22,
+            "request_id": "input:1",
+            "base_revision": 1,
+            "action_id": "explore.rest",
+            "payload": {},
+        }
+        with patch("server.conf.inputfuncs.handle_ui_action") as handle:
+            inputfuncs.ui_action(session, action)
+        handle.assert_called_once()
+        self.assertIsNotNone(player_input.seconds_since_player_input())
+
+    @covers_requirement(
+        "population-settlement-units::player-input-is-recorded-at-command-and-action-ingress"
+    )
+    def test_sync_and_unpuppeted_action_record_no_player_input(self):
+        session = self.ws_session
+        session.puppet = self.char1
+        with patch("server.conf.inputfuncs.synchronize_session") as synchronize:
+            inputfuncs.ui_sync(session, {"protocol_version": 1})
+        synchronize.assert_called_once()
+        self.assertIsNone(
+            player_input.seconds_since_player_input(),
+            "a synchronization request must not record player input",
+        )
+
+        session.puppet = None
+        action = {
+            "protocol_version": 1,
+            "presentation_epoch": "a" * 22,
+            "request_id": "input:2",
+            "base_revision": 1,
+            "action_id": "explore.rest",
+            "payload": {},
+        }
+        inputfuncs.ui_action(session, action)
+        self.assertIsNone(
+            player_input.seconds_since_player_input(),
+            "an unpuppeted action must not record player input",
+        )
 
 
 if __name__ == "__main__":

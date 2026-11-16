@@ -13,10 +13,10 @@ world tick and admits no field contact; it materialises game time that already
 elapsed through player actions.
 
 ``PopulationDrainScript`` is the thin periodic caller: it holds no logic of its
-own beyond the enable switch and reads its interval from settings at creation.
-The reactor is single-threaded and every clock advance is synchronous, so a
-repeat can never interleave with a pass; a drain is never called from inside
-one either.
+own beyond the enable switch and the recent-input gate, and reads its interval
+from settings at creation. The reactor is single-threaded and every clock
+advance is synchronous, so a repeat can never interleave with a pass; a drain
+is never called from inside one either.
 """
 
 from __future__ import annotations
@@ -30,6 +30,7 @@ from evennia import DefaultScript
 
 from world.maps import population_lifecycle, population_units, regional_population
 from world.observability import log_error, log_info
+from world.rules import player_input
 from world.rules.clock import held_advance_registry, restore_advance_registry
 
 #: How many lagging closed sets one run tries before it yields to the reactor.
@@ -151,7 +152,11 @@ def drain_population_backlog(slice_seconds: int) -> bool:
 
 
 class PopulationDrainScript(DefaultScript):
-    """Periodically settles the most lagging population set by one slice."""
+    """Periodically settles the most lagging population set by one slice.
+
+    A repeat inside the idle window since the last player input returns before
+    reading any population record.
+    """
 
     def at_script_creation(self) -> None:
         self.key = "population_drain"
@@ -162,6 +167,9 @@ class PopulationDrainScript(DefaultScript):
 
     def at_repeat(self) -> None:
         if not settings.POPULATION_DRAIN_ENABLED:
+            return
+        idle = player_input.seconds_since_player_input()
+        if idle is not None and idle < settings.POPULATION_DRAIN_IDLE_SECONDS:
             return
         drain_population_backlog(settings.POPULATION_DRAIN_SLICE_SECONDS)
 

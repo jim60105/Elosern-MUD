@@ -220,7 +220,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "b7b554ef36b64fbc73ae6c4ced66182919fdbaeb584abf1902a743cbed9073eb",
+  "fingerprint": "d3d7b6a7e7cda4ba6ac88c144205db83a114f055dd319d616965b92bb7eb336a",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -16364,6 +16364,7 @@
     "world/rules/persona_edit.py": "5428ff71124b5f08c9619a11bd84e14300eed2aba5bb080b47353c7fb2156611",
     "world/rules/phase_hooks.py": "7625f75ccc45b769f893b315fa5fb0b41323dd32761f146d808cb76ab00dc54a",
     "world/rules/player_control.py": "e4488afe9b22179a52f615098b82feebb261dc8018f8aa177eac093983785116",
+    "world/rules/player_input.py": "c9635da922f94178b2607b54d55e372353363a8b2fd283ba8b6d0a37d0f7dfb2",
     "world/rules/player_messages.py": "b6020c28561d50e49ea3aa6d39c22e913678b635d6c599e12fcae206d78b5456",
     "world/rules/pleasure.py": "09d5fdf11f720c6d0be2349542684b532d61f4a2a52cce84b81d6ab2204c02ab",
     "world/rules/possession.py": "bcf4f398e8195424bc0c950f49270bf0e70f0b71dd83df3a2a899432cbe7db8c",

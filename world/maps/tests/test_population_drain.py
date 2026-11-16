@@ -15,10 +15,9 @@ Script's own functions with deterministic inputs, never by starting a timer or
 sleeping. Because ``default`` is also the residual unit's cursor, every scenario
 writes the cursor record explicitly so exactly the intended units lag.
 
-The four ADDED requirements of this change have no canonical identifiers before
-the archive sync, so this module carries no ``covers_requirement`` annotation;
-the hand-off from each test to its requirement and scenario is in the apply
-report.
+The ``covers_requirement`` annotations of this module were added by the archive
+workflow, after the delta sync gave the requirements their canonical
+identifiers.
 """
 
 from __future__ import annotations
@@ -68,6 +67,7 @@ from world.maps.tests.test_scoped_population_settlement import (
     ZONE_B,
 )
 from world.maps.wilderness_provider import WILDERNESS_NAME
+from world.rules import player_input
 from world.rules.clock import get_world_clock
 from world.rules.movement_edges import LocationRef
 
@@ -87,6 +87,8 @@ class DrainFixture(ScopedSettlementFixture):
 
     def setUp(self):
         super().setUp()
+        player_input.reset_player_input()
+        self.addCleanup(player_input.reset_player_input)
         self._build_scenario(end_tick=COMPLETION_TICK)
 
     # -- runs ---------------------------------------------------------------
@@ -485,6 +487,83 @@ class PeriodicCallerTests(DrainFixture):
         drain.assert_called_once_with(SLICE)
         self.assertEqual(self.settled_through(self.unit_a), START + SLICE)
 
+    @covers_requirement(
+        "population-settlement-units::the-periodic-drain-yields-to-recent-player-input"
+    )
+    def test_recent_input_repeat_reads_nothing_and_drains_nothing(self):
+        self.set_world_tick(700)
+        self.write_cursors(700, {self.unit_a: START})
+        with (
+            override_settings(
+                POPULATION_DRAIN_ENABLED=True, POPULATION_DRAIN_IDLE_SECONDS=20
+            ),
+            patch.object(player_input, "_now", side_effect=[100.0, 102.0]),
+            patch.object(
+                population_drain,
+                "drain_population_backlog",
+                wraps=drain_population_backlog,
+            ) as drain,
+            patch.object(population_units, "lagging_sets", wraps=lagging_sets) as lagging,
+            patch.object(
+                monster_activity,
+                "read_monster_activity",
+                wraps=read_monster_activity,
+            ) as activity,
+            patch.object(population_drain, "log_info") as info,
+        ):
+            player_input.note_player_input()
+            PopulationDrainScript.at_repeat(Mock())
+        drain.assert_not_called()
+        lagging.assert_not_called()
+        activity.assert_not_called()
+        info.assert_not_called()
+        self.assertEqual(self.settled_through(self.unit_a), START)
+
+    @covers_requirement(
+        "population-settlement-units::the-periodic-drain-yields-to-recent-player-input"
+    )
+    def test_a_window_old_input_repeat_drains_once(self):
+        self.set_world_tick(700)
+        self.write_cursors(700, {self.unit_a: START})
+        with (
+            override_settings(
+                POPULATION_DRAIN_ENABLED=True, POPULATION_DRAIN_IDLE_SECONDS=20
+            ),
+            patch.object(player_input, "_now", side_effect=[100.0, 120.0]),
+            patch.object(
+                population_drain,
+                "drain_population_backlog",
+                wraps=drain_population_backlog,
+            ) as drain,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            player_input.note_player_input()
+            PopulationDrainScript.at_repeat(Mock())
+        drain.assert_called_once_with(SLICE)
+        self.assertEqual(self.settled_through(self.unit_a), START + SLICE)
+
+    @covers_requirement(
+        "population-settlement-units::the-periodic-drain-yields-to-recent-player-input"
+    )
+    def test_no_recorded_input_repeat_drains_once(self):
+        self.set_world_tick(700)
+        self.write_cursors(700, {self.unit_a: START})
+        player_input.reset_player_input()
+        with (
+            override_settings(
+                POPULATION_DRAIN_ENABLED=True, POPULATION_DRAIN_IDLE_SECONDS=20
+            ),
+            patch.object(
+                population_drain,
+                "drain_population_backlog",
+                wraps=drain_population_backlog,
+            ) as drain,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            PopulationDrainScript.at_repeat(Mock())
+        drain.assert_called_once_with(SLICE)
+        self.assertEqual(self.settled_through(self.unit_a), START + SLICE)
+
     def test_script_creation_reads_the_configured_interval(self):
         script = create_script(PopulationDrainScript, obj=None, autostart=False)
         self.assertEqual(script.key, "population_drain")
@@ -493,6 +572,39 @@ class PeriodicCallerTests(DrainFixture):
         )
         self.assertTrue(script.persistent)
         self.assertGreater(MAX_SETS_PER_RUN, 0)
+
+
+class IdleWindowBypassTests(DrainFixture):
+    """The catch-up and a direct drain ignore the recorded player input."""
+
+    @covers_requirement(
+        "population-settlement-units::catch-up-and-direct-drains-ignore-the-idle-window"
+    )
+    def test_catch_up_during_activity_settles_to_the_world_tick(self):
+        self.set_world_tick(700)
+        self.write_cursors(700, {self.unit_a: START})
+        with patch.object(player_input, "_now", return_value=100.0):
+            player_input.note_player_input()
+            self.assertTrue(
+                population_lifecycle.ensure_population_current(
+                    self.wilderness, {self.unit_a}
+                )
+            )
+        self.assertEqual(self.settled_through(self.unit_a), self.world_tick())
+
+    @covers_requirement(
+        "population-settlement-units::catch-up-and-direct-drains-ignore-the-idle-window"
+    )
+    def test_direct_drain_during_activity_settles_one_slice(self):
+        self.set_world_tick(700)
+        self.write_cursors(700, {self.unit_a: START})
+        with (
+            patch.object(player_input, "_now", return_value=100.0),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            player_input.note_player_input()
+            self.assertTrue(self.drain())
+        self.assertEqual(self.settled_through(self.unit_a), START + SLICE)
 
 
 class QuietRunTests(DrainFixture):

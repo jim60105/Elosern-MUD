@@ -26,6 +26,7 @@ from web.webclient.presentation.protocol import (
     validate_ui_sync,
 )
 from web.webclient.presentation.registry import build_production_registry
+from world.rules.player_input import note_player_input
 
 
 def ui_sync(session, *args, **kwargs):
@@ -93,6 +94,7 @@ def ui_action(session, *args, **kwargs):
             return
         reject_no_puppet(session, action)
         return
+    note_player_input()
     handle_ui_action(
         session,
         actor,
@@ -120,6 +122,7 @@ def text(session, *args, **kwargs):
         session.update_session_counters(idle=True)
         return
 
+    note_player_input()
     txt = _maybe_strip_incoming_mxp(txt)
 
     if session.account:

@@ -3233,6 +3233,7 @@ performs one drain run while `POPULATION_DRAIN_ENABLED` is true.
 | `POPULATION_DRAIN_ENABLED` | `True` | Whether the periodic caller drains |
 | `POPULATION_DRAIN_INTERVAL_SECONDS` | `2` | Real seconds between repeats |
 | `POPULATION_DRAIN_SLICE_SECONDS` | `600` | Game seconds one run advances |
+| `POPULATION_DRAIN_IDLE_SECONDS` | `20` | Real seconds without player input before a repeat drains |
 
 Each has an environment override of the same name; see
 `docs/development/settings-and-environment.md`. A disabled drain changes no
@@ -3240,6 +3241,14 @@ outcome: a lagging unit is still caught up synchronously by the first action
 that needs it. The slice of 600 equals
 `monster_activity.RESTING_DECISION_INTERVAL`, so one slice of a resting unit
 holds about one decision per group.
+
+A repeat also runs nothing while the last player input is newer than
+`POPULATION_DRAIN_IDLE_SECONDS`. Input is a non-idle text command or a
+WebClient UI action sent by a session with a puppet; an idle keepalive, a
+synchronization request and an unpuppeted action are not input. The recorded
+time is an in-memory monotonic reading, so a reload starts with no input
+recorded and reads as idle. The synchronous catch-up and a direct
+`drain_population_backlog` call ignore the record.
 
 To drain by hand from a shell (for example after a long time skip):
 

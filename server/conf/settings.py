@@ -666,10 +666,12 @@ ART_SCHEDULER_LIMIT = _env_int("ART_SCHEDULER_LIMIT", 4)
 # only the observed units, so a periodic drain pays the unobserved units' debt
 # off the action path in bounded game-time slices. When it is disabled, a
 # lagging unit is still caught up synchronously by the first action that needs
-# it. The interval is real seconds; the slice is game seconds.
+# it. The interval is real seconds; the slice is game seconds. A repeat is
+# skipped while a player sent input within the idle window (real seconds).
 POPULATION_DRAIN_ENABLED = _env_bool("POPULATION_DRAIN_ENABLED", True)
 POPULATION_DRAIN_INTERVAL_SECONDS = _env_int("POPULATION_DRAIN_INTERVAL_SECONDS", 2)
 POPULATION_DRAIN_SLICE_SECONDS = _env_int("POPULATION_DRAIN_SLICE_SECONDS", 600)
+POPULATION_DRAIN_IDLE_SECONDS = _env_int("POPULATION_DRAIN_IDLE_SECONDS", 20)
 
 # The periodic art drain Script. It survives reloads and is recreated
 # automatically; at_script_creation reads the interval from the settings above.
