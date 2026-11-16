@@ -101,7 +101,7 @@ Precondition: `subrace-start-locations` is archived on master.
   It must exit 0.
 - [x] 3.3 `uv run --locked python -m tools.observability_lint check` is clean, including
   the new `log_warn` and `log_info` calls.
-- [ ] 3.4 Run `pnpm run build`, then
+- [x] 3.4 Run `pnpm run build`, then
   `uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_browser_creation_preset`
   and `... web.tests.browser.test_browser_creation_custom`. Then run
   `EV web.webclient.actions.tests.test_party_management_acceptance_fixture` (the
