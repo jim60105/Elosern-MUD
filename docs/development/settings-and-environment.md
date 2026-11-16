@@ -105,6 +105,7 @@ django.core.exceptions.ImproperlyConfigured: setting ART_SD_STEPS: invalid envir
 | `POPULATION_DRAIN_ENABLED` | `POPULATION_DRAIN_ENABLED` | 布林 | `True` | 布林字（1/true/yes/on／0/false/no/off，不分大小寫）；False 時 PopulationDrainScript 永不排空；落後的單位仍會在需要它的下一個動作前同步追趕 |
 | `POPULATION_DRAIN_INTERVAL_SECONDS` | `POPULATION_DRAIN_INTERVAL_SECONDS` | 整數 | `2` | 正整數；排空重複間隔的真實秒數（於 Script 建立時讀取） |
 | `POPULATION_DRAIN_SLICE_SECONDS` | `POPULATION_DRAIN_SLICE_SECONDS` | 整數 | `600` | 正整數；每次排空推進的遊戲秒數（等於 `monster_activity.RESTING_DECISION_INTERVAL`，故休息中的單位每次約走一個決策） |
+| `POPULATION_DRAIN_IDLE_SECONDS` | `POPULATION_DRAIN_IDLE_SECONDS` | 整數 | `20` | 正整數；玩家最近一次輸入後經過的真實秒數未達此值時，排空重複會跳過；同步追趕不受影響 |
 
 ### Webclient 載入旗標
 
