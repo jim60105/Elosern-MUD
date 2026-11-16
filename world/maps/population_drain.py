@@ -3,9 +3,10 @@
 A clock advance settles only the units a player observes, so an unobserved unit
 falls behind the world tick and would pay its whole debt in one synchronous
 step when a player first comes near. This module pays that debt off the action
-path: one drain run selects the closed set of units with the lowest
-settled-through tick and settles it forward by at most one bounded slice of
-game time, in its own short transaction with full rollback.
+path: one drain run performs a bounded number of steps, each selecting the
+closed set of units with the lowest settled-through tick and settling it
+forward by at most one bounded slice of game time, in its own short transaction
+with full rollback.
 
 Any partition of the same elapsed interval gives the same per-unit result, so
 materialising the debt in slices changes no outcome. The drain never moves the
@@ -21,7 +22,7 @@ is never called from inside one either.
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 
 from django.conf import settings
 from django.db import transaction
@@ -33,8 +34,8 @@ from world.observability import log_error, log_info
 from world.rules import player_input
 from world.rules.clock import held_advance_registry, restore_advance_registry
 
-#: How many lagging closed sets one run tries before it yields to the reactor.
-MAX_SETS_PER_RUN = 3
+#: How many failed sets one run tolerates before it yields to the reactor.
+MAX_FAILED_SETS_PER_RUN = 3
 
 
 def _require_slice(slice_seconds: object) -> int:
@@ -50,52 +51,76 @@ def _require_slice(slice_seconds: object) -> int:
     return slice_seconds
 
 
+def _require_steps(max_steps: object) -> int:
+    """One positive settlement-step count; every other value is an argument error."""
+    if (
+        isinstance(max_steps, bool)
+        or not isinstance(max_steps, int)
+        or max_steps <= 0
+    ):
+        raise ValueError(
+            f"max_steps must be a positive integer, got {max_steps!r}"
+        )
+    return max_steps
+
+
 def _units_still_lagging(
     pending: Iterable[tuple[int, frozenset[str]]],
     cursors: population_units.UnitCursors,
-    settled: frozenset[str],
+    advanced: Mapping[str, int],
+    units: frozenset[str],
     target: int,
     now: int,
 ) -> int:
-    """How many units lag once this run settled ``settled`` to ``target``.
+    """How many units lag once this step settled ``units`` to ``target``.
 
-    A settlement never lowers a cursor, so a settled unit stands at
-    ``max(cursor, target)`` afterwards and every other unit keeps its cursor.
-    A linked set may lawfully hold an already-current unit; it is counted only
-    while its own cursor is behind ``now``, which is what the event reports.
+    A settlement never lowers a cursor, so a unit stands at the largest of its
+    recorded cursor, the tick an earlier step of this run advanced it to, and
+    ``target`` when this step settled it. A linked set may lawfully hold an
+    already-current unit; it is counted only while its own cursor is behind
+    ``now``, which is what the event reports.
     """
     remaining = 0
     for _, closed in pending:
         for unit_id in closed:
             after = population_units.unit_cursor(cursors, unit_id)
-            if unit_id in settled and target > after:
+            earlier = advanced.get(unit_id)
+            if earlier is not None and earlier > after:
+                after = earlier
+            if unit_id in units and target > after:
                 after = target
             if after < now:
                 remaining += 1
     return remaining
 
 
-def drain_population_backlog(slice_seconds: int) -> bool:
-    """Settle the most lagging closed set forward by one slice.
+def drain_population_backlog(slice_seconds: int, max_steps: int = 1) -> int:
+    """Settle lagging closed sets forward, one slice per step.
 
-    Returns ``True`` when one set settled. A world with no wilderness, no
-    population seed or no cursor record settles nothing and returns ``False``.
-    A set whose settlement fails keeps its complete prior durable and live
-    state, emits one error event, and the run then tries the next lagging set,
-    so one bad set cannot starve the others. A world fault is reported the same
-    way with no unit: the periodic caller must survive a malformed record.
+    Performs at most ``max_steps`` settlement steps and returns how many
+    settled. Each step selects the set with the lowest cursor (ties: the
+    smallest unit identifier) among the sets this run has not failed on, using
+    the cursors this run has already advanced.
+
+    A world with no wilderness, no population seed or no cursor record settles
+    nothing and returns ``0``. A set whose settlement fails keeps its complete
+    prior durable and live state, emits one error event, and is not tried again
+    in the same run; after three failed sets the run stops, so one bad set
+    cannot starve the others. A world fault is reported the same way with no
+    unit: the periodic caller must survive a malformed record.
     """
     slice_seconds = _require_slice(slice_seconds)
+    max_steps = _require_steps(max_steps)
     try:
         wilderness = regional_population.live_wilderness()
         if wilderness is None or not regional_population.population_provisioned(
             wilderness
         ):
-            return False
+            return 0
         if not wilderness.attributes.has(
             population_units.POPULATION_UNIT_CURSORS_ATTRIBUTE
         ):
-            return False
+            return 0
         now = regional_population.current_population_tick()
         cursors = population_units.read_unit_cursors(wilderness)
         pending = population_units.lagging_sets(wilderness, now)
@@ -107,8 +132,16 @@ def drain_population_backlog(slice_seconds: int) -> bool:
             exc=error,
             context={"units": 0, "tick_from": 0, "tick_to": 0},
         )
-        return False
-    for start, units in pending[:MAX_SETS_PER_RUN]:
+        return 0
+    candidates = [[cursor, units] for cursor, units in pending]
+    advanced: dict[str, int] = {}
+    settled = failed = 0
+    while candidates and settled < max_steps and failed < MAX_FAILED_SETS_PER_RUN:
+        position = min(
+            range(len(candidates)),
+            key=lambda item: (candidates[item][0], min(candidates[item][1])),
+        )
+        start, units = candidates[position]
         target = min(now, start + slice_seconds)
         registry = None
         try:
@@ -116,7 +149,9 @@ def drain_population_backlog(slice_seconds: int) -> bool:
             registry = population_lifecycle.snapshot_population_lifecycle_surfaces(
                 start, target, scope=scope
             )
-            remaining = _units_still_lagging(pending, cursors, units, target, now)
+            remaining = _units_still_lagging(
+                pending, cursors, advanced, units, target, now
+            )
             event = {
                 "units": len(units),
                 "tick_from": start,
@@ -146,13 +181,21 @@ def drain_population_backlog(slice_seconds: int) -> bool:
                     "tick_to": target,
                 },
             )
+            del candidates[position]
+            failed += 1
             continue
-        return True
-    return False
+        settled += 1
+        for unit_id in units:
+            advanced[unit_id] = target
+        if target >= now:
+            del candidates[position]
+        else:
+            candidates[position][0] = target
+    return settled
 
 
 class PopulationDrainScript(DefaultScript):
-    """Periodically settles the most lagging population set by one slice.
+    """Periodically settles the most lagging population sets, one slice each.
 
     A repeat inside the idle window since the last player input returns before
     reading any population record.
@@ -171,11 +214,14 @@ class PopulationDrainScript(DefaultScript):
         idle = player_input.seconds_since_player_input()
         if idle is not None and idle < settings.POPULATION_DRAIN_IDLE_SECONDS:
             return
-        drain_population_backlog(settings.POPULATION_DRAIN_SLICE_SECONDS)
+        drain_population_backlog(
+            settings.POPULATION_DRAIN_SLICE_SECONDS,
+            settings.POPULATION_DRAIN_STEPS_PER_RUN,
+        )
 
 
 __all__ = [
-    "MAX_SETS_PER_RUN",
+    "MAX_FAILED_SETS_PER_RUN",
     "PopulationDrainScript",
     "drain_population_backlog",
 ]
