@@ -87,6 +87,23 @@ This named review section is human-reviewed for policy consistency, not an execu
 
 Retirement's deltas are composed with the new scenarios here. After this change synchronizes, retirement must resolve its full blocks against the new main specs and retain every non-classic scenario. Never archive retirement first. Neither plan depends on a sibling's implementation files before its authorized apply.
 
+The exact shared requirement blocks are:
+
+| Capability | Requirement | Retirement operation |
+| --- | --- | --- |
+| art-gallery-autogen | Automatic character portraits produce exactly one unbound default card | remove and replace with gallery-only publication |
+| art-gallery-resolution | Display resolution is one deterministic chain from equipment to fallback | remove and replace without classic slot |
+| art-gallery-resolution | Monster subjects resolve through the chain without the binding steps | remove and replace without classic scenario |
+| art-gallery-kind-capabilities | One closed declaration states what every subject kind's gallery may do | remove temporary classic policy field |
+| official-art-resolution | The extended chain stays deterministic, offline, and side-effect-free | remove classic examples, preserve preference ownership |
+| art-gallery-model | One gallery record per art subject carries an ordered card list and a default | remove classic reference, preserve scene lazy creation |
+| art-gallery-fallback | The fallback seam supplies a URL and a face rectangle and reports its use | replace classic-free terminal contract |
+| art-gallery-generation | One validated service seam requests every gallery image | remove classic enqueue analogy |
+| art-source-fault-facts | Faults are attributed to requested sources | exclude retired sources |
+| art-asset-lifecycle | Startup recovery rescans explicit unique portrait policies | relocate guarded recovery to gallery-autogen |
+| art-asset-lifecycle | Successful player creation and validated import schedule an eligible unique portrait through transaction.on_commit | relocate guarded scheduling to gallery-autogen |
+| art-asset-lifecycle | Every player-activation path finalizes the portrait lifecycle | relocate guarded transport parity to gallery-autogen |
+
 ## Risks / Trade-offs
 
 Changing scene preferences is shared-archetype behavior, so action admission and UI state must say which subject is affected. Retention must authorize the selected shared source and revoke it when a selection/default changes, while preserving a prior generated card during pending/failed replacement. A catalog default that cannot produce an admitted bounded URL must not suppress generation. Keeping portrait and scene projections without a shared enumerator would preserve the defect and is rejected. Inferring provenance or generating a card as an official-art proxy is also rejected.

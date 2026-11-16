@@ -148,6 +148,5 @@ One declared terminal seam SHALL follow all subject image sources and precede th
 - **THEN** one authoritative deterministic alpha selector supplies its terminal without duplicate selector or legacy aliases
 
 #### Scenario: The filled seam serves persons and declines scenes
-- **WHEN** the filled seam resolves
-- **THEN** it resolves the built-in default identity and face rectangle for person subjects and
-  returns `None` for scene subjects
+- **WHEN** the common terminal seam dispatches to its declared adapter
+- **THEN** the person-alpha adapter resolves person identity/geometry and declines scene inputs; the common seam dispatches scene subjects to the scene bundled/terminal adapter instead

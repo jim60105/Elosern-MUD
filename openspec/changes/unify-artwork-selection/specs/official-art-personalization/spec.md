@@ -13,7 +13,7 @@ Explicit official selections SHALL use stable identities inside the resolved con
 
 #### Scenario: Selection touches no shared state
 - **WHEN** a player selects an official image
-- **THEN** the mounted directory bytes are unchanged, no card is appended to `GalleryRecord.cards`, and no other entity's presentation changed
+- **THEN** mounted bytes and cards are unchanged; only the declared preference owner's presentation changes, including rooms sharing a scene archetype, while other character subjects, monster individuals and scene archetypes are unaffected
 
 #### Scenario: Equipment precedence retained at step 1
 - **WHEN** a selected-and-resolving official image competes in presentation step 1
@@ -22,7 +22,7 @@ Explicit official selections SHALL use stable identities inside the resolved con
 
 #### Scenario: Selection side-effect limits
 - **WHEN** a personal official selection is set
-- **THEN** the selection SHALL NOT edit the mounted directory, SHALL NOT create or modify a gallery card, and SHALL NOT change any other entity's presentation
+- **THEN** the selection SHALL NOT edit mounted files or gallery cards and SHALL NOT affect a different preference owner; a scene owner deliberately includes every room using that archetype
 
 #### Scenario: Species default edits do not clear an individual choice
 - **WHEN** a species gallery default changes while two same-species individuals hold distinct official choices

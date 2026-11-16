@@ -73,11 +73,11 @@ gallery-bearing kind.
 Every automatic path SHALL use the shared gallery request and official-satisfied guard for every gallery-bearing kind. An eligible unsatisfied subject SHALL request one unbound image from its standard deterministic description, with no free text or face rectangle. Settlement SHALL establish a default only under the declared gallery cap and preserve explicit official preferences.
 
 #### Scenario: A committed creation produces one unbound default card
-- **WHEN** player creation commits and its post-commit job is drained
+- **WHEN** eligible player creation commits without skipping or satisfying official artwork and its requested post-commit job is drained
 - **THEN** the character's gallery holds exactly one unbound card carrying the fitted default square for its image, that card is the default, and no classic asset record exists for the subject
 
 #### Scenario: A registered monster tier produces one unbound default card
-- **WHEN** startup synchronization runs for a registered monster visual species with an empty gallery and its job is drained
+- **WHEN** startup synchronization runs for a registered monster visual species with an empty gallery, no job and no satisfying official default and its requested job is drained
 - **THEN** that species' gallery holds exactly one unbound card carrying the fitted default square for its image, that card is the default, and startup wrote no classic asset record for any retired tier
 
 #### Scenario: The age gate still rejects before any record or prompt
@@ -85,7 +85,7 @@ Every automatic path SHALL use the shared gallery request and official-satisfied
 - **THEN** nothing is queued, no prompt is rendered, no card is appended, and the named diagnostic is logged
 
 #### Scenario: A kind without the age precondition reads no age attribute
-- **WHEN** an automatic path runs for a registered monster visual species
+- **WHEN** an otherwise unsatisfied automatic path runs for a registered monster visual species
 - **THEN** no canonical-age check runs, no age attribute is read, and the request proceeds
 
 #### Scenario: A rolled-back transaction produces nothing

@@ -35,6 +35,7 @@ None.
 - `art-source-fault-facts`: shared source-attributed faults.
 - `scene-artwork-presentation`: include explicit scene official selection after authored room overrides.
 - `webclient-gallery-management-actions`: allow admitted scene official selection through declared preference scope.
+- `art-asset-lifecycle`: qualify existing recovery/activation scenarios with the shared official guard and creation skip flag.
 
 ## Impact
 

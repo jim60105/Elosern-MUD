@@ -64,3 +64,7 @@ Each row names the assertion owner, not permission to annotate every test in tha
 | Creation skip/official suppression controls | `art-gallery-autogen::player-creation-may-skip-the-automatic-portrait` |
 | Scene explicit-choice/room-override regression | `scene-artwork-presentation::normal-scenes-use-the-complete-authored-source-chain` |
 | Scene selection admission/action regression | `webclient-gallery-management-actions::gallery-mutations-resolve-scene-subjects-through-the-scene-producer` |
+| Scene cardless preference/uncapped controls | `art-gallery-model::one-gallery-record-per-art-subject-carries-an-ordered-card-list-and-a-default` |
+| Recovery official-satisfaction controls | `art-asset-lifecycle::startup-recovery-rescans-explicit-unique-portrait-policies` |
+| Creation/import transaction and skip controls | `art-asset-lifecycle::successful-player-creation-and-validated-import-schedule-an-eligible-unique-portrait-through-transaction-on-commit` |
+| Transport parity with suppression/skip | `art-asset-lifecycle::every-player-activation-path-finalizes-the-portrait-lifecycle` |
