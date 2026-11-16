@@ -183,6 +183,7 @@ REGISTRY_INDEX: tuple[RegistrySpec, ...] = (
     _spec("prices", "價格表", "物品與經濟", _attr("world.lore.economy", "PRICE_TABLE"), f"{_LORE}/economy.py", "display_name_zh", "min_copper", "max_copper"),
     _spec("assortments", "商品組合", "物品與經濟", _attr("world.lore.settlements.assortments", "ASSORTMENT_REGISTRY"), f"{_LORE}/settlements/assortments.py", "display_name_zh"),
     _spec("starting_kits", "起始裝備", "物品與經濟", _attr("world.lore.starting_kits", "SUBRACE_STARTING_KIT_REGISTRY"), f"{_LORE}/starting_kits.py", "subrace_key"),
+    _spec("start_locations", "起始地點", "聚落", _attr("world.lore.start_locations", "SUBRACE_START_LOCATION_REGISTRY"), f"{_LORE}/start_locations.py", "anchor_key"),
     # 聚落
     _spec("settlements", "聚落", "聚落", _attr("world.lore.settlements.settlements", "SETTLEMENT_REGISTRY"), f"{_LORE}/settlements/settlements.py", "archetype", "zcoord"),
     _spec(

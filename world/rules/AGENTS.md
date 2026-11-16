@@ -20,7 +20,7 @@ you read the body.
 | Money, items, equipment, shops | `wallet.py`, `economy.py`, `equipment.py`, `equipment_effects.py`, `item_effects.py`, `items/`, `party_inventory.py`, `shop_hours.py`, `caravan_arrivals.py` |
 | Guild, exams, quest offers | `guild.py`, `guild_config/`, `guild_economy.py`, `guild_offers.py`, `guild_exams.py`, `guild_exam_request.py`, `guild_exam_restrictions.py`, `exam_schedule_holds.py`, `human_guild_hosts.py`, `quest_issuance.py`, `quest_delivery.py` |
 | Church | `church.py`, `church_rulebook.py` |
-| Character creation, traits, identity | `character_creation.py`, `creation_wizard.py`, `creation_messages.py`, `traits.py`, `identity.py`, `social_identity.py`, `persona.py`, `persona_edit.py`, `starting_companions.py`, `account_roster.py` |
+| Character creation, traits, identity | `character_creation.py`, `creation_wizard.py`, `creation_messages.py`, `traits.py`, `identity.py`, `social_identity.py`, `persona.py`, `persona_edit.py`, `starting_companions.py`, `start_location.py`, `account_roster.py` |
 | Skills, progression, titles, buffs | `progression/`, `lineage_query.py`, `cross_lineage_unlock.py`, `skill_ownership.py`, `titles/`, `title_view.py`, `buffs/`, `mp_flow.py` |
 | Party and companions | `party.py`, `party_scope.py`, `possession.py`, `player_control.py`, `affinity.py`, `affinity_config.py`, `unlock_notices.py` |
 | NPCs, dialogue, services | `npc_capabilities.py`, `npc_identity.py`, `npc_intents.py`, `npc_persona.py`, `npc_roster_validation.py`, `npc_schedules.py`, `npc_services.py`, `dialogue.py`, `dialogue_*.py`, `service_gate.py`, `service_targets.py`, `service_windows.py`, `service_messages.py`, `met_people.py` |

@@ -15,6 +15,7 @@ from world.lore.races import (
     Subrace,
     Vitals,
 )
+from world.lore.start_locations import SubraceStartLocation
 from world.lore.starting_kits import SubraceStartingKit
 
 from world.tests.synthetic_data.vocab import _SYNTH_ELEMENT
@@ -87,6 +88,15 @@ SYNTH_STARTING_KITS: dict[str, SubraceStartingKit] = {
     for kit in (
         SubraceStartingKit("t_duskmari_evensong", (("t_thorn_knife", 1),)),
     )
+}
+
+# One start settlement per synthetic subrace. Its anchor carries a kit
+# placement on a borrowed, materialized node, so the real resolver finds a
+# room once that node's settlement is synchronized. Swap it together with
+# ``anchor_placements`` (see the package docstring).
+SYNTH_START_LOCATIONS: dict[str, SubraceStartLocation] = {
+    row.subrace_key: row
+    for row in (SubraceStartLocation("t_duskmari_evensong", "t_hollow_tarn"),)
 }
 
 SYNTH_NPC_TIERS: MappingProxyType[str, NPCTier] = MappingProxyType(
