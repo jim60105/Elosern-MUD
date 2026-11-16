@@ -54,7 +54,7 @@ from world.art.official import (
     reset_catalog,
 )
 from world.art.official_refs import PRESET_PROVENANCE_ATTRIBUTE
-from world.art.store import ArtAssetRecord
+from world.art.store import GalleryJobRecord
 from world.art.subjects import ArtSubject, ArtSubjectKind
 from tools.spec_traceability import covers_requirement
 
@@ -761,7 +761,7 @@ class RuntimeLookupSmokeTests(_FaultCase):
             if path.is_file()
         }
         self.assertEqual(before, after)
-        self.assertEqual(ArtAssetRecord.objects.count(), 0)
+        self.assertEqual(GalleryJobRecord.objects.count(), 0)
 
     @covers_requirement(
         "official-artwork-catalog::a-missing-or-empty-official-root-is-a-valid-no-art-configuration",

@@ -21,7 +21,7 @@ from evennia.utils import create
 from typeclasses.characters import PlayerCharacter
 from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
-from world.art.store import ArtAssetRecord
+from world.art.store import GalleryJobRecord
 from world.narrative.models import NarrativeEvent
 from world.rules.monster_individual import construct_species_individual
 from world.tests.synthetic_data import (
@@ -56,7 +56,9 @@ class StateApiTestCase(GmTestCase):
         super().setUp()
         self.npc = create.create_object(NPC, key="t_state_npc", location=self.room1)
         self.room = create.create_object(Room, key="t_state_room")
-        self.art = create.create_script(ArtAssetRecord, key="art:t_state_subject")
+        self.art = create.create_script(
+            GalleryJobRecord, key="art:t_state_subject:gen:t_state_image"
+        )
         self.art.db.subject_key = "t_state_subject"
         self.event = NarrativeEvent.objects.create(
             source_id="t_state_event", event_type="t_state_kind", content={"note": "合成"}

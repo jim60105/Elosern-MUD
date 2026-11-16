@@ -13,7 +13,7 @@ from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 from typeclasses.characters import PlayerCharacter
 from typeclasses.npcs import NPC
-from world.art.queue import ensure, record_key, source_hash
+from world.art.queue import source_hash
 from world.art import gallery as gallery_api
 from world.art.fake_sd_client import FakeSDWebUIClient
 from world.art.gallery_prompt import (
@@ -35,7 +35,7 @@ from world.art.service import (
     request_gallery_image,
     schedule_portrait_ensure,
 )
-from world.art.store import ArtAssetRecord, ArtAssetStatus
+from world.art.store import ArtAssetStatus, GalleryJobRecord
 from world.art.subjects import ArtSubject, ArtSubjectKind
 from world.lore.monster_visuals import get_monster_visual_registry
 from tools.spec_traceability import covers_requirement
@@ -64,17 +64,17 @@ class ArtServiceTests(EvenniaTestCase):
         self.player.apparent_age = 22
 
     def _records(self):
-        return {record.db_key: record for record in ArtAssetRecord.objects.all()}
+        return {record.db_key: record for record in GalleryJobRecord.objects.all()}
 
     def _scene_job_keys(self, archetype):
         return sorted(
             record.db_key
-            for record in ArtAssetRecord.objects.all()
+            for record in GalleryJobRecord.objects.all()
             if record.db_key.startswith(f"art:scene:{archetype}:gen:")
         )
 
     @covers_requirement(
-        "art-asset-lifecycle::startup-synchronization-requests-gallery-art-for-every-registered-scene-and-species"
+        "art-gallery-autogen::startup-synchronization-requests-gallery-art-for-every-registered-scene-and-species"
     )
     def test_startup_sync_requests_one_gallery_card_per_registered_scene(self):
         art_sync_all()
@@ -100,15 +100,12 @@ class ArtServiceTests(EvenniaTestCase):
         self.assertEqual(classic, [])
         monster_jobs = [
             record
-            for record in ArtAssetRecord.objects.all()
+            for record in GalleryJobRecord.objects.all()
             if str(record.db.gallery_image_id or "")
             and record.db_key.startswith("art:portrait:monster:")
         ]
         self.assertEqual(len(monster_jobs), len(visual_registry))
 
-    @covers_requirement(
-        "art-asset-lifecycle::startup-synchronization-requests-gallery-art-for-every-registered-scene-and-species"
-    )
     def test_a_carded_scene_requests_nothing(self):
         subject = scene_subject_for(_SYNTH_SCENE)
         card = gallery_api.append_card(
@@ -129,9 +126,6 @@ class ArtServiceTests(EvenniaTestCase):
         self.assertEqual(self._scene_job_keys(_SYNTH_SCENE), [])
         self.assertEqual(gallery_api.cards_for(subject), [card])
 
-    @covers_requirement(
-        "art-asset-lifecycle::startup-synchronization-requests-gallery-art-for-every-registered-scene-and-species"
-    )
     def test_a_scene_emptied_by_deletion_requests_nothing(self):
         subject = scene_subject_for(_SYNTH_SCENE)
         identity = (
@@ -161,18 +155,12 @@ class ArtServiceTests(EvenniaTestCase):
                 ensure_scene_asset(_SYNTH_SCENE)
         self.assertEqual(self._scene_job_keys(_SYNTH_SCENE), [])
 
-    @covers_requirement(
-        "art-asset-lifecycle::startup-synchronization-requests-gallery-art-for-every-registered-scene-and-species"
-    )
     def test_a_failed_first_scene_generation_is_retried_at_startup(self):
         subject = scene_subject_for(_SYNTH_SCENE)
         gallery_api.record_error(subject, "sd_connection_error")
         art_sync_all()
         self.assertEqual(len(self._scene_job_keys(_SYNTH_SCENE)), 1)
 
-    @covers_requirement(
-        "art-asset-lifecycle::startup-synchronization-requests-gallery-art-for-every-registered-scene-and-species"
-    )
     def test_a_pending_scene_job_is_left_untouched(self):
         ensure_scene_asset(_SYNTH_SCENE)
         job_keys = self._scene_job_keys(_SYNTH_SCENE)
@@ -183,10 +171,7 @@ class ArtServiceTests(EvenniaTestCase):
             self._records()[job_keys[0]].db.status, ArtAssetStatus.PENDING
         )
 
-    @covers_requirement(
-        "art-asset-lifecycle::startup-synchronization-requests-gallery-art-for-every-registered-scene-and-species"
-    )
-    def test_an_operator_scene_image_still_requests_generation(self):
+    def test_an_operator_scene_image_satisfies_automatic_generation(self):
         from world.art import official
 
         official.reset_catalog()
@@ -208,18 +193,17 @@ class ArtServiceTests(EvenniaTestCase):
             ):
                 self.assertEqual(official.load_catalog()["images"], 1)
                 art_sync_all()
-        self.assertEqual(len(self._scene_job_keys(_SYNTH_SCENE)), 1)
+        self.assertEqual(len(self._scene_job_keys(_SYNTH_SCENE)), 0)
 
-    @covers_requirement("art-asset-lifecycle::startup-recovery-rescans-explicit-unique-portrait-policies")
     @covers_requirement(
-        "art-gallery-autogen::automatic-character-portraits-produce-exactly-one-unbound-default-card"
+        "art-gallery-autogen::startup-recovery-rescans-explicit-unique-portrait-policies"
     )
     def test_recovery_requests_a_gallery_job_for_a_missing_named_policy(self):
         self.player.db.portrait_policy = {"mode": "named", "stable_key": str(self.player.pk)}
         art_sync_all()
         jobs = [
             record
-            for record in ArtAssetRecord.objects.all()
+            for record in GalleryJobRecord.objects.all()
             if str(record.db.gallery_image_id or "")
             and record.db_key.startswith(f"art:portrait:character:{self.player.pk}:gen:")
         ]
@@ -231,8 +215,9 @@ class ArtServiceTests(EvenniaTestCase):
         # The retrofit: no classic fixed-identity record is ever created.
         self.assertNotIn(f"art:portrait:character:{self.player.pk}", self._records())
 
-    @covers_requirement("art-asset-lifecycle::startup-recovery-rescans-explicit-unique-portrait-policies")
-    @covers_requirement("art-asset-lifecycle::the-age-check-runs-on-every-lifecycle-path-and-rejects-deterministically-without-a-persisted-marker")
+    @covers_requirement(
+        "art-gallery-autogen::the-age-check-runs-on-every-lifecycle-path-and-rejects-deterministically-without-a-persisted-marker"
+    )
     def test_recovery_skips_an_ineligible_subject_deterministically(self):
         self.player.db.portrait_policy = {"mode": "named", "stable_key": str(self.player.pk)}
         self.player.attributes.remove("age")
@@ -242,9 +227,8 @@ class ArtServiceTests(EvenniaTestCase):
         art_sync_all()
         self.assertNotIn(key, self._records())
 
-    @covers_requirement("art-asset-lifecycle::successful-player-creation-and-validated-import-schedule-an-eligible-unique-portrait-through-transaction-on-commit")
     @covers_requirement(
-        "art-gallery-autogen::automatic-character-portraits-produce-exactly-one-unbound-default-card"
+        "art-gallery-autogen::successful-player-creation-and-validated-import-schedule-an-eligible-unique-portrait-through-transaction-on-commit"
     )
     def test_schedule_portrait_ensure_runs_the_gate_and_enqueues_one_gallery_job(self):
         self.player.db.portrait_policy = {"mode": "named", "stable_key": str(self.player.pk)}
@@ -254,7 +238,7 @@ class ArtServiceTests(EvenniaTestCase):
         key = f"art:portrait:character:{self.player.pk}"
         jobs = [
             record
-            for record in ArtAssetRecord.objects.all()
+            for record in GalleryJobRecord.objects.all()
             if str(record.db.gallery_image_id or "")
         ]
         self.assertEqual(len(jobs), 1)
@@ -262,7 +246,9 @@ class ArtServiceTests(EvenniaTestCase):
         self.assertEqual(jobs[0].db.status, ArtAssetStatus.PENDING)
         self.assertNotIn(key, self._records())
 
-    @covers_requirement("art-asset-lifecycle::portrait-character-enqueue-validates-canonical-age-attributes-immediately-before-enqueue")
+    @covers_requirement(
+        "art-gallery-autogen::portrait-character-enqueue-validates-canonical-age-attributes-immediately-before-enqueue"
+    )
     def test_rejected_portrait_produces_no_record_and_no_worker_call(self):
         self.player.db.portrait_policy = {"mode": "named", "stable_key": str(self.player.pk)}
         self.player.attributes.remove("age")
@@ -279,7 +265,7 @@ class ArtServiceTests(EvenniaTestCase):
         key = f"art:portrait:character:{self.player.pk}"
         self.assertNotIn(key, self._records())
 
-    @covers_requirement("art-asset-lifecycle::queue-failure-never-rolls-back-gameplay")
+    @covers_requirement("art-gallery-autogen::queue-failure-never-rolls-back-gameplay")
     def test_an_art_callback_exception_never_propagates_to_the_owning_workflow(self):
         self.player.db.portrait_policy = {"mode": "named", "stable_key": str(self.player.pk)}
         with (
@@ -293,7 +279,9 @@ class ArtServiceTests(EvenniaTestCase):
         self.assertEqual(len(callbacks), 1)
         self.assertTrue(self.player.creation_pending is not None)
 
-    @covers_requirement("art-asset-lifecycle::successful-room-entry-ensures-the-scene-asset-for-a-validated-archetype")
+    @covers_requirement(
+        "art-gallery-autogen::successful-room-entry-ensures-the-scene-asset-for-a-validated-archetype"
+    )
     def test_ensure_scene_asset_requests_one_gallery_card_for_a_validated_archetype(self):
         ensure_scene_asset(_SYNTH_SCENE)
         job_keys = self._scene_job_keys(_SYNTH_SCENE)
@@ -302,13 +290,12 @@ class ArtServiceTests(EvenniaTestCase):
         self.assertEqual(self._scene_job_keys(_SYNTH_SCENE), job_keys)
         self.assertNotIn(f"art:scene:{_SYNTH_SCENE}", self._records())
 
-    @covers_requirement("art-asset-lifecycle::successful-room-entry-ensures-the-scene-asset-for-a-validated-archetype")
     def test_ensure_scene_asset_is_a_noop_for_none_or_unresolvable_archetype(self):
         ensure_scene_asset(None)
         ensure_scene_asset("not_a_scene")
         self.assertEqual(self._records(), {})
 
-    @covers_requirement("art-asset-lifecycle::queue-failure-never-rolls-back-gameplay")
+    @covers_requirement("art-gallery-autogen::queue-failure-never-rolls-back-gameplay")
     def test_scene_asset_failure_is_bounded_and_never_blocks_the_move(self):
         with patch(
             "world.art.service._ensure_scene_gallery_subject",

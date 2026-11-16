@@ -27,7 +27,7 @@ from evennia.scripts.models import ScriptDB
 from evennia.utils.search import search_script
 from evennia.utils.test_resources import EvenniaTestCase
 
-from world.art.store import ArtAssetRecord
+from world.art.store import GalleryJobRecord
 from world.lore import monster_species as registry
 from world.lore.monster_species import (
     MonsterCombatProfile,
@@ -954,7 +954,7 @@ class MonsterSpeciesSyncTests(EvenniaTestCase):
         # Scripts themselves are the mirror's own output and are excluded.
         return (
             _runtime_digest(ObjectDB),
-            _runtime_digest(ArtAssetRecord),
+            _runtime_digest(GalleryJobRecord),
             _runtime_digest(ScriptDB, exclude_prefix="lore:"),
         )
 

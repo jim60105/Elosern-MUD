@@ -115,39 +115,6 @@ Defines the in-process SDWebUIClient that generates one image per art subject th
 - **WHEN** the sd-webui is unreachable, timed out, or misbehaving
 - **THEN** the deterministic game remains playable: records remain failed, presenters keep their truthful placeholders, and the queue retry path (`@art retry`) recovers after the service is restored
 
-### Requirement: Art generation prompts are stored in the prompt library
-The positive and negative image-generation prompts SHALL be defined in `prompts/art.yaml` under the keys `art.scene_prompt`, `art.portrait_prompt`, and `art.negative_prompt`, and SHALL be the only source of that prompt text — `world/art/sd_worker.py` SHALL render them through `render_prompt()` like every other generative layer and SHALL NOT embed prompt text as Python constants.
-
-#### Scenario: Scene and portrait prompts render the deterministic description
-- **WHEN** the client builds a request for a scene subject and for a portrait subject
-- **THEN** each positive prompt equals `render_prompt("art.scene_prompt", description=…)` or
-  `render_prompt("art.portrait_prompt", description=…)` with the same deterministic description
-  value the queue record carries
-
-#### Scenario: The negative prompt renders without placeholders
-- **WHEN** the client builds any request
-- **THEN** the request's negative prompt equals `render_prompt("art.negative_prompt")` and the
-  prompt library is the only place that text exists
-
-#### Scenario: Editing a prompt template surfaces through the record digest, never silently
-- **WHEN** an admin edits `art.scene_prompt`, `art.portrait_prompt`, or `art.negative_prompt`
-  and a `done` subject is re-ensured
-- **THEN** the record's rendered-prompt digest changes, the `hash_changed` staff-review flag is
-  set, the completed image is left untouched, and `@art requeue` regenerates it with the prior
-  valid output retained
-
-#### Scenario: The positive templates take the deterministic description
-- **WHEN** `art.scene_prompt` and `art.portrait_prompt` are defined
-- **THEN** they SHALL be templates accepting a `{description}` placeholder whose value is the deterministic subject description produced by `world/art/subjects.py` (scene sentence or character/monster template)
-
-#### Scenario: The negative prompt carries no placeholders
-- **WHEN** `art.negative_prompt` is defined
-- **THEN** it SHALL be a plain text block with no placeholders
-
-#### Scenario: Shipped template text follows the authoring skill and stays admin-tunable
-- **WHEN** the shipped template text is authored
-- **THEN** it follows the image-prompt-builder-nl skill's guidance and remains tunable by admins in the mounted `prompts/` folder without touching code
-
 ### Requirement: The client is injectable and tests never open a socket
 `world/art/sd_worker.py` SHALL expose the client class through the settings `ART_SD_CLIENT` dotted path (default `world.art.sd_worker.SDWebUIClient`).
 
@@ -260,3 +227,33 @@ The txt2img client SHALL respect `ART_SD_SERVER_RETAIN_IMAGES`, defaulting to `T
 - **WHEN** either retention mode is active
 - **THEN** the engine's returned-image validation, local output processing, and art-store persistence SHALL remain unchanged
 
+### Requirement: Prompt library edits affect subsequent gallery requests only
+The positive and negative image-generation prompts SHALL be defined in `prompts/art.yaml` under the keys `art.scene_prompt`, `art.portrait_prompt`, and `art.negative_prompt`, and SHALL be the only source of that prompt text — `world/art/sd_worker.py` SHALL render them through `render_prompt()` like every other generative layer and SHALL NOT embed prompt text as Python constants.
+
+#### Scenario: Scene and portrait prompts render the deterministic description
+- **WHEN** the client builds a request for a scene subject and for a portrait subject
+- **THEN** each positive prompt equals `render_prompt("art.scene_prompt", description=…)` or
+  `render_prompt("art.portrait_prompt", description=…)` with the same deterministic description
+  value the queue record carries
+
+#### Scenario: The negative prompt renders without placeholders
+- **WHEN** the client builds any request
+- **THEN** the request's negative prompt equals `render_prompt("art.negative_prompt")` and the
+  prompt library is the only place that text exists
+
+#### Scenario: Editing a prompt template affects new requests only
+- **WHEN** an admin edits `art.scene_prompt`, `art.portrait_prompt`, or `art.negative_prompt`
+  after a gallery card has been published
+- **THEN** the existing card is unchanged; the next explicit gallery request captures the new prompt pair without a completed-record digest-review flag
+
+#### Scenario: The positive templates take the deterministic description
+- **WHEN** `art.scene_prompt` and `art.portrait_prompt` are defined
+- **THEN** they SHALL be templates accepting a `{description}` placeholder whose value is the deterministic subject description produced by `world/art/subjects.py` (scene sentence or character/monster template)
+
+#### Scenario: The negative prompt carries no placeholders
+- **WHEN** `art.negative_prompt` is defined
+- **THEN** it SHALL be a plain text block with no placeholders
+
+#### Scenario: Shipped template text follows the authoring skill and stays admin-tunable
+- **WHEN** the shipped template text is authored
+- **THEN** it follows the image-prompt-builder-nl skill's guidance and remains tunable by admins in the mounted `prompts/` folder without touching code

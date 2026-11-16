@@ -1,13 +1,14 @@
-"""Observability boundary events for the sd-webui worker (art deltas).
+"""Observability boundary events for the gallery worker (art deltas).
 
-Asserts per-record ``sd_job_claim``/``sd_job_settled`` cardinality (no fake
-settles for stale records, per-record reason codes on batch-config failure),
-the claim-failure diagnostic, and the swallowed-code chain events. All
+Asserts per-job ``sd_job_claim``/``sd_job_settled`` cardinality (no fake
+settles for stale jobs, per-job reason codes on batch-config failure), the
+claim-failure diagnostic, and the swallowed-code chain events. All
 deterministic and socket-free through the injected client seam.
 """
 
 from contextlib import contextmanager
 import tempfile
+import uuid
 from pathlib import Path
 from unittest.mock import patch
 
@@ -15,17 +16,18 @@ from django.test import override_settings
 
 from evennia.utils.test_resources import EvenniaTest
 
+from world.art import gallery as gallery_api
 from world.art.fake_cutout import FakeCutoutBackend
 from world.art.fake_sd_client import FakeSDWebUIClient
 from world.art.fake_translate import FakeTranslator
-from world.art.queue import ensure, record_key, requeue
+from world.art.queue import enqueue_gallery_job, gallery_record_key
 from evennia.utils.create import create_object
 from typeclasses.characters import PlayerCharacter
 from world.art.service import request_gallery_image
 
 from tools.spec_traceability import covers_requirement
 from world.art.sd_worker import SDError
-from world.art.store import ArtAssetRecord, ArtAssetStatus
+from world.art.store import ArtAssetStatus
 from world.art.subjects import ArtSubject, ArtSubjectKind
 from world.art.translate import TranslateError
 import world.art.translate_ct2 as translate_ct2
@@ -48,6 +50,20 @@ def _events(mock, name):
         for call in mock.call_args_list
         if call.args and call.args[0] == name
     ]
+
+
+def _enqueue(subject, description="desc"):
+    """Enqueue one real gallery job and return ``(job, image_id)``."""
+    image_id = str(uuid.uuid4())
+    job = enqueue_gallery_job(
+        subject,
+        description,
+        image_id=image_id,
+        binding=None,
+        face_rect=None,
+        requested_fields=[],
+    )
+    return job, image_id
 
 
 class ArtWorkerObservabilityTests(EvenniaTest):
@@ -73,7 +89,7 @@ class ArtWorkerObservabilityTests(EvenniaTest):
     @covers_requirement('art-queue-worker::worker-claim-and-settle-emit-boundary-events')
     def test_success_emits_exactly_one_claim_and_settle_pair(self):
         subject = _subject()
-        ensure(subject, "desc")
+        job, image_id = _enqueue(subject)
         with self._client(FakeSDWebUIClient()):
             with patch("world.art.worker.log_info") as info:
                 drain_synchronous(10)
@@ -83,16 +99,16 @@ class ArtWorkerObservabilityTests(EvenniaTest):
         self.assertEqual(len(settles), 1, settles)
         claim_ctx = claims[0].kwargs["context"]
         settle_ctx = settles[0].kwargs["context"]
-        self.assertEqual(claim_ctx["job"], record_key(subject))
+        self.assertEqual(claim_ctx["job"], str(job.db_key))
         self.assertEqual(settle_ctx["job"], claim_ctx["job"])
         self.assertEqual(settle_ctx["subject"], subject.full())
         self.assertEqual(settle_ctx["status"], ArtAssetStatus.DONE)
         self.assertEqual(settle_ctx["reason"], "generated")
+        self.assertEqual(len(gallery_api.cards_for(subject)), 1)
 
-    def test_client_config_failure_settles_every_record_with_reason(self):
+    def test_client_config_failure_settles_every_job_with_reason(self):
         subjects = [_subject(f"path_{n}") for n in range(3)]
-        for subject in subjects:
-            ensure(subject, "desc")
+        jobs = [_enqueue(subject)[0] for subject in subjects]
         with patch(
             "world.art.worker.resolve_sd_client",
             side_effect=ImportError("no module named nope"),
@@ -104,21 +120,23 @@ class ArtWorkerObservabilityTests(EvenniaTest):
         self.assertEqual(len(settles), 3, settles)
         reasons = {call.kwargs["context"]["reason"] for call in settles}
         self.assertEqual(reasons, {"sd_client_config_error"})
-        jobs = {call.kwargs["context"]["job"] for call in settles}
-        self.assertEqual(jobs, {record_key(s) for s in subjects})
+        self.assertEqual(
+            {call.kwargs["context"]["job"] for call in settles},
+            {str(job.db_key) for job in jobs},
+        )
         config_events = _events(error, "sd_client_config_failed")
         self.assertEqual(len(config_events), 1, config_events)
         self.assertIn("endpoint", config_events[0].kwargs["context"])
         self.assertIsNotNone(config_events[0].kwargs["exc"])
 
-    def test_stale_record_produces_no_fake_settle_event(self):
+    def test_stale_job_produces_no_fake_settle_event(self):
         subject = _subject()
-        ensure(subject, "desc")
+        _enqueue(subject)
         failing = FakeSDWebUIClient()
         failing.fail_every_call(SDError("sd_connection_error", "offline"))
         with self._client(failing):
-            # The record was reclaimed/requeued mid-flight: settle is a no-op.
-            with patch("world.art.worker.settle", return_value=None):
+            # The job was reclaimed mid-flight: settle is a no-op.
+            with patch("world.art.worker.settle_gallery_failed", return_value=None):
                 with patch("world.art.worker.log_info") as info:
                     drain_synchronous(10)
         self.assertEqual(len(_events(info, "sd_job_claim")), 1)
@@ -141,7 +159,7 @@ class ArtWorkerObservabilityTests(EvenniaTest):
     @covers_requirement('internal-art-worker::named-degradation-codes-carry-the-swallowed-exception-in-the-log')
     def test_internal_error_keeps_code_and_adds_chain_event(self):
         subject = _subject()
-        ensure(subject, "desc")
+        _enqueue(subject)
         failing = FakeSDWebUIClient()
         failing.fail_every_call(RuntimeError("encoder exploded"))
         with self._client(failing):
@@ -157,21 +175,18 @@ class ArtWorkerObservabilityTests(EvenniaTest):
         settles = _events(info, "sd_job_settled")
         self.assertEqual(len(settles), 1, settles)
         self.assertEqual(settles[0].kwargs["context"]["reason"], "sd_internal_error")
-        from world.art.store import ArtAssetRecord
-
-        record = ArtAssetRecord.objects.filter(db_key=record_key(subject)).first()
+        record = gallery_api.record_for(subject)
         self.assertEqual(record.db.last_error_code, "sd_internal_error")
-        self.assertEqual(record.db.status, ArtAssetStatus.FAILED)
 
     def test_publication_failure_still_reaches_terminal_settle(self):
-        # A claimed record whose atomic publication raises must not escape
-        # the batch loop: it settles FAILED with one sd_job_settled, and the
-        # worker slot is released (rubber-duck P3 MAJOR).
+        # A claimed job whose atomic publication raises must not escape the
+        # batch loop: it settles FAILED with one sd_job_settled, and the worker
+        # slot is released.
         subject = _subject()
-        ensure(subject, "desc")
+        _enqueue(subject)
         with self._client(FakeSDWebUIClient()):
             with patch(
-                "world.art.worker.settle_generated",
+                "world.art.worker.settle_gallery_generated",
                 side_effect=OSError("filesystem went away"),
             ):
                 with patch("world.art.worker.log_warn") as warn:
@@ -185,10 +200,9 @@ class ArtWorkerObservabilityTests(EvenniaTest):
         self.assertEqual(len(events), 1, events)
         self.assertEqual(events[0].kwargs["context"]["stage"], "publication")
         self.assertIsNotNone(events[0].kwargs["exc"])
-        from world.art.store import ArtAssetRecord
-
-        record = ArtAssetRecord.objects.filter(db_key=record_key(subject)).first()
-        self.assertEqual(record.db.status, ArtAssetStatus.FAILED)
+        self.assertEqual(
+            gallery_api.record_for(subject).db.last_error_code, "sd_internal_error"
+        )
         # The slot was released: a following drain proceeds normally.
         with self._client(FakeSDWebUIClient()):
             self.assertEqual(drain_synchronous(10), 0)
@@ -311,7 +325,7 @@ class CutoutEventTests(EvenniaTest):
     @covers_requirement("art-portrait-cutout::the-background-removal-stage-emits-boundary-events")
     def test_a_successful_cutout_emits_exactly_one_stage_event(self):
         subject = ArtSubject(ArtSubjectKind.CHARACTER, "42")
-        ensure(subject, "desc")
+        job, image_id = _enqueue(subject)
         with self._cutout(FakeCutoutBackend()):
             with self._client(self._opaque_client()):
                 with patch("world.art.worker.log_info") as info:
@@ -319,9 +333,9 @@ class CutoutEventTests(EvenniaTest):
         done = _events(info, "art_cutout_done")
         self.assertEqual(len(done), 1)
         context = done[0].kwargs["context"]
-        self.assertEqual(context["job"], record_key(subject))
+        self.assertEqual(context["job"], str(job.db_key))
         self.assertEqual(context["subject"], subject.full())
-        self.assertEqual(context["image_id"], "")
+        self.assertEqual(context["image_id"], image_id)
         self.assertEqual(context["model"], "bria-rmbg")
         self.assertIsInstance(context["duration_ms"], int)
         self.assertEqual(_events(info, "art_cutout_failed"), [])
@@ -332,7 +346,7 @@ class CutoutEventTests(EvenniaTest):
         from world.art.cutout import CutoutError
 
         subject = ArtSubject(ArtSubjectKind.CHARACTER, "42")
-        ensure(subject, "desc")
+        job, image_id = _enqueue(subject)
         fake = FakeCutoutBackend()
         fake.fail_every_call(CutoutError("art_cutout_unavailable", "model missing"))
         with self._cutout(fake):
@@ -343,13 +357,12 @@ class CutoutEventTests(EvenniaTest):
         failed = _events(warn, "art_cutout_failed")
         self.assertEqual(len(failed), 1)
         context = failed[0].kwargs["context"]
-        self.assertEqual(context["job"], record_key(subject))
+        self.assertEqual(context["job"], str(job.db_key))
         self.assertEqual(context["subject"], subject.full())
-        self.assertEqual(context["image_id"], "")
+        self.assertEqual(context["image_id"], image_id)
         self.assertEqual(context["model"], "bria-rmbg")
         self.assertEqual(context["code"], "art_cutout_unavailable")
         self.assertIsNotNone(failed[0].kwargs["exc"])
-        # The existing job events still fire, exactly once, with the same code.
         generation_errors = _events(warn, "sd_generation_error")
         self.assertEqual(len(generation_errors), 1)
         self.assertEqual(
@@ -363,18 +376,8 @@ class CutoutEventTests(EvenniaTest):
     @covers_requirement("art-queue-worker::worker-claim-and-settle-emit-boundary-events")
     @covers_requirement("art-portrait-cutout::the-background-removal-stage-emits-boundary-events")
     def test_a_successful_gallery_cutout_emits_one_stage_event(self):
-        from world.art.queue import enqueue_gallery_job
-
         subject = ArtSubject(ArtSubjectKind.CHARACTER, "42")
-        image_id = "bbbbbbbb-2222-4222-8222-222222222222"
-        job = enqueue_gallery_job(
-            subject,
-            "desc",
-            image_id=image_id,
-            binding=None,
-            face_rect=None,
-            requested_fields=[],
-        )
+        job, image_id = _enqueue(subject)
         with self._cutout(FakeCutoutBackend()):
             with self._client(self._opaque_client()):
                 with patch("world.art.worker.log_info") as info:
@@ -382,8 +385,6 @@ class CutoutEventTests(EvenniaTest):
         done = _events(info, "art_cutout_done")
         self.assertEqual(len(done), 1)
         context = done[0].kwargs["context"]
-        # The gallery path carries the same fixed model identity and the
-        # REQUESTED image id (the spent job record is deleted by the settle).
         self.assertEqual(context["job"], str(job.db_key))
         self.assertEqual(context["subject"], subject.full())
         self.assertEqual(context["image_id"], image_id)
@@ -399,18 +400,9 @@ class CutoutEventTests(EvenniaTest):
     @covers_requirement("art-portrait-cutout::the-background-removal-stage-emits-boundary-events")
     def test_a_failing_gallery_cutout_emits_the_gallery_terminal_event(self):
         from world.art.cutout import CutoutError
-        from world.art.queue import enqueue_gallery_job
 
         subject = ArtSubject(ArtSubjectKind.CHARACTER, "42")
-        image_id = "aaaaaaaa-1111-4111-8111-111111111111"
-        job = enqueue_gallery_job(
-            subject,
-            "desc",
-            image_id=image_id,
-            binding=None,
-            face_rect=None,
-            requested_fields=[],
-        )
+        job, image_id = _enqueue(subject)
         fake = FakeCutoutBackend()
         fake.fail_every_call(CutoutError("art_cutout_error", "scripted"))
         with self._cutout(fake):
@@ -420,8 +412,6 @@ class CutoutEventTests(EvenniaTest):
                         drain_synchronous(10)
         failed = _events(warn, "art_cutout_failed")
         self.assertEqual(len(failed), 1)
-        # The spent job record is deleted by the settle, so the event context
-        # is compared against the REQUESTED image id captured before the drain.
         self.assertEqual(failed[0].kwargs["context"]["image_id"], image_id)
         self.assertEqual(failed[0].kwargs["context"]["model"], "bria-rmbg")
         self.assertEqual(failed[0].kwargs["context"]["code"], "art_cutout_error")
@@ -430,9 +420,6 @@ class CutoutEventTests(EvenniaTest):
         self.assertEqual(
             gallery_settles[0].kwargs["context"]["status"], ArtAssetStatus.FAILED
         )
-        # The batch settler's job-level settle event also fires for the spent
-        # gallery job record (existing behavior, shared with the config-failure
-        # path): exactly one, with the same bounded code.
         job_settles = _events(info, "sd_job_settled")
         self.assertEqual(len(job_settles), 1)
         self.assertEqual(job_settles[0].kwargs["context"]["reason"], "art_cutout_error")
@@ -440,7 +427,7 @@ class CutoutEventTests(EvenniaTest):
     @covers_requirement("art-portrait-cutout::the-background-removal-stage-emits-boundary-events")
     def test_no_cutout_event_for_a_skipped_or_disabled_run(self):
         scene = ArtSubject(ArtSubjectKind.SCENE, _SCENE_KEY)
-        ensure(scene, "desc")
+        _enqueue(scene)
         # Enabled stage, scene subject only: skipped, no cutout event.
         with self._cutout(FakeCutoutBackend()):
             with self._client(self._opaque_client()):
@@ -451,8 +438,7 @@ class CutoutEventTests(EvenniaTest):
         self.assertEqual(_events(warn, "art_cutout_failed"), [])
         # Fully disabled stage: no event for any kind, backend never built.
         character = ArtSubject(ArtSubjectKind.CHARACTER, "42")
-        ensure(character, "desc")
-        requeue(scene)
+        _enqueue(character)
         with patch("world.art.fake_cutout.FakeCutoutBackend") as backend_cls:
             with self._client(self._opaque_client()):
                 with patch("world.art.worker.log_info") as info:
@@ -509,7 +495,7 @@ class TranslationEventTests(EvenniaTest):
     )
     def test_success_emits_one_done_event_with_the_exact_context_schema(self):
         subject = _subject("t_synth_translate_done")
-        ensure(subject, "第一行漢字\nLatin")
+        job, image_id = _enqueue(subject, "第一行漢字\nLatin")
         with self._translator(FakeTranslator()):
             with self._client(FakeSDWebUIClient()):
                 with patch("world.art.worker.log_info") as info:
@@ -531,9 +517,9 @@ class TranslationEventTests(EvenniaTest):
             },
         )
         context = done[0].kwargs["context"]
-        self.assertEqual(context["job"], record_key(subject))
+        self.assertEqual(context["job"], str(job.db_key))
         self.assertEqual(context["subject"], subject.full())
-        self.assertEqual(context["image_id"], "")
+        self.assertEqual(context["image_id"], image_id)
         self.assertEqual(
             (context["lines_total"], context["lines_offered"], context["lines_untranslated"]),
             (2, 1, 0),
@@ -548,19 +534,9 @@ class TranslationEventTests(EvenniaTest):
         "art-prompt-translation::translation-failure-degrades-the-prompt-and-never-costs-the-image"
     )
     def test_forward_default_failure_emits_one_bounded_event_and_still_settles(self):
-        # Forward default with no backend override: the shipped
-        # CTranslate2Backend resolves, but the model directory is unseeded, so
-        # the layout check raises art_translate_unavailable. The run is
-        # air-gapped by settings — the explicit DOWNLOAD_ENABLED=False here is
-        # belt-and-braces beside the test-settings pin (task 3.4), so the test
-        # neither populates server/.translate nor trips the module download
-        # latch. The stage boundary maps every failure inside a backend call
-        # to art_translate_error (the seam's own contract), the worker emits
-        # one bounded event, and the record still settles with the authored
-        # prompt.
         subject = _subject("t_synth_translate_forward_default")
         description = "模型尚未種子"
-        ensure(subject, description)
+        job, image_id = _enqueue(subject, description)
         client = FakeSDWebUIClient()
         with override_settings(
             ART_TRANSLATE_ENABLED=True,
@@ -580,9 +556,9 @@ class TranslationEventTests(EvenniaTest):
         self.assertEqual(
             failed[0].kwargs["context"],
             {
-                "job": record_key(subject),
+                "job": str(job.db_key),
                 "subject": subject.full(),
-                "image_id": "",
+                "image_id": image_id,
                 "code": "art_translate_error",
             },
         )
@@ -598,14 +574,9 @@ class TranslationEventTests(EvenniaTest):
         "art-prompt-translation::translation-failure-degrades-the-prompt-and-never-costs-the-image"
     )
     def test_download_failure_degrades_the_prompt_and_never_costs_the_image(self):
-        # The download track end to end through the worker: a fetch failure is
-        # observed as the normal one art_translate_failed warn (never a crash,
-        # never a settled failure), the backend's own download-failed warn has
-        # fired exactly once, and the record settles done with the authored
-        # prompt while the image is still produced.
         subject = _subject("t_synth_translate_download_failure")
         description = "模型下載失敗"
-        ensure(subject, description)
+        job, image_id = _enqueue(subject, description)
         client = FakeSDWebUIClient()
         with override_settings(
             ART_TRANSLATE_ENABLED=True,
@@ -636,17 +607,11 @@ class TranslationEventTests(EvenniaTest):
             download_failed[0].kwargs["context"]["url"],
             translate_ct2._MODEL_URL,
         )
-        # The record settles DONE with the untranslated description (task
-        # 2.4's "the job still settles done on the untranslated description").
-        record = ArtAssetRecord.objects.filter(
-            db_key=record_key(subject)
-        ).first()
-        self.assertEqual(record.db.status, ArtAssetStatus.DONE)
+        # The job settles DONE with the untranslated description.
+        self.assertEqual(len(gallery_api.cards_for(subject)), 1)
         settles = _events(info, "sd_job_settled")
         self.assertEqual(len(settles), 1)
-        self.assertEqual(
-            settles[0].kwargs["context"]["status"], ArtAssetStatus.DONE
-        )
+        self.assertEqual(settles[0].kwargs["context"]["status"], ArtAssetStatus.DONE)
 
     @covers_requirement(
         "art-prompt-translation::the-stage-emits-exactly-one-boundary-event-per-non-skipped-outcome"
@@ -654,7 +619,7 @@ class TranslationEventTests(EvenniaTest):
     def test_unknown_translator_code_is_normalized_before_the_failure_event(self):
         subject = _subject("t_synth_translate_unknown_code")
         description = "未知錯誤碼"
-        ensure(subject, description)
+        _job, _image_id = _enqueue(subject, description)
         translator = FakeTranslator()
         translator.fail_every_call(TranslateError("unexpected", "scripted"))
         client = FakeSDWebUIClient()
@@ -678,7 +643,7 @@ class TranslationEventTests(EvenniaTest):
     def test_disabled_and_all_latin_runs_are_silent_and_unresolved(self):
         disabled = _subject("t_synth_translate_disabled")
         latin = _subject("t_synth_translate_latin")
-        ensure(disabled, "關閉時不翻譯")
+        _enqueue(disabled, "關閉時不翻譯")
         with patch(
             "world.art.translate.resolve_translate_backend",
             side_effect=AssertionError("skipped stages must not resolve"),
@@ -687,7 +652,7 @@ class TranslationEventTests(EvenniaTest):
                 with patch("world.art.worker.log_info") as disabled_info:
                     with patch("world.art.worker.log_warn") as disabled_warn:
                         drain_synchronous(10)
-            ensure(latin, "English prompt tags")
+            _enqueue(latin, "English prompt tags")
             with override_settings(ART_TRANSLATE_ENABLED=True):
                 with self._client(FakeSDWebUIClient()):
                     with patch("world.art.worker.log_info") as latin_info:

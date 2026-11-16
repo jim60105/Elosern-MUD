@@ -45,7 +45,6 @@ _WRITE_TOKENS = (
 
 
 class ArtOfflineAcceptanceContract(unittest.TestCase):
-    @covers_requirement("art-asset-lifecycle::world-art-service-py-is-the-sole-writer-of-asset-and-queue-records")
     def test_no_world_ai_module_writes_art_state(self):
         ai_root = REPO_ROOT / "world" / "ai"
         for path in sorted(ai_root.rglob("*.py")):
@@ -56,6 +55,9 @@ class ArtOfflineAcceptanceContract(unittest.TestCase):
                 self.assertNotIn("world.art", source)
                 self.assertNotIn("from world.art", source)
 
+    @covers_requirement(
+        "art-gallery-autogen::gallery-lifecycle-writes-stay-inside-the-deterministic-art-owner"
+    )
     def test_art_package_has_no_forbidden_transport_fragments(self):
         for path in sorted((REPO_ROOT / "world" / "art").rglob("*.py")):
             if "tests" in path.parts:

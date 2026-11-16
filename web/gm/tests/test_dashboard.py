@@ -163,7 +163,7 @@ class DashboardIsolationTest(_DashboardCase):
                       "translate_unavailable"),
         "cutout": ("world.art.cutout.resolve_cutout_backend", ("services", "cutout"), "cutout_unavailable"),
         "llm_recent": ("web.gm.dashboard._llm_recent", ("llm", "recent"), "llm_recent_unavailable"),
-        "art": ("world.art.store.ArtAssetRecord.objects.all", ("art",), "art_unavailable"),
+        "art": ("world.art.store.GalleryJobRecord.objects.all", ("art",), "art_unavailable"),
         "world": ("world.rules.clock.read_world_clock", ("world",), "world_unavailable"),
         "errors": ("web.gm.dashboard._errors", ("errors", "recent"), "errors_unavailable"),
     }
@@ -261,3 +261,44 @@ class DashboardReadOnlyTest(_DashboardCase):
         self.assertEqual((world["clock"]["hour"], world["clock"]["day"]), (expected.hour, expected.day_in_season))
         self.assertIsInstance(world["clock"]["daypart"], str)
         self.assertIsInstance(world["clock"]["season"], str)
+
+    @covers_requirement('gm-operations-dashboard::independent-read-only-dashboard-sections')
+    def test_gallery_errors_survive_terminal_job_deletion_and_clear_on_success(self):
+        import uuid
+
+        from world.art import gallery as gallery_api
+        from world.art.queue import (
+            claim,
+            enqueue_gallery_job,
+            settle_gallery_failed,
+        )
+        from world.art.store import GalleryJobRecord
+        from world.art.subjects import ArtSubject, ArtSubjectKind
+
+        subject = ArtSubject(ArtSubjectKind.CHARACTER, "9001")
+        job = enqueue_gallery_job(
+            subject,
+            "desc",
+            image_id=str(uuid.uuid4()),
+            binding=None,
+            face_rect=None,
+            requested_fields=[],
+        )
+        claimed = claim(10)[0]
+        settle_gallery_failed(
+            job.db_key,
+            generation_token=str(claimed.db.generation_token),
+            error="sd_timeout",
+        )
+        self.assertFalse(GalleryJobRecord.objects.filter(db_key=job.db_key).exists())
+        before = self.snapshot()["art"]
+        self.assertEqual(before["counts"]["pending"], 0)
+        self.assertEqual(
+            [(row["subject_key"], row["kind"], row["error"]) for row in before["failures"]],
+            [("9001", "portrait:character", "sd_timeout")],
+        )
+        # The dashboard read itself creates and mutates nothing.
+        self.assertEqual(self.snapshot()["art"]["failures"], before["failures"])
+        # A later successful publication clears the row.
+        gallery_api.clear_error(subject)
+        self.assertEqual(self.snapshot()["art"]["failures"], [])

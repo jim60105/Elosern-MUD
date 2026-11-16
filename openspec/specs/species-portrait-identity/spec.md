@@ -41,7 +41,7 @@ official image, a different species' bytes, or a tier-derived stand-in in its pl
 - **THEN** it is rejected at every production, selection, resolution and media-admission boundary; no tier gallery layer remains
 
 ### Requirement: Monster portraits never borrow runtime state across visual species
-A monster SHALL resolve reusable cards and valid classic identities only inside its declared visual species. Individual official selections and geometry SHALL remain entity-local. Missing, failed or invalid images SHALL retain truthful state and carry monster_anon for browser load failure.
+A monster SHALL resolve reusable gallery cards only inside its declared visual species. Individual official selections and geometry SHALL remain entity-local. Missing, failed or invalid images SHALL retain truthful state and carry monster_anon for browser load failure.
 
 #### Scenario: Same-tier species do not share imagery
 - **WHEN** two monsters share a combat tier but declare different visual species, and only one species has a card

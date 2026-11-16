@@ -270,23 +270,25 @@ def _llm_recent(llm: list[dict[str, Any]]) -> list[dict[str, Any]]:
 def _art() -> dict[str, Any]:
     from evennia.utils.search import search_script
 
-    from world.art.store import ArtAssetRecord, ArtAssetStatus
+    from world.art import gallery as gallery_api
+    from world.art.store import ArtAssetStatus, GalleryJobRecord
 
     counts = {status: 0 for status in (
         ArtAssetStatus.MISSING, ArtAssetStatus.PENDING, ArtAssetStatus.IN_PROGRESS,
         ArtAssetStatus.DONE, ArtAssetStatus.FAILED,
     )}
-    failures = []
-    for record in ArtAssetRecord.objects.all():
-        status = record.db.status or ArtAssetStatus.MISSING
+    for record in GalleryJobRecord.objects.all():
+        status = str(record.db.status or ArtAssetStatus.MISSING)
         counts[status] = counts.get(status, 0) + 1
-        if status == ArtAssetStatus.FAILED:
-            failures.append({
-                "subject_key": record.db.subject_key or record.key,
-                "kind": record.db.kind or None,
-                "error": record.db.last_error_code,
-                "ts": _number(record.db.enqueued_at),
-            })
+    failures = [
+        {
+            "subject_key": _json_safe(state.subject.key),
+            "kind": _json_safe(state.subject.kind.value),
+            "error": _json_safe(state.error_code),
+            "ts": _number(state.error_at),
+        }
+        for state in gallery_api.erroring_subjects()
+    ]
     failures.sort(key=lambda item: item["ts"] or 0, reverse=True)
     drain = search_script("art_drain")
     script = drain[0] if len(drain) else None

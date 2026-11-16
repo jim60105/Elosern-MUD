@@ -8,7 +8,7 @@ from evennia.utils.test_resources import EvenniaTestCase
 from typeclasses.characters import PlayerCharacter
 from typeclasses.rooms import AnchorRoom, InstanceRoom
 from world.art import gallery as gallery_api
-from world.art.store import ArtAssetRecord
+from world.art.store import GalleryJobRecord
 from world.art.subjects import scene_subject_for
 from world.tests.synthetic_data import SYNTH_ARCHETYPES, synthetic_registries
 
@@ -36,11 +36,10 @@ class ArtRoomEntryTests(EvenniaTestCase):
     def _scene_job_keys(self, archetype):
         return sorted(
             record.db_key
-            for record in ArtAssetRecord.objects.all()
+            for record in GalleryJobRecord.objects.all()
             if record.db_key.startswith(f"art:scene:{archetype}:gen:")
         )
 
-    @covers_requirement("art-asset-lifecycle::successful-room-entry-ensures-the-scene-asset-for-a-validated-archetype")
     def test_entering_a_scene_bearing_grid_room_requests_its_gallery_card(self):
         with synthetic_registries("archetypes"):
             self._ensure_scene_asset_grid_room()
@@ -52,10 +51,9 @@ class ArtRoomEntryTests(EvenniaTestCase):
         self._move(room)
         self.assertEqual(len(self._scene_job_keys(_BAZAAR)), 1)
         self.assertIsNone(
-            ArtAssetRecord.objects.filter(db_key=f"art:scene:{_BAZAAR}").first()
+            GalleryJobRecord.objects.filter(db_key=f"art:scene:{_BAZAAR}").first()
         )
 
-    @covers_requirement("art-asset-lifecycle::successful-room-entry-ensures-the-scene-asset-for-a-validated-archetype")
     def test_entering_an_instance_room_requests_its_gallery_card(self):
         with synthetic_registries("archetypes"):
             self._ensure_instance_room_asset()
@@ -67,17 +65,18 @@ class ArtRoomEntryTests(EvenniaTestCase):
         self._move(room)
         self.assertEqual(len(self._scene_job_keys(_LODGE)), 1)
         self.assertIsNone(
-            ArtAssetRecord.objects.filter(db_key=f"art:scene:{_LODGE}").first()
+            GalleryJobRecord.objects.filter(db_key=f"art:scene:{_LODGE}").first()
         )
 
-    @covers_requirement("art-asset-lifecycle::successful-room-entry-ensures-the-scene-asset-for-a-validated-archetype")
     def test_room_without_a_resolvable_archetype_is_a_noop(self):
         room, errors = AnchorRoom.create(key="art-plain", xyz=(2, 2, "test_map"))
         self.assertEqual(errors, [])
         self._move(room)
-        self.assertEqual(ArtAssetRecord.objects.count(), 0)
+        self.assertEqual(GalleryJobRecord.objects.count(), 0)
 
-    @covers_requirement("art-asset-lifecycle::successful-room-entry-ensures-the-scene-asset-for-a-validated-archetype")
+    @covers_requirement(
+        "art-gallery-autogen::successful-room-entry-ensures-the-scene-asset-for-a-validated-archetype"
+    )
     def test_a_second_entry_while_a_job_is_pending_requests_nothing(self):
         with synthetic_registries("archetypes"):
             first, errors = AnchorRoom.create(
@@ -95,7 +94,6 @@ class ArtRoomEntryTests(EvenniaTestCase):
             self._move(second)
             self.assertEqual(len(self._scene_job_keys(_BAZAAR)), 1)
 
-    @covers_requirement("art-asset-lifecycle::successful-room-entry-ensures-the-scene-asset-for-a-validated-archetype")
     def test_entry_after_a_deleted_card_requests_nothing(self):
         with synthetic_registries("archetypes"):
             # The empty record a player's delete leaves behind keeps the
@@ -109,7 +107,6 @@ class ArtRoomEntryTests(EvenniaTestCase):
             self._move(room)
             self.assertEqual(self._scene_job_keys(_BAZAAR), [])
 
-    @covers_requirement("art-asset-lifecycle::successful-room-entry-ensures-the-scene-asset-for-a-validated-archetype")
     def test_entry_after_a_failed_first_generation_requests_again(self):
         with synthetic_registries("archetypes"):
             gallery_api.record_error(
@@ -123,7 +120,7 @@ class ArtRoomEntryTests(EvenniaTestCase):
             self._move(room)
             self.assertEqual(len(self._scene_job_keys(_BAZAAR)), 1)
 
-    @covers_requirement("art-asset-lifecycle::queue-failure-never-rolls-back-gameplay")
+    @covers_requirement("art-gallery-autogen::queue-failure-never-rolls-back-gameplay")
     def test_art_failure_during_movement_leaves_the_move_committed(self):
         with synthetic_registries("archetypes"):
             self._movement_survives_art_failure()

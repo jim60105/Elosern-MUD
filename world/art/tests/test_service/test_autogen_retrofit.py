@@ -14,7 +14,7 @@ from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 from typeclasses.characters import PlayerCharacter
 from typeclasses.npcs import NPC
-from world.art.queue import ensure, record_key, source_hash
+from world.art.queue import record_key, source_hash
 from world.art import gallery as gallery_api, official, official_refs
 from world.art.official import load_catalog, reset_catalog
 from world.art.official_refs import PRESET_PROVENANCE_ATTRIBUTE
@@ -51,7 +51,7 @@ from world.art.service import (
     request_gallery_image,
     schedule_portrait_ensure,
 )
-from world.art.store import ArtAssetRecord, ArtAssetStatus
+from world.art.store import ArtAssetStatus, GalleryJobRecord
 from world.art.subjects import ArtSubject, ArtSubjectKind
 from tools.spec_traceability import covers_requirement
 from world.tests.synthetic_data import (
@@ -88,7 +88,7 @@ class AutogenRetrofitTests(EvenniaTestCase):
     def _gallery_jobs(self):
         return [
             record
-            for record in ArtAssetRecord.objects.all()
+            for record in GalleryJobRecord.objects.all()
             if str(record.db.gallery_image_id or "")
             # Scoped to THIS subject: startup sync now enqueues monster-tier
             # gallery jobs too (``gallery-monster-autogen``).
@@ -127,7 +127,7 @@ class AutogenRetrofitTests(EvenniaTestCase):
             schedule_portrait_ensure(self.player)
 
     @covers_requirement(
-        "art-gallery-autogen::automatic-character-portraits-produce-exactly-one-unbound-default-card"
+        "art-gallery-autogen::automatic-generation-publishes-gallery-defaults-only"
     )
     def test_a_committed_path_drains_to_exactly_one_unbound_default_card(self):
         self._schedule()
@@ -135,7 +135,7 @@ class AutogenRetrofitTests(EvenniaTestCase):
         # autogen job record carries no explicit face_rect (face_rect=None)
         self.assertIsNone(self._gallery_jobs()[0].db.gallery_face_rect)
         self.assertNotIn(self.classic_key,
-                         {record.db_key for record in ArtAssetRecord.objects.all()})
+                         {record.db_key for record in GalleryJobRecord.objects.all()})
         self._drain()
         cards = gallery_api.cards_for(self.subject)
         self.assertEqual(len(cards), 1)
@@ -149,7 +149,7 @@ class AutogenRetrofitTests(EvenniaTestCase):
         # No classic fixed-identity record was ever created on any path.
         self.assertNotIn(
             self.classic_key,
-            {record.db_key for record in ArtAssetRecord.objects.all()},
+            {record.db_key for record in GalleryJobRecord.objects.all()},
         )
 
     @covers_requirement(
@@ -194,9 +194,6 @@ class AutogenRetrofitTests(EvenniaTestCase):
         self._schedule()
         self.assertEqual(len(self._gallery_jobs()), 2)
 
-    @covers_requirement(
-        "art-gallery-autogen::automatic-character-portraits-produce-exactly-one-unbound-default-card"
-    )
     def test_the_failed_card_path_still_asks_again_next_time(self):
         # A failed generation leaves no card and no in-flight job, so the
         # next automatic pass is allowed to request again.
@@ -208,9 +205,7 @@ class AutogenRetrofitTests(EvenniaTestCase):
         art_sync_all()
         self.assertEqual(len(self._gallery_jobs()), 2)
 
-    @covers_requirement(
-        "art-gallery-autogen::automatic-character-portraits-produce-exactly-one-unbound-default-card"
-    )
+    @covers_requirement("art-gallery-autogen::queue-failure-never-rolls-back-gameplay")
     def test_a_failing_request_never_rolls_back_gameplay_and_logs_bounded(self):
         with (
             patch(
@@ -232,9 +227,6 @@ class AutogenRetrofitTests(EvenniaTestCase):
             )
         )
 
-    @covers_requirement(
-        "art-gallery-autogen::automatic-character-portraits-produce-exactly-one-unbound-default-card"
-    )
     def test_retry_reports_truthfully_through_the_guard(self):
         from world.art.service import retry_gallery_subject
 
@@ -242,7 +234,7 @@ class AutogenRetrofitTests(EvenniaTestCase):
         self.assertEqual(len(self._gallery_jobs()), 1)
         self.assertNotIn(
             self.classic_key,
-            {record.db_key for record in ArtAssetRecord.objects.all()},
+            {record.db_key for record in GalleryJobRecord.objects.all()},
         )
         # The in-flight guard suppresses the second attempt honestly.
         self.assertFalse(retry_gallery_subject(self.subject))
@@ -256,9 +248,6 @@ class AutogenRetrofitTests(EvenniaTestCase):
         # The spent FAILED job survives; no NEW job was enqueued.
         self.assertEqual(len(self._gallery_jobs()), 1)
 
-    @covers_requirement(
-        "art-gallery-autogen::automatic-character-portraits-produce-exactly-one-unbound-default-card"
-    )
     def test_requeue_forces_one_card_beyond_the_idempotency_guard(self):
         from world.art.service import requeue_gallery_subject
 
@@ -285,9 +274,6 @@ class AutogenRetrofitTests(EvenniaTestCase):
             cards[0]["image_id"],
         )
 
-    @covers_requirement(
-        "art-gallery-autogen::automatic-character-portraits-produce-exactly-one-unbound-default-card"
-    )
     def test_an_ineligible_subject_still_rejects_before_anything(self):
         self.player.attributes.remove("age")
         with patch("world.art.sd_worker.render_prompt_pair") as render:
@@ -374,7 +360,7 @@ class OfficialSatisfiedSuppressionTests(EvenniaTestCase):
         prefix = f"art:{self._subject(entity).full()}:gen:"
         return [
             record
-            for record in ArtAssetRecord.objects.all()
+            for record in GalleryJobRecord.objects.all()
             if str(record.db.gallery_image_id or "") and record.db_key.startswith(prefix)
         ]
 
@@ -396,7 +382,7 @@ class OfficialSatisfiedSuppressionTests(EvenniaTestCase):
         self._schedule(entity)
         self.assertEqual(self._gallery_jobs(entity), [])
         self.assertIsNone(
-            ArtAssetRecord.objects.filter(db_key=record_key(self._subject(entity))).first()
+            GalleryJobRecord.objects.filter(db_key=record_key(self._subject(entity))).first()
         )
         self.assertEqual(gallery_api.cards_for(self._subject(entity)), [])
         # The automatic skip neither installs nor removes the named policy, and

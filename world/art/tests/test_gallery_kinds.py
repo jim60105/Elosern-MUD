@@ -57,7 +57,6 @@ def _gallery_less(key: str) -> "gallery_kinds.GalleryKindCapabilities":
         official_reference_policy="none",
         official_preference_scope="none",
         terminal_policy="none",
-        supports_classic_source=False,
     )
 
 
@@ -155,7 +154,6 @@ class DeclarationContractTests(unittest.TestCase):
             "supports_face_rect",
             "supports_stage",
             "supports_card_delete",
-            "supports_classic_source",
         ):
             with self.subTest(field=flag):
                 violations = _violations_with(monster_value, **{flag: 0})
@@ -215,7 +213,6 @@ class DeclarationContractTests(unittest.TestCase):
             "supports_face_rect",
             "supports_stage",
             "supports_card_delete",
-            "supports_classic_source",
         ):
             with self.subTest(case=f"no-gallery kind claiming {flag}"):
                 violations = _violations_with_no_gallery(
@@ -246,7 +243,6 @@ class DeclarationContractTests(unittest.TestCase):
                 "supports_face_rect",
                 "supports_stage",
                 "supports_card_delete",
-                "supports_classic_source",
             ):
                 self.assertIsInstance(getattr(record, flag), bool)
             for field in (
@@ -271,16 +267,13 @@ class DeclarationContractTests(unittest.TestCase):
         self.assertEqual(character.official_reference_policy, "entity_provenance")
         self.assertEqual(character.official_preference_scope, "subject")
         self.assertEqual(character.terminal_policy, "alpha")
-        self.assertTrue(character.supports_classic_source)
         self.assertEqual(monster.official_reference_policy, "visual_species")
         self.assertEqual(monster.official_preference_scope, "entity")
         self.assertEqual(monster.terminal_policy, "alpha")
-        self.assertTrue(monster.supports_classic_source)
         scene = gallery_kinds.capabilities_for(ArtSubjectKind.SCENE.value)
         self.assertEqual(scene.official_reference_policy, "scene_archetype")
         self.assertEqual(scene.official_preference_scope, "subject")
         self.assertEqual(scene.terminal_policy, "scene")
-        self.assertFalse(scene.supports_classic_source)
         # The per-card operation facts (gallery-kind-card-capabilities): the
         # character declares all three; the monster declares both geometry
         # facts but no deletion.
@@ -325,7 +318,6 @@ class DeclarationContractTests(unittest.TestCase):
         self.assertEqual(scene.official_reference_policy, "scene_archetype")
         self.assertEqual(scene.official_preference_scope, "subject")
         self.assertEqual(scene.terminal_policy, "scene")
-        self.assertFalse(scene.supports_classic_source)
         for flag in (
             "supports_bindings",
             "requires_age_precondition",

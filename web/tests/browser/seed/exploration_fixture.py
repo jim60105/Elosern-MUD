@@ -14,21 +14,21 @@ TERMINAL_FATIGUE_ENEMY_HP = 1200
 def _settle_admitted_portrait(entity, stable_key: str) -> None:
     """Give one present entity a named policy and an admitted DONE portrait.
 
-    The completed record's output file is written under the runtime art store,
-    so ``/art/portrait/character/<stable_key>.png`` serves real bytes from the
-    project origin: the production exploration descriptor then carries the
-    catalog key the presenter emits, and the committed art panel carries the
-    image URL (with its face rectangle) beside it. The record is created,
-    claimed and settled through the canonical queue, exactly as the worker
-    would; nothing here invents a key or a URL.
+    A real gallery card is appended through the sole writer, so
+    ``/art/gallery/character/<stable_key>/<image-id>.png`` serves real bytes
+    from the project origin: the production exploration descriptor then carries
+    the catalog key the presenter emits, and the committed art panel carries
+    the image URL (with its face rectangle) beside it. Nothing here invents a
+    key or a URL.
     """
     from pathlib import Path
 
     from typeclasses.npcs import NPC, ensure_npc_canonical_age
     from web.tests.browser.seed.identity import FIXTURE_VALID_PNG
-    from world.art.queue import claim, ensure, record_key, settle
-    from world.art.store import ArtAssetRecord, ArtAssetStatus
+    from world.art import gallery as gallery_api
     from world.art.subjects import character_subject_for
+
+    import uuid
 
     entity.db.portrait_policy = {"mode": "named", "stable_key": stable_key}
     if isinstance(entity, NPC):
@@ -40,32 +40,22 @@ def _settle_admitted_portrait(entity, stable_key: str) -> None:
     subject = character_subject_for(entity)
     if subject is None:
         raise RuntimeError(f"portrait fixture: no named subject for {stable_key}")
-    ensure(subject, "browser exploration portrait fixture")
-    # Eager startup sync enqueues the scene/monster records first; the subject
-    # record enqueued last is claimed by a bounded number of rounds, and a
-    # genuinely absent record fails loudly instead of timing out later.
-    token = None
-    for _ in range(20):
-        claimed = claim(50)
-        record = ArtAssetRecord.objects.filter(db_key=record_key(subject)).first()
-        if record is not None and record.db.status == ArtAssetStatus.IN_PROGRESS:
-            token = str(record.db.generation_token)
-            break
-        if not claimed:
-            break
-    if token is None:
-        raise RuntimeError(f"portrait fixture: record {stable_key} not claimed")
-
     root = Path(os.environ["ELOSERN_BROWSER_ART_ROOT"])
-    identity = f"portrait/character/{stable_key}.png"
-    (root / "portrait" / "character").mkdir(parents=True, exist_ok=True)
+    image_id = str(uuid.uuid4())
+    identity = f"gallery/character/{stable_key}/{image_id}.png"
+    (root / "gallery" / "character" / stable_key).mkdir(parents=True, exist_ok=True)
     (root / identity).write_bytes(FIXTURE_VALID_PNG)
-    settle(
+    gallery_api.append_card(
         subject,
-        generation_token=token,
-        status=ArtAssetStatus.DONE,
-        output_identity=identity,
-        error=None,
+        image_id=image_id,
+        stored_identity=identity,
+        prompt=None,
+        seed=None,
+        checkpoint=None,
+        requested_fields=[],
+        binding=None,
+        source="generated",
+        image_size={"width": 1000, "height": 1000},
     )
 
 

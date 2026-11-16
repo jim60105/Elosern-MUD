@@ -2,14 +2,11 @@
 
 ## Purpose
 States the single shared validation contract every portrait/scene stable-key producer must apply — forbidden characters, a 64-character and 200-UTF-8-byte ceiling — so worker output identities and queue keys stay within filesystem limits, and reserves the digit-only keyspace of character portraits for player characters.
+
 ## Requirements
+
 ### Requirement: Stable keys share one producer contract
-Every producer of a portrait/scene stable key — character import, quest characterization, and any
-blueprint policy — SHALL validate keys against the same rules: no `|`, `/`, `:`, `{`, `}`, or
-control characters, a maximum length of 64 characters, and a maximum of 200 UTF-8 bytes (so every
-accepted key keeps the worker output identity and the queue record key within the filesystem
-name-length limit). This is the single shared key contract; the import/creation validation changes
-mirror it.
+All portrait/scene stable-key producers SHALL reject forbidden separators/control characters and keys exceeding 64 characters or 200 UTF-8 bytes. The common limits SHALL bound gallery path components, per-image job keys and serialized subjects. Removing fixed-output identities SHALL NOT relax producer validation.
 
 #### Scenario: Slash key is rejected at import
 - **WHEN** a character import record declares a `key` containing `/`

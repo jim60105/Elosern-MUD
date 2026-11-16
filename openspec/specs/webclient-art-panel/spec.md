@@ -559,7 +559,7 @@ Resolved gallery-card portraits SHALL carry validated card stage. A malformed st
 - **THEN** the portrait carries identity stage and one bounded art_stage_invalid warning with subject, while the snapshot remains valid
 
 #### Scenario: Non-card assets and placeholders preserve truthful defaults
-- **WHEN** classic done, fallback or scene assets and placeholder branches are resolved
+- **WHEN** fallback or scene resources and placeholder branches are resolved
 - **THEN** assets carry identity stage, placeholders carry null, and scene visuals remain unchanged
 
 #### Scenario: Exact art validation lands in lockstep
@@ -567,7 +567,7 @@ Resolved gallery-card portraits SHALL carry validated card stage. A malformed st
 - **THEN** Python and dependency-free Node validators both accept; missing stage, wrong shape, non-finite/bool or out-of-bounds asset stage and non-null placeholder stage reject on both sides
 
 #### Scenario: Non-card assets carry identity stage
-- **WHEN** classic done assets, fallback portraits, or scene assets resolve
+- **WHEN** fallback portraits or scene resources resolve
 - **THEN** each carries identity stage
 
 #### Scenario: Producers and consumers retain the stage shape

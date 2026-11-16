@@ -36,7 +36,7 @@ from commands.character_creation import (
 )
 from typeclasses.accounts import Account
 from typeclasses.characters import PlayerCharacter
-from world.art.store import ArtAssetRecord, ArtAssetStatus
+from world.art.store import ArtAssetStatus, GalleryJobRecord
 from world.ai.character_creation import CharacterProposal
 
 from ._support import (
@@ -410,7 +410,6 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertTrue(self.char1.creation_pending)
         self.assertEqual(self.char1.traits.all(), [])
 
-    @covers_requirement("art-asset-lifecycle::successful-player-creation-and-validated-import-schedule-an-eligible-unique-portrait-through-transaction-on-commit")
     def test_committed_creation_schedules_exactly_one_portrait_ensure(self):
         with self.captureOnCommitCallbacks(execute=True) as callbacks:
             output = self.call(CmdCharacter(), _PRESET_COMMAND)
@@ -425,7 +424,7 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         # classic fixed-identity record.
         jobs = [
             record
-            for record in ArtAssetRecord.objects.all()
+            for record in GalleryJobRecord.objects.all()
             if str(record.db.gallery_image_id or "")
         ]
         self.assertEqual(len(jobs), 1)
@@ -434,7 +433,6 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         )
         self.assertEqual(jobs[0].db.status, ArtAssetStatus.PENDING)
 
-    @covers_requirement("art-asset-lifecycle::successful-player-creation-and-validated-import-schedule-an-eligible-unique-portrait-through-transaction-on-commit")
     def test_rolled_back_creation_emits_no_job(self):
         with self.captureOnCommitCallbacks(execute=True) as callbacks:
             output = self.call(
@@ -445,9 +443,8 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertIn("已取消", output)
         self.assertEqual(callbacks, [])
         self.assertIsNone(self.char1.db.portrait_policy)
-        self.assertEqual(ArtAssetRecord.objects.count(), 0)
+        self.assertEqual(GalleryJobRecord.objects.count(), 0)
 
-    @covers_requirement("art-asset-lifecycle::queue-failure-never-rolls-back-gameplay")
     def test_art_callback_exception_still_reports_creation_success(self):
         with (
             self.captureOnCommitCallbacks(execute=True) as callbacks,

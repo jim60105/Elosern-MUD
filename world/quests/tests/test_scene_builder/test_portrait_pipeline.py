@@ -149,9 +149,6 @@ class SceneBuilderPortraitPipelineTests(SceneBuilderTestBase):
         return record, client, dispatched
 
     @covers_requirement("spawn-named-portraits::a-spawned-named-occupant-completes-the-full-portrait-pipeline")
-    @covers_requirement(
-        "art-gallery-autogen::automatic-character-portraits-produce-exactly-one-unbound-default-card"
-    )
     def test_fake_worker_receives_the_story_driven_description(self):
         record, client, dispatched = self._materialize_and_drain(
             self._characterized_payload()
@@ -169,7 +166,7 @@ class SceneBuilderPortraitPipelineTests(SceneBuilderTestBase):
         # The retrofit settles to a gallery card, not a classic record.
         from world.art import gallery as gallery_api
         from world.art.subjects import ArtSubject
-        from world.art.store import ArtAssetRecord
+        from world.art.store import GalleryJobRecord
 
         cards = gallery_api.cards_for(ArtSubject(ArtSubjectKind.CHARACTER, "forest_bandit_chief"))
         self.assertEqual(len(cards), 1)
@@ -178,7 +175,7 @@ class SceneBuilderPortraitPipelineTests(SceneBuilderTestBase):
             (Path(self.tempdir.name) / cards[0]["stored_identity"]).is_file()
         )
         self.assertFalse(
-            ArtAssetRecord.objects.filter(
+            GalleryJobRecord.objects.filter(
                 db_key="art:portrait:character:forest_bandit_chief"
             ).exists()
         )

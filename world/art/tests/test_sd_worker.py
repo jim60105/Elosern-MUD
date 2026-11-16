@@ -79,7 +79,9 @@ class FakeResponse:
 
 
 class RequestBuildingTests(unittest.TestCase):
-    @covers_requirement("internal-art-worker::art-generation-prompts-are-stored-in-the-prompt-library")
+    @covers_requirement(
+        "internal-art-worker::prompt-library-edits-affect-subsequent-gallery-requests-only"
+    )
     def test_scene_request_renders_the_scene_prompt_with_16_9_dimensions(self):
         request = build_txt2img_request(_scene("t_synth_tavern"), "a description")
         self.assertIn("a description", request["prompt"])
@@ -94,7 +96,9 @@ class RequestBuildingTests(unittest.TestCase):
         )
         self.assertIs(request["override_settings_restore_afterwards"], True)
 
-    @covers_requirement("internal-art-worker::art-generation-prompts-are-stored-in-the-prompt-library")
+    @covers_requirement(
+        "internal-art-worker::prompt-library-edits-affect-subsequent-gallery-requests-only"
+    )
     def test_portrait_request_renders_the_portrait_prompt_with_3_4_dimensions(self):
         request = build_txt2img_request(_monster("low"), "a monster description")
         self.assertIn("a monster description", request["prompt"])
@@ -152,7 +156,6 @@ class RequestBuildingTests(unittest.TestCase):
         self.assertEqual(request["override_settings"], {"samples_format": "png"})
         self.assertIs(request["override_settings_restore_afterwards"], True)
 
-    @covers_requirement("internal-art-worker::art-generation-prompts-are-stored-in-the-prompt-library")
     def test_prompt_pair_and_digest_are_deterministic(self):
         first = render_prompt_pair(_scene("t_synth_city"), "desc")
         second = render_prompt_pair(_scene("t_synth_city"), "desc")
@@ -672,27 +675,15 @@ class SeedParsingTests(unittest.TestCase):
         client = SDWebUIClient(transport=lambda request: response)
         return client.generate(_scene(), "desc").seed
 
-    @covers_requirement(
-        "art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root"
-    )
     def test_json_string_info_seed_is_reported(self):
         self.assertEqual(self._seed(json.dumps({"seed": 42})), 42)
 
-    @covers_requirement(
-        "art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root"
-    )
     def test_zero_seed_is_reported(self):
         self.assertEqual(self._seed(json.dumps({"seed": 0})), 0)
 
-    @covers_requirement(
-        "art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root"
-    )
     def test_already_decoded_dict_info_is_accepted(self):
         self.assertEqual(self._seed({"seed": 7}), 7)
 
-    @covers_requirement(
-        "art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root"
-    )
     def test_absent_or_unusable_info_yields_no_seed(self):
         for info in (
             _MISSING,
@@ -709,9 +700,6 @@ class SeedParsingTests(unittest.TestCase):
             with self.subTest(info=info):
                 self.assertIsNone(self._seed(info))
 
-    @covers_requirement(
-        "art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root"
-    )
     def test_unparseable_info_never_fails_a_valid_image(self):
         # Garbage info alongside a valid image still returns the image bytes.
         image = SDWebUIClient(

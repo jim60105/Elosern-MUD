@@ -65,7 +65,7 @@ describe("GmJsonTree", () => {
   it("never sends an account or script reference to the object route", () => {
     const value = {
       account: { $ref: "#4", typeclass: "typeclasses.accounts.Account", key: "op", model: "account" },
-      script: { $ref: "#9", typeclass: "world.art.store.ArtAssetRecord", key: "art:x", model: "script" },
+      script: { $ref: "#9", typeclass: "world.art.store.GalleryJobRecord", key: "art:x", model: "script" },
     };
     const wrapper = mountWith(GmJsonTree, { props: { value, openDepth: 3 } });
     expect(wrapper.findAll("a")).toHaveLength(0);

@@ -49,8 +49,7 @@ from world.art.presenter import (
     describe_entity,
     describe_portrait,
 )
-from world.art.queue import claim, ensure, settle
-from world.art.store import ArtAssetRecord, ArtAssetStatus
+from world.art.store import GalleryJobRecord
 from world.art.subjects import ArtSubject, ArtSubjectKind
 from web.webclient.presentation import artwork as artwork_wire
 
@@ -71,15 +70,6 @@ def _png(width=4, height=4) -> bytes:
     buffer = io.BytesIO()
     Image.new("L", (width, height)).save(buffer, format="PNG")
     return buffer.getvalue()
-
-
-def _subject_directory(subject: ArtSubject) -> str:
-    """The store directory one subject's classic output identity lives under."""
-    if subject.kind is ArtSubjectKind.SCENE:
-        return "scene"
-    if subject.kind is ArtSubjectKind.MONSTER:
-        return "portrait/monster"
-    return "portrait/character"
 
 
 class _PortraitAttemptCase(EvenniaTestCase):
@@ -151,28 +141,6 @@ class _PortraitAttemptCase(EvenniaTestCase):
             image_size=dict(_CARD_SIZE),
         )
 
-    def _classic_identity(self, subject) -> str:
-        return f"{_subject_directory(subject)}/{subject.key}.png"
-
-    def _settle_classic(
-        self, subject, *, status=ArtAssetStatus.DONE, error=None, write=True
-    ):
-        """Settle one real classic record through the shipped queue writers."""
-        ensure(subject, "desc")
-        token = str(claim(10)[0].db.generation_token)
-        identity = self._classic_identity(subject)
-        if write:
-            target = self.store / identity
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_bytes(b"classic-asset")
-        return settle(
-            subject,
-            generation_token=token,
-            status=status,
-            output_identity=identity,
-            error=error,
-        )
-
     def _index(self, name="hero.png", width=4, height=4, **manifest) -> str:
         """Admit one real official image through the real startup load."""
         folder = self.official_root / "preset" / _PRESET_KEY
@@ -188,7 +156,7 @@ class _PortraitAttemptCase(EvenniaTestCase):
         preferences = official_preferences_for(subject)
         return (
             GalleryRecord.objects.count(),
-            ArtAssetRecord.objects.count(),
+            GalleryJobRecord.objects.count(),
             sorted(cards_for(subject), key=lambda card: card["image_id"]),
             preferences.selection,
             preferences.geometry,
@@ -209,9 +177,6 @@ class _PortraitAttemptCase(EvenniaTestCase):
 class PortraitAttemptOrderTests(_PortraitAttemptCase):
     """Source order, source identity, fault position and generation truth."""
 
-    @covers_requirement(
-        "art-gallery-resolution::display-resolution-is-one-deterministic-chain-from-equipment-to-fallback"
-    )
     @covers_requirement("artwork-descriptor::source-priority-and-retained-access-are-explicit")
     def test_a_bound_card_is_the_rank_ten_candidate_beside_the_alpha_terminal(self):
         subject = self._subject("bound-attempt")
@@ -249,9 +214,6 @@ class PortraitAttemptOrderTests(_PortraitAttemptCase):
         self.assertNotEqual(terminal["resource"]["resource_id"], resource["resource_id"])
 
     @covers_requirement(
-        "art-gallery-resolution::display-resolution-is-one-deterministic-chain-from-equipment-to-fallback"
-    )
-    @covers_requirement(
         "official-art-personalization::stale-official-selections-are-retained-but-ignored-for-resolution"
     )
     @covers_requirement(
@@ -288,9 +250,6 @@ class PortraitAttemptOrderTests(_PortraitAttemptCase):
         # and its origin once; the retired flat cross-check is not repeated)
         self.assertEqual(official_preferences_for(subject).selection, selection)
 
-    @covers_requirement(
-        "art-gallery-resolution::display-resolution-is-one-deterministic-chain-from-equipment-to-fallback"
-    )
     def test_a_named_default_that_cannot_resolve_is_a_bounded_fault(self):
         subject = self._subject("vanished-default")
         card = self._card(subject)
@@ -314,9 +273,6 @@ class PortraitAttemptOrderTests(_PortraitAttemptCase):
         self.assertEqual(descriptor["generation_state"], descriptors.GENERATION_DONE)
         self.assertEqual(descriptor["terminal"]["resource"]["origin"], descriptors.ORIGIN_SILHOUETTE)
 
-    @covers_requirement(
-        "art-gallery-resolution::display-resolution-is-one-deterministic-chain-from-equipment-to-fallback"
-    )
     def test_an_unset_selection_and_default_add_no_attempt(self):
         subject = self._subject("no-art")
         entity = self._character("no-art", provenance=False)
@@ -326,70 +282,16 @@ class PortraitAttemptOrderTests(_PortraitAttemptCase):
         self.assertEqual(descriptor["generation_subject"], subject.full())
         self.assertIsNotNone(descriptor["terminal"])
 
-    @covers_requirement(
-        "art-gallery-resolution::display-resolution-is-one-deterministic-chain-from-equipment-to-fallback"
-    )
-    @covers_requirement("artwork-descriptor::descriptors-preserve-independent-artwork-facts")
-    def test_a_missing_completed_output_is_its_own_fault(self):
-        subject = self._subject("missing-output")
-        self._settle_classic(subject, write=False)
-        with patch("world.art.presenter.log_warn") as warned:
-            descriptor = describe_portrait(subject)
-        self.assertEqual(
-            self._ordered(descriptor),
-            [
-                (
-                    "fault",
-                    f"portrait.classic:{subject.full()}",
-                    descriptors.PORTRAIT_RANK_CLASSIC,
-                )
-            ],
-        )
-        self.assertEqual(
-            descriptor["attempts"][0]["reason"], descriptors.REASON_GENERATED_OUTPUT_MISSING
-        )
-        self.assertEqual(descriptor["generation_state"], descriptors.GENERATION_DONE)
-        events = [call.args[0] for call in warned.call_args_list if call.args]
-        self.assertEqual(events.count("art_asset_output_missing"), 1)
-        # The same case states no candidate at all (the descriptor facts above).
-        self.assertIsNone(
-            next(
-                (
-                    attempt
-                    for attempt in descriptor["attempts"]
-                    if attempt["type"] == "image"
-                ),
-                None,
-            )
-        )
-
-    @covers_requirement(
-        "art-gallery-resolution::display-resolution-is-one-deterministic-chain-from-equipment-to-fallback"
-    )
     @covers_requirement("artwork-descriptor::descriptors-preserve-independent-artwork-facts")
     def test_a_recorded_failure_is_reported_without_touching_state(self):
         subject = self._subject("failed-job")
         entity = self._character("failed-job")
         with override_settings(ART_SCHEDULER_ENABLED=False):
-            self._settle_classic(
-                subject, status=ArtAssetStatus.FAILED, error="sd_unreachable", write=False
-            )
+            record_error(subject, "sd_unreachable")
             before = self._state(subject)
             descriptor = describe_portrait(subject, entity)
             self.assertEqual(self._state(subject), before)
-        self.assertEqual(
-            self._ordered(descriptor),
-            [
-                (
-                    "fault",
-                    f"portrait.classic:{subject.full()}",
-                    descriptors.PORTRAIT_RANK_CLASSIC,
-                )
-            ],
-        )
-        self.assertEqual(
-            descriptor["attempts"][0]["reason"], descriptors.REASON_GENERATION_FAILED
-        )
+        self.assertEqual(descriptor["attempts"], [])
         # The recorded failure is the descriptor's own independent fact.
         self.assertEqual(descriptor["generation_state"], descriptors.GENERATION_FAILED)
         self.assertEqual(descriptor["generation_subject"], subject.full())
@@ -405,19 +307,12 @@ class PortraitAttemptOrderTests(_PortraitAttemptCase):
     def test_a_finished_official_image_never_completes_a_failed_generation(self):
         subject = self._subject("official-with-failure")
         entity = self._character("official-with-failure")
-        self._settle_classic(
-            subject, status=ArtAssetStatus.FAILED, error="sd_unreachable", write=False
-        )
+        record_error(subject, "sd_unreachable")
         identity = self._index(face_rect=dict(_OFFICIAL_RECT), stage=dict(_OFFICIAL_STAGE))
         descriptor = describe_portrait(subject, entity)
         self.assertEqual(
             self._ordered(descriptor),
             [
-                (
-                    "fault",
-                    f"portrait.classic:{subject.full()}",
-                    descriptors.PORTRAIT_RANK_CLASSIC,
-                ),
                 (
                     "image",
                     f"portrait.official:preset/{_PRESET_KEY}",
@@ -425,7 +320,7 @@ class PortraitAttemptOrderTests(_PortraitAttemptCase):
                 ),
             ],
         )
-        candidate = descriptor["attempts"][1]["resource"]
+        candidate = descriptor["attempts"][0]["resource"]
         self.assertEqual(candidate["origin"], descriptors.ORIGIN_OFFICIAL)
         self.assertEqual(candidate["resource_id"], identity)
         self.assertEqual(candidate["url"], current_catalog().url_for(identity))
@@ -548,23 +443,6 @@ class PortraitAttemptOrderTests(_PortraitAttemptCase):
         descriptor = describe_portrait(scene)
         self.assertEqual(descriptor["attempts"], [])
         self.assertIsNone(descriptor["terminal"])
-        record = self._settle_classic(scene)
-        descriptor = describe_portrait(scene)
-        self.assertEqual(
-            self._ordered(descriptor),
-            [
-                (
-                    "image",
-                    f"portrait.classic:{scene.full()}",
-                    descriptors.PORTRAIT_RANK_CLASSIC,
-                )
-            ],
-        )
-        self.assertEqual(
-            descriptor["attempts"][0]["resource"]["geometry"]["aspect_ratio"],
-            record.db.aspect_ratio,
-        )
-        self.assertIsNone(descriptor["terminal"])
 
     @covers_requirement(
         "official-art-resolution::official-payloads-are-catalog-derived-confined-and-fall-through-when-unresolvable"
@@ -628,13 +506,7 @@ class PortraitAttemptSmokeTests(_PortraitAttemptCase):
     """The production boundary: real writers, real admission, one real selection."""
 
     @covers_requirement(
-        "art-gallery-resolution::display-resolution-is-one-deterministic-chain-from-equipment-to-fallback"
-    )
-    @covers_requirement(
         "art-source-fault-facts::faults-are-attributed-to-requested-sources"
-    )
-    @covers_requirement(
-        "art-gallery-fallback::the-fallback-seam-supplies-a-url-and-a-face-rectangle-and-reports-its-use"
     )
     def test_real_gallery_official_and_alpha_resolution(self):
         subject = self._subject("boundary")

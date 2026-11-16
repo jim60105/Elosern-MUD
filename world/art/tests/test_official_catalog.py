@@ -60,7 +60,7 @@ from world.art.scene_definitions import (
     current_bundled_scenes,
     reset_bundled_scenes,
 )
-from world.art.store import ArtAssetRecord
+from world.art.store import GalleryJobRecord
 from tools.spec_traceability import covers_requirement
 
 # Deterministic valid PNG transport bytes: 1x1 and 1x2, so a fitted default
@@ -966,7 +966,7 @@ class ObservabilityTests(_CatalogCase):
             if path.is_file()
         }
         self.assertEqual(before, after)
-        self.assertEqual(ArtAssetRecord.objects.count(), 0)
+        self.assertEqual(GalleryJobRecord.objects.count(), 0)
         self.assertEqual(GalleryRecord.objects.count(), 0)
 
     @covers_requirement(

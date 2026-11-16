@@ -473,7 +473,9 @@ def terminal(descriptor: dict) -> dict | None:
 
 
 class SeamPayloadTests(EvenniaTestCase):
-    @covers_requirement("art-gallery-fallback::the-fallback-seam-supplies-a-url-and-a-face-rectangle-and-reports-its-use")
+    @covers_requirement(
+        "art-gallery-fallback::declared-terminal-resources-retain-geometry-and-observability"
+    )
     def test_the_presenter_carries_a_fallback_image_and_logs_one_event(self):
         subject = _character("fallbackhero")
         with patch("world.observability.log_info") as logged:
@@ -506,7 +508,6 @@ class SeamPayloadTests(EvenniaTestCase):
         self.assertEqual(context["kind"], ArtSubjectKind.CHARACTER.value)
         self.assertIn(context["key"], FALLBACK_KEYS)
 
-    @covers_requirement("art-gallery-fallback::the-fallback-seam-supplies-a-url-and-a-face-rectangle-and-reports-its-use")
     def test_a_decorative_carriage_selects_the_same_key_without_reporting_a_use(self):
         # The presenter carries the reference beside a resolved real image and
         # reports no use then: the event marks a presented silhouette, never a
@@ -533,7 +534,6 @@ class SeamPayloadTests(EvenniaTestCase):
         ]
         self.assertEqual(len(events), 1)
 
-    @covers_requirement("art-gallery-fallback::the-fallback-seam-supplies-a-url-and-a-face-rectangle-and-reports-its-use")
     def test_the_fallback_writes_no_record_and_no_card(self):
         from world.art.gallery import GalleryRecord, record_key
 
@@ -542,7 +542,6 @@ class SeamPayloadTests(EvenniaTestCase):
             fallback_for(subject)
         self.assertIsNone(GalleryRecord.objects.filter(db_key=record_key(subject)).first())
 
-    @covers_requirement("art-gallery-fallback::the-fallback-seam-supplies-a-url-and-a-face-rectangle-and-reports-its-use")
     def test_a_scene_subject_still_falls_through_to_the_placeholder(self):
         with patch("world.observability.log_info"):
             self.assertIsNone(resolve_fallback(_scene()))

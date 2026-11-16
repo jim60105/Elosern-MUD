@@ -34,3 +34,7 @@ The startup snapshot SHALL preserve bounded requested-default, rejected-identity
 #### Scenario: Unified chain preserves reached source attribution
 - **WHEN** a scene or portrait explicit official choice is missing and its generated default resolves
 - **THEN** the missing choice contributes its own fault before that default, unrelated lower official siblings contribute none, and no preference changes
+
+#### Scenario: Removed sources produce no fault positions
+- **WHEN** a descriptor is built after classic retirement
+- **THEN** only current gallery, official and declared terminal sources contribute faults; no classic source or fixed-output lookup occurs

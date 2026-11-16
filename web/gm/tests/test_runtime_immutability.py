@@ -24,7 +24,7 @@ from evennia.utils.test_resources import EvenniaTest
 from typeclasses.characters import PlayerCharacter
 from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
-from world.art.store import ArtAssetRecord
+from world.art.store import GalleryJobRecord
 from world.narrative.models import (
     DialogueEpoch,
     DialogueFrame,
@@ -116,7 +116,9 @@ class RuntimeImmutabilityTest(EvenniaTest):
         self.monster.traits.mp.current = 10
         self.monster.traits.sp.current = 10
         self.room = create.create_object(Room, key="t_imm_room")
-        self.art = create.create_script(ArtAssetRecord, key="art:t_imm_subject")
+        self.art = create.create_script(
+            GalleryJobRecord, key="art:t_imm_subject:gen:t_imm_image"
+        )
         self.art.db.subject_key = "t_imm_subject"
         self.event = NarrativeEvent.objects.create(
             source_id="t_imm_event", event_type="t_imm_kind", content={"note": "合成"}
@@ -209,7 +211,7 @@ class RuntimeImmutabilityTest(EvenniaTest):
         registry.detail("npcs", str(self.npc.pk), {})
         registry.detail("monsters", str(self.monster.pk), {})
         registry.detail("rooms", str(self.room.pk), {})
-        registry.detail("art", "art:t_imm_subject", {})
+        registry.detail("art", "art:t_imm_subject:gen:t_imm_image", {})
         registry.detail("narrative", "event:t_imm_event", {})
         registry.detail("quests", self.record.quest_id, {"owner": f"#{self.owner.pk}"})
         registry.detail("memories", str(self.memory.pk), {"owner": f"#{self.npc.pk}"})

@@ -29,7 +29,6 @@ from typing import Any
 from django.conf import settings
 from twisted.internet import threads
 
-from world.art import gallery_kinds
 from world.art.cutout import (
     REMBG_MODEL_NAME,
     CutoutError,
@@ -40,18 +39,16 @@ from world.art.formats import encode
 from world.art.paths import resolved_under_store_root
 from world.art.queue import (
     claim,
-    is_gallery_job,
+    expected_gallery_identity,
     queue_lock,
     reclaim_expired_leases,
     settle_gallery_failed,
     settle_gallery_generated,
-    settle,
-    settle_generated,
 )
 from world.art import publication
 from world.art.sd_worker import SDError, resolve_sd_client
-from world.art.store import ArtAssetRecord, ArtAssetStatus
-from world.art.subjects import ArtSubject, ArtSubjectKind, parse_subject
+from world.art.store import GalleryJobRecord, ArtAssetStatus
+from world.art.subjects import ArtSubject, parse_subject
 from world.art.translate import TranslateError, translate_description
 from world.observability import log_error, log_info, log_warn
 from world.observability.sanitize import safe_endpoint
@@ -90,30 +87,19 @@ def _release_worker_slot() -> None:
         _worker_in_flight = False
 
 
-def expected_output_identity(subject: ArtSubject) -> str:
-    """The exact same-store relative identity the engine expects for a subject."""
-    extension = str(settings.ART_SD_OUTPUT_EXTENSION)
-    if subject.kind is ArtSubjectKind.SCENE:
-        return f"scene/{subject.key}{extension}"
-    if subject.kind is ArtSubjectKind.MONSTER:
-        return f"portrait/monster/{subject.key}{extension}"
-    return f"portrait/character/{subject.key}{extension}"
+def output_identity_for(record: GalleryJobRecord) -> str:
+    """The job's exact per-image gallery identity, or a bounded rejection.
 
-
-def output_identity_for(record: ArtAssetRecord) -> str:
-    """The engine's expected relative identity derived from the RECORD itself.
-
-    A gallery job publishes to the per-image gallery path
-    ``gallery/<kind-directory>/<subject-key>/<image-id><extension>`` — never
-    the subject's fixed identity. A classic subject job keeps
-    ``expected_output_identity(subject)`` byte-for-byte.
+    Derived from the job's own validated subject/image metadata:
+    ``gallery/<kind-directory>/<subject-key>/<image-id><extension>``. Invalid
+    metadata rejects; it never falls back to a fixed subject path.
     """
-    image_id = str(record.db.gallery_image_id or "")
-    if image_id:
-        kind_directory = gallery_kinds.store_directory_for(str(record.db.kind))
-        extension = str(settings.ART_SD_OUTPUT_EXTENSION)
-        return f"gallery/{kind_directory}/{record.db.subject_key}/{image_id}{extension}"
-    return expected_output_identity(subject_for(record))
+    identity = expected_gallery_identity(record)
+    if identity is None:
+        raise WorkerStoreError(
+            f"job {record.db_key!r} carries no valid per-image gallery identity"
+        )
+    return identity
 
 
 def _store_root() -> Path:
@@ -124,9 +110,9 @@ def _write_temp(identity: str, png_bytes: bytes) -> str:
     """Write the PNG to a unique temporary file inside the store directory.
 
     The final atomic replace onto ``identity`` happens later in
-    ``settle_generated`` (under the queue lock, only while the claim is still
-    current), so a stale or failed generation never touches the record's prior
-    valid output. The identity must resolve strictly under the store root
+    ``settle_gallery_generated`` (under the queue lock, only while the claim is
+    still current), so a stale or failed generation never touches any existing
+    card or byte. The identity must resolve strictly under the store root
     (``world.art.paths.resolved_under_store_root``, which also refuses any
     symlinked component) or the write is rejected before any file is created.
     """
@@ -154,14 +140,14 @@ def _write_temp(identity: str, png_bytes: bytes) -> str:
     return tmp_path
 
 
-def subject_for(record: ArtAssetRecord) -> ArtSubject:
+def subject_for(record: GalleryJobRecord) -> ArtSubject:
     """Rebuild the typed subject from a claimed record's persisted fields."""
     return parse_subject(f"{record.db.kind}:{record.db.subject_key}")
 
 
 def _settle_one(
     client: Any,
-    record: ArtAssetRecord,
+    record: GalleryJobRecord,
     subject: ArtSubject,
     generation_token: str,
 ) -> tuple[str, str | None, str | None, bool] | None:
@@ -177,19 +163,16 @@ def _settle_one(
     background-removal failures (``art_cutout_unavailable`` /
     ``art_cutout_error``), local-conversion failures (``sd_format_error``),
     prompt-library failures (``sd_prompt_error``), and any unexpected internal
-    error (``sd_internal_error``); the record's prior valid output is retained
+    error (``sd_internal_error``); every existing card and byte is retained
     on every failure path. The embedded-metadata provenance comes from the
     ``GeneratedImage`` the client returned — never from a second render of
     the mutable prompt library. A success publishes the encoded bytes
-    atomically through ``settle_generated`` (carrying the returned seed),
-    which settles the record ``done`` under the queue lock (the returned flag
-    marks that); only after that commit does an extension change delete the
-    validated prior file (a deletion error is a bounded log, never a revert).
-    A GALLERY JOB record instead publishes through ``settle_gallery_generated``
-    (file write, then exactly one card append, then spent-record deletion) and
-    fails through ``settle_gallery_failed`` (no card, bounded code on the
-    subject's gallery record, spent-record deletion) — it never deletes a prior file
-    and never touches a classic record's committed output.
+    atomically through ``settle_gallery_generated`` (file write, then exactly
+    one card append, then spent-record deletion, carrying the returned seed);
+    a failure goes through ``settle_gallery_failed`` (no card, bounded code on
+    the subject's gallery record, spent-record deletion). No prior file is
+    deleted here: a capped gallery's own append handles its displaced
+    unreferenced file after commit.
     Returns ``None`` when the claim was requeued or reclaimed mid-flight and
     must not be settled by this worker.
     """
@@ -198,7 +181,6 @@ def _settle_one(
     # event must still name the finished job.
     job_key = str(record.db_key)
     image_id = str(record.db.gallery_image_id or "")
-    is_gallery = bool(image_id)
     description = str(record.db.source_description or "")
     if bool(settings.ART_TRANSLATE_ENABLED):
         description = _translate_prompt(
@@ -283,74 +265,34 @@ def _settle_one(
         tmp_path = _write_temp(identity, encoded)
     except SDError as error:
         log_warn("sd_generation_error", context={"endpoint": _sd_endpoint(), "code": error.code}, exc=error)
-        if is_gallery:
-            return _gallery_failure(error.code)
-        return ArtAssetStatus.FAILED, None, error.code, False
+        return _gallery_failure(error.code)
     except CutoutError as error:
         log_warn("sd_generation_error", context={"endpoint": _sd_endpoint(), "code": error.code}, exc=error)
-        if is_gallery:
-            return _gallery_failure(error.code)
-        return ArtAssetStatus.FAILED, None, error.code, False
+        return _gallery_failure(error.code)
     except PromptLibraryError as error:
         log_warn("sd_generation_error", context={"endpoint": _sd_endpoint(), "code": "sd_prompt_error"}, exc=error)
-        if is_gallery:
-            return _gallery_failure("sd_prompt_error")
-        return ArtAssetStatus.FAILED, None, "sd_prompt_error", False
+        return _gallery_failure("sd_prompt_error")
     except WorkerStoreError as error:
         log_warn("sd_generation_error", context={"endpoint": _sd_endpoint(), "code": "worker_output_out_of_root"}, exc=error)
-        if is_gallery:
-            return _gallery_failure("worker_output_out_of_root")
-        return ArtAssetStatus.FAILED, None, "worker_output_out_of_root", False
+        return _gallery_failure("worker_output_out_of_root")
     except Exception as error:
         log_warn("sd_generation_error", context={"endpoint": _sd_endpoint(), "code": "sd_internal_error"}, exc=error)
-        if is_gallery:
-            return _gallery_failure("sd_internal_error")
-        return ArtAssetStatus.FAILED, None, "sd_internal_error", False
+        return _gallery_failure("sd_internal_error")
 
     def _publish() -> tuple[str, str | None, str | None, bool] | None:
         """The publication step a world snapshot never splits."""
-        if is_gallery:
-            try:
-                stored = settle_gallery_generated(
-                    job_key,
-                    generation_token=generation_token,
-                    output_identity=identity,
-                    tmp_path=tmp_path,
-                    prompt={"positive": image.prompt, "negative": image.negative_prompt},
-                    seed=image.seed,
-                    checkpoint=image.checkpoint,
-                    image_size={"width": image.decoded_width, "height": image.decoded_height},
-                )
-            except Exception as error:  # noqa: BLE001 - a publication failure is a terminal per-record failure, never a batch abort
-                log_warn(
-                    "sd_generation_error",
-                    context={
-                        "endpoint": _sd_endpoint(),
-                        "code": "sd_internal_error",
-                        "stage": "publication",
-                    },
-                    exc=error,
-                )
-                # A card-append failure leaves at worst an orphan FILE (written
-                # before the append) for the startup prune; the job settles failed.
-                return _gallery_failure("sd_internal_error")
-            if stored is None:
-                return None
-            _log_gallery_settle(subject, image_id, ArtAssetStatus.DONE, "generated")
-            return ArtAssetStatus.DONE, identity, None, True
         try:
-            committed = settle_generated(
-                subject,
+            stored = settle_gallery_generated(
+                job_key,
                 generation_token=generation_token,
                 output_identity=identity,
                 tmp_path=tmp_path,
+                prompt={"positive": image.prompt, "negative": image.negative_prompt},
                 seed=image.seed,
+                checkpoint=image.checkpoint,
+                image_size={"width": image.decoded_width, "height": image.decoded_height},
             )
         except Exception as error:  # noqa: BLE001 - a publication failure is a terminal per-record failure, never a batch abort
-            # A non-stale claim whose atomic publication failed must still reach
-            # a terminal settle (the batch settles FAILED with the prior output
-            # retained); letting this escape would strand the record
-            # ``in_progress`` and skip every later record in the batch.
             log_warn(
                 "sd_generation_error",
                 context={
@@ -360,17 +302,17 @@ def _settle_one(
                 },
                 exc=error,
             )
-            return ArtAssetStatus.FAILED, None, "sd_internal_error", False
-        if committed is None:
+            # A card-append failure leaves at worst an orphan FILE (written
+            # before the append) for the startup prune; the job settles failed.
+            return _gallery_failure("sd_internal_error")
+        if stored is None:
             return None
-        _record, prior_identity = committed
-        if prior_identity:
-            _cleanup_prior_output(prior_identity)
+        _log_gallery_settle(subject, image_id, ArtAssetStatus.DONE, "generated")
         return ArtAssetStatus.DONE, identity, None, True
 
-    # The record transition, the atomic replace, and the superseded file's
-    # deletion run under the publication gate (``world.art.publication``),
-    # taken before ``queue_lock``, so a snapshot sees either none or all of it.
+    # The card publication and spent-job deletion run under the publication
+    # gate (``world.art.publication``), taken before ``queue_lock``, so a
+    # snapshot sees either none or all of it.
     with publication.publishing():
         return _publish()
 
@@ -422,23 +364,6 @@ def _translate_prompt(
     return translated
 
 
-def _cleanup_prior_output(identity: str) -> None:
-    """Delete the validated prior file after the record transition committed.
-
-    Runs strictly after the commit, so the record can never point at the
-    deleted file. The under-root confinement is re-checked before unlinking;
-    any deletion error is a bounded ``cleanup_failed`` log that leaves an
-    unreferenced orphan (cleaned by the next regeneration) and NEVER reverts
-    the committed transition.
-    """
-    if resolved_under_store_root(identity) is None:
-        return
-    try:
-        (_store_root() / identity).unlink(missing_ok=True)
-    except OSError as error:
-        log_warn("art_cleanup_failed", context={"identity": identity}, exc=error)
-
-
 def _sd_endpoint() -> str:
     """The configured sd-webui endpoint identity, credential-free.
 
@@ -449,20 +374,24 @@ def _sd_endpoint() -> str:
     return safe_endpoint(settings.ART_SD_BASE_URL)
 
 
-def _log_claim(record: ArtAssetRecord) -> None:
+def _log_claim(record: GalleryJobRecord) -> None:
     """One boundary event per actually-claimed record."""
     subject = subject_for(record)
     log_info("sd_job_claim", context={"job": record.db_key, "subject": subject.full()})
 
 
 def _log_settled(
-    record: ArtAssetRecord, subject: ArtSubject, status: str, reason: str
+    job_key: str, subject: ArtSubject, status: str, reason: str
 ) -> None:
-    """One boundary event per record whose terminal settle was applied."""
+    """One boundary event per job whose terminal settle was applied.
+
+    ``job_key`` is the CLAIM-TIME snapshot: the gallery settle deletes the
+    job record, so the event never re-reads a deleted row.
+    """
     log_info(
         "sd_job_settled",
         context={
-            "job": record.db_key,
+            "job": job_key,
             "subject": subject.full(),
             "status": status,
             "reason": reason,
@@ -486,24 +415,32 @@ def _log_gallery_settle(
     )
 
 
-def _claim_pairs(records: list[ArtAssetRecord]) -> list[tuple[ArtAssetRecord, ArtSubject, str]]:
-    """Capture the CLAIM-TIME (record, subject, generation token) triples.
+def _claim_pairs(
+    records: list[GalleryJobRecord],
+) -> list[tuple[GalleryJobRecord, ArtSubject, str, str]]:
+    """Capture the CLAIM-TIME (record, subject, generation token, job key) tuples.
 
     Runs synchronously on the calling thread immediately after ``claim()``
     returned, before any blocking work (design D6a): settle authority is the
     token this worker actually claimed. The record attribute is live storage —
     a record reclaimed and re-claimed later would hand a stale worker the NEW
-    claim's token — so the token is snapshotted exactly once here and threaded
-    through every settle call; the attribute is never re-read afterwards.
+    claim's token — so the token and the job key are snapshotted exactly once
+    here and threaded through every settle/log call; the attribute is never
+    re-read afterwards (the terminal gallery settle deletes the row).
     """
     return [
-        (record, subject_for(record), str(record.db.generation_token or ""))
+        (
+            record,
+            subject_for(record),
+            str(record.db.generation_token or ""),
+            str(record.db_key),
+        )
         for record in records
     ]
 
 
 def _run_and_settle_batch(
-    pairs: list[tuple[ArtAssetRecord, ArtSubject, str]],
+    pairs: list[tuple[GalleryJobRecord, ArtSubject, str, str]],
 ) -> list[ArtSubject]:
     """Generate and settle one claimed batch on the background thread.
 
@@ -513,10 +450,10 @@ def _run_and_settle_batch(
     subject never fails its batch-mates and no claimed job is left
     ``in_progress``.
 
-    Returns the subjects whose status was actually applied (``done`` via
-    ``settle_generated``, or a terminal ``failed`` via ``settle``). A stale
-    result whose claim was requeued or reclaimed is excluded, so the completion
-    notification is emitted only for a result that is truly the current record.
+    Returns the subjects whose status was actually applied (a card published or
+    a bounded gallery error recorded). A stale result whose claim was requeued
+    or reclaimed is excluded, so the completion notification is emitted only
+    for a result that is truly the current job.
     """
     try:
         client = resolve_sd_client()
@@ -529,76 +466,48 @@ def _run_and_settle_batch(
         _fail_batch(pairs, "sd_client_config_error")
         return []
     settled: list[ArtSubject] = []
-    for record, subject, token in pairs:
+    for record, subject, token, job_key in pairs:
         outcome = _settle_one(client, record, subject, token)
         if outcome is None:
             continue
-        status, identity, error, already_settled = outcome
-        if already_settled:
+        status, _identity, error, applied = outcome
+        if applied:
             if subject.full() not in {s.full() for s in settled}:
                 settled.append(subject)
             _log_settled(
-                record,
+                job_key,
                 subject,
                 status,
                 str(error) if status == ArtAssetStatus.FAILED else "generated",
             )
-            continue
-        if (
-            settle(
-                subject,
-                generation_token=token,
-                status=status,
-                output_identity=identity,
-                error=error,
-            )
-            is not None
-        ):
-            settled.append(subject)
-            _log_settled(record, subject, status, str(error))
     return settled
 
 
 def _fail_batch(
-    pairs: list[tuple[ArtAssetRecord, ArtSubject, str]], error: str
+    pairs: list[tuple[GalleryJobRecord, ArtSubject, str, str]], error: str
 ) -> None:
-    """Settle every claimed record ``failed``; event only when applied.
+    """Settle every claimed job ``failed``; event only when applied.
 
-    A stale record (requeued or reclaimed mid-flight) settles to a no-op
-    (``settle`` returns ``None``) and must not fabricate a settle event.
-    Gallery job records settle through the gallery-failed path — their card
-    is never appended, the bounded code lands on the subject's gallery record,
-    and the spent job record is deleted — so no gallery job is ever settled
-    through (or onto) its subject's classic record.
+    A stale job (requeued or reclaimed mid-flight) settles to a no-op and must
+    not fabricate a settle event. The job's card is never appended, the
+    bounded code lands on the subject's gallery record, and the spent job
+    record is deleted.
     """
-    for record, subject, token in pairs:
-        if is_gallery_job(record):
-            # The event fields are captured BEFORE the settle: the terminal
-            # gallery-failed settle deletes the job record (task 3.4).
-            image_id = str(record.db.gallery_image_id or "")
-            applied = settle_gallery_failed(
-                str(record.db_key),
-                generation_token=token,
-                error=error,
+    for record, subject, token, job_key in pairs:
+        # The event fields are captured BEFORE the settle: the terminal
+        # gallery-failed settle deletes the job record.
+        image_id = str(record.db.gallery_image_id or "")
+        applied = settle_gallery_failed(
+            job_key,
+            generation_token=token,
+            error=error,
+        )
+        if applied is not None:
+            _log_gallery_settle(
+                subject, image_id,
+                ArtAssetStatus.FAILED, error,
             )
-            if applied is not None:
-                _log_gallery_settle(
-                    subject, image_id,
-                    ArtAssetStatus.FAILED, error,
-                )
-                _log_settled(record, subject, ArtAssetStatus.FAILED, error)
-            continue
-        if (
-            settle(
-                subject,
-                generation_token=token,
-                status=ArtAssetStatus.FAILED,
-                output_identity=None,
-                error=error,
-            )
-            is not None
-        ):
-            _log_settled(record, subject, ArtAssetStatus.FAILED, error)
+            _log_settled(job_key, subject, ArtAssetStatus.FAILED, error)
 
 
 def _lease_timeout() -> float:
@@ -676,7 +585,7 @@ def drain(limit: int) -> int:
     # requeue could interleave even between the claim logs, so the snapshot
     # must be the very next statement after claim() (design D6a).
     pairs = _claim_pairs(records)
-    for record, _subject, _token in pairs:
+    for record, _subject, _token, _job_key in pairs:
         _log_claim(record)
     deferred = threads.deferToThread(_run_and_release_slot, pairs)
     # The success callback runs on the reactor thread, so the completion
@@ -687,7 +596,7 @@ def drain(limit: int) -> int:
 
 
 def _run_and_release_slot(
-    pairs: list[tuple[ArtAssetRecord, ArtSubject, str]],
+    pairs: list[tuple[GalleryJobRecord, ArtSubject, str, str]],
 ) -> list[ArtSubject]:
     """Run a claimed batch on the worker thread and always release the slot.
 
@@ -723,7 +632,7 @@ def drain_synchronous(limit: int) -> int:
         return 0
     try:
         pairs = _claim_pairs(records)
-        for record, _subject, _token in pairs:
+        for record, _subject, _token, _job_key in pairs:
             _log_claim(record)
         settled = _run_and_settle_batch(pairs)
         _notify_completed_batch(settled)

@@ -39,13 +39,10 @@ from world.art.presenter import TOWN_TERMINAL_KEY, describe_scene
 from world.art.queue import (
     claim,
     enqueue_gallery_job,
-    ensure,
     gallery_record_key,
-    record_key,
-    settle,
     settle_gallery_failed,
 )
-from world.art.store import ArtAssetRecord, ArtAssetStatus
+from world.art.store import GalleryJobRecord
 from world.art.subjects import ArtSubject, ArtSubjectKind
 from world.rules import art_view
 from world.rules.art_view import SceneTarget, scene_target_for
@@ -177,25 +174,11 @@ class _SceneFixture(EvenniaTestCase):
         return ArtSubject(ArtSubjectKind.SCENE, key)
 
     def publish(self, key: str = SCENE_KEY, *, body: bytes = b"synthetic stored output"):
-        """Run one real queue lifecycle and publish one readable stored output."""
-        subject = self.subject(key)
-        ensure(subject, SCENE_DESCRIPTION)
-        claimed = next(
-            record
-            for record in claim(ArtAssetRecord.objects.count() + 1)
-            if record.db_key == record_key(subject)
-        )
+        """Write a legacy fixed-path file that no record may present."""
         identity = f"scene/{key}.png"
         path = self.store_root / identity
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(body)
-        settle(
-            subject,
-            status=ArtAssetStatus.DONE,
-            output_identity=identity,
-            error=None,
-            generation_token=str(claimed.db.generation_token),
-        )
         return identity
 
     def publish_gallery_card(
@@ -547,23 +530,8 @@ class GalleryGeneratedSourceTests(_SceneFixture):
     @covers_requirement(
         "scene-artwork-presentation::normal-scenes-use-the-complete-authored-source-chain"
     )
-    def test_a_card_wins_over_a_legacy_classic_failure(self):
-        # A classic record the producers left failed must not report the carded
-        # scene as failed: the card is the generated source and the state.
-        subject = self.subject()
-        ensure(subject, SCENE_DESCRIPTION)
-        claimed = next(
-            record
-            for record in claim(ArtAssetRecord.objects.count() + 1)
-            if record.db_key == record_key(subject)
-        )
-        settle(
-            subject,
-            status=ArtAssetStatus.FAILED,
-            output_identity=None,
-            error="boom",
-            generation_token=str(claimed.db.generation_token),
-        )
+    def test_a_card_is_the_generated_source_and_state(self):
+        # The card is the generated source and the generation state.
         _image_id, identity = self.publish_gallery_card()
         descriptor = describe_scene(self.target())
         generated = self.generated_position(descriptor)
@@ -909,7 +877,7 @@ class RetentionAuthorizationTests(_SceneFixture):
         pending = self.sources(describe_scene(self.target()))
         self.assertEqual(pending.get(generated), published[generated])
 
-        claimed = claim(ArtAssetRecord.objects.count() + 1)
+        claimed = claim(GalleryJobRecord.objects.count() + 1)
         job = next(
             (record for record in claimed if record.db.gallery_image_id == image_id),
             None,
@@ -1066,7 +1034,7 @@ class ReadOnlyResolutionTests(_SceneFixture):
             record.db.last_error_code,
             attributes(record),
         )
-        before_count = ArtAssetRecord.objects.count()
+        before_count = GalleryJobRecord.objects.count()
 
         describe_scene(self.target(room_key=ROOM_KEY))
         scene_target_for(room)
@@ -1081,7 +1049,7 @@ class ReadOnlyResolutionTests(_SceneFixture):
             ),
             before_record,
         )
-        self.assertEqual(ArtAssetRecord.objects.count(), before_count)
+        self.assertEqual(GalleryJobRecord.objects.count(), before_count)
         room.refresh_from_db()
         self.assertEqual(attributes(room), before_room)
         self.assertTrue((self.store_root / identity).exists())

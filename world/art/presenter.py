@@ -4,8 +4,8 @@ The presenter resolves a validated subject to its status, same-origin media
 URL, aspect, and alternative text, or to a truthful placeholder kind/label.
 ONE canonical enumerator owns the portrait source policy: the ordered chain of
 the equipment-bound card, the personal official selection, the record's
-default card, the classic ``done`` asset record, the mounted catalog's
-official default for the entity's content reference, and the authoritative
+default card, the mounted catalog's official default for the entity's content
+reference, and the authoritative
 alpha terminal. ``_enumerate_portrait`` walks that chain exactly once and
 projects it as the canonical artwork descriptor
 (``describe_portrait``/``describe_entity``, using the frozen
@@ -74,8 +74,7 @@ from world.art.gallery_match import (
     resolve_display_chain,
     validated_card_identity,
 )
-from world.art.queue import pending_gallery_jobs, record_key
-from world.art.store import ArtAssetRecord, ArtAssetStatus
+from world.art.queue import pending_gallery_jobs
 from world.art.subjects import (
     ArtSubject,
     ArtSubjectError,
@@ -86,7 +85,7 @@ from world.art.subjects import (
 )
 
 # The CLOSED portrait-origin discriminator vocabulary (art-gallery-fallback
-# owns it here): ``runtime`` for a card or classic image the payload itself
+# owns it here): ``runtime`` for a gallery card the payload itself
 # carries, ``official`` for the mounted catalog's read-only default for the
 # entity's content reference, ``silhouette`` when only the built-in fallback
 # resolved, and ``placeholder`` when nothing did. The origin is computed from
@@ -105,8 +104,8 @@ ORIGIN_PLACEHOLDER = "placeholder"
 TOWN_TERMINAL_KEY = "city_street"
 
 # The wire ceiling every portrait payload URL must fit: the art-panel and
-# roster validators both bound a payload URL at this many code points. Card,
-# classic, and fallback identities are bounded by construction (the shared
+# roster validators both bound a payload URL at this many code points. Card
+# and fallback identities are bounded by construction (the shared
 # subject-key contract), but an official identity embeds an
 # operator-chosen filename, so the official step presents a URL only inside
 # this ceiling and otherwise falls through. Pinned equal to the presentation
@@ -121,10 +120,6 @@ GALLERY_ASPECT_RATIO = "3:4"
 # The fixed aspect ratio of a scene gallery card row's geometry: a scene card
 # is a 16:9 landscape (the same ratio the scene generation requests).
 SCENE_ASPECT_RATIO = "16:9"
-
-
-def _record_for(subject: ArtSubject) -> ArtAssetRecord | None:
-    return ArtAssetRecord.objects.filter(db_key=record_key(subject)).first()
 
 
 def media_url_for(identity: str) -> str:
@@ -153,7 +148,6 @@ class _PortraitEnumeration:
     """One subject's canonical descriptor plus the facts its flat payload needs."""
 
     descriptor: dict
-    record: ArtAssetRecord | None
     attempt: _PortraitAttempt | None
     silhouette: dict | None
 
@@ -167,8 +161,6 @@ def _slot_source(layer: str, source_identity: str | None) -> tuple[str, int]:
     if layer == "personal":
         source_id = descriptors.portrait_personal_source_id(identity)
         return _bounded_source(source_id, identity), descriptors.PORTRAIT_RANK_PERSONAL
-    if layer == "classic":
-        return descriptors.portrait_classic_source_id(identity), descriptors.PORTRAIT_RANK_CLASSIC
     if layer == "official":
         source_id = descriptors.portrait_official_source_id(identity)
         return _bounded_source(source_id, identity), descriptors.PORTRAIT_RANK_OFFICIAL
@@ -309,28 +301,6 @@ def _personal_attempt(subject: ArtSubject, slot, entity) -> _PortraitAttempt:
     )
 
 
-def _classic_attempt_from_slot(subject: ArtSubject, slot) -> _PortraitAttempt:
-    """One chain classic slot as its canonical runtime candidate."""
-    record = slot.facts["record"]
-    identity = slot.facts["identity"]
-    source_id = descriptors.portrait_classic_source_id(subject.full())
-    return _PortraitAttempt(
-        source_id,
-        descriptors.PORTRAIT_RANK_CLASSIC,
-        descriptors.resource(
-            identity,
-            _published_output_version(record, identity),
-            media_url_for(identity),
-            descriptors.ORIGIN_RUNTIME,
-            geometry_payload=descriptors.geometry(
-                face_rect=dict(DEFAULT_FACE_RECT),
-                stage=identity_stage(),
-                aspect_ratio=record.db.aspect_ratio,
-            ),
-        ),
-    )
-
-
 def _official_attempt_from_slot(subject: ArtSubject, slot, entity) -> _PortraitAttempt:
     """One chain official-default slot as its canonical official candidate."""
     facts = slot.facts
@@ -368,37 +338,26 @@ def _subject_terminal(subject: ArtSubject, entity, *, report: bool) -> dict | No
 
 def _generation_facts(
     subject: ArtSubject,
-    record: ArtAssetRecord | None,
     has_cards: bool,
     gallery_failed: bool,
 ) -> tuple[str, str]:
     """The subject's recorded generation key and state, independent of any candidate.
 
-    A pure read of stored state: a live gallery request or a claimed/pending
-    classic record is ``pending``; a recorded failure (the gallery record's
-    retained error, the classic record's own error code, or a failed classic
-    record) is ``failed``; a stored card or a ``done`` classic record is
-    ``done``; anything else is factually ``missing``. Nothing here erases a
-    recorded failure or invents an active job, so a subject whose generation is
-    deliberately disabled and unstarted claims nothing, while a finished
-    official image can never complete a pending or failed generation of the
-    subject's own.
+    A pure read of stored gallery state: a live gallery job is ``pending``; a
+    recorded gallery error is ``failed``; a stored card is ``done``; anything
+    else is factually ``missing``. Nothing here erases a recorded failure or
+    invents an active job, so a subject whose generation is deliberately
+    disabled and unstarted claims nothing, while a finished official image can
+    never complete a pending or failed generation of the subject's own.
     """
     pending = bool(pending_gallery_jobs(subject)) if capabilities_for(
         subject.kind.value
     ).has_gallery else False
-    recorded = descriptors.normalize_generation_state(
-        record.db.status if record is not None else None
-    )
-    if pending or recorded == descriptors.GENERATION_PENDING:
+    if pending:
         state = descriptors.GENERATION_PENDING
-    elif (
-        gallery_failed
-        or (record is not None and record.db.last_error_code)
-        or recorded == descriptors.GENERATION_FAILED
-    ):
+    elif gallery_failed:
         state = descriptors.GENERATION_FAILED
-    elif has_cards or recorded == descriptors.GENERATION_DONE:
+    elif has_cards:
         state = descriptors.GENERATION_DONE
     else:
         state = descriptors.GENERATION_MISSING
@@ -452,27 +411,16 @@ def _enumerate_portrait(subject: ArtSubject, entity=None) -> _PortraitEnumeratio
     consulted exactly once with its report decided by whether a real image
     resolved.
     """
-    record = _record_for(subject)
     attempts: list[_PortraitAttempt] = []
     candidate: _PortraitAttempt | None = None
     chain = resolve_display_chain(subject, entity)
     for slot in chain.slots:
-        if slot.layer == "classic":
-            # The classic position has exactly one source per subject, so both
-            # its faults and its candidate share that source id.
-            source_id = descriptors.portrait_classic_source_id(subject.full())
-            rank = descriptors.PORTRAIT_RANK_CLASSIC
-        else:
-            source_id, rank = _slot_source(slot.layer, slot.source_identity)
+        source_id, rank = _slot_source(slot.layer, slot.source_identity)
         for identity, reason in slot.faults:
             # A fault names its OWN failed source identity: two facts of one
             # layer (a replaced manifest default and a degraded image) must
             # never collide on one source id at one rank.
-            fault_source = (
-                descriptors.portrait_classic_source_id(subject.full())
-                if slot.layer == "classic"
-                else _slot_source(slot.layer, identity)[0]
-            )
+            fault_source = _slot_source(slot.layer, identity)[0]
             attempts.append(
                 _PortraitAttempt(fault_source, rank, fault=reason)
             )
@@ -480,8 +428,6 @@ def _enumerate_portrait(subject: ArtSubject, entity=None) -> _PortraitEnumeratio
             continue
         if slot.layer == "personal":
             candidate = _personal_attempt(subject, slot, entity)
-        elif slot.layer == "classic":
-            candidate = _classic_attempt_from_slot(subject, slot)
         elif slot.layer == "official":
             candidate = _official_attempt_from_slot(subject, slot, entity)
         else:
@@ -494,7 +440,7 @@ def _enumerate_portrait(subject: ArtSubject, entity=None) -> _PortraitEnumeratio
     # exactly when no real candidate resolved, so that is the report.
     fallback = _subject_terminal(subject, entity, report=(candidate is None))
     generation_subject, generation_state = _generation_facts(
-        subject, record, chain.has_cards, chain.failed
+        subject, chain.has_cards, chain.failed
     )
     return _PortraitEnumeration(
         descriptors.descriptor(
@@ -513,7 +459,6 @@ def _enumerate_portrait(subject: ArtSubject, entity=None) -> _PortraitEnumeratio
             # portrait wire owner is the one that introduces authorization.
             retention_sources=[],
         ),
-        record,
         candidate,
         _silhouette_from(fallback),
     )
@@ -526,8 +471,8 @@ def describe_portrait(subject: ArtSubject, entity=None) -> dict:
     the flat payload presents, with every position's stable source identity and
     rank, every reached fault at its own position, the subject's independent
     recorded generation truth, and the authoritative alpha terminal at its own
-    rank. A scene subject resolves no person source and so contributes only its
-    classic record — the scene wire itself stays the scene owner's.
+    rank. A scene subject resolves no person source at all — the scene wire
+    itself stays the scene owner's.
     """
     return _enumerate_portrait(subject, entity).descriptor
 
@@ -823,21 +768,6 @@ def _scene_official_position(
             )
         )
     return faults, resource
-
-
-def _published_output_version(record: ArtAssetRecord, identity: str) -> str:
-    """The resource version of one published output: its identity plus its
-    PUBLISHING token.
-
-    The claim token is cleared when the output is published, so the version
-    reads the token that actually published the current bytes
-    (``published_generation_token``): two successive successful publications of
-    the same stored path therefore carry two different versions, which is what
-    makes a regeneration a new resource for every consumer instead of a reused
-    cached one. A record published before this fact existed contributes its
-    empty token, which is a stable version of its own.
-    """
-    return descriptors.generated_version(identity, str(record.db.published_generation_token))
 
 
 def _scene_gallery_resource(subject: ArtSubject, card: dict) -> dict | None:
@@ -1207,7 +1137,6 @@ def describe_scene(target) -> dict:
     # classic record never contributes since ``scene-classic-fallback-removal``.
     generation_subject, generation_state = _generation_facts(
         subject,
-        None,
         chain.has_cards,
         gallery_failed,
     )

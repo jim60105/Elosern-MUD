@@ -42,7 +42,7 @@ Explicit official selections SHALL use stable identities inside the resolved con
 - **THEN** its selection remains stored and resolves ahead of that replacement
 
 ### Requirement: Stale official selections are retained but ignored for resolution
-Unresolvable personal official selections SHALL remain stored and contribute an attributed fault at their original precedence position before the remaining runtime-default, classic, official-default and alpha sources. Resolution SHALL not delete preferences or images. Replaced bytes at the same identity SHALL use the refreshed snapshot fingerprint.
+Unresolvable personal official selections SHALL remain stored and contribute an attributed fault at their original precedence position before the remaining runtime-default, official-default and alpha sources. Resolution SHALL not delete preferences or images. Replaced bytes at the same identity SHALL use the refreshed snapshot fingerprint.
 
 #### Scenario: Removed image falls through, preference survives
 - **WHEN** the official image a player selected disappears from a later prepared directory and the server restarts

@@ -11,7 +11,7 @@ from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 from typeclasses.characters import PlayerCharacter
 from typeclasses.npcs import NPC
-from world.art.queue import ensure, record_key, source_hash
+from world.art.queue import source_hash
 from world.art import gallery as gallery_api
 from world.art.fake_sd_client import FakeSDWebUIClient
 from world.art.gallery_prompt import (
@@ -32,7 +32,7 @@ from world.art.service import (
     request_gallery_image,
     schedule_portrait_ensure,
 )
-from world.art.store import ArtAssetRecord, ArtAssetStatus
+from world.art.store import ArtAssetStatus, GalleryJobRecord
 from world.art.subjects import ArtSubject, ArtSubjectKind
 from tools.spec_traceability import covers_requirement
 from world.tests.synthetic_data import (
@@ -80,7 +80,7 @@ class MonsterGalleryGenerationTests(EvenniaTestCase):
     def _gallery_jobs(self):
         return [
             record
-            for record in ArtAssetRecord.objects.all()
+            for record in GalleryJobRecord.objects.all()
             if str(record.db.gallery_image_id or "")
         ]
 
@@ -361,7 +361,7 @@ class MonsterStartupSyncTests(EvenniaTestCase):
     def _job_keys(self):
         return sorted(
             record.db_key
-            for record in ArtAssetRecord.objects.all()
+            for record in GalleryJobRecord.objects.all()
             if str(record.db.gallery_image_id or "")
         )
 
@@ -379,13 +379,6 @@ class MonsterStartupSyncTests(EvenniaTestCase):
             if key.startswith(f"art:scene:{archetype}:gen:")
         ]
 
-    def _classic_keys(self):
-        return sorted(
-            record.db_key
-            for record in ArtAssetRecord.objects.all()
-            if not str(record.db.gallery_image_id or "")
-        )
-
     def _drain(self):
         from world.art.worker import drain_synchronous
 
@@ -395,9 +388,6 @@ class MonsterStartupSyncTests(EvenniaTestCase):
             # Drain past every scene and monster gallery job.
             drain_synchronous(200)
 
-    @covers_requirement(
-        "art-gallery-autogen::automatic-character-portraits-produce-exactly-one-unbound-default-card"
-    )
     def test_a_fresh_startup_gives_each_tier_one_gallery_request_and_drains_to_one_card(self):
         # The monster kind declares NO age precondition: no age attribute is
         # ever read on this path.
@@ -406,9 +396,7 @@ class MonsterStartupSyncTests(EvenniaTestCase):
         ages.assert_not_called()
         for tier in self.tiers:
             self.assertEqual(len(self._monster_job_keys(tier)), 1)
-        # Neither kind writes a classic record any more; both request one
-        # gallery card per registered subject.
-        self.assertEqual(self._classic_keys(), [])
+        # Both kinds request one gallery card per registered subject.
         for archetype in _SYNTH_SCENES:
             self.assertEqual(len(self._scene_job_keys(archetype)), 1)
         self._drain()
@@ -422,8 +410,7 @@ class MonsterStartupSyncTests(EvenniaTestCase):
                 gallery_api.record_for(subject).db.default_image_id, cards[0]["image_id"]
             )
             self.assertTrue((self.root / cards[0]["stored_identity"]).exists())
-        # The drained per-image jobs are spent and gone; no classic record remains.
-        self.assertEqual(self._classic_keys(), [])
+        # The drained per-image jobs are spent and gone.
 
     @covers_requirement(
         "art-gallery-autogen::automatic-generation-is-idempotent-against-the-subject-s-gallery"
@@ -494,7 +481,6 @@ class MonsterStartupSyncTests(EvenniaTestCase):
         expected_id = derive_image_id(f"monster/{tier}/sentinel.png")
         launched: list[str] = []
         art_steps = (
-            "art_scene_migration",
             "art_gallery_prune",
             "art_seed_sync",
             "art_sync_all",
@@ -553,49 +539,8 @@ class MonsterStartupSyncTests(EvenniaTestCase):
                 for call in warn.call_args_list
             )
         )
-        # Scenes were unaffected by the failing tier: no classic record and
-        # one gallery request per registered archetype.
-        self.assertEqual(self._classic_keys(), [])
+        # Scenes were unaffected by the failing tier: one gallery request per
+        # registered archetype.
         for archetype in _SYNTH_SCENES:
             self.assertEqual(len(self._scene_job_keys(archetype)), 1)
 
-    def test_a_pre_existing_classic_record_is_left_alone_and_still_resolves_classic(self):
-        from world.art.presenter import describe_portrait
-        from world.art.queue import claim, settle
-
-        tier = self.tiers[0]
-        subject = monster_subject_for(tier)
-        identity = f"portrait/monster/{tier}.png"
-        target = self.root / identity
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(b"classic")
-        ensure(subject, "desc")
-        claimed = claim(10)
-        settle(
-            subject,
-            generation_token=str(claimed[0].db.generation_token),
-            status=ArtAssetStatus.DONE,
-            output_identity=identity,
-            error=None,
-        )
-        before = ArtAssetRecord.objects.filter(db_key=f"art:portrait:monster:{tier}").first()
-        self.assertEqual(before.db.status, ArtAssetStatus.DONE)
-        art_sync_all()
-        # The classic record's presence never suppresses the tier's gallery
-        # request: an empty gallery still gets exactly one job.
-        self.assertEqual(len(self._monster_job_keys(tier)), 1)
-        after = ArtAssetRecord.objects.filter(db_key=f"art:portrait:monster:{tier}").first()
-        self.assertIsNotNone(after)
-        self.assertEqual(after.db.status, ArtAssetStatus.DONE)
-        self.assertEqual(after.db.output_identity, identity)
-        # An empty gallery still resolves through the chain's classic step.
-        descriptor = describe_portrait(subject)
-        presented = next(
-            attempt["resource"]
-            for attempt in descriptor["attempts"]
-            if attempt["type"] == "image"
-        )
-        self.assertIn(identity, presented["url"])
-        # The classic asset is the PRESENTED image; the subject's own recorded
-        # generation truth stays the gallery job's independent fact.
-        self.assertEqual(descriptor["generation_state"], ArtAssetStatus.PENDING)

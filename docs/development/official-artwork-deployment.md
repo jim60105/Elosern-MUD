@@ -258,8 +258,8 @@ preference, card or file is touched by rendering the panel.
 One art-owned enumerator in `world/art/presenter.py` decides which portrait a
 subject presents, and it is the single place the portrait source policy lives:
 the equipment-bound card, the player's explicit personal official selection,
-the record's default card, the classic generated asset, the reference's
-official default and the subject's committed silhouette, in that precedence.
+the record's default card, the reference's official default and the subject's
+committed silhouette, in that precedence.
 The same enumerator now owns the scene archetype chain and respects each
 kind's closed declaration (reference policy, preference owner and terminal
 policy) instead of comparing kinds inline.

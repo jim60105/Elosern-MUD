@@ -8,7 +8,7 @@ from unittest.mock import patch
 from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.npcs import NPC
-from world.art.store import ArtAssetRecord, ArtAssetStatus
+from world.art.store import ArtAssetStatus, GalleryJobRecord
 from world.imports.loader import ImportRejected, load_batch
 from world.imports.tests.helpers import EXAMPLE_PATH, example_record
 
@@ -59,9 +59,8 @@ class ImportPortraitSeamTests(EvenniaTestCase):
             records.append(record)
         return records
 
-    @covers_requirement("art-asset-lifecycle::successful-player-creation-and-validated-import-schedule-an-eligible-unique-portrait-through-transaction-on-commit")
     @covers_requirement(
-        "art-gallery-autogen::automatic-character-portraits-produce-exactly-one-unbound-default-card"
+        "art-gallery-autogen::successful-player-creation-and-validated-import-schedule-an-eligible-unique-portrait-through-transaction-on-commit"
     )
     def test_committed_batch_schedules_one_post_commit_ensure_per_record(self):
         first = example_record()
@@ -85,19 +84,18 @@ class ImportPortraitSeamTests(EvenniaTestCase):
             # job, never a classic fixed-identity record.
             jobs = [
                 record
-                for record in ArtAssetRecord.objects.all()
+                for record in GalleryJobRecord.objects.all()
                 if str(record.db.gallery_image_id or "")
             ]
             self.assertEqual(len(jobs), 2)
             for job in jobs:
                 self.assertEqual(job.db.status, ArtAssetStatus.PENDING)
             self.assertFalse(
-                ArtAssetRecord.objects.filter(
+                GalleryJobRecord.objects.filter(
                     db_key=f"art:portrait:character:{entity.key}"
                 ).exists()
             )
 
-    @covers_requirement("art-asset-lifecycle::successful-player-creation-and-validated-import-schedule-an-eligible-unique-portrait-through-transaction-on-commit")
     def test_rejected_import_batch_emits_no_job(self):
         bad = example_record()
         bad["age"] = 10001
@@ -106,12 +104,11 @@ class ImportPortraitSeamTests(EvenniaTestCase):
             with self.assertRaises(ImportRejected):
                 load_batch(paths)
         self.assertEqual(callbacks, [])
-        self.assertEqual(ArtAssetRecord.objects.count(), 0)
+        self.assertEqual(GalleryJobRecord.objects.count(), 0)
         self.assertFalse(
             NPC.objects.filter(db_key="human_reference").exists()
         )
 
-    @covers_requirement("art-asset-lifecycle::queue-failure-never-rolls-back-gameplay")
     def test_art_callback_exception_never_surfaces_as_an_import_error(self):
         path = self.write("ok.json", example_record())
         with (

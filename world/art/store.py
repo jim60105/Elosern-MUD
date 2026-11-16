@@ -1,9 +1,10 @@
-"""Persistent asset-record contract for generated art outputs.
+"""Persistent carrier for one transient gallery generation job.
 
-One ``ArtAssetRecord`` (an Evennia ``DefaultScript``) exists per subject key.
-It carries the full deterministic record contract and never a live object
-reference, mirroring the idempotent lore-mirror pattern ``world/lore/sync.py``
-uses (design D4).
+One ``GalleryJobRecord`` (an Evennia ``DefaultScript``) exists per REQUESTED
+IMAGE, keyed ``art:<full-subject-key>:gen:<image-id>``. It carries only the
+transient request state a claimed job needs and never a live object reference
+or a committed output identity: its published artifact is a gallery card, and
+the job is deleted the moment it reaches a terminal settle (design D1).
 """
 
 from evennia import DefaultScript
@@ -11,7 +12,7 @@ from evennia.typeclasses.attributes import AttributeProperty
 
 
 class ArtAssetStatus:
-    """The ordered art-record lifecycle statuses."""
+    """The ordered gallery-job lifecycle statuses."""
 
     MISSING = "missing"
     PENDING = "pending"
@@ -23,24 +24,8 @@ class ArtAssetStatus:
     ACTIVE = (PENDING, IN_PROGRESS)
 
 
-# Status advancement rank used by duplicate consolidation: keep the most
-# advanced record when the same subject somehow has more than one.
-_STATUS_RANK = {
-    ArtAssetStatus.MISSING: 0,
-    ArtAssetStatus.PENDING: 1,
-    ArtAssetStatus.IN_PROGRESS: 2,
-    ArtAssetStatus.FAILED: 3,
-    ArtAssetStatus.DONE: 4,
-}
-
-
-def status_rank(status: str) -> int:
-    """Return the advancement rank of an art status for consolidation."""
-    return _STATUS_RANK.get(status, 0)
-
-
-class ArtAssetRecord(DefaultScript):
-    """One persistent art record keyed ``art:<full-subject-key>``."""
+class GalleryJobRecord(DefaultScript):
+    """One transient per-image gallery job keyed ``art:<subject>:gen:<image>``."""
 
     kind: str = AttributeProperty(default="")
     subject_key: str = AttributeProperty(default="")
@@ -48,32 +33,13 @@ class ArtAssetRecord(DefaultScript):
     source_hash: str = AttributeProperty(default="")
     prompt_digest: str = AttributeProperty(default="")
     generation_token: str = AttributeProperty(default="")
-    # The token that PUBLISHED the current output, kept after publication (the
-    # claim token above is cleared then). It is the one durable fact that
-    # distinguishes two successive successful publications of the same stored
-    # path, so a consumer deriving a resource version from it always sees a new
-    # version for a new output -- a requeue clears only the transient claim.
-    published_generation_token: str = AttributeProperty(default="")
-    status: str = AttributeProperty(default=ArtAssetStatus.MISSING)
-    output_identity: str | None = AttributeProperty(default=None)
-    prior_output_identity: str | None = AttributeProperty(default=None)
+    status: str = AttributeProperty(default=ArtAssetStatus.PENDING)
     attempt_count: int = AttributeProperty(default=0)
     last_error_code: str | None = AttributeProperty(default=None)
     enqueued_at: float | None = AttributeProperty(default=None)
     claimed_at: float | None = AttributeProperty(default=None)
     completed_at: float | None = AttributeProperty(default=None)
     aspect_ratio: str = AttributeProperty(default="")
-    hash_changed: bool = AttributeProperty(default=False)
-    # The server-reported generation seed of the CURRENT output (nullable:
-    # servers may not report one). settle_generated assigns it unconditionally
-    # on publish, so a seedless regeneration never keeps a stale seed.
-    seed: int | None = AttributeProperty(default=None)
-    # --- Gallery job fields (change gallery-generation-jobs) ---------------
-    # A record with a non-empty ``gallery_image_id`` is a GALLERY JOB record:
-    # it is keyed ``art:<full-subject-key>:gen:<image-id>`` (never the plain
-    # subject key), carries no ``output_identity`` / ``prior_output_identity``
-    # (its published artifact is a gallery card, not a record field), and is
-    # deleted the moment it reaches a terminal settle.
     gallery_image_id: str = AttributeProperty(default="")
     gallery_binding: dict | None = AttributeProperty(default=None)
     gallery_face_rect: dict | None = AttributeProperty(default=None)

@@ -11,12 +11,7 @@ the existing named error codes.
 ## Requirements
 
 ### Requirement: Generated art is converted locally to the configured output format at the configured quality
-`world/art/formats.py::encode(...)` SHALL convert the transport PNG bytes of a
-`GeneratedImage` into the format named by `ART_SD_OUTPUT_FORMAT` (`png`,
-`webp`, `jpeg`, or `avif`) at `ART_SD_OUTPUT_QUALITY` (1–100), returning the
-encoded bytes together with the store extension for that format. Encoding a non-PNG
-or corrupted input SHALL raise the named `SDError` code `sd_format_error` before any
-output is produced.
+Encoding SHALL convert validated transport PNG bytes into the configured png/webp/jpeg/avif format at configured quality. Invalid input SHALL raise sd_format_error before publication. Gallery outputs SHALL use immutable per-image identities with that format extension; replacement SHALL leave earlier referenced card bytes intact.
 
 #### Scenario: WebP output is produced at the configured quality
 - **WHEN** `ART_SD_OUTPUT_FORMAT=webp` and `ART_SD_OUTPUT_QUALITY=60` and a valid PNG is encoded
@@ -86,6 +81,10 @@ output is produced.
 - **WHEN** the encoder's failure modes are enumerated
 - **THEN** `sd_format_error` is the only named code this pipeline adds; no other error taxonomy is
   introduced
+
+#### Scenario: Format changes publish a distinct card
+- **WHEN** a capped gallery regenerates from PNG storage to WebP
+- **THEN** the replacement uses its fresh image identity and new extension; only the displaced unreferenced card file is cleaned after commit
 
 ### Requirement: Generation metadata is embedded when preserved and provably absent when not
 When `ART_SD_PRESERVE_GENERATION_METADATA` is true, the encoded output SHALL

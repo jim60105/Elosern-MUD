@@ -9,6 +9,7 @@ from pathlib import Path
 import tempfile
 import time
 import unittest
+import uuid
 from unittest.mock import patch
 
 from django.test import override_settings
@@ -23,17 +24,12 @@ from world.art import gallery as gallery_api
 from world.art.gallery import DEFAULT_FACE_RECT
 from world.art.queue import (
     claim,
-    ensure,
     enqueue_gallery_job,
     gallery_record_key,
-    record_key,
     reclaim_expired_leases,
-    requeue,
-    settle,
-    settle_generated,
 )
 from world.art.sd_worker import GeneratedImage, SDError
-from world.art.store import ArtAssetRecord, ArtAssetStatus
+from world.art.store import ArtAssetStatus, GalleryJobRecord
 from world.art.subjects import ArtSubject, ArtSubjectKind
 from world.art.worker import (
     _lease_timeout,
@@ -41,7 +37,6 @@ from world.art.worker import (
     _write_temp,
     drain,
     drain_synchronous,
-    expected_output_identity,
     output_identity_for,
 )
 
@@ -71,7 +66,12 @@ class _MixedOutcomeClient:
         error = self.outcomes.get(description)
         if error is not None:
             raise error
-        return GeneratedImage(data=DEFAULT_PNG, seed=self.seed)
+        return GeneratedImage(
+            data=DEFAULT_PNG,
+            seed=self.seed,
+            decoded_width=1,
+            decoded_height=1,
+        )
 
 
 def _opaque_portrait_png(size=(16, 12)) -> bytes:
@@ -102,6 +102,7 @@ class WorkerStoreIsolation(EvenniaTest):
         scope.__enter__()
         self.addCleanup(scope.__exit__, None, None, None)
         super().setUp()
+        self._image_seq = 0
         self.tempdir = tempfile.TemporaryDirectory()
         self.addCleanup(self.tempdir.cleanup)
         self.root = Path(self.tempdir.name)
@@ -125,10 +126,37 @@ class WorkerStoreIsolation(EvenniaTest):
         return ArtSubject(kind, key)
 
     def _record(self, subject, description="desc"):
-        return ensure(subject, description)
+        """Enqueue one per-image gallery job with a deterministic fresh id."""
+        self._image_seq += 1
+        image_id = str(
+            uuid.uuid5(
+                uuid.NAMESPACE_DNS,
+                f"{subject.full()}:{description}:{self._image_seq}",
+            )
+        )
+        return enqueue_gallery_job(
+            subject,
+            description,
+            image_id=image_id,
+            binding=None,
+            face_rect=None,
+            requested_fields=[],
+        )
 
-    def _record_for(self, subject):
-        return ArtAssetRecord.objects.filter(db_key=record_key(subject)).first()
+    def _job_for(self, job):
+        return GalleryJobRecord.objects.filter(db_key=job.db_key).first()
+
+    def _card_identity(self, subject, image_id):
+        return (
+            f"gallery/{subject.kind.value.split(':')[-1]}/{subject.key}/"
+            f"{image_id}{self._extension()}"
+        )
+
+    @staticmethod
+    def _extension():
+        from django.conf import settings
+
+        return str(settings.ART_SD_OUTPUT_EXTENSION)
 
     def _assert_region_transparent(self, path: Path) -> None:
         """The fake zeroes the top-left 8x8; the standard fixture is 16x12."""

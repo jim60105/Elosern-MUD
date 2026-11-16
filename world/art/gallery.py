@@ -2,7 +2,7 @@
 
 One ``GalleryRecord`` (an Evennia ``DefaultScript``) exists per portrait
 subject — ``gallery:<full-subject-key>`` — carrying the subject kind and
-un-prefixed subject key (mirroring ``ArtAssetRecord``), an append-ordered list
+un-prefixed subject key (mirroring ``GalleryJobRecord``), an append-ordered list
 of image cards, a nullable ``default_image_id``, and the subject's last
 generation error. Records are created lazily (first append, first recorded
 generation error, first explicit default set) — never by a startup scan — and

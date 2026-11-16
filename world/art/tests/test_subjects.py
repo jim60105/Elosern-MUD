@@ -117,12 +117,17 @@ class StableKeyContractTests(unittest.TestCase):
             parse_subject(f"scene:{key}")
         boundary = "😀" * (MAX_SUBJECT_KEY_BYTES // 4)
         self.assertEqual(len(boundary.encode("utf-8")), MAX_SUBJECT_KEY_BYTES)
-        from world.art.worker import expected_output_identity
+        from world.art import gallery_kinds
+
+        image_id = "aaaaaaaa-1111-4111-8111-111111111111"
 
         for kind in ArtSubjectKind:
             with self.subTest(kind=kind):
                 subject = ArtSubject(kind, boundary)
-                identity = expected_output_identity(subject)
+                identity = (
+                    f"gallery/{gallery_kinds.store_directory_for(kind.value)}/"
+                    f"{subject.key}/{image_id}.png"
+                )
                 self.assertLessEqual(
                     len(identity.encode("utf-8")), 255, identity
                 )

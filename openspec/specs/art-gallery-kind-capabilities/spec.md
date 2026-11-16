@@ -6,7 +6,7 @@ Declares exactly one immutable capability record per art subject kind — galler
 ## Requirements
 
 ### Requirement: One closed declaration states what every subject kind's gallery may do
-One immutable capability record per subject kind SHALL govern gallery eligibility, directory, cap, bindings, age, prompt and geometry support. It SHALL declare official-reference policy, preference scope, terminal policy and whether an existing classic source is supported. Shared selection, suppression and preference routing SHALL use these declarations without inline kind comparisons.
+One immutable capability record per subject kind SHALL be the authority for gallery eligibility, directory, cap, bindings, age, prompt and geometry support. It SHALL also declare official-reference policy, preference scope and terminal policy as closed data values. Shared selection, suppression and preference routing SHALL consume those declarations without inline kind comparisons.
 
 #### Scenario: Every declared capability is readable from one place
 - **WHEN** the capability record for the character kind and for the monster kind are read
@@ -42,7 +42,7 @@ One immutable capability record per subject kind SHALL govern gallery eligibilit
 
 #### Scenario: Reference and preference policy are declared
 - **WHEN** capabilities for a registry-backed and an entity-provenance-backed kind are read
-- **THEN** reference policy distinguishes registry scene/species from character provenance, preference scope distinguishes subject from entity, terminal policy distinguishes scene from alpha, and classic support is false for scenes without imports or callables
+- **THEN** reference policy distinguishes registry scene/species from character provenance, preference scope distinguishes subject from entity, and terminal policy distinguishes scene from alpha without imports or callables
 
 ### Requirement: The declaration covers every subject kind exhaustively
 A contract test SHALL assert that the declaration holds exactly one entry for every member of

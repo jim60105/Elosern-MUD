@@ -18,7 +18,6 @@ from evennia.utils.test_resources import EvenniaTestCase
 from world.art import official
 from world.art import scene_definitions
 from world.art.gallery import append_card
-from world.art.queue import ensure, settle
 from world.art.scene_definitions import (
     BUNDLED_SCENE_MEDIA_PREFIX,
     SCENE_ART_KEYS,
@@ -28,14 +27,9 @@ from world.art.scene_definitions import (
     load_bundled_scene_catalog,
     reset_bundled_scenes,
 )
-from world.art.store import ArtAssetStatus
 from world.art.subjects import ArtSubject, ArtSubjectKind
 
 from tools.spec_traceability import covers_requirement
-
-
-def _scene(key="t_synth_bazaar"):
-    return ArtSubject(ArtSubjectKind.SCENE, key)
 
 
 def _encoded(format_name: str, size=(2, 2)) -> bytes:
@@ -57,33 +51,19 @@ def _tree_bytes(root: Path) -> dict[str, bytes]:
 
 
 class ArtMediaViewTests(EvenniaTestCase):
+    """Former fixed-output identities are absent routes."""
+
     def setUp(self):
         super().setUp()
         self.tempdir = tempfile.TemporaryDirectory()
         self.root = Path(self.tempdir.name)
         (self.root / "scene").mkdir(parents=True, exist_ok=True)
+        (self.root / "portrait" / "character").mkdir(parents=True, exist_ok=True)
+        (self.root / "portrait" / "monster").mkdir(parents=True, exist_ok=True)
 
     def tearDown(self):
         self.tempdir.cleanup()
         super().tearDown()
-
-    def _done_identity(self, identity, key="t_synth_bazaar"):
-        subject = _scene(key)
-        ensure(subject, "desc")
-        target = self.root / identity
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text("asset", encoding="utf-8")
-        from world.art.queue import claim
-
-        claimed = claim(10)
-        settle(
-            subject,
-            generation_token=str(claimed[0].db.generation_token),
-            status=ArtAssetStatus.DONE,
-            output_identity=identity,
-            error=None,
-        )
-        return subject
 
     def _get(self, identity):
         from django.test import Client
@@ -91,79 +71,28 @@ class ArtMediaViewTests(EvenniaTestCase):
         with override_settings(ART_STORE_ROOT=str(self.root)):
             return Client().get(f"/art/{identity}")
 
-    @covers_requirement("art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root")
-    def test_valid_done_record_identity_is_served_same_origin(self):
-        self._done_identity("scene/t_synth_bazaar.png")
-        response = self._get("scene/t_synth_bazaar.png")
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response["Content-Type"], "image/png")
-
-    @covers_requirement("art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root")
-    def test_every_store_extension_is_served_with_its_exact_media_type(self):
-        cases = {
-            ".webp": "image/webp",
-            ".jpg": "image/jpeg",
-            ".avif": "image/avif",
-        }
-        for extension, media_type in cases.items():
-            identity = f"scene/mixed_store_{extension[1:]}{extension}"
-            with self.subTest(extension=extension):
-                self._done_identity(identity, key=f"mixed_store_{extension[1:]}")
-                response = self._get(identity)
-                self.assertEqual(response.status_code, 200)
-                self.assertEqual(response["Content-Type"], media_type)
-
-    @covers_requirement("art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root")
-    def test_mixed_store_serves_a_png_record_under_another_formats_config(self):
-        # The route never consults the configured format: a done record with
-        # a .png identity is served even when the store's active format is
-        # avif (a store mid-way through a format switch).
-        self._done_identity("scene/t_synth_bazaar.png")
-        with override_settings(ART_SD_OUTPUT_FORMAT="avif", ART_SD_OUTPUT_EXTENSION=".avif"):
-            response = self._get("scene/t_synth_bazaar.png")
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response["Content-Type"], "image/png")
-
-    @covers_requirement("art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root")
-    def test_unlisted_extension_and_extensionless_identity_return_404(self):
-        for identity in ("scene/t_synth_bazaar.jxl", "scene/t_synth_bazaar"):
-            with self.subTest(identity=identity):
-                response = self._get(identity)
-                self.assertEqual(response.status_code, 404)
-
-    @covers_requirement("art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root")
-    def test_out_of_root_traversal_and_symlink_identities_return_404(self):
-        self._done_identity("scene/t_synth_bazaar.png")
-        (self.root / "scene" / "inner.png").write_text("inner", encoding="utf-8")
-        (self.root / "scene" / "inroot_symlink.png").symlink_to(
-            self.root / "scene" / "inner.png"
-        )
-        outside_dir = Path(tempfile.mkdtemp())
-        self.addCleanup(shutil.rmtree, outside_dir, ignore_errors=True)
-        (self.root / "scene" / "outroot_symlink.png").symlink_to(
-            outside_dir / "x.png"
-        )
+    @covers_requirement("art-queue-worker::runtime-media-serves-gallery-card-identities-only")
+    def test_formerly_fixed_identities_return_404_even_when_files_exist(self):
         for identity in (
+            "scene/t_synth_bazaar.png",
+            "portrait/character/42.png",
+            "portrait/monster/gray_wolf.webp",
+        ):
+            target = self.root / identity
+            target.write_text("legacy", encoding="utf-8")
+            with self.subTest(identity=identity):
+                self.assertEqual(self._get(identity).status_code, 404)
+
+    def test_unlisted_extension_and_traversal_return_404(self):
+        for identity in (
+            "scene/t_synth_bazaar.jxl",
+            "scene/t_synth_bazaar",
             "../outside.png",
             "scene/../outside.png",
-            "absolute",
-            "unknown.png",
-            "scene/wrong.txt",
-            "scene/inroot_symlink.png",
-            "scene/outroot_symlink.png",
-            "portrait/character/../scene/t_synth_bazaar.png",
+            "portrait/character/../../scene/x.png",
         ):
             with self.subTest(identity=identity):
-                response = self._get(identity)
-                self.assertEqual(response.status_code, 404)
-
-    def test_unreferenced_identity_returns_404_even_if_the_file_exists(self):
-        target = self.root / "scene" / "orphan.png"
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text("orphan", encoding="utf-8")
-        response = self._get("scene/orphan.png")
-        self.assertEqual(response.status_code, 404)
-        self.assertNotIn(str(self.root), repr(response))
+                self.assertEqual(self._get(identity).status_code, 404)
 
 
 class GalleryIdentityServingTests(EvenniaTestCase):
@@ -223,9 +152,7 @@ class GalleryIdentityServingTests(EvenniaTestCase):
 
         return Client().get(f"/art/{identity}")
 
-    @covers_requirement(
-        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root"
-    )
+    @covers_requirement("art-queue-worker::runtime-media-serves-gallery-card-identities-only")
     def test_a_card_referenced_gallery_identity_is_served_with_its_type(self):
         media_types = {
             ".png": "image/png",
@@ -242,9 +169,6 @@ class GalleryIdentityServingTests(EvenniaTestCase):
                 self.assertEqual(response.status_code, 200)
                 self.assertEqual(response["Content-Type"], media_type)
 
-    @covers_requirement(
-        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root"
-    )
     def test_a_scene_card_identity_is_served_same_origin(self):
         # A scene's generated source IS its scene gallery card
         # (``scene-classic-fallback-removal``), so that card identity is served
@@ -256,9 +180,7 @@ class GalleryIdentityServingTests(EvenniaTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response["Content-Type"], "image/png")
 
-    @covers_requirement(
-        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root"
-    )
+    @covers_requirement("art-queue-worker::runtime-media-serves-gallery-card-identities-only")
     def test_unreferenced_gallery_identity_returns_404(self):
         subject = self._subject(key="gallery-unref")
         stray = f"gallery/character/{subject.key}/{uuid.uuid4()}.png"
@@ -268,9 +190,6 @@ class GalleryIdentityServingTests(EvenniaTestCase):
         self._write(scene_stray)
         self.assertEqual(self._get(scene_stray).status_code, 404)
 
-    @covers_requirement(
-        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root"
-    )
     def test_mis_addressed_gallery_identity_returns_404(self):
         # A card of one subject whose stored identity addresses ANOTHER
         # subject's path: the addressed record holds no such card -> 404.
@@ -290,9 +209,6 @@ class GalleryIdentityServingTests(EvenniaTestCase):
         record.db.cards = [poisoned]
         self.assertEqual(self._get(victim_identity).status_code, 404)
 
-    @covers_requirement(
-        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root"
-    )
     def test_traversal_unexpected_directory_and_extension_404(self):
         subject = self._subject(key="gallery-rules")
         for bad in (
@@ -303,9 +219,6 @@ class GalleryIdentityServingTests(EvenniaTestCase):
             with self.subTest(bad=bad):
                 self.assertEqual(self._get(bad).status_code, 404)
 
-    @covers_requirement(
-        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root"
-    )
     def test_symlinked_gallery_file_returns_404_and_leaves_the_target_alive(self):
         subject = self._subject(key="gallery-symlink")
         identity = self._card(subject)
@@ -344,9 +257,6 @@ class DefaultsServingTests(EvenniaTestCase):
 
         return Client().get(f"/art/{identity}")
 
-    @covers_requirement(
-        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root"
-    )
     def test_a_defaults_identity_is_served_from_the_defaults_directory(self):
         # Closed vocabulary (gallery-builtin-fallbacks): only a committed key
         # is served; an out-of-vocabulary stem 404s even when the file exists.
@@ -365,9 +275,6 @@ class DefaultsServingTests(EvenniaTestCase):
                     self._get(f"defaults/man.{extension}").status_code, 404
                 )
 
-    @covers_requirement(
-        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root"
-    )
     def test_missing_escaping_or_symlinked_defaults_identities_404(self):
         outside = Path(self.tempdir.name) / "outside.png"
         outside.write_bytes(b"x")
@@ -444,9 +351,6 @@ class OfficialIdentityServingTests(EvenniaTestCase):
     def _body(response) -> bytes:
         return b"".join(response.streaming_content)
 
-    @covers_requirement(
-        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root"
-    )
     def test_a_catalog_admitted_identity_is_served_with_its_exact_bytes(self):
         cases = (
             ("a.png", "PNG", "image/png"),
@@ -463,9 +367,6 @@ class OfficialIdentityServingTests(EvenniaTestCase):
                 self.assertEqual(response["Content-Type"], media_type)
                 self.assertEqual(self._body(response), path.read_bytes())
 
-    @covers_requirement(
-        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root"
-    )
     def test_an_admitted_file_deleted_after_load_404s(self):
         identity = "npc/t_synth_profile/a.png"
         path = self._image()
@@ -482,9 +383,6 @@ class OfficialIdentityServingTests(EvenniaTestCase):
         self.official_root.rmdir()
         self.assertEqual(self._get(url).status_code, 404)
 
-    @covers_requirement(
-        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root"
-    )
     def test_a_url_for_a_reserved_character_identity_round_trips(self):
         # A content key and a filename may legally contain a space, '#', or
         # '?' (the shared stable-key contract forbids only |/:{} and control
@@ -502,7 +400,6 @@ class OfficialIdentityServingTests(EvenniaTestCase):
         self.assertEqual(self._body(response), path.read_bytes())
 
     @covers_requirement(
-        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root",
         "official-artwork-catalog::each-indexed-image-carries-a-startup-computed-content-fingerprint"
     )
     def test_a_stale_fingerprint_404s_while_the_refreshed_one_serves(self):
@@ -520,9 +417,6 @@ class OfficialIdentityServingTests(EvenniaTestCase):
         self.assertEqual(self._body(response), path.read_bytes())
         self.assertNotEqual(self._url(identity), stale)
 
-    @covers_requirement(
-        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root"
-    )
     def test_unindexed_paths_and_bogus_fingerprints_404_without_acquiring(self):
         identity = "npc/t_synth_profile/a.png"
         self._image()
@@ -544,9 +438,6 @@ class OfficialIdentityServingTests(EvenniaTestCase):
             (self.official_root / "npc" / "t_synth_late" / "a.png").is_file()
         )
 
-    @covers_requirement(
-        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root"
-    )
     def test_escaping_and_post_load_swapped_symlinks_404(self):
         identity = "npc/t_synth_profile/a.png"
         path = self._image()
@@ -571,9 +462,6 @@ class OfficialIdentityServingTests(EvenniaTestCase):
             with self.subTest(target=target):
                 self.assertEqual(self._get(target).status_code, 404)
 
-    @covers_requirement(
-        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root"
-    )
     def test_serving_copies_nothing_into_the_runtime_store(self):
         identity = "npc/t_synth_profile/a.png"
         self._image()
@@ -587,9 +475,6 @@ class OfficialIdentityServingTests(EvenniaTestCase):
         self.assertEqual(_tree_bytes(self.official_root), official_before)
         self.assertEqual(_tree_bytes(self.store_root), {})
 
-    @covers_requirement(
-        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root"
-    )
     def test_an_unloaded_catalog_serves_no_official_identity(self):
         identity = "npc/t_synth_profile/a.png"
         self._image()
@@ -694,7 +579,6 @@ class BundledSceneServingTests(EvenniaTestCase):
 
     # -- cases ------------------------------------------------------------
     @covers_requirement(
-        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root",
         "bundled-scene-art::bundled-media-has-a-closed-trusted-namespace"
     )
     def test_an_admitted_identity_serves_the_committed_bytes(self):
@@ -708,7 +592,6 @@ class BundledSceneServingTests(EvenniaTestCase):
         self.assertTrue(self._url(key).startswith(f"{BUNDLED_SCENE_MEDIA_PREFIX}{key}/"))
 
     @covers_requirement(
-        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root",
         "bundled-scene-art::bundled-media-has-a-closed-trusted-namespace"
     )
     def test_a_stale_fingerprint_404s_while_the_refreshed_one_serves(self):
@@ -727,7 +610,6 @@ class BundledSceneServingTests(EvenniaTestCase):
             self.assertNotEqual(self._url(key), stale)
 
     @covers_requirement(
-        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root",
         "bundled-scene-art::bundled-media-has-a-closed-trusted-namespace"
     )
     def test_unknown_keys_and_bogus_fingerprints_404(self):
@@ -750,7 +632,6 @@ class BundledSceneServingTests(EvenniaTestCase):
                 self._assert_actual_404(self._get(target))
 
     @covers_requirement(
-        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root",
         "bundled-scene-art::bundled-media-has-a-closed-trusted-namespace"
     )
     def test_a_file_deleted_after_admission_is_a_real_404(self):
@@ -767,7 +648,6 @@ class BundledSceneServingTests(EvenniaTestCase):
             self._assert_actual_404(self._get(url))
 
     @covers_requirement(
-        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root",
         "bundled-scene-art::bundled-media-has-a-closed-trusted-namespace"
     )
     def test_a_symlink_swapped_in_after_admission_is_refused(self):
@@ -784,7 +664,6 @@ class BundledSceneServingTests(EvenniaTestCase):
             self.assertTrue(outside.exists())
 
     @covers_requirement(
-        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root",
         "bundled-scene-art::bundled-media-has-a-closed-trusted-namespace"
     )
     def test_an_operator_root_neither_replaces_nor_serves_a_bundled_identity(self):
@@ -829,9 +708,6 @@ class BundledSceneServingTests(EvenniaTestCase):
         )
         self.assertEqual(self._get(bundled_url).status_code, 200)
 
-    @covers_requirement(
-        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root"
-    )
     def test_an_unloaded_snapshot_serves_no_bundled_identity(self):
         key = self._key(0)
         committed = Path(scene_definitions.bundled_scene_root()) / bundled_asset_filename(key)
@@ -840,9 +716,6 @@ class BundledSceneServingTests(EvenniaTestCase):
         self._assert_actual_404(self._get(identity))
         self.assertEqual(current_bundled_scenes().url_for(key), None)
 
-    @covers_requirement(
-        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root"
-    )
     def test_serving_a_bundled_identity_copies_nothing_into_the_store(self):
         key = self._key(0)
         load_bundled_scene_catalog()

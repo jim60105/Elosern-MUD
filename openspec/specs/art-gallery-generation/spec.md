@@ -49,7 +49,7 @@ One validated service seam SHALL enqueue every gallery-bearing kind through type
 #### Scenario: Preconditions are read from the capability declaration
 - **WHEN** the seam enforces any precondition
 - **THEN** it SHALL be read from the subject kind's capability declaration rather than from a comparison against a particular kind
-- **AND** it SHALL re-check the canonical age pair exactly as the classic portrait ensure does for a kind that declares the age precondition, and SHALL NOT read age attributes for a kind that does not
+- **AND** it SHALL re-check the canonical age pair through the canonical-age validator for a kind that declares the age precondition, and SHALL NOT read age attributes for a kind that does not
 - **AND** it SHALL validate a supplied field selection against the catalog for a kind that declares field-selection support, and SHALL reject a non-empty selection with a typed error for a kind that does not
 - **AND** it SHALL accept free-form prompt text for a kind that declares free-text support, and SHALL reject non-empty text with a typed error for a kind that does not
 - **AND** it SHALL validate a supplied binding for a kind that declares binding support, and SHALL reject a non-`None` binding with a typed error for a kind that does not
@@ -176,10 +176,10 @@ the settled `status` and bounded `reason` code on settle.
 - **THEN** it additionally produces the queue-level `sd_job_claim`/`sd_job_settled` events keyed by the job record, and the `gallery_*` pair is the per-image business stream operators SHALL count
 
 ### Requirement: The startup prune reclaims stored art of unregistered monster keys
-The startup prune SHALL delete every gallery record, gallery job record and classic asset record whose kind is `monster` and whose key is not a registered visual species, before its file phase, so the files only those records referenced become orphans and are deleted in the same pass. Records of registered species SHALL be untouched.
+Startup prune SHALL delete gallery records and gallery jobs for unregistered monster visual keys before reclaiming unreferenced gallery files. Registered species records, cards and referenced files SHALL remain untouched. No retired fixed-output record scanning or conversion SHALL remain.
 
 #### Scenario: An unregistered species leaves nothing behind
-- **WHEN** the server starts with a gallery record holding one card, a pending gallery job and a done classic record for monster key `t_gone`, which the synthetic registry does not register
+- **WHEN** the server starts with a gallery record holding one card, a pending gallery job for monster key `t_gone`, which the synthetic registry does not register
 - **THEN** after the prune no record names `t_gone` and none of the files those records referenced exists
 
 #### Scenario: A registered species is untouched

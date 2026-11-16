@@ -77,19 +77,19 @@ The party panel SHALL present the commander as row 0 followed by one ordered row
 - **THEN** portrait_ref names its complete descriptor, including expected alpha/initial presentation; null is reserved for no admitted reference and no job or private-catalog expansion occurs
 
 #### Scenario: Personal official selection works without runtime cards
-- **WHEN** a present named companion has a resolving retained personal official selection, no runtime card and no classic runtime asset
+- **WHEN** a present named companion has a resolving retained personal official selection and no runtime card
 - **THEN** its non-null `portrait_ref` resolves in the same snapshot's `art.portrait_catalog` to that selected official image with `origin: official` and its `/art/official/...` URL
 - **AND** no runtime default card is required and official artwork is never appended to the card list
 
 #### Scenario: Mounted official default works without a gallery record
-- **WHEN** a present preset-born named companion has a mounted official content-directory default and no gallery record or classic runtime asset
+- **WHEN** a present preset-born named companion has a mounted official content-directory default and no gallery record
 - **THEN** its non-null `portrait_ref` resolves in the same snapshot's `art.portrait_catalog` to that official default with `origin: official` and its `/art/official/...` URL
 - **AND** the gallery record remains absent
 
 #### Scenario: Equipment matching retains chain precedence
 - **WHEN** a companion has a matching equipment-bound runtime card and a resolving personal official selection
 - **THEN** its `portrait_ref` resolves to the runtime card with `origin: runtime`
-- **AND** precedence remains equipment-bound matching card > personal official selection > record default card > classic runtime asset > mounted official default > null, subject to the chain's existing eligibility and validation rules
+- **AND** precedence remains equipment-bound matching card > personal official selection > record default card > mounted official default > null, subject to the chain's existing eligibility and validation rules
 
 #### Scenario: HP fields come from the true traits
 - **WHEN** a slot row is serialized

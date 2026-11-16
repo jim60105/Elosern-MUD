@@ -57,7 +57,7 @@ from web.webclient.presentation.registry import (
     PanelUnavailableError,
     build_production_registry,
 )
-from world.art.store import ArtAssetRecord
+from world.art.store import GalleryJobRecord
 from world.art.subjects import monster_subject_for
 from world.rules.lore_knowledge import (
     CATEGORY_LABELS,
@@ -883,12 +883,12 @@ class LoreCodexPresenterTests(EvenniaTestCase):
         record = {f"monster:{T_SPECIES}", f"region:{T_ART_REGION}", f"race:{T_RACE}"}
         defeated = {T_SPECIES}
         player = _mock_player(lore_discovered=set(record), lore_species_defeated=set(defeated))
-        before = ArtAssetRecord.objects.count()
+        before = GalleryJobRecord.objects.count()
         with patch("world.art.queue.enqueue_gallery_job") as enqueued:
             first = self._render(player)
             second = self._render(player)
         enqueued.assert_not_called()
-        self.assertEqual(ArtAssetRecord.objects.count(), before)
+        self.assertEqual(GalleryJobRecord.objects.count(), before)
         self.assertEqual(first, second)
         self.assertEqual(player.db.lore_discovered, record)
         self.assertEqual(player.db.lore_species_defeated, defeated)

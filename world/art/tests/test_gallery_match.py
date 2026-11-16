@@ -61,7 +61,7 @@ from world.art.official_refs import (
     PRESET_PROVENANCE_ATTRIBUTE,
     UNRESOLVED_REFERENCE_EVENT,
 )
-from world.art.store import ArtAssetRecord
+from world.art.store import GalleryJobRecord
 from world.art.subjects import ArtSubject, ArtSubjectKind
 from world.lore import monster_visuals
 
@@ -176,9 +176,6 @@ class _ChainBase(EvenniaTestCase):
 
 
 class ChainBindingTests(_ChainBase):
-    @covers_requirement(
-        "art-gallery-resolution::display-resolution-is-one-deterministic-chain-from-equipment-to-fallback"
-    )
     def test_the_most_specific_matching_binding_wins(self):
         subject = _character("specific")
         entity = _FakeEntity(
@@ -201,9 +198,6 @@ class ChainBindingTests(_ChainBase):
             f"expected two-slot card {narrow}, got {broad}",
         )
 
-    @covers_requirement(
-        "art-gallery-resolution::display-resolution-is-one-deterministic-chain-from-equipment-to-fallback"
-    )
     def test_an_equal_specificity_tie_resolves_to_the_newest_card(self):
         subject = _character("tiebreak")
         entity = _FakeEntity({"armor": "leather_vest"})
@@ -221,9 +215,6 @@ class ChainBindingTests(_ChainBase):
         self._set_created_at(subject, newer, now - 1)
         self.assertEqual(resolve_card(subject, entity)["image_id"], older)
 
-    @covers_requirement(
-        "art-gallery-resolution::display-resolution-is-one-deterministic-chain-from-equipment-to-fallback"
-    )
     def test_a_binding_over_empty_slots_matches_an_unequipped_entity(self):
         subject = _character("emptyward")
         bare = self._append_present(
@@ -236,9 +227,6 @@ class ChainBindingTests(_ChainBase):
         self.assertIsNotNone(resolved)
         self.assertEqual(resolved["image_id"], bare, "unmasked slots are don't-cares")
 
-    @covers_requirement(
-        "art-gallery-resolution::display-resolution-is-one-deterministic-chain-from-equipment-to-fallback"
-    )
     def test_changing_equipment_changes_the_resolved_card_without_a_write(self):
         subject = _character("swapper")
         first = self._append_present(
@@ -259,7 +247,7 @@ class ChainBindingTests(_ChainBase):
         self.assertEqual(record_for(subject).db.cards, cards_before)
 
     @covers_requirement(
-        "art-gallery-resolution::display-resolution-is-one-deterministic-chain-from-equipment-to-fallback"
+        "art-gallery-resolution::all-artwork-subjects-use-the-gallery-only-deterministic-chain"
     )
     def test_no_binding_match_falls_through_to_the_default(self):
         subject = _character("fallthrough")
@@ -304,9 +292,6 @@ class UnboundCardTests(_ChainBase):
 
 
 class MonsterChainTests(_ChainBase):
-    @covers_requirement(
-        "art-gallery-resolution::monster-subjects-resolve-through-the-chain-without-the-binding-steps"
-    )
     def test_a_monster_resolves_its_single_card_with_no_equipment_read(self):
         subject = _monster("snapshotless")
         card_id = self._append_present(subject)
@@ -318,14 +303,11 @@ class MonsterChainTests(_ChainBase):
             resolved = resolve_card(subject, _FakeEntity({"armor": "plate_harness"}))
         self.assertEqual(resolved["image_id"], card_id)
 
-    @covers_requirement(
-        "art-gallery-resolution::monster-subjects-resolve-through-the-chain-without-the-binding-steps"
-    )
     def test_a_monster_with_no_card_resolves_to_nothing(self):
         self.assertIsNone(resolve_card(_monster("bare"), _FakeEntity()))
 
     @covers_requirement(
-        "art-gallery-resolution::monster-subjects-resolve-through-the-chain-without-the-binding-steps"
+        "art-gallery-resolution::declared-binding-support-gates-shared-resolution"
     )
     def test_the_binding_skip_follows_the_declaration_not_the_kind(self):
         # A CHARACTER whose declaration is patched to drop binding support
@@ -350,9 +332,6 @@ class MonsterChainTests(_ChainBase):
             resolved = resolve_card(subject, _FakeEntity({"armor": "leather_vest"}))
         self.assertEqual(resolved["image_id"], unbound_default)
 
-    @covers_requirement(
-        "art-gallery-resolution::display-resolution-is-one-deterministic-chain-from-equipment-to-fallback"
-    )
     def test_a_kind_without_a_gallery_resolves_to_nothing(self):
         # The preserved no-gallery machinery, read through the declaration: a
         # gallery-less kind contributes no chain slots at all.
@@ -664,14 +643,14 @@ class OfficialDefaultStepTests(EvenniaTestCase):
                 stack.enter_context(tripwire)
             before = (
                 GalleryRecord.objects.count(),
-                ArtAssetRecord.objects.count(),
+                GalleryJobRecord.objects.count(),
                 sorted(path.relative_to(store).as_posix() for path in store.rglob("*")),
                 dict(entity.attributes),
             )
             facts = [official_default_for(subject, entity) for _ in range(100)]
             after = (
                 GalleryRecord.objects.count(),
-                ArtAssetRecord.objects.count(),
+                GalleryJobRecord.objects.count(),
                 sorted(path.relative_to(store).as_posix() for path in store.rglob("*")),
                 dict(entity.attributes),
             )
@@ -779,9 +758,6 @@ class BareRegistrySubjectTests(EvenniaTestCase):
 class ImportBoundaryTests(unittest.TestCase):
     FORBIDDEN = ("world.ai", "ollama", "llm_client", "world.art.connectivity")
 
-    @covers_requirement(
-        "art-gallery-resolution::display-resolution-is-one-deterministic-chain-from-equipment-to-fallback"
-    )
     def test_gallery_match_imports_no_connectivity_module(self):
         source = (REPO_ROOT / "world/art/gallery_match.py").read_text(encoding="utf-8")
         tree = ast.parse(source)
@@ -1042,7 +1018,7 @@ class OfficialSelectionStepTests(EvenniaTestCase):
         )
         before = (
             GalleryRecord.objects.count(),
-            ArtAssetRecord.objects.count(),
+            GalleryJobRecord.objects.count(),
             repr(record_for(subject).attributes.all()),
             sorted(path.relative_to(self.store).as_posix() for path in self.store.rglob("*")),
         )
@@ -1052,7 +1028,7 @@ class OfficialSelectionStepTests(EvenniaTestCase):
             resolutions = [resolve_display(subject, entity) for _ in range(100)]
         after = (
             GalleryRecord.objects.count(),
-            ArtAssetRecord.objects.count(),
+            GalleryJobRecord.objects.count(),
             repr(record_for(subject).attributes.all()),
             sorted(path.relative_to(self.store).as_posix() for path in self.store.rglob("*")),
         )

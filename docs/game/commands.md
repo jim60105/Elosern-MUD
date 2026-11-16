@@ -201,12 +201,12 @@ NPC 可選擇回信，送達不代表必定收到回覆。回信寄出後另需�
 
 | 指令 | 說明 |
 | --- | --- |
-| [`art status`](/game/command-reference?id=art-status) | 列出美術資產記錄。 |
+| [`art status`](/game/command-reference?id=art-status) | 列出圖庫持有狀態。 |
 | [`art run`](/game/command-reference?id=art-run) | 立即排空美術佇列。 |
-| [`art retry`](/game/command-reference?id=art-retry) | 重新排入失敗記錄。 |
-| [`art requeue`](/game/command-reference?id=art-requeue) | 強制重新生成主體。 |
+| [`art retry`](/game/command-reference?id=art-retry) | 重新驅動已記錄的圖庫生成失敗。 |
+| [`art requeue`](/game/command-reference?id=art-requeue) | 強制重新請求單一主體的圖庫生成。 |
 | [`art options`](/game/command-reference?id=art-options) | 查詢 sd-webui 可選名稱。 |
-| [`art health`](/game/command-reference?id=art-health) | 檢視 sd-webui 連線與管線狀態。 |
+| [`art health`](/game/command-reference?id=art-health) | 檢視 sd-webui 連線與即時圖庫工作狀態。 |
 
 ## 系統與建造
 
