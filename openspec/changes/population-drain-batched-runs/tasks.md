@@ -4,16 +4,17 @@
 Do not add `covers_requirement` for the ADDED requirement of this change; that happens at archive. Tests of the three MODIFIED requirements keep or receive the existing identifiers already used in `world/maps/tests/test_population_drain.py`.
 No test may sleep, start a timer or assert elapsed real time. Work is bounded and asserted by counts (steps, events, calls).
 Tests use the synthetic two-zone world of `DrainFixture` only.
+Where a test must rewrite a stored group, use `monster_activity.write_monster_activity` when that function exists and the fixture's existing `link_group_home` helper otherwise.
 Do not edit `world/maps/population_lifecycle.py`, `world/maps/monster_activity.py`, `world/maps/regional_population.py`, or the signatures and results of `lagging_sets` and `build_scope`.
 
 ## 1. Preconditions
 
-- [ ] 1.1 Confirm the baseline and the earlier changes are merged. Verify: `grep -c "_AREA_UNITS = SourceMemo()" world/maps/population_units.py` prints 1 (commit `c0736d44`), `grep -c "POPULATION_DRAIN_IDLE_SECONDS" world/maps/population_drain.py` prints 1 or more (`population-drain-idle-gate`), and `grep -c "def scope_part_units" world/maps/monster_activity.py` prints 1 (`population-snapshot-part-scoping`). If any prints 0, stop and report.
+- [ ] 1.1 Confirm the baseline and the earlier changes are merged. Verify: `grep -c "_AREA_UNITS = SourceMemo()" world/maps/population_units.py` prints 1 (commit `c0736d44`), and `grep -c "POPULATION_DRAIN_IDLE_SECONDS" world/maps/population_drain.py` prints 1 or more (`population-drain-idle-gate`). If either prints 0, stop and report.
 
 ## 2. Shared group units
 
 - [ ] 2.1 Apply design D3 to `world/maps/population_units.py`. Verify: `grep -c "_GROUP_UNITS = SourceMemo()" world/maps/population_units.py` prints 1.
-- [ ] 2.2 In `world/maps/tests/test_population_units.py`, beside the existing `warm_group_units` test, add the two scenarios of "Group units are computed once per activity record": patch `world.maps.population_units.group_units` with `wraps=`; call `lagging_sets(wilderness, now)` with one unit behind, then `build_scope` twice; assert the call count equals the number of stored groups. Then rewrite one group's home to a cell of another unit through `monster_activity.write_monster_activity`, build the scope again and assert the scope's `units` contain the other unit. Verify: the test prefix with `world.maps.tests.test_population_units` passes.
+- [ ] 2.2 In `world/maps/tests/test_population_drain.py` add a class `SharedGroupUnitsTests(DrainFixture)` with the two scenarios of "Group units are computed once per activity record". First test: `self.set_world_tick(FAR_TICK)`; `self.write_cursors(FAR_TICK, {self.unit_a: START})`; make the memo miss by rewriting one group through `self.link_group_home(group_id, cell)` with the group's present home cell (any stored write replaces the record object); then patch `world.maps.population_units.group_units` with `wraps=`, call `lagging_sets(self.wilderness, FAR_TICK)` and `population_units.build_scope(self.wilderness, {self.unit_a})` twice, and assert the call count equals `len(read_monster_activity(self.wilderness).groups)`. Second test: build the scope of `self.unit_a`, call `self.link_group_home` to move one first-zone group's home to a second-zone cell, build the scope again and assert its `units` contain `self.unit_b`. Verify: the test prefix with `world.maps.tests.test_population_drain` passes.
 
 ## 3. Steps per run
 

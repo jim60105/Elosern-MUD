@@ -2,7 +2,7 @@
 
 ## Context
 
-See `proposal.md` for the motivation. This design assumes commit `c0736d44` and the changes `population-drain-idle-gate`, `monster-activity-record-parts` and `population-snapshot-part-scoping` are merged.
+See `proposal.md` for the motivation. This design requires commit `c0736d44` and the change `population-drain-idle-gate` to be merged. It works with or without `monster-activity-record-parts` and `population-snapshot-part-scoping`: it relies only on `read_monster_activity` answering the same object for an unchanged record, which holds before and after them.
 
 Current code:
 
@@ -164,7 +164,7 @@ Not needed: sharing one activity read between `lagging_sets` and `build_scope`. 
 
 ### D5. Documentation
 
-- `docs/development/regional-monster-population.md`, drain section: rewrite step 4 of "One run" as the step loop of D1 (selection from updated cursors, one slice per step, the stop conditions); in "Failure" replace "tries the next most lagging set" with the D1 rule (a failed set is not retried in the same run; three failed sets end the run); in "The event" say one event per settled step; in "The periodic caller" add the setting row (`POPULATION_DRAIN_STEPS_PER_RUN` | `4` | Settlement steps one repeat may perform) and note the function's `int` result; the by-hand loop `while drain_population_backlog(600): pass` stays valid and may pass a larger `max_steps`. Add one paragraph "Shared group units" describing D3.
+- `docs/development/regional-monster-population.md`, drain section: rewrite step 4 of "One run" as the step loop of D1 (selection from updated cursors, one slice per step, the stop conditions, and the bound that one run attempts at most `max_steps + MAX_FAILED_SETS_PER_RUN - 1` settlements); in "Failure" replace "tries the next most lagging set" with the D1 rule (a failed set is not retried in the same run; three failed sets end the run); in "The event" say one event per settled step; in "The periodic caller" add the setting row (`POPULATION_DRAIN_STEPS_PER_RUN` | `4` | Settlement steps one repeat may perform) and note the function's `int` result; the by-hand loop `while drain_population_backlog(600): pass` stays valid and may pass a larger `max_steps`. Add one paragraph "Shared group units" describing D3.
 - `docs/development/settings-and-environment.md`: one row after `POPULATION_DRAIN_IDLE_SECONDS`, in zh-TW like its neighbours.
 - `docs/superpowers/specs/2026-09-02-observability-logging-design.md` §4.2, the `population_backlog_drained` and `population_backlog_drain_failed` rows: say one info event per settled step, and that a failed set is skipped for the rest of the run.
 

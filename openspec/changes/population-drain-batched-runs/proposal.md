@@ -38,7 +38,6 @@ None.
 ## Batch:
 
 - depends-on: population-drain-idle-gate
-- depends-on: population-snapshot-part-scoping
 - This change requires commit `c0736d44` (`fix/population-group-units-memo`) to be merged to `master` first: it edits `population_units.group_units_map` beside that commit's `_area_units` memo and `warm_group_units`.
-- conflicts: `population-drain-idle-gate` edits `PopulationDrainScript.at_repeat` and the settings inventories; this change edits the same places and is ordered after it. The dependency on `population-snapshot-part-scoping` is an ordering one: both edit `docs/development/regional-monster-population.md`, and the default of 4 steps assumes the cheaper step that `monster-activity-record-parts` and `population-snapshot-part-scoping` deliver.
+- conflicts: `population-drain-idle-gate` edits `PopulationDrainScript.at_repeat` and the settings inventories; this change edits the same places and is ordered after it. `monster-activity-record-parts` and `population-snapshot-part-scoping` are not code dependencies, but both edit `docs/development/regional-monster-population.md` and `monster-activity-record-access` edits `world/maps/tests/test_population_drain.py`, so do not run this change in parallel with them. Merging it after them is recommended: the default of 4 steps is cheaper per run once a step no longer writes and snapshots the whole activity record.
 - parallel with: none.
