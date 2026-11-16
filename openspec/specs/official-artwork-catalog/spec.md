@@ -44,17 +44,7 @@ An absent default optional root or healthy empty root SHALL remain valid offline
 - **THEN** startup succeeds but its snapshot and boundary diagnostic retain configured-root unavailability
 
 ### Requirement: The catalog indexes the mounted layout once at startup and serves from that snapshot
-`world/art/official.py` SHALL index the official root once at startup and ordinary resolution SHALL read from that in-memory snapshot only. An image's root-relative path SHALL be its stable official asset identity.
-
-The index SHALL cover this content layout, where the content kind is exactly one of `monster`, `preset`, `npc`, `scene`, `room`:
-
-```
-monster/<species-key>/<image-file>
-preset/<preset-key>/<image-file>
-npc/<npc-or-profile-key>/<image-file>
-scene/<scene-key>/<image-file>
-room/<room-art-key>/<image-file>
-```
+The catalog SHALL index admitted monster, preset, npc, scene and room content once at startup and resolve from that snapshot. Root-relative paths SHALL be stable identities. Scene membership SHALL use the scene archetype registry; room membership SHALL retain its authored room-art registry. Subject-reference consumers SHALL recognize monster, preset, npc and scene; room SHALL remain an authored override.
 
 #### Scenario: The snapshot is built at startup and reused
 - **WHEN** the server starts with a populated official root and ten portraits resolve during ordinary play
@@ -87,6 +77,10 @@ room/<room-art-key>/<image-file>
 #### Scenario: Scene and room keys are authored
 - **WHEN** operator scene/room directories are indexed
 - **THEN** scene keys and room-art keys must be registered authored content, not database ids or translated labels
+
+#### Scenario: Scene reference vocabulary agrees with admission
+- **WHEN** a synthetic registered archetype has a valid scene directory
+- **THEN** catalog admission and official-reference validation both admit it; an unknown archetype is rejected without affecting another directory
 
 ### Requirement: Admission admits only valid images confined to the configured root
 Catalog admission SHALL accept only regular, non-symlinked image files that (a) match the existing closed image-format extension vocabulary, (b) decode successfully under the existing bounded image limits, and (c) resolve strictly inside `ART_OFFICIAL_ROOT`. Every other entry SHALL be refused with bounded diagnostics. Each refusal SHALL be per-entry: the catalog SHALL never reject the whole root.

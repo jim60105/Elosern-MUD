@@ -93,7 +93,7 @@ from world.art.gallery_prompt import (
 # primitive (design D1 step 3) instead of hand-rolling an atomic write.
 from world.art.gallery_seed import _MAX_FILE_BYTES, _publish_under_store
 from world.art.paths import resolved_under_store_root
-from world.art.presenter import _validated_output_identity
+from world.art.gallery_match import classic_output_identity
 from world.art.queue import (
     enqueue_gallery_job,
     gallery_job_in_flight,
@@ -141,8 +141,8 @@ _GALLERY_REGISTRY_PRODUCERS = {
 }
 
 
-def _official_default_satisfies(subject, entity) -> bool:
-    """True when an eligible official reference already resolves a default image.
+def _official_default_slot(subject, entity):
+    """The chain's official slot for an automatic-path subject.
 
     The automatic-generation guard's official-satisfied condition
     (``official-art-resolution-contracts``): a subject whose stored provenance
@@ -152,20 +152,44 @@ def _official_default_satisfies(subject, entity) -> bool:
     default image, exactly as a subject that already holds a card is left
     alone. The presentation chain then shows the read-only official default.
 
-    The check reuses the chain's own step (``official_default_for``), so the
+    The check reuses the chain's own step (``official_default_slot``), so the
     guard and the presentation agree by construction; it reads stored state
     plus the startup snapshot only — nothing is recorded, enqueued, acquired,
     or mutated, the subject's named portrait policy is untouched, and the
     manual generation seams stay available. A subject whose reference the
-    caller cannot see answers False, so its automatic request proceeds exactly
-    as before: a character or NPC without authored provenance, a registry-keyed
-    monster subject (the automatic paths pass a bare ``ArtSubject``, which
-    carries no stored species identity), and any reference the snapshot does
-    not hold.
+    caller cannot see answers no facts, so its automatic request proceeds
+    exactly as before. Registry-backed kinds resolve from their validated typed
+    subject with no entity (the startup suppression gap this change closes).
     """
-    from world.art.gallery_match import official_default_for
+    from world.art.gallery_match import official_default_slot
 
-    return official_default_for(subject, entity) is not None
+    return official_default_slot(subject, entity)
+
+
+def _emit_registry_suppression(subject, slot) -> None:
+    """Emit the one bounded info event for a registry-subject official skip.
+
+    Only a kind whose official reference is registry-derived (a monster visual
+    species or a scene archetype) can be satisfied without any spawned entity;
+    that is the path this change fixes, so that path alone reports the
+    suppression. The event carries business identifiers only — the subject,
+    kind, content reference, and the closed ``official_default`` reason — and
+    never a prompt, credentials, root, or file path.
+    """
+    policy = gallery_kinds.capabilities_for(
+        subject.kind.value
+    ).official_reference_policy
+    if policy not in ("visual_species", "scene_archetype"):
+        return
+    log_info(
+        "art_auto_generation_suppressed",
+        context={
+            "subject": subject.full(),
+            "kind": subject.kind.value,
+            "reference": slot.source_identity,
+            "reason": "official_default",
+        },
+    )
 
 
 def _standard_gallery_request_kwargs(capability) -> dict:
@@ -201,7 +225,9 @@ def _guarded_gallery_request(subject, entity) -> bool:
                 f"a gallery request for {subject.full()!r} requires the entity carrying the portrait subject"
             )
         character_ages(entity)
-    if _official_default_satisfies(subject, entity):
+    official = _official_default_slot(subject, entity)
+    if official.facts is not None:
+        _emit_registry_suppression(subject, official)
         return False
     if _gallery_auto_generation_pending(subject):
         return False
@@ -816,7 +842,9 @@ def _migrate_classic_scene_record(record) -> str:
         subject = None
     converted = False
     if subject is not None and status == ArtAssetStatus.DONE:
-        identity = _validated_output_identity(subject, record.db.output_identity)
+        identity = classic_output_identity(
+            subject, record.db.output_identity, directory="scene"
+        )
         if identity is not None and not gallery_api.cards_for(subject):
             _convert_classic_scene_output(record, subject, identity)
             converted = True

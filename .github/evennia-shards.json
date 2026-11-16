@@ -711,7 +711,8 @@
         "world.art.tests.test_worker.test_translate_stage",
         "world.narrative.tests.test_dialogue_memory",
         "world.narrative.tests.test_gm",
-        "world.art.tests.test_bundled_rite_art"
+        "world.art.tests.test_bundled_rite_art",
+        "world.art.tests.test_unified_selection"
       ]
     },
     {

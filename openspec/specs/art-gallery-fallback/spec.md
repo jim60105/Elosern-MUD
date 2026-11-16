@@ -86,7 +86,7 @@ function of the subject key and the stored sex and apparent age.
 - **THEN** resolution SHALL fail closed to the adult band rather than raising
 
 ### Requirement: The fallback seam supplies a URL and a face rectangle and reports its use
-The single art-domain silhouette selector SHALL supply the existing closed key, committed resource identity/URL and its own geometry as the descriptor's alpha terminal. Existing declaration, demographics and stable-hash rules SHALL remain unchanged. Backend-selected fallback use SHALL emit gallery_fallback_used through named facade imports; browser-only failures SHALL not claim backend logging.
+One capability-selected terminal seam SHALL supply person alpha identity and geometry or scene bundled/terminal sources. Existing person demographic and stable-hash rules SHALL remain. Reached terminal faults SHALL stay source-attributed. Backend-selected alpha use SHALL emit gallery_fallback_used through named facade imports; browser-only failures SHALL not claim backend logging.
 
 #### Scenario: A subject with no card and no classic asset resolves a fallback image
 - **WHEN** the chain reaches the seam for a subject with no card and no `done` classic asset
@@ -141,6 +141,10 @@ The single art-domain silhouette selector SHALL supply the existing closed key, 
 #### Scenario: The fallback field is decorative presentation data
 - **WHEN** a silhouette terminal is provided
 - **THEN** it never completes or mutates the subject generation state and remains separate from real-source attempts
+
+#### Scenario: Scene policy never uses person geometry
+- **WHEN** a gallery-bearing kind declares the scene terminal policy and has no real image
+- **THEN** its terminal has landscape geometry with null face rectangle and never invokes person demographic selection
 
 ### Requirement: The built-in fallback images carry a transparent background
 Each committed built-in fallback image SHALL be produced from the project art prompt library

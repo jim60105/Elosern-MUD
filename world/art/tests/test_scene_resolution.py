@@ -49,6 +49,7 @@ from world.art.store import ArtAssetRecord, ArtAssetStatus
 from world.art.subjects import ArtSubject, ArtSubjectKind
 from world.rules import art_view
 from world.rules.art_view import SceneTarget, scene_target_for
+from web.webclient.presentation.artwork import validate_artwork
 
 from tools.spec_traceability import covers_requirement
 
@@ -300,6 +301,108 @@ class SourceChainTests(_SceneFixture):
     @covers_requirement(
         "scene-artwork-presentation::normal-scenes-use-the-complete-authored-source-chain"
     )
+    def test_explicit_scene_official_choice_outranks_the_generated_default(self):
+        _image_id, _identity = self.publish_gallery_card()
+        selection = f"scene/{SCENE_KEY}/a.png"
+        gallery_api.set_official_selection(self.subject(), selection)
+        descriptor = describe_scene(self.target())
+        attempts = self.entries(descriptor)
+        self.assertEqual(
+            (attempts[0]["type"], attempts[0]["rank"]),
+            ("image", descriptors.SCENE_RANK_SELECTED),
+        )
+        self.assertEqual(
+            attempts[0]["source_id"],
+            descriptors.scene_selected_source_id(selection),
+        )
+        self.assertEqual(attempts[0]["resource"]["resource_id"], selection)
+        # The generated card, operator default and bundled art stay listed
+        # below the explicit choice in the scene's browser-side cascade.
+        self.assertEqual(
+            [entry["rank"] for entry in attempts[1:]],
+            [
+                descriptors.SCENE_RANK_GENERATED,
+                descriptors.SCENE_RANK_OPERATOR,
+                descriptors.SCENE_RANK_BUNDLED,
+            ],
+        )
+        # Clearing restores the generated image as the highest source.
+        gallery_api.clear_official_selection(self.subject())
+        cleared = self.entries(describe_scene(self.target()))
+        self.assertEqual(cleared[0]["rank"], descriptors.SCENE_RANK_GENERATED)
+
+    @covers_requirement(
+        "scene-artwork-presentation::normal-scenes-use-the-complete-authored-source-chain"
+    )
+    def test_explicit_scene_choice_never_displaces_a_room_override(self):
+        selection = f"scene/{SCENE_KEY}/a.png"
+        gallery_api.set_official_selection(self.subject(), selection)
+        descriptor = describe_scene(self.target(room_key=ROOM_KEY))
+        attempts = self.entries(descriptor)
+        self.assertEqual(attempts[0]["rank"], descriptors.SCENE_RANK_ROOM)
+        self.assertEqual(
+            attempts[0]["source_id"], descriptors.scene_room_source_id(ROOM_KEY)
+        )
+        selected = [
+            entry
+            for entry in attempts
+            if entry["rank"] == descriptors.SCENE_RANK_SELECTED
+        ]
+        self.assertEqual(len(selected), 1)
+        self.assertEqual(
+            selected[0]["resource"]["resource_id"], selection
+        )
+
+    def test_an_over_budget_default_keeps_the_descriptor_valid(self):
+        name = "d" * 200 + ".png"
+        identity = f"scene/{SCENE_KEY}/{name}"
+        self.contents[("scene", SCENE_KEY)] = official.OfficialContent(
+            kind="scene",
+            key=SCENE_KEY,
+            default_identity=identity,
+            images=(identity,),
+        )
+        self.official_images[identity] = _official_image(
+            identity, "scene", SCENE_KEY
+        )
+        self.patch_snapshots()
+        descriptor = describe_scene(self.target())
+        validate_artwork(descriptor)
+        faults = [
+            entry
+            for entry in self.entries(descriptor)
+            if entry["rank"] == descriptors.SCENE_RANK_OPERATOR
+            and entry["type"] == "fault"
+        ]
+        self.assertTrue(faults)
+        for entry in faults:
+            self.assertLessEqual(len(entry["source_id"]), descriptors.MAX_SOURCE_ID)
+
+    @covers_requirement(
+        "scene-artwork-presentation::normal-scenes-use-the-complete-authored-source-chain"
+    )
+    def test_a_redeclared_scene_terminal_policy_removes_the_terminal(self):
+        from world.art import gallery_kinds
+
+        capability = gallery_kinds.capabilities_for(ArtSubjectKind.SCENE.value)
+        with patch.dict(
+            gallery_kinds._CAPABILITIES_BY_KIND_VALUE,
+            {ArtSubjectKind.SCENE.value: capability.with_values(terminal_policy="none")},
+        ):
+            descriptor = describe_scene(self.target())
+        self.assertIsNone(descriptor["terminal"])
+        self.assertEqual(
+            [
+                entry
+                for entry in self.entries(descriptor)
+                if entry["rank"] == descriptors.SCENE_RANK_TERMINAL
+            ],
+            [],
+        )
+
+    @covers_requirement(
+        "scene-artwork-presentation::normal-scenes-use-the-complete-authored-source-chain"
+    )
     def test_a_recorded_gallery_error_is_a_reached_generation_fault(self):
         gallery_api.record_error(self.subject(), "sd_connection_error")
         descriptor = describe_scene(self.target())
@@ -472,16 +575,19 @@ class GalleryGeneratedSourceTests(_SceneFixture):
     @covers_requirement(
         "scene-artwork-presentation::normal-scenes-use-the-complete-authored-source-chain"
     )
-    def test_a_card_whose_file_vanished_has_no_generated_attempt(self):
+    def test_a_card_whose_file_vanished_reports_a_generated_output_fault(self):
         classic_identity = self.publish()
         _image_id, identity = self.publish_gallery_card()
         (self.store_root / identity).unlink()
         descriptor = describe_scene(self.target())
         generated = self.generated_position(descriptor)
-        # A stored card whose bytes cannot be presented contributes no
-        # candidate and no retention token, and the classic output is still
-        # not an alternative.
-        self.assertEqual(generated, [])
+        # A stored card whose bytes cannot be presented contributes a reached
+        # generated-output fault and no retention token, and the classic output
+        # is still not an alternative.
+        self.assertEqual(
+            [(entry["type"], entry["reason"]) for entry in generated],
+            [("fault", descriptors.REASON_GENERATED_OUTPUT_MISSING)],
+        )
         self.assertEqual(descriptor["generation_state"], descriptors.GENERATION_DONE)
         self.assertEqual(descriptor["retention_sources"], [])
         image_identities = [
@@ -705,7 +811,7 @@ class GenerationStateTests(_SceneFixture):
             [],
         )
 
-    def test_a_vanished_card_file_claims_no_generated_attempt(self):
+    def test_a_vanished_card_file_reports_a_generated_output_fault(self):
         _image_id, identity = self.publish_gallery_card()
         (self.store_root / identity).unlink()
         descriptor = describe_scene(self.target())
@@ -715,8 +821,12 @@ class GenerationStateTests(_SceneFixture):
             if entry["rank"] == descriptors.SCENE_RANK_GENERATED
         ]
         # The stored card is the recorded generation truth; its vanished bytes
-        # authorize no candidate and no retention.
-        self.assertEqual(generated, [])
+        # authorize no candidate and no retention, and the reached failure
+        # stays attributed at the generated position.
+        self.assertEqual(
+            [(entry["type"], entry["reason"]) for entry in generated],
+            [("fault", descriptors.REASON_GENERATED_OUTPUT_MISSING)],
+        )
         self.assertEqual(descriptor["generation_state"], descriptors.GENERATION_DONE)
         self.assertEqual(descriptor["retention_sources"], [])
 

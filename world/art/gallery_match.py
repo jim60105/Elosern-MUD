@@ -12,34 +12,36 @@ the entity's stored equipment — never the environment, never a write):
    broken by the newest ``created_at``;
 4. otherwise the entity's personal official selection when one is set and
    resolves inside its own content reference (``official_selection_for`` — the
-   player's explicit choice REPLACES the gallery default, and every
+   player's explicit choice outranks the gallery default, and every
    equipment-bound card still outranks it), else the card named by the
    record's ``default_image_id``;
+5. the temporarily supported classic ``done`` asset record;
+6. the mounted catalog's official default for the subject's own content
+   reference;
+7. the declared terminal seam and the non-image placeholder, owned by the
+   canonical presenters.
 
 Monster subjects skip steps 1-3 entirely — no equipment snapshot is ever
 computed for them and no monster card is ever selected by a binding — so a
 monster resolves through its default card alone. An unbound card is eligible
-ONLY as the explicit default (step 4); no image the player has not chosen is
-ever displayed as a surprise. A kind whose declaration grants no gallery
-always resolves to ``None`` here — a declaration consequence, never a kind
+ONLY as the explicit default; no image the player has not chosen is ever
+displayed as a surprise. A kind whose declaration grants no gallery always
+resolves to ``None`` here — a declaration consequence, never a kind
 comparison.
 
-``resolve_display_chain`` returns steps 1-4 as ORDERED SLOTS
-(``bound`` | ``personal`` | ``default``) that name each source position and
-carry the bounded faults it reached at that position; ``resolve_display`` is
-its two-tuple projection (``card`` | ``official`` | ``none``) and
-``resolve_card`` the card-only projection of that. The chain's remaining
-lookups live in the presenter, which owns payload construction: the classic
-``done`` asset record (step 5 — consulted only when no personal official
-selection resolved), the official default for the entity's content reference
-(step 6, ``official_default_for`` — resolved from the startup catalog snapshot
-alone, so an entity with no reference, or a reference the snapshot does not
-hold, falls through with no diagnostic beyond the resolver's own bounded
-event), the terminal fallback seam (step 7), and the truthful placeholder
-(step 8). This module exposes the official lookup and the seam
-``fallback_for(subject)``, filling the latter from
-``gallery-builtin-fallbacks``: the deterministic built-in resolver over the
-six committed defaults, or ``None`` when no fallback applies (a scene subject
+``resolve_display_chain`` is the ONE ordered subject-slot enumerator: it emits
+ORDERED SLOTS (``bound`` | ``personal`` | ``default`` | ``classic`` |
+``official``) that name each source position and carry the bounded faults it
+reached at that position. The default walk stops at the first presentable
+candidate; ``complete=True`` enumerates every lower position too (the scene
+presenter's browser-side cascade). ``resolve_display`` is the steps 1-4
+two-tuple projection (``card`` | ``official`` | ``none``) and ``resolve_card``
+the card-only projection of that. The terminal seam and the truthful
+placeholder remain presenter-owned adapters selected by the kind's declared
+``terminal_policy``, so no terminal slot is selected here. This module exposes
+the official lookups and the seam ``fallback_for(subject)``, filling the latter
+from ``gallery-builtin-fallbacks``: the deterministic built-in resolver over
+the committed defaults, or ``None`` when no fallback applies (a scene subject
 has no built-in portrait fallback).
 
 A personal official selection that no longer resolves — removed by an artwork
@@ -75,7 +77,7 @@ from world.art.gallery import (
 )
 from world.art.paths import resolved_under_store_root
 from world.art.subjects import ArtSubject
-from world.observability import log_debug
+from world.observability import log_debug, log_warn
 
 
 @dataclass(frozen=True)
@@ -104,18 +106,22 @@ class ChainSlot:
 
 @dataclass(frozen=True)
 class DisplayChain:
-    """The chain's steps 1-4: their ordered slots plus the subject's own card fact.
+    """The chain's ordered slots plus the subject's own card facts.
 
     ``has_cards`` reports whether the subject's record carries at least one
     valid card — a completed generation of its own — and ``failed`` whether it
     retains a recorded gallery generation failure, both beside the slots, so a
     consumer can state the subject's recorded generation truth without reading
-    the record a second time.
+    the record a second time. ``default_card`` is the record's named default
+    card in its validated stored form whenever one is presentable, even when a
+    higher precedence slot resolved first: retention and generation facts read
+    the generation's own output independently of which source presents.
     """
 
     slots: tuple[ChainSlot, ...]
     has_cards: bool
     failed: bool = False
+    default_card: dict | None = None
 
 
 def card_identity_resolution(subject: ArtSubject, card: dict) -> tuple[str | None, str | None]:
@@ -207,6 +213,8 @@ def resolve_display(
     this form answers only which of the three shapes a caller builds.
     """
     for slot in resolve_display_chain(subject, entity).slots:
+        if slot.layer not in ("bound", "personal", "default"):
+            continue
         if slot.facts is None:
             continue
         if slot.layer == "personal":
@@ -215,26 +223,34 @@ def resolve_display(
     return ("none", None)
 
 
-def resolve_display_chain(subject: ArtSubject, entity: Any = None) -> DisplayChain:
-    """The chain's steps 1-4 as their ordered slots, faults included.
+def resolve_display_chain(
+    subject: ArtSubject, entity: Any = None, *, complete: bool = False
+) -> DisplayChain:
+    """The subject's ordered source slots, faults included.
 
     The slot order is the chain's precedence, independent of any array index:
     the equipment-bound card (steps 1-3), the personal official selection
-    (step 4's first half), then the card named by the record's
-    ``default_image_id`` (step 4's other half). The walk stops at the FIRST
-    position that resolves a presentable source, but it never drops a fault: an
-    explicit stored source that cannot resolve — a retained personal selection
-    or a named default card — is reported as a facts-less slot carrying its
-    bounded reason, BEFORE the substitute that follows it, so a consumer can
-    attribute the failure to the exact position that failed. An unusable
-    equipment-bound candidate is skipped operationally and contributes nothing:
-    it is an unselected sibling, not a displayed source.
+    (step 4's first half), the card named by the record's ``default_image_id``
+    (step 4's other half), the capability-declared classic source, and the
+    official catalog default for the subject's own content reference. The walk
+    stops at the FIRST position that resolves a presentable source unless
+    ``complete`` asks for every lower position too (the scene presenter's
+    ordered browser cascade). It never drops a fault: an explicit stored source
+    that cannot resolve — a retained personal selection, a named default card,
+    a classic record or an official default — is reported as a facts-less slot
+    carrying its bounded reason, BEFORE the substitute that follows it, so a
+    consumer can attribute the failure to the exact position that failed. An
+    unusable equipment-bound candidate is skipped operationally and contributes
+    nothing: it is an unselected sibling, not a displayed source.
 
     A step-4 personal selection that resolves also carries the retained
     metadata fault of the very image it resolved (the startup catalog's own
     fact, never a re-derived one), so a degraded manifest is visible while its
-    valid bytes still present. A kind declaring no gallery returns no slots
-    at all.
+    valid bytes still present. An official resource whose URL exceeds the
+    shared wire ceiling never resolves: it contributes the bounded
+    configuration-invalid fault and the chain continues to the next source,
+    exactly as it does for the automatic-generation satisfaction guard. A kind
+    declaring no gallery returns no slots at all.
     """
     capability = gallery_kinds.capabilities_for(subject.kind.value)
     if not capability.has_gallery:
@@ -242,26 +258,43 @@ def resolve_display_chain(subject: ArtSubject, entity: Any = None) -> DisplayCha
     gallery_record = record_for(subject)
     failed = gallery_record is not None and bool(gallery_record.db.last_error_code)
     cards = cards_for(subject)
+    default = _default_card_slot(subject, cards)
     slots: list[ChainSlot] = []
     if capability.supports_bindings:
         bound = _selected_bound_card(cards, subject, entity)
         if bound is not None:
-            return DisplayChain(
-                (ChainSlot("bound", str(bound["image_id"]), bound),),
-                bool(cards),
-                failed,
-            )
+            slot = ChainSlot("bound", str(bound["image_id"]), bound)
+            if not complete:
+                return DisplayChain((slot,), bool(cards), failed, default.facts)
+            slots.append(slot)
     selection = official_selection_slot(subject, entity)
     if selection.facts is not None:
-        return DisplayChain((selection,), bool(cards), failed)
-    if selection.faults:
+        if not complete:
+            return DisplayChain((selection,), bool(cards), failed, default.facts)
         slots.append(selection)
-    default = _default_card_slot(subject, cards)
+    elif complete or selection.faults:
+        slots.append(selection)
     if default.facts is not None:
-        return DisplayChain((*slots, default), bool(cards), failed)
-    if default.faults:
+        if not complete:
+            return DisplayChain((*slots, default), bool(cards), failed, default.facts)
         slots.append(default)
-    return DisplayChain(tuple(slots), bool(cards), failed)
+    elif complete or default.faults:
+        slots.append(default)
+    classic = _classic_slot(subject, capability)
+    if classic.facts is not None:
+        if not complete:
+            return DisplayChain((*slots, classic), bool(cards), failed, default.facts)
+        slots.append(classic)
+    elif complete or classic.faults:
+        slots.append(classic)
+    official = official_default_slot(subject, entity)
+    if official.facts is not None:
+        if not complete:
+            return DisplayChain((*slots, official), bool(cards), failed, default.facts)
+        slots.append(official)
+    elif complete or official.faults:
+        slots.append(official)
+    return DisplayChain(tuple(slots), bool(cards), failed, default.facts)
 
 
 def resolve_card(subject: ArtSubject, entity: Any = None) -> dict | None:
@@ -347,6 +380,102 @@ def _default_card_slot(subject: ArtSubject, cards: list[dict]) -> ChainSlot:
         None,
         ((identity, descriptors.REASON_EXPLICIT_REFERENCE_MISSING),),
     )
+
+
+def classic_output_identity(
+    subject: ArtSubject, identity: object, *, directory: str | None = None
+) -> str | None:
+    """One classic ``done`` output identity when it is presentable, else ``None``.
+
+    The classic store convention is ``portrait/<store-directory>/<subject-key>``
+    with one of the closed store extensions — a declaration-derived directory,
+    never a kind comparison. A format-switch deployment keeps presenting every
+    existing asset until the subject is regenerated because the check uses the
+    closed extension set rather than one configured suffix.
+    """
+    capability = gallery_kinds.capabilities_for(subject.kind.value)
+    if directory is None:
+        if not capability.has_gallery or capability.store_directory is None:
+            return None
+        directory = f"portrait/{capability.store_directory}"
+    if not isinstance(directory, str) or not directory:
+        return None
+    if not isinstance(identity, str) or not identity:
+        return None
+    prefix = f"{directory}/"
+    stem = f"{subject.key}."
+    if not identity.startswith(prefix):
+        return None
+    remainder = identity[len(prefix):]
+    if not remainder.startswith(stem):
+        return None
+    extension = remainder[len(stem) - 1:]
+    if extension.lower() not in STORE_EXTENSIONS:
+        return None
+    resolved = resolved_under_store_root(identity)
+    if resolved is None or not resolved.is_file():
+        return None
+    return identity
+
+
+def _classic_slot(subject: ArtSubject, capability) -> ChainSlot:
+    """Step 5 as a chain slot: the temporarily supported classic ``done`` asset.
+
+    Only a kind whose declaration supports a classic source reads one; the scene
+    kind declares ``False`` and therefore never regains the removed classic
+    branch. The record's own validated output identity is the whole original; a
+    vanished output contributes a generated-output-missing fault and a recorded
+    failure a generation-failed one, while an absent, queued, or claimed record
+    contributes nothing. Unlike an official slot, the classic position has one
+    source identity per subject, so faults carry an empty identity and the
+    presenter attributes them to its own classic source id.
+    """
+    if not capability.supports_classic_source:
+        return ChainSlot("classic")
+    from world.art.queue import record_key
+    from world.art.store import ArtAssetRecord, ArtAssetStatus
+
+    record = ArtAssetRecord.objects.filter(db_key=record_key(subject)).first()
+    if record is None:
+        return ChainSlot("classic")
+    status = record.db.status
+    if status == ArtAssetStatus.DONE:
+        identity = classic_output_identity(subject, record.db.output_identity)
+        if identity is None:
+            log_warn("art_asset_output_missing", context={"subject": subject.full()})
+            return ChainSlot(
+                "classic",
+                None,
+                None,
+                (("", descriptors.REASON_GENERATED_OUTPUT_MISSING),),
+            )
+        return ChainSlot(
+            "classic", identity, {"record": record, "identity": identity}
+        )
+    if status == ArtAssetStatus.FAILED:
+        return ChainSlot(
+            "classic", None, None, (("", descriptors.REASON_GENERATION_FAILED),)
+        )
+    return ChainSlot("classic")
+
+
+def _official_facts_within_budget(subject: ArtSubject, facts: dict) -> bool:
+    """True when an official resource fits the shared media-URL ceiling.
+
+    An official identity embeds an operator-chosen filename, so its URL can
+    exceed the wire budget even though every card and fallback identity cannot.
+    One such file must never satisfy the automatic-generation guard or be
+    selected for presentation; it is skipped with the same bounded diagnostic
+    the presenter historically emitted, and the chain continues.
+    """
+    url = facts.get("url")
+    if isinstance(url, str) and len(url) <= descriptors.MAX_MEDIA_URL:
+        return True
+    log_warn(
+        "art_official_url_over_wire_budget",
+        context={"subject": subject.full(), "identity": facts.get("identity")},
+    )
+    return False
 
 
 def fallback_for(subject: ArtSubject, entity=None, *, report: bool = True) -> dict | None:
@@ -485,15 +614,22 @@ def official_selection_slot(subject: ArtSubject, entity: Any = None) -> ChainSlo
     read-only, transport-free module-level import surface.
     """
     from world.art import official
-    from world.art.official_refs import official_content_reference_for_entity
+    from world.art.official_refs import official_content_reference_for_subject
 
     selection = official_preferences_for(subject, entity=entity).selection
     if selection is None:
         return ChainSlot("personal")
-    reference = official_content_reference_for_entity(entity)
+    reference = official_content_reference_for_subject(subject, entity)
     catalog = official.current_catalog()
     facts = _official_facts_for(reference, selection, catalog)
     if facts is not None:
+        if not _official_facts_within_budget(subject, facts):
+            return ChainSlot(
+                "personal",
+                selection,
+                None,
+                ((selection, descriptors.REASON_CONFIGURATION_INVALID),),
+            )
         return ChainSlot(
             "personal", selection, facts, _official_metadata_faults(selection)
         )
@@ -541,9 +677,9 @@ def official_default_slot(subject: ArtSubject, entity: Any = None) -> ChainSlot:
     read-only, transport-free module-level import surface.
     """
     from world.art import official
-    from world.art.official_refs import official_content_reference_for_entity
+    from world.art.official_refs import official_content_reference_for_subject
 
-    reference = official_content_reference_for_entity(entity)
+    reference = official_content_reference_for_subject(subject, entity)
     if reference is None:
         return ChainSlot("official")
     source_identity = f"{reference.kind}/{reference.key}"
@@ -555,6 +691,13 @@ def official_default_slot(subject: ArtSubject, entity: Any = None) -> ChainSlot:
     facts = _official_facts_for(reference, content.default_identity, catalog)
     if facts is None:
         return ChainSlot("official", source_identity, None, faults)
+    if not _official_facts_within_budget(subject, facts):
+        return ChainSlot(
+            "official",
+            source_identity,
+            None,
+            (*faults, (content.default_identity, descriptors.REASON_CONFIGURATION_INVALID)),
+        )
     return ChainSlot(
         "official",
         source_identity,
@@ -582,6 +725,7 @@ def official_default_for(subject: ArtSubject, entity: Any = None) -> dict | None
 __all__ = [
     "ChainSlot",
     "DisplayChain",
+    "classic_output_identity",
     "fallback_for",
     "official_default_for",
     "official_default_slot",

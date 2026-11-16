@@ -806,11 +806,9 @@ def _official_entries(subject, entity, generation, terminal) -> list[dict]:
     yields an empty list.
     """
     from world.art.official import current_catalog
-    from world.art.official_refs import official_content_reference_for_entity
+    from world.art.official_refs import official_content_reference_for_subject
 
-    if entity is None:
-        return []
-    reference = official_content_reference_for_entity(entity)
+    reference = official_content_reference_for_subject(subject, entity)
     if reference is None:
         return []
     catalog = current_catalog()
@@ -974,7 +972,14 @@ def _selected_subject_fields(subject, entity) -> dict:
         "cards": rows,
         "official_entries": _official_entries(subject, entity, generation, terminal),
         "equipment_summary": _equipment(snapshot) if snapshot is not None else None,
-        "capabilities": {field: (subject.kind is ArtSubjectKind.CHARACTER if field == "supports_personal_official_preferences" else getattr(capability, field)) for field in CAPABILITY_FIELDS},
+        "capabilities": {
+            field: (
+                capability.official_preference_scope == "subject"
+                if field == "supports_personal_official_preferences"
+                else getattr(capability, field)
+            )
+            for field in CAPABILITY_FIELDS
+        },
         "binding_warnings": warnings, "error_state": error,
     }
 

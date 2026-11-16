@@ -32,9 +32,7 @@ full-key string; every access path SHALL go through a parsed `ArtSubject`.
 - **AND** anything else raises a named `ArtSubjectError`
 
 ### Requirement: Scene and generic-monster subjects resolve from immutable registries
-A scene subject SHALL re-validate its visual species against `SCENE_ARCHETYPE_REGISTRY`; a monster
-subject SHALL re-validate its visual species against the registered visual-species vocabulary. An unresolvable registry
-key SHALL raise a named `ArtSubjectError` and produce no record.
+Scene and monster typed subjects SHALL revalidate against their immutable archetype and visual-species registries before queue or official-reference access. A capability-declared registry reference SHALL derive from that validated subject without an entity. Character references SHALL remain entity-provenance-only. Unknown keys SHALL produce a named rejection and no state.
 
 #### Scenario: A registered archetype yields a valid scene subject
 - **WHEN** a room carries `scene_archetype = "tavern_interior"` and that key exists in the registry
@@ -52,6 +50,10 @@ key SHALL raise a named `ArtSubjectError` and produce no record.
 #### Scenario: The tier-validated vocabulary is the generic layer's only monster subject vocabulary
 - **WHEN** any queue, store, worker, command or presenter resolves a monster subject
 - **THEN** only registered visual-species keys are admitted; the subject and its official reference name the same declared visual species, and no threat tier is an image identity
+
+#### Scenario: Registry lookup does not need a live entity
+- **WHEN** a registered scene or monster subject has no spawned entity
+- **THEN** official lookup uses its own registry key; an invalid key creates no reference, prompt, record or job
 
 ### Requirement: Named-character portrait eligibility is explicit policy, never inferred
 `world/art/subjects.py` SHALL derive a `portrait:character` subject only from an explicit

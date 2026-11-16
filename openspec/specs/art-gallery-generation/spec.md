@@ -12,11 +12,7 @@ make every request and terminal settle observable.
 ## Requirements
 
 ### Requirement: One validated service seam requests every gallery image
-`world/art/service.py::request_gallery_image(entity_or_subject, *, fields=(), custom_prompt="", binding=None, face_rect=None)`
-SHALL be the only gameplay-reachable entry point that queues a gallery generation, and it SHALL serve
-EVERY gallery-bearing subject kind through one path. It SHALL accept either an entity carrying a
-portrait subject or an already-derived art subject, and SHALL derive the subject through the existing
-typed subject producers.
+One validated service seam SHALL enqueue every gallery-bearing kind through typed subjects and capability-declared preconditions. An explicit on-demand request SHALL remain available when official artwork satisfies automatic generation. Each accepted request SHALL create one fresh image job and preserve stored official preferences.
 
 #### Scenario: A valid request queues exactly one job
 - **WHEN** a gallery image is requested for an eligible character subject with a valid binding and rect
@@ -84,6 +80,10 @@ typed subject producers.
 #### Scenario: A scene subject queues one job through the same seam
 - **WHEN** a gallery image is requested for a registered scene archetype subject with empty fields, no binding and no face rectangle
 - **THEN** exactly one gallery job is queued for that scene subject and the settled image is a scene-sized card
+
+#### Scenario: Manual generation bypasses official suppression
+- **WHEN** a subject presents a valid official default and the user requests generation
+- **THEN** one job is queued and settles a runtime card; official bytes remain unchanged, and a stored explicit official choice still wins
 
 ### Requirement: Generation while the image server is unreachable is a reported failure, never a gate
 `request_gallery_image` SHALL NOT consult the connectivity probe and SHALL NOT import

@@ -54,6 +54,10 @@ def _gallery_less(key: str) -> "gallery_kinds.GalleryKindCapabilities":
         supports_face_rect=False,
         supports_stage=False,
         supports_card_delete=False,
+        official_reference_policy="none",
+        official_preference_scope="none",
+        terminal_policy="none",
+        supports_classic_source=False,
     )
 
 
@@ -151,11 +155,22 @@ class DeclarationContractTests(unittest.TestCase):
             "supports_face_rect",
             "supports_stage",
             "supports_card_delete",
+            "supports_classic_source",
         ):
             with self.subTest(field=flag):
                 violations = _violations_with(monster_value, **{flag: 0})
                 self.assertTrue(
                     any(flag in v for v in violations), violations
+                )
+        for field, illegal in (
+            ("official_reference_policy", "inferred"),
+            ("official_preference_scope", "everyone"),
+            ("terminal_policy", "silhouette"),
+        ):
+            with self.subTest(field=field):
+                violations = _violations_with(monster_value, **{field: illegal})
+                self.assertTrue(
+                    any(field in v for v in violations), violations
                 )
 
     @covers_requirement(
@@ -200,6 +215,7 @@ class DeclarationContractTests(unittest.TestCase):
             "supports_face_rect",
             "supports_stage",
             "supports_card_delete",
+            "supports_classic_source",
         ):
             with self.subTest(case=f"no-gallery kind claiming {flag}"):
                 violations = _violations_with_no_gallery(
@@ -230,8 +246,15 @@ class DeclarationContractTests(unittest.TestCase):
                 "supports_face_rect",
                 "supports_stage",
                 "supports_card_delete",
+                "supports_classic_source",
             ):
                 self.assertIsInstance(getattr(record, flag), bool)
+            for field in (
+                "official_reference_policy",
+                "official_preference_scope",
+                "terminal_policy",
+            ):
+                self.assertIsInstance(getattr(record, field), str)
         self.assertEqual(character.store_directory, "character")
         self.assertIsNone(character.max_cards)
         self.assertTrue(character.supports_bindings)
@@ -244,6 +267,20 @@ class DeclarationContractTests(unittest.TestCase):
         self.assertFalse(monster.requires_age_precondition)
         self.assertFalse(monster.supports_field_selection)
         self.assertFalse(monster.supports_free_text)
+        # The policy declaration is readable from the same one place.
+        self.assertEqual(character.official_reference_policy, "entity_provenance")
+        self.assertEqual(character.official_preference_scope, "subject")
+        self.assertEqual(character.terminal_policy, "alpha")
+        self.assertTrue(character.supports_classic_source)
+        self.assertEqual(monster.official_reference_policy, "visual_species")
+        self.assertEqual(monster.official_preference_scope, "entity")
+        self.assertEqual(monster.terminal_policy, "alpha")
+        self.assertTrue(monster.supports_classic_source)
+        scene = gallery_kinds.capabilities_for(ArtSubjectKind.SCENE.value)
+        self.assertEqual(scene.official_reference_policy, "scene_archetype")
+        self.assertEqual(scene.official_preference_scope, "subject")
+        self.assertEqual(scene.terminal_policy, "scene")
+        self.assertFalse(scene.supports_classic_source)
         # The per-card operation facts (gallery-kind-card-capabilities): the
         # character declares all three; the monster declares both geometry
         # facts but no deletion.
@@ -285,6 +322,10 @@ class DeclarationContractTests(unittest.TestCase):
         self.assertEqual(scene.store_directory, "scene")
         self.assertEqual(scene.max_cards, 1)
         self.assertTrue(scene.supports_card_delete)
+        self.assertEqual(scene.official_reference_policy, "scene_archetype")
+        self.assertEqual(scene.official_preference_scope, "subject")
+        self.assertEqual(scene.terminal_policy, "scene")
+        self.assertFalse(scene.supports_classic_source)
         for flag in (
             "supports_bindings",
             "requires_age_precondition",

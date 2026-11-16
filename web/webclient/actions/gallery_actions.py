@@ -475,11 +475,9 @@ def _official_target(subject, entity, identity):
     subject's reference — and an identity outside it is refused, never stored.
     """
     from world.art import official
-    from world.art.official_refs import official_content_reference_for_entity
+    from world.art.official_refs import official_content_reference_for_subject
 
-    if entity is None:
-        return None
-    reference = official_content_reference_for_entity(entity)
+    reference = official_content_reference_for_subject(subject, entity)
     if reference is None:
         return None
     catalog = official.current_catalog()
@@ -551,15 +549,14 @@ def _mutate_official(actor, action_id, payload):
             subject, entity = scene_subject_for(parsed.key), None
         else:
             raise ArtSubjectError("no typed producer resolves this gallery kind")
-        if parsed.kind is ArtSubjectKind.SCENE:
-            # A scene archetype's image is a shared world asset: it holds no
-            # official read-only entry and no personal official preference.
-            log_warn("gallery_action", context=context)
-            return _rejected("official_unsupported")
         if action_id == "gallery.official.clear_selection":
             # Clearing touches only the subject's own record: no identity is
             # named, so no reference scope applies.
-            if parsed.kind is ArtSubjectKind.MONSTER and entity is None:
+            if (
+                capabilities_for(subject.kind.value).official_preference_scope
+                == "entity"
+                and entity is None
+            ):
                 log_warn("gallery_action", context=context)
                 return _rejected("entity_required")
             already_clear = gallery_api.official_preferences_for(subject).selection is None
@@ -569,10 +566,18 @@ def _mutate_official(actor, action_id, payload):
             image = _official_target(subject, entity, identity)
             if image is None:
                 log_warn("gallery_action", context=context)
-                if parsed.kind is ArtSubjectKind.MONSTER and entity is None:
+                if (
+                    capabilities_for(subject.kind.value).official_preference_scope
+                    == "entity"
+                    and entity is None
+                ):
                     return _rejected("entity_required")
                 return _rejected("unknown_official_image")
-            if parsed.kind is ArtSubjectKind.MONSTER and entity is None:
+            if (
+                capabilities_for(subject.kind.value).official_preference_scope
+                == "entity"
+                and entity is None
+            ):
                 return _rejected("entity_required")
             if action_id == "gallery.official.select":
                 gallery_api.set_official_selection(subject, identity)

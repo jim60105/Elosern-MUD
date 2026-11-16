@@ -949,26 +949,48 @@ def set_official_selection(subject: ArtSubject, identity: str, *, entity: Any = 
     catalog admits it — and whether it belongs to the subject's own content
     reference — is the caller's scope check, so a stale identity stays a legal
     stored preference that resolution simply ignores. The write creates a
-    card-less record on demand, never touches a card, and CLEARS
-    ``default_image_id`` so exactly one personal default governs.
+    card-less record on demand and never touches a card. For a personal
+    uncapped gallery the selection CLEARS ``default_image_id`` so exactly one
+    personal default governs; a shared capped gallery keeps its generated
+    default, because selecting official artwork never erases the shared card
+    the way an explicit runtime-default action does. An entity-scoped
+    preference is stored on the owning entity only and never creates a species
+    record.
     """
     validated = validate_official_identity(identity)
+    capability = gallery_kinds.capabilities_for(subject.kind.value)
+    scope = capability.official_preference_scope
+    if scope == "entity":
+        if entity is None:
+            raise GalleryRecordError(
+                f"official preferences for subject kind {subject.kind.value!r} "
+                "require the owning entity"
+            )
+        attributes = getattr(entity, "attributes", None)
+        if attributes is not None:
+            attributes.add("official_selection", validated)
+            return
+        raise GalleryRecordError(
+            f"entity for subject kind {subject.kind.value!r} carries no attributes"
+        )
+    if scope == "none":
+        raise GalleryRecordError(
+            f"subject kind {subject.kind.value!r} declares no official preference scope"
+        )
     with gallery_lock:
-        if subject.kind is ArtSubjectKind.MONSTER and entity is not None:
-            attributes = getattr(entity, "attributes", None)
-            if attributes is not None:
-                attributes.add("official_selection", validated)
-                return
         record = record_for(subject, create=True)
         cleared_default = record.db.default_image_id
         record.db.official_selection = validated
-        record.db.default_image_id = None
+        if capability.max_cards is None:
+            record.db.default_image_id = None
         log_info(
             "gallery_official_selection_set",
             context={
                 "subject": subject.full(),
                 "identity": validated,
-                "cleared_default": cleared_default is not None,
+                "cleared_default": (
+                    capability.max_cards is None and cleared_default is not None
+                ),
             },
         )
 
@@ -978,13 +1000,22 @@ def clear_official_selection(subject: ArtSubject, *, entity: Any = None) -> None
 
     Clearing never restores a runtime default — the invariant is "at most one
     personal default governs", so a cleared selection simply leaves the
-    gallery-default slot unset until the player sets one.
+    gallery-default slot unset until the player sets one. Clearing a
+    shared-capped gallery's selection leaves its generated default untouched.
+    An entity-scoped clear with no entity is a no-op that writes nothing.
     """
-    if subject.kind is ArtSubjectKind.MONSTER and entity is not None:
+    scope = gallery_kinds.capabilities_for(
+        subject.kind.value
+    ).official_preference_scope
+    if scope == "entity":
+        if entity is None:
+            return
         attributes = getattr(entity, "attributes", None)
         if attributes is not None:
             attributes.add("official_selection", None)
-            return
+        return
+    if scope == "none":
+        return
     with gallery_lock:
         record = _consolidate(subject)
         if record is None:
@@ -1045,6 +1076,13 @@ def set_official_geometry(
         subject, face_rect=face_rect is not None, stage=stage is not None
     )
     validated_identity = validate_official_identity(identity)
+    scope = gallery_kinds.capabilities_for(
+        subject.kind.value
+    ).official_preference_scope
+    if scope == "none":
+        raise GalleryRecordError(
+            f"subject kind {subject.kind.value!r} declares no official preference scope"
+        )
     stored: dict = {}
     if face_rect is not None:
         stored["face_rect"] = validate_face_rect(face_rect)
@@ -1054,18 +1092,27 @@ def set_official_geometry(
         raise GalleryRecordError(
             "an official geometry override needs a face_rect, a stage, or both"
         )
+    if scope == "entity":
+        if entity is None:
+            raise GalleryRecordError(
+                f"official preferences for subject kind {subject.kind.value!r} "
+                "require the owning entity"
+            )
+        attributes = getattr(entity, "attributes", None)
+        if attributes is None:
+            raise GalleryRecordError(
+                f"entity for subject kind {subject.kind.value!r} carries no attributes"
+            )
+        geometry = dict(attributes.get("official_geometry") or {})
+        if (
+            validated_identity not in geometry
+            and len(geometry) >= MAX_OFFICIAL_GEOMETRY_OVERRIDES
+        ):
+            raise GalleryRecordError("the official geometry table is full")
+        geometry[validated_identity] = stored
+        attributes.add("official_geometry", geometry)
+        return dict(stored)
     with gallery_lock:
-        if subject.kind is ArtSubjectKind.MONSTER and entity is not None:
-            attributes = getattr(entity, "attributes", None)
-            if attributes is not None:
-                geometry = dict(attributes.get("official_geometry") or {})
-                if validated_identity not in geometry and len(geometry) >= MAX_OFFICIAL_GEOMETRY_OVERRIDES:
-                    raise GalleryRecordError("the official geometry table is full")
-                geometry[validated_identity] = stored
-                attributes.add("official_geometry", geometry)
-                return dict(stored)
-            return dict(stored)
-
         record = record_for(subject, create=True)
         geometry = dict(record.db.official_geometry or {})
         if (
@@ -1096,7 +1143,12 @@ def clear_official_geometry(subject: ArtSubject, identity: str, *, entity: Any =
     A subject with no record, or an identity carrying no override, is a no-op
     that creates nothing and writes nothing.
     """
-    if subject.kind is ArtSubjectKind.MONSTER and entity is not None:
+    scope = gallery_kinds.capabilities_for(
+        subject.kind.value
+    ).official_preference_scope
+    if scope == "entity":
+        if entity is None:
+            return False
         attributes = getattr(entity, "attributes", None)
         if attributes is not None:
             geometry = dict(attributes.get("official_geometry") or {})
@@ -1106,6 +1158,8 @@ def clear_official_geometry(subject: ArtSubject, identity: str, *, entity: Any =
             del geometry[validated]
             attributes.add("official_geometry", geometry)
             return True
+        return False
+    if scope == "none":
         return False
     validated = validate_official_identity(identity)
     with gallery_lock:
@@ -1323,7 +1377,14 @@ def official_preferences_for(subject: ArtSubject, *, entity: Any = None) -> Offi
     ``gallery_preference_invalid`` event naming the subject, so one corrupt
     field can never blind the read or fail a presentation.
     """
-    if subject.kind is ArtSubjectKind.MONSTER and entity is not None:
+    scope = gallery_kinds.capabilities_for(
+        subject.kind.value
+    ).official_preference_scope
+    if scope == "none":
+        return OfficialPreferences(None, {})
+    if scope == "entity":
+        if entity is None:
+            return OfficialPreferences(None, {})
         attributes = getattr(entity, "attributes", None)
         if attributes is not None:
             context = {"subject": subject.full()}
@@ -1354,9 +1415,6 @@ def official_preferences_for(subject: ArtSubject, *, entity: Any = None) -> Offi
                             },
                         )
             return OfficialPreferences(selection, geometry)
-
-    if subject.kind is ArtSubjectKind.MONSTER:
-        # Bare species subject has no personal preference
         return OfficialPreferences(None, {})
 
     record = record_for(subject)

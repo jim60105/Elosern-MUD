@@ -6,11 +6,7 @@ Declares exactly one immutable capability record per art subject kind — galler
 ## Requirements
 
 ### Requirement: One closed declaration states what every subject kind's gallery may do
-`world/art/gallery_kinds.py` SHALL declare exactly one immutable capability record per art subject
-kind, and that declaration SHALL be the single origin of every per-kind gallery rule. Each record
-SHALL carry at least a gallery-presence flag, the directory segment its stored identities use, the
-maximum number of cards one record may hold, and flags for equipment-binding support,
-canonical-age precondition, prompt-field selection, and free-form prompt-text support.
+One immutable capability record per subject kind SHALL govern gallery eligibility, directory, cap, bindings, age, prompt and geometry support. It SHALL declare official-reference policy, preference scope, terminal policy and whether an existing classic source is supported. Shared selection, suppression and preference routing SHALL use these declarations without inline kind comparisons.
 
 #### Scenario: Every declared capability is readable from one place
 - **WHEN** the capability record for the character kind and for the monster kind are read
@@ -43,6 +39,10 @@ canonical-age precondition, prompt-field selection, and free-form prompt-text su
 #### Scenario: The declaration is data only
 - **WHEN** the declaration module is exercised in any process
 - **THEN** it performs no I/O, reads no settings, and holds no mutable state, so the same kind resolves the same capabilities in every process
+
+#### Scenario: Reference and preference policy are declared
+- **WHEN** capabilities for a registry-backed and an entity-provenance-backed kind are read
+- **THEN** reference policy distinguishes registry scene/species from character provenance, preference scope distinguishes subject from entity, terminal policy distinguishes scene from alpha, and classic support is false for scenes without imports or callables
 
 ### Requirement: The declaration covers every subject kind exhaustively
 A contract test SHALL assert that the declaration holds exactly one entry for every member of

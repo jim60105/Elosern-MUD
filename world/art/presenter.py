@@ -56,12 +56,10 @@ from dataclasses import dataclass
 from world.observability import log_warn
 
 from world.art import descriptors
-from world.art.formats import STORE_EXTENSIONS
 from world.art.gallery import (
     DEFAULT_FACE_RECT,
     GalleryRecordError,
     OfficialPreferences,
-    cards_for as gallery_cards_for,
     default_face_rect,
     official_preferences_for,
     record_for as gallery_record_for,
@@ -73,11 +71,9 @@ from world.art.gallery_fallback import fallback_identity_and_rect, fallback_key_
 from world.art.gallery_kinds import capabilities_for
 from world.art.gallery_match import (
     fallback_for,
-    official_default_slot,
     resolve_display_chain,
     validated_card_identity,
 )
-from world.art.paths import resolved_under_store_root
 from world.art.queue import pending_gallery_jobs, record_key
 from world.art.store import ArtAssetRecord, ArtAssetStatus
 from world.art.subjects import (
@@ -115,7 +111,7 @@ TOWN_TERMINAL_KEY = "city_street"
 # operator-chosen filename, so the official step presents a URL only inside
 # this ceiling and otherwise falls through. Pinned equal to the presentation
 # layer's ``MAX_MEDIA_URL`` by ``web.webclient.presentation.tests.test_art_panel``.
-MAX_PORTRAIT_MEDIA_URL = 256
+MAX_PORTRAIT_MEDIA_URL = descriptors.MAX_MEDIA_URL
 
 # The fixed aspect ratio of every gallery card / fallback image payload:
 # portrait geometry is a presenter-side constant (cards store no ratio),
@@ -134,39 +130,6 @@ def _record_for(subject: ArtSubject) -> ArtAssetRecord | None:
 def media_url_for(identity: str) -> str:
     """Build the same-origin media URL for a validated stored identity."""
     return f"/art/{identity}"
-
-
-def _validated_output_identity(subject: ArtSubject, identity: str | None) -> str | None:
-    """Return a presentable identity only when its expected file still exists.
-
-    The STORED identity is validated against the subject's directory/key
-    shape and the closed set of ALL store extensions — never equality with
-    the currently configured ``expected_output_identity`` — so a store
-    mid-way through a format switch keeps presenting every existing asset
-    until that subject is regenerated under the new format.
-    """
-    if not isinstance(identity, str) or not identity:
-        return None
-    expected_prefix = f"{_subject_directory(subject)}/"
-    stem = f"{subject.key}."
-    if not identity.startswith(expected_prefix) or not identity[len(expected_prefix):].startswith(stem):
-        return None
-    extension = identity[len(expected_prefix) + len(stem) - 1:]
-    if extension.lower() not in STORE_EXTENSIONS:
-        return None
-    resolved = resolved_under_store_root(identity)
-    if resolved is None or not resolved.is_file():
-        return None
-    return identity
-
-
-def _subject_directory(subject: ArtSubject) -> str:
-    """The store directory a subject's identity must live in."""
-    if subject.kind is ArtSubjectKind.SCENE:
-        return "scene"
-    if subject.kind is ArtSubjectKind.MONSTER:
-        return "portrait/monster"
-    return "portrait/character"
 
 
 @dataclass(frozen=True)
@@ -199,12 +162,25 @@ def _slot_source(layer: str, source_identity: str | None) -> tuple[str, int]:
     """The canonical source id and rank of one gallery chain slot position."""
     identity = source_identity or ""
     if layer == "bound":
-        return descriptors.portrait_bound_source_id(identity), descriptors.PORTRAIT_RANK_BOUND
+        source_id = descriptors.portrait_bound_source_id(identity)
+        return _bounded_source(source_id, identity), descriptors.PORTRAIT_RANK_BOUND
     if layer == "personal":
-        return descriptors.portrait_personal_source_id(identity), descriptors.PORTRAIT_RANK_PERSONAL
+        source_id = descriptors.portrait_personal_source_id(identity)
+        return _bounded_source(source_id, identity), descriptors.PORTRAIT_RANK_PERSONAL
+    if layer == "classic":
+        return descriptors.portrait_classic_source_id(identity), descriptors.PORTRAIT_RANK_CLASSIC
     if layer == "official":
-        return descriptors.portrait_official_source_id(identity), descriptors.PORTRAIT_RANK_OFFICIAL
-    return descriptors.portrait_default_source_id(identity), descriptors.PORTRAIT_RANK_DEFAULT
+        source_id = descriptors.portrait_official_source_id(identity)
+        return _bounded_source(source_id, identity), descriptors.PORTRAIT_RANK_OFFICIAL
+    source_id = descriptors.portrait_default_source_id(identity)
+    return _bounded_source(source_id, identity), descriptors.PORTRAIT_RANK_DEFAULT
+
+
+def _bounded_source(source_id: str, identity: str) -> str:
+    """One source id inside the wire bound, digest-substituted when needed."""
+    if len(source_id) <= descriptors.MAX_SOURCE_ID:
+        return source_id
+    return descriptors.bounded_source_id(source_id.split(":", 1)[0], identity)
 
 
 def _card_geometry(subject: ArtSubject, card: dict) -> dict:
@@ -333,46 +309,61 @@ def _personal_attempt(subject: ArtSubject, slot, entity) -> _PortraitAttempt:
     )
 
 
-def _classic_attempts(
-    subject: ArtSubject, record: ArtAssetRecord | None
-) -> tuple[list[_PortraitAttempt], _PortraitAttempt | None]:
-    """The classic ``done`` asset record's attempts: its bounded fault or its candidate.
-
-    The record's own validated output identity is the whole original (the one
-    digest convention of the classic layer is its identity plus the generation
-    token that published it), so a vanished output contributes a
-    generated-output-missing fault at this exact position and a recorded
-    failure a generation-failed one — while a record that is merely absent,
-    queued, or claimed contributes nothing at all.
-    """
+def _classic_attempt_from_slot(subject: ArtSubject, slot) -> _PortraitAttempt:
+    """One chain classic slot as its canonical runtime candidate."""
+    record = slot.facts["record"]
+    identity = slot.facts["identity"]
     source_id = descriptors.portrait_classic_source_id(subject.full())
-    rank = descriptors.PORTRAIT_RANK_CLASSIC
-    if record is None:
-        return [], None
-    status = record.db.status
-    if status == ArtAssetStatus.DONE:
-        identity = _validated_output_identity(subject, record.db.output_identity)
-        if identity is None:
-            log_warn("art_asset_output_missing", context={"subject": subject.full()})
-            return [_PortraitAttempt(source_id, rank, fault=descriptors.REASON_GENERATED_OUTPUT_MISSING)], None
-        return [], _PortraitAttempt(
-            source_id,
-            rank,
-            descriptors.resource(
-                identity,
-                _published_output_version(record, identity),
-                media_url_for(identity),
-                descriptors.ORIGIN_RUNTIME,
-                geometry_payload=descriptors.geometry(
-                    face_rect=dict(DEFAULT_FACE_RECT),
-                    stage=identity_stage(),
-                    aspect_ratio=record.db.aspect_ratio,
-                ),
+    return _PortraitAttempt(
+        source_id,
+        descriptors.PORTRAIT_RANK_CLASSIC,
+        descriptors.resource(
+            identity,
+            _published_output_version(record, identity),
+            media_url_for(identity),
+            descriptors.ORIGIN_RUNTIME,
+            geometry_payload=descriptors.geometry(
+                face_rect=dict(DEFAULT_FACE_RECT),
+                stage=identity_stage(),
+                aspect_ratio=record.db.aspect_ratio,
             ),
-        )
-    if status == ArtAssetStatus.FAILED:
-        return [_PortraitAttempt(source_id, rank, fault=descriptors.REASON_GENERATION_FAILED)], None
-    return [], None
+        ),
+    )
+
+
+def _official_attempt_from_slot(subject: ArtSubject, slot, entity) -> _PortraitAttempt:
+    """One chain official-default slot as its canonical official candidate."""
+    facts = slot.facts
+    source_id, rank = _slot_source(slot.layer, slot.source_identity)
+    return _PortraitAttempt(
+        source_id,
+        rank,
+        descriptors.resource(
+            facts["identity"],
+            facts["fingerprint"],
+            facts["url"],
+            descriptors.ORIGIN_OFFICIAL,
+            geometry_payload=_official_geometry(
+                subject, facts, official_preferences_for(subject, entity=entity)
+            ),
+        ),
+    )
+
+
+def _subject_terminal(subject: ArtSubject, entity, *, report: bool) -> dict | None:
+    """The capability-declared terminal adapter for one subject presentation.
+
+    The person-alpha adapter is the filled seam; a scene subject's
+    bundled/terminal adapter is owned by ``describe_scene`` because its
+    resources come from the bundled collection, and a declared ``none`` policy
+    has no terminal at all. Dispatching on ``terminal_policy`` — never on a
+    subject kind literal — keeps a redeclared kind's terminal behavior
+    declaration-driven.
+    """
+    policy = capabilities_for(subject.kind.value).terminal_policy
+    if policy == "alpha":
+        return fallback_for(subject, entity=entity, report=report)
+    return None
 
 
 def _generation_facts(
@@ -466,90 +457,42 @@ def _enumerate_portrait(subject: ArtSubject, entity=None) -> _PortraitEnumeratio
     candidate: _PortraitAttempt | None = None
     chain = resolve_display_chain(subject, entity)
     for slot in chain.slots:
-        source_id, rank = _slot_source(slot.layer, slot.source_identity)
+        if slot.layer == "classic":
+            # The classic position has exactly one source per subject, so both
+            # its faults and its candidate share that source id.
+            source_id = descriptors.portrait_classic_source_id(subject.full())
+            rank = descriptors.PORTRAIT_RANK_CLASSIC
+        else:
+            source_id, rank = _slot_source(slot.layer, slot.source_identity)
         for identity, reason in slot.faults:
             # A fault names its OWN failed source identity: two facts of one
             # layer (a replaced manifest default and a degraded image) must
             # never collide on one source id at one rank.
+            fault_source = (
+                descriptors.portrait_classic_source_id(subject.full())
+                if slot.layer == "classic"
+                else _slot_source(slot.layer, identity)[0]
+            )
             attempts.append(
-                _PortraitAttempt(_slot_source(slot.layer, identity)[0], rank, fault=reason)
+                _PortraitAttempt(fault_source, rank, fault=reason)
             )
         if slot.facts is None:
             continue
-        # An official identity embeds an operator-chosen filename, so a URL
-        # outside the shared wire budget falls through exactly like an absent
-        # reference: one oversized filename must never fail the panel.
-        if slot.layer == "personal" and len(slot.facts["url"]) > MAX_PORTRAIT_MEDIA_URL:
-            log_warn(
-                "art_official_url_over_wire_budget",
-                context={"subject": subject.full(), "identity": slot.facts["identity"]},
-            )
-            attempts.append(
-                _PortraitAttempt(source_id, rank, fault=descriptors.REASON_CONFIGURATION_INVALID)
-            )
-            continue
-        candidate = (
-            _personal_attempt(subject, slot, entity)
-            if slot.layer == "personal"
-            else _card_attempt(subject, slot)
-        )
+        if slot.layer == "personal":
+            candidate = _personal_attempt(subject, slot, entity)
+        elif slot.layer == "classic":
+            candidate = _classic_attempt_from_slot(subject, slot)
+        elif slot.layer == "official":
+            candidate = _official_attempt_from_slot(subject, slot, entity)
+        else:
+            candidate = _card_attempt(subject, slot)
         attempts.append(candidate)
         break
-    if candidate is None:
-        classic_faults, classic = _classic_attempts(subject, record)
-        attempts.extend(classic_faults)
-        if classic is not None:
-            candidate = classic
-            attempts.append(classic)
-    if candidate is None:
-        official = official_default_slot(subject, entity)
-        if official.source_identity is not None:
-            source_id, rank = _slot_source("official", official.source_identity)
-            faults: list[_PortraitAttempt] = []
-            for identity, reason in official.faults:
-                faults.append(
-                    _PortraitAttempt(
-                        _slot_source("official", identity)[0], rank, fault=reason
-                    )
-                )
-            if official.facts is not None:
-                if len(official.facts["url"]) <= MAX_PORTRAIT_MEDIA_URL:
-                    candidate = _PortraitAttempt(
-                        source_id,
-                        rank,
-                        descriptors.resource(
-                            official.facts["identity"],
-                            official.facts["fingerprint"],
-                            official.facts["url"],
-                            descriptors.ORIGIN_OFFICIAL,
-                            geometry_payload=_official_geometry(
-                                subject,
-                                official.facts,
-                                official_preferences_for(subject, entity=entity),
-                            ),
-                        ),
-                    )
-                else:
-                    log_warn(
-                        "art_official_url_over_wire_budget",
-                        context={
-                            "subject": subject.full(),
-                            "identity": official.facts["identity"],
-                        },
-                    )
-                    faults.append(
-                        _PortraitAttempt(
-                            source_id, rank, fault=descriptors.REASON_CONFIGURATION_INVALID
-                        )
-                    )
-            attempts.extend(faults)
-            if candidate is not None:
-                attempts.append(candidate)
     # The already-resolved entity rides along so the seam reads its sex,
     # apparent age, and registry provenance directly
     # (gallery-builtin-fallbacks). A resolution here IS the presented figure
     # exactly when no real candidate resolved, so that is the report.
-    fallback = fallback_for(subject, entity=entity, report=(candidate is None))
+    fallback = _subject_terminal(subject, entity, report=(candidate is None))
     generation_subject, generation_state = _generation_facts(
         subject, record, chain.has_cards, chain.failed
     )
@@ -871,7 +814,13 @@ def _scene_official_position(
     metadata = catalog.fault_for(content.default_identity)
     if metadata is not None:
         faults.append(
-            (f"{source_prefix}:{content.default_identity}", rank, metadata.reason)
+            (
+                descriptors.bounded_source_id(
+                    source_prefix, content.default_identity
+                ),
+                rank,
+                metadata.reason,
+            )
         )
     return faults, resource
 
@@ -889,30 +838,6 @@ def _published_output_version(record: ArtAssetRecord, identity: str) -> str:
     empty token, which is a stable version of its own.
     """
     return descriptors.generated_version(identity, str(record.db.published_generation_token))
-
-
-def _scene_gallery_card(subject: ArtSubject) -> dict | None:
-    """The scene gallery's default card, in its validated stored form.
-
-    The scene kind holds at most one card and every append installs it as the
-    default, so the record's ``default_image_id`` names the only card that can
-    be the generated position's source. ``None`` covers the legal no-card
-    states: no gallery record, a record whose default was cleared (deletion),
-    and a default the record no longer holds. Presentability of the stored
-    bytes is deliberately NOT decided here — ``_scene_gallery_resource`` owns
-    that check, so this one helper is the only place the chain reads a scene
-    card.
-    """
-    record = gallery_record_for(subject)
-    if record is None:
-        return None
-    default_id = record.db.default_image_id
-    if not isinstance(default_id, str) or not default_id:
-        return None
-    for card in gallery_cards_for(subject):
-        if card["image_id"] == default_id:
-            return card
-    return None
 
 
 def _scene_gallery_resource(subject: ArtSubject, card: dict) -> dict | None:
@@ -939,7 +864,13 @@ def _scene_gallery_resource(subject: ArtSubject, card: dict) -> dict | None:
     )
 
 
-def _scene_retention_sources(target, subject: ArtSubject, card: dict | None) -> list[dict]:
+def _scene_retention_sources(
+    target,
+    subject: ArtSubject,
+    card: dict | None,
+    *,
+    selected_identity: str | None = None,
+) -> list[dict]:
     """The bounded retention authorizations of one logical scene.
 
     Only a scene whose logical identity came from the map owner's authored
@@ -964,6 +895,18 @@ def _scene_retention_sources(target, subject: ArtSubject, card: dict | None) -> 
                 descriptors.scene_generated_source_id(subject.full()),
                 descriptors.retention_token(
                     target.identity, subject.full(), "generated", output
+                ),
+            )
+        )
+    if selected_identity is not None:
+        sources.append(
+            descriptors.retention_source(
+                descriptors.scene_selected_source_id(selected_identity),
+                descriptors.retention_token(
+                    target.identity,
+                    subject.full(),
+                    "selected",
+                    selected_identity,
                 ),
             )
         )
@@ -1001,7 +944,12 @@ def _malformed_scene_descriptor(identity: str) -> dict:
     from world.art.scene_definitions import current_bundled_scenes
 
     source_id = descriptors.scene_terminal_source_id(TOWN_TERMINAL_KEY)
-    resource = _scene_bundled_resource(current_bundled_scenes(), TOWN_TERMINAL_KEY)
+    policy = capabilities_for(ArtSubjectKind.SCENE.value).terminal_policy
+    resource = (
+        _scene_bundled_resource(current_bundled_scenes(), TOWN_TERMINAL_KEY)
+        if policy == "scene"
+        else None
+    )
     terminal_payload = (
         None if resource is None else _scene_image_terminal(TOWN_TERMINAL_KEY, resource)
     )
@@ -1079,6 +1027,7 @@ def describe_scene(target) -> dict:
         # malformed-metadata path as an absent archetype instead of raising
         # into the art panel.
         return _malformed_scene_descriptor(target.identity)
+    terminal_policy = capabilities_for(subject.kind.value).terminal_policy
     attempts: list[dict] = []
 
     # (1) The authored per-room operator override.
@@ -1110,55 +1059,106 @@ def describe_scene(target) -> dict:
                 )
             )
 
-    # (2) The scene archetype's own generated artwork: the scene gallery's
-    # default card is the ONLY generated source (change
-    # ``scene-classic-fallback-removal`` deleted the classic record branch).
-    # A recorded gallery failure is a reached fact at this position and stays
-    # visible beside the card it did not replace, which is what keeps the
-    # "failed regeneration remains visible" presentation contract true; it is
-    # also the fact the browser's own failure caption renders. A job still in
-    # flight contributes no attempt, and an archetype without a presentable
-    # card has no generated attempt at all.
+    # (2)-(4) The shared archetype subject chain: explicit official choice,
+    # generated default card, then the operator archetype official default.
+    # This is the SAME capability-driven enumerator every portrait uses; the
+    # scene envelope only wraps it, maps its source positions into the scene
+    # descriptor vocabulary and keeps its authored room override ahead of it.
+    # ``complete=True`` preserves the scene's browser-side cascade: every lower
+    # position stays listed for the shared loader even when a higher image
+    # resolves.
+    from world.art import official
+
+    operator_catalog = official.current_catalog()
     generated_source = descriptors.scene_generated_source_id(subject.full())
     gallery_record = gallery_record_for(subject)
-    gallery_card = _scene_gallery_card(subject)
-    gallery_resource = (
-        _scene_gallery_resource(subject, gallery_card)
-        if gallery_card is not None
-        else None
-    )
-    if gallery_record is not None and gallery_record.db.last_error_code:
-        attempts.append(
-            descriptors.fault_attempt(
-                generated_source,
-                descriptors.SCENE_RANK_GENERATED,
-                descriptors.REASON_GENERATION_FAILED,
-            )
-        )
-    if gallery_resource is not None:
-        attempts.append(
-            descriptors.image_attempt(
-                generated_source, descriptors.SCENE_RANK_GENERATED, gallery_resource
-            )
-        )
-
-    # (3) The optional operator scene default.
-    faults, resource = _scene_official_position(
-        "scene",
-        archetype,
-        descriptors.SCENE_OPERATOR_SOURCE_PREFIX,
-        descriptors.SCENE_RANK_OPERATOR,
-    )
-    for source_id, rank, reason in faults:
-        attempts.append(descriptors.fault_attempt(source_id, rank, reason))
-    if resource is not None:
-        attempts.append(
-            descriptors.image_attempt(
-                descriptors.scene_operator_source_id(archetype),
-                descriptors.SCENE_RANK_OPERATOR,
-                resource,
-            )
-        )
+    chain = resolve_display_chain(subject, complete=True)
+    gallery_card = chain.default_card
+    selected_identity: str | None = None
+    for slot in chain.slots:
+        if slot.layer == "personal":
+            for identity, reason in slot.faults:
+                attempts.append(
+                    descriptors.fault_attempt(
+                        descriptors.scene_selected_source_id(identity),
+                        descriptors.SCENE_RANK_SELECTED,
+                        reason,
+                    )
+                )
+            if slot.facts is not None:
+                selected_identity = slot.facts["identity"]
+                resource = _scene_official_resource(
+                    operator_catalog, selected_identity
+                )
+                if resource is not None:
+                    attempts.append(
+                        descriptors.image_attempt(
+                            descriptors.scene_selected_source_id(selected_identity),
+                            descriptors.SCENE_RANK_SELECTED,
+                            resource,
+                        )
+                    )
+        elif slot.layer == "default":
+            # A recorded gallery failure is a reached fact at this position and
+            # stays visible beside the card it did not replace, which is what
+            # keeps the "failed regeneration remains visible" presentation
+            # contract true; it is also the fact the browser's failure caption
+            # renders. A job still in flight contributes no attempt.
+            if gallery_record is not None and gallery_record.db.last_error_code:
+                attempts.append(
+                    descriptors.fault_attempt(
+                        generated_source,
+                        descriptors.SCENE_RANK_GENERATED,
+                        descriptors.REASON_GENERATION_FAILED,
+                    )
+                )
+            for _identity, reason in slot.faults:
+                attempts.append(
+                    descriptors.fault_attempt(
+                        generated_source,
+                        descriptors.SCENE_RANK_GENERATED,
+                        reason,
+                    )
+                )
+            if slot.facts is not None:
+                gallery_resource = _scene_gallery_resource(subject, slot.facts)
+                if gallery_resource is not None:
+                    attempts.append(
+                        descriptors.image_attempt(
+                            generated_source,
+                            descriptors.SCENE_RANK_GENERATED,
+                            gallery_resource,
+                        )
+                    )
+        elif slot.layer == "official":
+            operator_source = descriptors.scene_operator_source_id(archetype)
+            for identity, reason in slot.faults:
+                fault_source = (
+                    operator_source
+                    if identity == slot.source_identity
+                    else descriptors.bounded_source_id(
+                        descriptors.SCENE_OPERATOR_SOURCE_PREFIX, identity
+                    )
+                )
+                attempts.append(
+                    descriptors.fault_attempt(
+                        fault_source,
+                        descriptors.SCENE_RANK_OPERATOR,
+                        reason,
+                    )
+                )
+            if slot.facts is not None:
+                resource = _scene_official_resource(
+                    operator_catalog, slot.facts["identity"]
+                )
+                if resource is not None:
+                    attempts.append(
+                        descriptors.image_attempt(
+                            operator_source,
+                            descriptors.SCENE_RANK_OPERATOR,
+                            resource,
+                        )
+                    )
 
     # (4) The REQUIRED bundled type illustration.
     catalog = current_bundled_scenes()
@@ -1181,7 +1181,11 @@ def describe_scene(target) -> dict:
 
     # (5) The distinct declared terminal image.
     terminal_payload = None
-    if terminal_key is not None and terminal_key != archetype:
+    if (
+        terminal_policy == "scene"
+        and terminal_key is not None
+        and terminal_key != archetype
+    ):
         terminal_source = descriptors.scene_terminal_source_id(terminal_key)
         terminal_resource = _scene_bundled_resource(catalog, terminal_key)
         if terminal_resource is None:
@@ -1204,7 +1208,7 @@ def describe_scene(target) -> dict:
     generation_subject, generation_state = _generation_facts(
         subject,
         None,
-        gallery_card is not None,
+        chain.has_cards,
         gallery_failed,
     )
     return descriptors.descriptor(
@@ -1213,7 +1217,9 @@ def describe_scene(target) -> dict:
         generation_state=generation_state,
         attempts=_unique_attempts(attempts),
         terminal_payload=terminal_payload,
-        retention_sources=_scene_retention_sources(target, subject, gallery_card),
+        retention_sources=_scene_retention_sources(
+            target, subject, gallery_card, selected_identity=selected_identity
+        ),
     )
 
 

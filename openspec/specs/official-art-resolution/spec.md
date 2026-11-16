@@ -71,7 +71,7 @@ Portrait age and eligibility validation SHALL run before official or runtime cha
 - **THEN** the eligibility outcome is identical whether or not official artwork exists for the entity
 
 ### Requirement: The extended chain stays deterministic, offline, and side-effect-free
-Extending the chain with the official-default step SHALL preserve the existing purity guarantees: resolution SHALL be a function of stored state plus the startup official snapshot only, and SHALL perform no network call, filesystem write, job enqueue, or record mutation. It SHALL NOT let a catalog DEFAULT replace an entity's own resolved runtime image: a subject with a resolvable card or classic asset SHALL keep presenting it even when official artwork exists.
+All gallery-bearing kinds SHALL resolve from stored state and startup snapshots without network calls, writes or enqueue. Generated defaults SHALL outrank unselected official defaults; explicit official choices SHALL outrank generated defaults after any declared binding. Registry-backed references SHALL resolve from validated typed subjects even without an entity.
 
 #### Scenario: Runtime art outranks official defaults
 - **WHEN** a subject resolves a gallery default card and its content reference also has official artwork
@@ -92,3 +92,7 @@ Extending the chain with the official-default step SHALL preserve the existing p
 #### Scenario: The personal selection is exempt by construction
 - **WHEN** the personal official selection added by `official-art-personalization` is set
 - **THEN** it is exempt from the catalog-default protection by construction — it is itself the player's explicit choice, presented at the personal-default slot ahead of the classic asset exactly as design §7 orders it, and clearing it restores the pre-selection resolution unchanged with nothing mutated by either act
+
+#### Scenario: Bare registry subject uses its own official reference
+- **WHEN** a registered scene or monster typed subject is resolved without an entity
+- **THEN** the same registered content reference is used by presentation and automatic suppression; no character reference is guessed from its stable key
