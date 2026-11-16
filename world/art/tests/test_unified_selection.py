@@ -24,7 +24,7 @@ from unittest.mock import patch
 from django.test import override_settings
 from evennia.utils.test_resources import EvenniaTestCase
 
-from world.art import gallery as gallery_api, gallery_kinds, official, official_refs
+from world.art import descriptors, gallery as gallery_api, gallery_kinds, official
 from world.art import gallery_match, service, worker
 from world.art.fake_sd_client import FakeSDWebUIClient
 from world.art.gallery_match import (
@@ -33,7 +33,7 @@ from world.art.gallery_match import (
     resolve_display,
 )
 from world.art.official import load_catalog, reset_catalog
-from world.art.presenter import describe_portrait
+from world.art.presenter import _slot_source, describe_portrait
 from world.art.queue import (
     claim,
     enqueue_gallery_job,
@@ -48,7 +48,7 @@ from world.art.subjects import (
     monster_subject_for,
     scene_subject_for,
 )
-from world.tests.synthetic_data import synthetic_registries
+from world.tests.synthetic_data import SYNTH_ARCHETYPES, synthetic_registries
 from tools.spec_traceability import covers_requirement
 
 _TINY_PNG = base64.b64decode(
@@ -82,10 +82,9 @@ class UnifiedSelectionTests(EvenniaTestCase):
         self.addCleanup(self.settings.disable)
         reset_catalog()
         self.addCleanup(reset_catalog)
-        from world.art.subjects import SCENE_ARCHETYPE_REGISTRY
         from world.lore.monster_visuals import get_monster_visual_registry
 
-        self.scene_key = sorted(SCENE_ARCHETYPE_REGISTRY)[0]
+        self.scene_key = sorted(SYNTH_ARCHETYPES)[0]
         self.species_key = sorted(get_monster_visual_registry())[0]
 
     # -- harness ---------------------------------------------------------
@@ -367,6 +366,17 @@ class UnifiedSelectionTests(EvenniaTestCase):
         ):
             terminal = describe_portrait(subject)["terminal"]
         self.assertEqual(terminal["kind"], "alpha_mask")
+        with patch.dict(
+            gallery_kinds._CAPABILITIES_BY_KIND_VALUE,
+            {subject.kind.value: capability.with_values(terminal_policy="scene")},
+        ):
+            self.assertIsNone(describe_portrait(subject)["terminal"])
+
+    def test_long_official_fault_source_ids_stay_inside_the_wire_bound(self):
+        identity = "scene/" + "d" * 220 + "/a.png"
+        for layer in ("personal", "official"):
+            source_id, _rank = _slot_source(layer, identity)
+            self.assertLessEqual(len(source_id), descriptors.MAX_SOURCE_ID)
 
 
 if __name__ == "__main__":

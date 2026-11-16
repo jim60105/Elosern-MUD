@@ -49,6 +49,7 @@ from world.art.store import ArtAssetRecord, ArtAssetStatus
 from world.art.subjects import ArtSubject, ArtSubjectKind
 from world.rules import art_view
 from world.rules.art_view import SceneTarget, scene_target_for
+from web.webclient.presentation.artwork import validate_artwork
 
 from tools.spec_traceability import covers_requirement
 
@@ -350,6 +351,53 @@ class SourceChainTests(_SceneFixture):
         self.assertEqual(len(selected), 1)
         self.assertEqual(
             selected[0]["resource"]["resource_id"], selection
+        )
+
+    def test_an_over_budget_default_keeps_the_descriptor_valid(self):
+        name = "d" * 200 + ".png"
+        identity = f"scene/{SCENE_KEY}/{name}"
+        self.contents[("scene", SCENE_KEY)] = official.OfficialContent(
+            kind="scene",
+            key=SCENE_KEY,
+            default_identity=identity,
+            images=(identity,),
+        )
+        self.official_images[identity] = _official_image(
+            identity, "scene", SCENE_KEY
+        )
+        self.patch_snapshots()
+        descriptor = describe_scene(self.target())
+        validate_artwork(descriptor)
+        faults = [
+            entry
+            for entry in self.entries(descriptor)
+            if entry["rank"] == descriptors.SCENE_RANK_OPERATOR
+            and entry["type"] == "fault"
+        ]
+        self.assertTrue(faults)
+        for entry in faults:
+            self.assertLessEqual(len(entry["source_id"]), descriptors.MAX_SOURCE_ID)
+
+    @covers_requirement(
+        "scene-artwork-presentation::normal-scenes-use-the-complete-authored-source-chain"
+    )
+    def test_a_redeclared_scene_terminal_policy_removes_the_terminal(self):
+        from world.art import gallery_kinds
+
+        capability = gallery_kinds.capabilities_for(ArtSubjectKind.SCENE.value)
+        with patch.dict(
+            gallery_kinds._CAPABILITIES_BY_KIND_VALUE,
+            {ArtSubjectKind.SCENE.value: capability.with_values(terminal_policy="none")},
+        ):
+            descriptor = describe_scene(self.target())
+        self.assertIsNone(descriptor["terminal"])
+        self.assertEqual(
+            [
+                entry
+                for entry in self.entries(descriptor)
+                if entry["rank"] == descriptors.SCENE_RANK_TERMINAL
+            ],
+            [],
         )
 
     @covers_requirement(

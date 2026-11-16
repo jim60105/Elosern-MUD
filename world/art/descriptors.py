@@ -233,6 +233,21 @@ def scene_terminal_source_id(terminal_key: str) -> str:
     return f"{SCENE_TERMINAL_SOURCE_PREFIX}:{terminal_key}"
 
 
+def bounded_source_id(prefix: str, identity: str) -> str:
+    """One ``<prefix>:<identity>`` source id inside the wire's source-id bound.
+
+    Card, fallback and subject identities are bounded by the subject-key
+    contract, but a catalog fault may name an operator-chosen filename. A
+    source id that would exceed ``MAX_SOURCE_ID`` keeps its stable prefix and
+    substitutes the identity's canonical digest, so attribution stays
+    collision-safe and the descriptor remains valid on the wire.
+    """
+    text = f"{prefix}:{identity}"
+    if len(text) <= MAX_SOURCE_ID:
+        return text
+    return f"{prefix}:{_digest(identity)}"
+
+
 def gallery_original_source_id(image_id: str) -> str:
     """The canonical source id of one exact requested gallery original."""
     return f"gallery.original:{image_id}"

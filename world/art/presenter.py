@@ -162,14 +162,25 @@ def _slot_source(layer: str, source_identity: str | None) -> tuple[str, int]:
     """The canonical source id and rank of one gallery chain slot position."""
     identity = source_identity or ""
     if layer == "bound":
-        return descriptors.portrait_bound_source_id(identity), descriptors.PORTRAIT_RANK_BOUND
+        source_id = descriptors.portrait_bound_source_id(identity)
+        return _bounded_source(source_id, identity), descriptors.PORTRAIT_RANK_BOUND
     if layer == "personal":
-        return descriptors.portrait_personal_source_id(identity), descriptors.PORTRAIT_RANK_PERSONAL
+        source_id = descriptors.portrait_personal_source_id(identity)
+        return _bounded_source(source_id, identity), descriptors.PORTRAIT_RANK_PERSONAL
     if layer == "classic":
         return descriptors.portrait_classic_source_id(identity), descriptors.PORTRAIT_RANK_CLASSIC
     if layer == "official":
-        return descriptors.portrait_official_source_id(identity), descriptors.PORTRAIT_RANK_OFFICIAL
-    return descriptors.portrait_default_source_id(identity), descriptors.PORTRAIT_RANK_DEFAULT
+        source_id = descriptors.portrait_official_source_id(identity)
+        return _bounded_source(source_id, identity), descriptors.PORTRAIT_RANK_OFFICIAL
+    source_id = descriptors.portrait_default_source_id(identity)
+    return _bounded_source(source_id, identity), descriptors.PORTRAIT_RANK_DEFAULT
+
+
+def _bounded_source(source_id: str, identity: str) -> str:
+    """One source id inside the wire bound, digest-substituted when needed."""
+    if len(source_id) <= descriptors.MAX_SOURCE_ID:
+        return source_id
+    return descriptors.bounded_source_id(source_id.split(":", 1)[0], identity)
 
 
 def _card_geometry(subject: ArtSubject, card: dict) -> dict:
@@ -803,7 +814,13 @@ def _scene_official_position(
     metadata = catalog.fault_for(content.default_identity)
     if metadata is not None:
         faults.append(
-            (f"{source_prefix}:{content.default_identity}", rank, metadata.reason)
+            (
+                descriptors.bounded_source_id(
+                    source_prefix, content.default_identity
+                ),
+                rank,
+                metadata.reason,
+            )
         )
     return faults, resource
 
@@ -927,7 +944,12 @@ def _malformed_scene_descriptor(identity: str) -> dict:
     from world.art.scene_definitions import current_bundled_scenes
 
     source_id = descriptors.scene_terminal_source_id(TOWN_TERMINAL_KEY)
-    resource = _scene_bundled_resource(current_bundled_scenes(), TOWN_TERMINAL_KEY)
+    policy = capabilities_for(ArtSubjectKind.SCENE.value).terminal_policy
+    resource = (
+        _scene_bundled_resource(current_bundled_scenes(), TOWN_TERMINAL_KEY)
+        if policy == "scene"
+        else None
+    )
     terminal_payload = (
         None if resource is None else _scene_image_terminal(TOWN_TERMINAL_KEY, resource)
     )
@@ -1005,6 +1027,7 @@ def describe_scene(target) -> dict:
         # malformed-metadata path as an absent archetype instead of raising
         # into the art panel.
         return _malformed_scene_descriptor(target.identity)
+    terminal_policy = capabilities_for(subject.kind.value).terminal_policy
     attempts: list[dict] = []
 
     # (1) The authored per-room operator override.
@@ -1113,7 +1136,9 @@ def describe_scene(target) -> dict:
                 fault_source = (
                     operator_source
                     if identity == slot.source_identity
-                    else f"{descriptors.SCENE_OPERATOR_SOURCE_PREFIX}:{identity}"
+                    else descriptors.bounded_source_id(
+                        descriptors.SCENE_OPERATOR_SOURCE_PREFIX, identity
+                    )
                 )
                 attempts.append(
                     descriptors.fault_attempt(
@@ -1156,7 +1181,11 @@ def describe_scene(target) -> dict:
 
     # (5) The distinct declared terminal image.
     terminal_payload = None
-    if terminal_key is not None and terminal_key != archetype:
+    if (
+        terminal_policy == "scene"
+        and terminal_key is not None
+        and terminal_key != archetype
+    ):
         terminal_source = descriptors.scene_terminal_source_id(terminal_key)
         terminal_resource = _scene_bundled_resource(catalog, terminal_key)
         if terminal_resource is None:
