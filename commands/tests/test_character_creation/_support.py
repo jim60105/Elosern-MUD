@@ -37,6 +37,7 @@ from world.rules.tests._combat_session_helpers import open_synthetic_scope
 from world.lore.starting_kits import SubraceStartingKit
 
 
+from world.tests.start_room_fixture import stub_start_room
 from world.tests.synthetic_data import (
     SYNTH_PRESETS,
     SYNTH_RACES,
@@ -171,6 +172,8 @@ def _open_creation_scope(test):
     open_synthetic_scope(
         test, *_CREATION_SCOPE_LOGICALS, extra=_CREATION_SCOPE_EXTRA
     )
+    # Activation resolves a start room; these tests do not test placement.
+    test.enterContext(stub_start_room())
     bound_patch = patch(
         "world.rules.character_creation._AFFINITY_INPUT_BOUNDS",
         _AFFINITY_BOUNDS,

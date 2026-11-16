@@ -15,11 +15,13 @@ from world.rules.creation_wizard import ALLOCATABLE_AXES, read_draft
 from world.tests.synthetic_data import SYNTH_PRESETS
 from ._support import _T_RACE, _T_SUBRACE, _open_t_creation_scope, _shipped_race_affinity, _t_profile_pairs, _t_spend
 import unittest
+from world.tests.start_room_fixture import stub_start_room
 
 
 class CreationPanelPresenterTests(EvenniaTest):
 
     def setUp(self):
+        self.enterContext(stub_start_room())
         # The wizard build, draft preflight, and activation all resolve
         # through the patched catalogs. Elements stay shipped: the panel
         # validator's affinity element set is captured at import time and

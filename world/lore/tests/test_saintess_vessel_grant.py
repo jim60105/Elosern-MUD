@@ -35,6 +35,7 @@ from world.rules.progression import grant_skill_practice_xp, grant_study_practic
 from world.rules.skill_effects import validate_conferrable_skill
 from world.rules.skill_ownership import owns_stored_skill
 from world.skills.registry import SKILL_REGISTRY, SkillCategory, SkillKind, TargetSpec
+from world.tests.start_room_fixture import stub_start_room
 
 VESSEL_KEY = "saintess_vessel"
 PRESET_KEY = "violet_altoria"
@@ -171,6 +172,7 @@ class SaintessVesselRegistryContractTests(EvenniaTestCase):
                     validate_conferrable_skill(key)
 
 
+@stub_start_room()
 class SaintessVesselPresetContractTests(EvenniaTest):
     """The shipped royal preset carries neither vessel nor robe nor narrative."""
 

@@ -8,7 +8,7 @@ Precondition: `subrace-start-locations` is archived on master.
 
 ## 1. Activation (design D4)
 
-- [ ] 1.1 In `world/rules/character_creation.py`: add `"map_knowledge"` to
+- [x] 1.1 In `world/rules/character_creation.py`: add `"map_knowledge"` to
   `_CREATION_ATTRIBUTE_KEYS`, add `from world.rules import start_location`, add the
   pre-transaction resolution and `origin` capture, the in-transaction placement block
   (between the `creation_draft` removal and the starting-companions block), the
@@ -16,10 +16,10 @@ Precondition: `subrace-start-locations` is archived on master.
   `transaction.on_commit` registration, the updated `except` order, and the
   `character_start_placed` info event. All of it is verbatim from D4. Update the
   docstring of `activate_player_character` with one sentence on placement.
-- [ ] 1.2 In `world/rules/creation_wizard.py::activate_draft`, capture `origin` before
+- [x] 1.2 In `world/rules/creation_wizard.py::activate_draft`, capture `origin` before
   the `try` and call `restore_activation_placement(character, origin)` first in the
   `except`.
-- [ ] 1.3 Add placement tests to
+- [x] 1.3 Add placement tests to
   `world/rules/tests/test_character_creation/test_activation_rollback.py`, using the
   synthetic scope of `subrace-start-locations` task 3.2 plus the module's existing registries:
   (a) replace `test_successful_activation_leaves_the_shell_in_place` with
@@ -50,15 +50,15 @@ Precondition: `subrace-start-locations` is archived on master.
   and keep the existing `activation-is-an-all-or-nothing-deterministic-core-operation`
   annotations on the rollback tests. Annotate (a) also with
   `map-knowledge::arrival-recording-happens-only-at-existing-successful-arrival-seams`.
-- [ ] 1.4 In `world/rules/tests/test_creation_wizard.py`, add a test where
+- [x] 1.4 In `world/rules/tests/test_creation_wizard.py`, add a test where
   `activate_draft`'s outer commit fails. Patch `transaction.atomic` in
   `world.rules.creation_wizard` with a context manager whose `__exit__` raises after
   the inner activation succeeds, and use the stub start room. Afterwards the character is
   back at its origin, pending, with its old `home`.
-- [ ] 1.5 In `world/rules/tests/test_starting_companions.py`, using the stub start room,
+- [x] 1.5 In `world/rules/tests/test_starting_companions.py`, using the stub start room,
   assert that every built companion's `location` equals the player's `location`, which
   equals the stub start room. Annotate with the 1.3 placement requirement ID.
-- [ ] 1.6 In `web/webclient/actions/tests/test_creation_actions/test_fingerprint_activate.py`,
+- [x] 1.6 In `web/webclient/actions/tests/test_creation_actions/test_fingerprint_activate.py`,
   update the activation hand-off test, using the stub start room: after
   `creation.activate`, the character's `location` and `home` are the stub room and the
   mode is `exploration`. The rollback test asserts the original `location` and `home`.
@@ -67,8 +67,8 @@ Precondition: `subrace-start-locations` is archived on master.
 
 ## 2. Test seams (design D6)
 
-- [ ] 2.1 Create `world/tests/start_room_fixture.py` exactly as in D6.
-- [ ] 2.2 Apply `stub_start_room()` (class decorator, or `self.enterContext(...)` in
+- [x] 2.1 Create `world/tests/start_room_fixture.py` exactly as in D6.
+- [x] 2.2 Apply `stub_start_room()` (class decorator, or `self.enterContext(...)` in
   `setUp`) to every test class that activates a character and is not covered by section
   1. To find them, run
   `rg -l "activate_player_character|activate_draft|_creation_activate_adapter|creation\.activate|character preset|_activate_creation" commands server typeclasses web/webclient world tests --glob '*/tests/*'`.
@@ -87,27 +87,27 @@ Precondition: `subrace-start-locations` is archived on master.
   that only names the command and never activates (for example `tests/test_command_docs.py`).
   When an existing assertion pins the pre-change location after a successful activation,
   change it to the stub room. Change nothing else.
-- [ ] 2.3 In `web/tests/browser/seed/runner.py` (both `activate_player_character`
+- [x] 2.3 In `web/tests/browser/seed/runner.py` (both `activate_player_character`
   calls) and `web/tests/browser/seed/npc_persona_fixture.py`, wrap the activation in the
   seed patch from D6, returning the room the seed just placed the character in.
-- [ ] 2.4 Extend `web/tests/browser/fixtures.py::journey_settlement_scope` with the
+- [x] 2.4 Extend `web/tests/browser/fixtures.py::journey_settlement_scope` with the
   creation-only union from D6, and add one sentence to its docstring.
 
 ## 3. Verification
 
-- [ ] 3.1 Run each module touched in sections 1 and 2 with `EV <dotted.module>`, one at
+- [x] 3.1 Run each module touched in sections 1 and 2 with `EV <dotted.module>`, one at
   a time. Each must pass.
-- [ ] 3.2 `uv run --locked python -m tools.shard_register fix` then `uv run --locked python -m tools.contract_gate --change subrace-start-settlements`.
+- [x] 3.2 `uv run --locked python -m tools.shard_register fix` then `uv run --locked python -m tools.contract_gate --change subrace-start-settlements`.
   It must exit 0.
-- [ ] 3.3 `uv run --locked python -m tools.observability_lint check` is clean, including
+- [x] 3.3 `uv run --locked python -m tools.observability_lint check` is clean, including
   the new `log_warn` and `log_info` calls.
-- [ ] 3.4 Run `pnpm run build`, then
+- [x] 3.4 Run `pnpm run build`, then
   `uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_browser_creation_preset`
   and `... web.tests.browser.test_browser_creation_custom`. Then run
   `EV web.webclient.actions.tests.test_party_management_acceptance_fixture` (the
   synthetic boot path). All must pass.
-- [ ] 3.5 Add a short "Start location" paragraph to
+- [x] 3.5 Add a short "Start location" paragraph to
   `docs/development/adding-player-presets.md`: a preset starts in its subrace's row of
   `world/lore/start_locations.py`, a new subrace must add a row, and the row names the
   settlement's anchor key only.
-- [ ] 3.6 `openspec validate subrace-start-settlements --strict` passes.
+- [x] 3.6 `openspec validate subrace-start-settlements --strict` passes.

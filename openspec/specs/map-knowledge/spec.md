@@ -93,7 +93,7 @@ positive integer dbref.
 - **THEN** the node resolves as unavailable and is eligible for pruning
 
 ### Requirement: Arrival recording happens only at existing successful-arrival seams
-record_arrival SHALL remain at existing successful movement-completion seams; wilderness ground observation SHALL also update at the end of a positive committed explicit skip, never from reads, replayed/refused operations or teleport-style relocation.
+record_arrival SHALL remain at existing successful movement-completion seams and at the committed character-activation placement into the start room; wilderness ground observation SHALL also update at the end of a positive committed explicit skip, never from reads, replayed/refused operations or any other teleport-style relocation.
 
 #### Scenario: Grid traversal records the destination after success
 - **WHEN** a `PlayerCharacter` successfully traverses a `CostedXYZExit` or an ordinary `Exit`
@@ -116,8 +116,12 @@ record_arrival SHALL remain at existing successful movement-completion seams; wi
 - **THEN** no map knowledge is recorded for that relocation
 
 #### Scenario: Teleport-style moves record nothing
-- **WHEN** a character is relocated via a teleport-style `move_to` call
+- **WHEN** a character is relocated via a teleport-style `move_to` call outside character activation
 - **THEN** no discovery is recorded
+
+#### Scenario: Activation placement records the start room
+- **WHEN** a character activation commits and places the character in its start room
+- **THEN** the knowledge record contains the start room's canonical node ID with the current world tick, and a rolled-back activation leaves no record
 
 #### Scenario: Read-only operations record nothing
 - **WHEN** search, map rendering, or remote inspection touches map data

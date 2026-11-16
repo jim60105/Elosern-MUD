@@ -53,6 +53,7 @@ from ._support import (
     _race_key,
     balanced_allocations,
 )
+from world.tests.start_room_fixture import stub_start_room
 
 
 class PortraitFinalizationTests(EvenniaTest):
@@ -60,6 +61,7 @@ class PortraitFinalizationTests(EvenniaTest):
     (fix-creation-finalization-safety D3 / art-asset-lifecycle)."""
 
     def setUp(self):
+        self.enterContext(stub_start_room())
         super().setUp()
         open_synthetic_scope(
             self,

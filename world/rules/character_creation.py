@@ -13,6 +13,8 @@ from world.lore.player_presets import PLAYER_PRESET_REGISTRY, PlayerPreset
 from world.lore.races import RACE_REGISTRY, SUBRACE_REGISTRY, StatModifiers
 from world.lore.sex import DEFAULT_SEX
 from world.lore.starting_kits import SUBRACE_STARTING_KIT_REGISTRY
+from world.observability import log_info, log_warn
+from world.rules import start_location
 from world.rules.equipment import toggle_equipment
 from world.rules.identity import IdentityError, resolve_sex
 from world.rules.progression import (
@@ -48,6 +50,9 @@ _CREATION_ATTRIBUTE_KEYS = (
     "creation_preset_key",
     # Social identities snapshot for atomic rollback (authored-dialogue-social-identity).
     "social_identities",
+    # Activation records the start-room arrival (subrace-start-settlements
+    # D4); a rolled-back activation must leave no map-knowledge record.
+    "map_knowledge",
 )
 
 # The single deterministic race-bound mapping every identity channel and the
@@ -623,8 +628,17 @@ def activate_player_character(
     The retired magic sampler is gone (D-A5): ``magic_power`` arrives as the
     seventh allocated static axis, so activation writes exactly what the
     profile resolved -- no injected randomness.
+
+    The character is moved into its subrace's start room and homed there
+    inside the same transaction (subrace-start-settlements); a failure returns
+    it to where it stood.
     """
     validated = preflight_character_creation(account, character, request)
+    try:
+        start_room = start_location.resolve_start_room(validated.subrace)
+    except start_location.StartLocationError as error:
+        raise CharacterCreationError(str(error)) from error
+    origin = character.location
 
     values = validated.values
     trait_config = trait_config_for_values(values)
@@ -760,6 +774,22 @@ def activate_player_character(
                 if write_observer:
                     write_observer("creation_draft")
                 character.attributes.remove("creation_draft")
+            # Start-location placement (subrace-start-settlements D4): the
+            # character moves into its subrace's start room, is homed there and
+            # records the arrival, BEFORE companions are built at its location.
+            # The move is hook-free so the transaction holds only durable,
+            # snapshot-covered writes; arrival effects run after commit.
+            if not character.move_to(start_room, quiet=True, move_hooks=False):
+                raise CharacterCreationError("start room refused the character")
+            character.home = start_room
+            from world.rules.map_knowledge import record_arrival
+
+            record_arrival(character)
+            transaction.on_commit(
+                lambda: _run_start_arrival_effects(character, start_room, origin)
+            )
+            if write_observer:
+                write_observer("start_location")
             # Declared starting companions are built, seeded, and bound LAST
             # among the player-side writes, before portrait finalization
             # (preset-companion-activation): the builder places each NPC at
@@ -804,10 +834,23 @@ def activate_player_character(
         # no phantom companion survives the failed activation in-process.
         if built_companions:
             _discard_built_companions(built_companions)
+        # After the companion discard (it evicts from the start room's
+        # contents) and before the attribute restore.
+        restore_activation_placement(character, origin)
         character.key = old_key
         restore_traits(character, trait_snapshot)
         restore_attributes(character, attribute_snapshots)
         raise
+    log_info(
+        "character_start_placed",
+        context={
+            "char": character.key,
+            "char_dbref": character.dbref,
+            "subrace": validated.subrace,
+            "room": start_room.key,
+            "room_dbref": start_room.dbref,
+        },
+    )
     from world.rules.lore_knowledge import reveal_lore_best_effort
 
     if validated.race:
@@ -817,6 +860,95 @@ def activate_player_character(
     return CharacterCreationResult(
         validated.display_name, validated.race, validated.subrace, validated.values["magic_power"]
     )
+
+
+def restore_activation_placement(character: Any, origin: Any) -> None:
+    """Undo a rolled-back activation placement in-process; never raises.
+
+    The rollback reverted the durable location and home rows, but the idmapper
+    object and both rooms' contents caches still hold the moved state. A
+    hook-free ``move_to`` (the mirror of the hook-free forward move) returns the
+    character even into a room whose entry hook refuses character arrivals (the
+    虛境 birth room); ``home`` is re-read from the rolled-back row and applied
+    in memory only.
+    """
+    from evennia.objects.models import ObjectDB
+
+    if character.location is not origin:
+        try:
+            if origin is None:
+                character.location = None
+            elif not character.move_to(origin, quiet=True, move_hooks=False):
+                raise RuntimeError("origin refused the returning character")
+        except Exception as error:
+            log_warn(
+                "rollback_restore_failed",
+                exc=error,
+                context={
+                    "stage": "activation_placement",
+                    "char": character.key,
+                    "key": "location",
+                },
+            )
+    try:
+        row_home = (
+            ObjectDB.objects.filter(id=character.id)
+            .values_list("db_home_id", flat=True)
+            .first()
+        )
+        if character.db_home_id != row_home:
+            character.db_home_id = row_home
+    except Exception as error:
+        log_warn(
+            "rollback_restore_failed",
+            exc=error,
+            context={
+                "stage": "activation_placement",
+                "char": character.key,
+                "key": "home",
+            },
+        )
+
+
+def _run_start_arrival_effects(character: Any, room: Any, origin: Any) -> None:
+    """Run the arrival effects of a committed start-room placement.
+
+    They are the effects a hooks-enabled move would have run: the room's
+    receive hook (scene entry and art ensure), arrival lore, encounter
+    dispatch and the auto look. Each step is best-effort: activation has
+    already committed, so a failure is logged and never raised.
+    """
+
+    def _receive() -> None:
+        room.at_object_receive(character, origin, move_type="teleport")
+
+    def _lore() -> None:
+        from world.quests.room_observation import observe_arrival_lore
+
+        observe_arrival_lore(character, room)
+
+    def _encounters() -> None:
+        from world.quests.encounter_dispatch import activate_for_move
+
+        activate_for_move(character)
+
+    def _look() -> None:
+        character.msg(text=(character.at_look(room), {"type": "look"}))
+
+    for step, effect in (
+        ("receive", _receive),
+        ("lore", _lore),
+        ("encounters", _encounters),
+        ("look", _look),
+    ):
+        try:
+            effect()
+        except Exception as error:
+            log_warn(
+                "character_start_arrival_effect_failed",
+                exc=error,
+                context={"char": getattr(character, "key", None), "step": step},
+            )
 
 
 def _validate_preset_persona_lengths(registry: Mapping[str, PlayerPreset]) -> None:

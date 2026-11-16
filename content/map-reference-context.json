@@ -222,7 +222,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "739d435dbbaf0989831e1e1fedd2389fba3cd9d428b9520453153c9fb66b1eed",
+  "fingerprint": "1d51a78f293823ac2c947a1f799a952420cbc15441b64cff3242093224682852",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -16263,7 +16263,7 @@
     "world/rules/camping.py": "19d4c1123af23841327252981c8ab51dbf8caea56fb7b80e7ff26c5cdca0e433",
     "world/rules/caravan_arrivals.py": "e811db84b8fd6992130ba77db149839f6159ff02097fff122c4ac96861248f39",
     "world/rules/cast_settlement.py": "7dc704ec3352f374216c83ee16d5b004bc46a3dfadb2be1010070eec6c5bf06a",
-    "world/rules/character_creation.py": "952c612c6f4dc44f0bac406486a503ce75c7322cf881bdd65fb8869271bc7fc0",
+    "world/rules/character_creation.py": "ff484f55c3559b92b464ab081457df6dcff81348d428f32532e2f2e9c169b920",
     "world/rules/church.py": "d0d197ca2b70aa2623edeecf065f4d702789bfcfde32dc59d1e8b028397e7b52",
     "world/rules/church_rulebook.py": "7373da0ee3b9311dc8dbb1c768ff54437ad180a86307ef7fc2c6d3480f679f7e",
     "world/rules/city_gates.py": "769431ba2710458d3f6f560ef8eb5b9f0c0d704ebf29230246b59b9fec67232b",
@@ -16298,7 +16298,7 @@
     "world/rules/combat_view.py": "4200881cef76e3a9280eafa74fa3c52b88bb11389f346114af4106ad5ae92784",
     "world/rules/correspondence.py": "4c7601c0ac797ce0e16becc186da411d3746443dcf15911b3931842037c673f6",
     "world/rules/creation_messages.py": "f8f8aa97bb664281592c53ecaeae8ba90fb31d8a8dd95bc5bc447eebd506a0f2",
-    "world/rules/creation_wizard.py": "1f117ffd88fbfd30ad6c06f318d3eb8563fde746ffb869d24772fd0c92dc39db",
+    "world/rules/creation_wizard.py": "a63e40d2178d02395a5da16ebc934b8831497245c5e6e9b3395c2e2097d01e6b",
     "world/rules/cross_lineage_unlock.py": "2d5be43005b3e54430e40fb48286367f88dc8a01b9b40d4fcd054c42f5d11d99",
     "world/rules/defeat_aftermath/__init__.py": "d21525ea09e3c34d72953eb6d9272371d94b5b76ebe37b39f7f3a0ffc09d3551",
     "world/rules/defeat_aftermath/aftermath.py": "ad09806eeef0efeaa53ae98a60b69a9f96b3e20fad3950f074b15840d9e95f7f",

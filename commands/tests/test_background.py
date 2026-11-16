@@ -31,6 +31,7 @@ from world.tests.synthetic_data import (
     SYNTH_SUBRACES,
     synthetic_registries,
 )
+from world.tests.start_room_fixture import stub_start_room
 
 _SCOPE_LOGICALS = (
     "races",
@@ -59,6 +60,7 @@ class BackgroundCommandTests(EvenniaCommandTestMixin, EvenniaTest):
     character_typeclass = PlayerCharacter
 
     def setUp(self):
+        self.enterContext(stub_start_room())
         # Activation builds traits and a starting kit against the catalogs,
         # so the scope opens before super().setUp() (class decorator would
         # only wrap the test* methods).

@@ -52,7 +52,9 @@ from world.rules.party import (
 from world.rules import starting_companions as starting_companions_module
 from world.rules.affinity import NATURAL_CAP
 from world.rules.character_creation import MAX_PERSONA_FIELD_LENGTH, validate_affinity_seed
+from world.rules import start_location
 from world.rules.tests._combat_session_helpers import _race_key, open_synthetic_scope
+from world.tests.start_room_fixture import stub_start_room
 from world.tests.synthetic_data import (
     SYNTH_RACES,
     SYNTH_STATIC_TIERS,
@@ -304,6 +306,7 @@ class _BuilderCase(EvenniaTest):
         # partner card, gear item, and activation below resolves through the
         # patched registries.
         open_synthetic_scope(self, *_BUILDER_SCOPE_LOGICALS)
+        self.enterContext(stub_start_room())
         super().setUp()
         self.hall = create_object(
             Room,
@@ -642,7 +645,11 @@ class CompanionActivationBindingTests(QuestRegistryIsolation, EvenniaCommandTest
         # Scope before construction: activation cards, entity races, gear, and
         # every twin build below resolve through the synthetic registries.
         open_synthetic_scope(self, *_BUILDER_SCOPE_LOGICALS)
+        self.enterContext(stub_start_room())
         super().setUp()
+        # Activation places the player in the stub start room; creating it up
+        # front keeps the object-count assertions below about companions only.
+        self.start_room = start_location.resolve_start_room(None)
         # The affinity config validates its cap-breaks against the quest
         # registry; register the shipped catalog before loading it. The
         # isolation mixin restores the process-global registries after.
@@ -740,15 +747,18 @@ class CompanionActivationBindingTests(QuestRegistryIsolation, EvenniaCommandTest
         return declaration.affinity
 
     @covers_requirement("starting-companions::preset-activation-builds-seeds-and-binds-every-declared-companion-atomically")
+    @covers_requirement("player-character-creation::activation-places-the-character-in-its-subrace-s-start-room")
     def test_activating_the_holder_card_binds_a_live_twin_at_declared_affinity(self):
         shell = self._shell("maker-shell-a")
         self._activate(shell, _T_HOLDER)
         self.assertFalse(shell.creation_pending)
         companion = self._companion_of(shell)
-        # Built from the partner card, at the player's location.
+        # Built from the partner card, at the player's location, which is
+        # the start room activation placed the player in.
         self.assertIsInstance(companion, LLMNPC)
         self.assertEqual(companion.key, _T_TWIN_DISPLAY)
         self.assertEqual(companion.location, shell.location)
+        self.assertEqual(shell.location, self.start_room)
         # Bound both ways through the sole writers.
         self.assertEqual(shell.db.party, [companion.pk])
         self.assertEqual(int(companion.db.party_member), int(shell.pk))
@@ -765,6 +775,7 @@ class CompanionActivationBindingTests(QuestRegistryIsolation, EvenniaCommandTest
         companion = self._companion_of(shell)
         self.assertEqual(companion.key, _T_TWIN2_DISPLAY)
         self.assertEqual(companion.location, shell.location)
+        self.assertEqual(shell.location, self.start_room)
         self.assertEqual(shell.db.party, [companion.pk])
         self.assertEqual(int(companion.db.party_member), int(shell.pk))
         self.assertEqual(
@@ -816,13 +827,13 @@ class CompanionActivationBindingTests(QuestRegistryIsolation, EvenniaCommandTest
         self._activate(shell, _T_HOLDER)
         self.assertEqual(party_size(shell), 1)
         fillers = [
-            create_object(LLMNPC, key=f"填充夥伴{i}", location=self.room1)
+            create_object(LLMNPC, key=f"填充夥伴{i}", location=shell.location)
             for i in range(PARTY_MAX_COMPANIONS - 1)
         ]
         for filler in fillers:
             join_party(filler, shell)
         self.assertEqual(party_size(shell), PARTY_MAX_COMPANIONS)
-        fifth = create_object(LLMNPC, key="第五夥伴", location=self.room1)
+        fifth = create_object(LLMNPC, key="第五夥伴", location=shell.location)
         with self.assertRaises(PartyJoinError) as context:
             join_party(fifth, shell)
         self.assertEqual(context.exception.reason, REASON_PARTY_FULL)
@@ -835,7 +846,7 @@ class CompanionActivationBindingTests(QuestRegistryIsolation, EvenniaCommandTest
         leave_party(companion, shell, reason="dismissed")
         # Dismissed, not deleted: still in the room at the seeded affinity.
         self.assertFalse(is_companion(companion, shell))
-        self.assertEqual(companion.location, self.room1)
+        self.assertEqual(companion.location, self.start_room)
         self.assertEqual(
             companion.relations.affinity_for(shell), self._declared_affinity(_T_HOLDER)
         )
@@ -881,7 +892,7 @@ class CompanionActivationBindingTests(QuestRegistryIsolation, EvenniaCommandTest
         # process-global idmapper — no phantom companion survives.
         self.assertFalse(ObjectDB.objects.filter(db_key=_T_TWIN_DISPLAY).exists())
         self.assertNotIn(
-            _T_TWIN_DISPLAY, [obj.key for obj in self.room1.contents]
+            _T_TWIN_DISPLAY, [obj.key for obj in self.start_room.contents]
         )
         self.assertNotIn(captured["pk"], LLMNPC.__dbclass__.__instance_cache__)
         self.assertFalse(shell.attributes.has("party"))

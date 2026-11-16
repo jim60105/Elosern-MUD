@@ -4,6 +4,7 @@ Slice of the former ``web/tests/browser/seed.py`` module;
 every body ships verbatim."""
 
 import os
+from unittest.mock import patch
 
 from web.tests.browser.seed.identity import (
     BROWSER_ACCOUNT_EMAIL,
@@ -249,7 +250,14 @@ def main() -> None:
                 allocations=balanced_allocations(SHIPPED_BASE_RACE, SHIPPED_BASE_SUBRACE),
                 skip_portrait=True,
             )
-        activate_player_character(superuser, dummy_char, dummy_req)
+        # Seeded characters keep their seeded room and home: the start-room
+        # placement resolves to the room the seed just put them in
+        # (subrace-start-settlements D6).
+        with patch(
+            "world.rules.start_location.resolve_start_room",
+            new=lambda subrace_key: dummy_room,
+        ):
+            activate_player_character(superuser, dummy_char, dummy_req)
 
     account = create_account(
         BROWSER_ACCOUNT_USERNAME,
@@ -299,7 +307,11 @@ def main() -> None:
             # race it, so the seeded activation carries the explicit skip flag.
             skip_portrait=True,
         )
-    result = activate_player_character(account, character, request)
+    with patch(
+        "world.rules.start_location.resolve_start_room",
+        new=lambda subrace_key: room,
+    ):
+        result = activate_player_character(account, character, request)
 
     # Deterministic MP for the exact-cost cast journeys: gauge regen accrues
     # only inside player-driven clock advances (world/rules.clock settles it

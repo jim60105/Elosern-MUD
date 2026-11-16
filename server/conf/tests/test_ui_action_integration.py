@@ -27,6 +27,7 @@ from web.webclient.actions.registry import (
 )
 from web.webclient.presentation.coordinator import attach_coordinator
 from web.webclient.presentation.registry import build_production_registry
+from world.tests.start_room_fixture import stub_start_room
 
 
 def _make_websocket_session(sessionhandler, account):
@@ -411,6 +412,7 @@ class MultiCharacterActionIntegrationTests(EvenniaTest):
     character_typeclass = PlayerCharacter
 
     def setUp(self):
+        self.enterContext(stub_start_room())
         super().setUp()
         import evennia
 

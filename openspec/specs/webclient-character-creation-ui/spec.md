@@ -459,16 +459,16 @@ Successful `creation.activate` SHALL remain all-or-nothing for character state: 
 
 #### Scenario: Successful activation moves the shell to exploration
 - **WHEN** `creation.activate` commits
-- **THEN** the full snapshot mode is `exploration`, the creation dock unloads, the character stands in 虛境 with no relocation performed, and `creation_pending` is false
+- **THEN** the full snapshot mode is `exploration`, the creation dock unloads, the character stands in the start room resolved for its subrace, and `creation_pending` is false
 
 #### Scenario: A failed activation transaction leaves the character pending
 - **WHEN** a write failure is injected into the activation transaction
-- **THEN** the whole activation rolls back, the character remains pending with its prior draft, and no partial trait, identity, or progression state is persisted
+- **THEN** the whole activation rolls back, the character remains pending with its prior draft and its original location and `home`, and no partial trait, identity, or progression state is persisted
 
 #### Scenario: The activated character stays home in 虛境
 - **WHEN** an activation commits
-- **THEN** the character remains in 虛境 — its unchanged default home; activation performs no
-  relocation and no arrival behavior
+- **THEN** the character no longer stays in 虛境: its `home` is the start room it was placed
+  in, never 虛境
 
 #### Scenario: No affected-panel set can strand the shell in creation mode
 - **WHEN** a creation adapter publishes after a successful activation

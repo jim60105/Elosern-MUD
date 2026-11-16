@@ -239,16 +239,27 @@ def journey_settlement_scope() -> tuple[str, ...]:
     seed process and the server process both read it, so seeding and booting
     cannot disagree, and ``sync_grid``/``sync_wilderness`` still converge these
     maps through the real planner, transaction and rollback.
+
+    A creation runtime (``ELOSERN_BROWSER_CREATION=1``) also materializes every
+    subrace's start settlement, because activation there places the new
+    character in its start room.
     """
 
     from world.maps.city_gates import CITY_GATE_REGISTRY
     from world.maps.static_references import settlement_node_xyz
 
-    return tuple(
-        sorted(
-            {settlement_node_xyz(row.gate)[2] for row in CITY_GATE_REGISTRY.values()}
-        )
-    )
+    scope = {settlement_node_xyz(row.gate)[2] for row in CITY_GATE_REGISTRY.values()}
+    if os.environ.get("ELOSERN_BROWSER_CREATION") == "1":
+        from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY
+        from world.maps.static_references import published_static_world
+
+        # The published static world's subrace -> start anchor family, so the
+        # scope follows whichever catalogs the runtime installed.
+        scope |= {
+            ANCHOR_PLACEMENT_REGISTRY[anchor_key].zcoord
+            for anchor_key in published_static_world().start_locations.values()
+        }
+    return tuple(sorted(scope))
 
 
 def port_env(ports: list[int]) -> dict[str, str]:

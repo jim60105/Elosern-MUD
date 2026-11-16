@@ -61,8 +61,10 @@ from ._support import (
     _race_key,
     balanced_allocations,
 )
+from world.tests.start_room_fixture import STUB_START_ROOM_KEY, stub_start_room
 
 
+@stub_start_room()
 @synthetic_registries(
     "races",
     "static_tiers",
@@ -121,7 +123,7 @@ class CharacterActivationTests(EvenniaTest):
     @covers_requirement("player-character-creation::preset-activation-grants-the-preset-s-declared-starting-inventory")
     def test_activation_persists_identity_traits_and_empty_mechanical_state(self):
         race_key = _race_key()
-        old_id, old_location = self.character.id, self.character.location
+        old_id = self.character.id
         result = activate_player_character(
             self.account, self.character, self.request()
         )
@@ -145,7 +147,7 @@ class CharacterActivationTests(EvenniaTest):
         )
         self.assertEqual(self.character.wallet, 0)
         self.assertEqual(self.character.id, old_id)
-        self.assertEqual(self.character.location, old_location)
+        self.assertEqual(self.character.location.key, STUB_START_ROOM_KEY)
         self.assertIn(self.character, self.account.characters)
 
     @covers_requirement("player-stat-allocation::player-starting-profiles-are-derived-from-immutable-lore-bands")
