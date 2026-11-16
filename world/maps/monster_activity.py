@@ -3707,14 +3707,15 @@ def _tracked_individual_ids(state: MonsterActivityState) -> tuple[int, ...]:
 
 
 def activity_record_surfaces(
-    wilderness: Any,
+    wilderness: Any, *, units: Iterable[str] | None = None
 ) -> dict[tuple[str, str | None], tuple[bool, Any]]:
-    """The header and every part as rollback surface entries.
+    """The header and the parts as rollback surface entries.
 
-    One entry for the header, one for each part the header lists, and one for
-    each unit of the current settlement-unit index, so a part the operation
-    creates is named before it exists. An entry of a part that is not stored is
-    ``(False, None)``: restoring it removes the part.
+    ``units`` names exactly the parts to include. Omitted, one entry is named
+    for each part the header lists and for each unit of the current
+    settlement-unit index, so a part the operation creates is named before it
+    exists. An entry of a part that is not stored is ``(False, None)``:
+    restoring it removes the part.
     """
     from world.maps import population_units
 
@@ -3723,22 +3724,54 @@ def activity_record_surfaces(
             wilderness, MONSTER_ACTIVITY_ATTRIBUTE
         ),
     }
-    units: set[str] = set()
-    stored = wilderness.attributes.get(MONSTER_ACTIVITY_ATTRIBUTE, return_obj=True)
-    raw = None if stored is None else stored.db_value
-    if isinstance(raw, Mapping):
-        listed = raw.get("units")
-        if _is_sequence(listed):
-            units.update(
-                unit for unit in listed if isinstance(unit, str) and unit
-            )
-    units.update(population_units.all_units(population_units.current_unit_index()))
-    for unit in sorted(units):
+    if units is None:
+        candidates: set[str] = set()
+        stored = wilderness.attributes.get(
+            MONSTER_ACTIVITY_ATTRIBUTE, return_obj=True
+        )
+        raw = None if stored is None else stored.db_value
+        if isinstance(raw, Mapping):
+            listed = raw.get("units")
+            if _is_sequence(listed):
+                candidates.update(
+                    unit for unit in listed if isinstance(unit, str) and unit
+                )
+        candidates.update(
+            population_units.all_units(population_units.current_unit_index())
+        )
+    else:
+        candidates = set(units)
+    for unit in sorted(candidates):
         key = part_key(unit)
         surfaces[(key, MONSTER_ACTIVITY_PART_CATEGORY)] = (
             _db_safe_attribute_snapshot(wilderness, key, MONSTER_ACTIVITY_PART_CATEGORY)
         )
     return surfaces
+
+
+def scope_part_units(wilderness: Any, scope: Any) -> frozenset[str]:
+    """Every unit whose part a pass of ``scope`` may write.
+
+    The scope's own units (a group the pass creates is placed in its home
+    unit, which lies inside the scope), the part holding each group of the
+    scope (a group stays in the part it was first stored in), and -- only when
+    the scope holds the residual unit -- each part storing a receipt whose
+    group no longer exists.
+    """
+    from world.maps import population_units
+
+    state = read_stored_monster_activity(wilderness)
+    placement = _ASSEMBLED.placement if _ASSEMBLED is not None else {}
+    units = set(scope.units)
+    for group_id in scope.group_ids:
+        unit = placement.get(("g", group_id))
+        if unit is not None:
+            units.add(unit)
+    if population_units.RESIDUAL_UNIT in scope.units:
+        for operation_id, receipt in state.receipts.items():
+            if receipt.group_id not in state.groups:
+                units.add(placement[("r", operation_id)])
+    return frozenset(units)
 
 
 def _scoped_individual_ids(
@@ -3779,20 +3812,28 @@ def snapshot_monster_activity_surfaces(
         return snapshot_activity_surfaces(wilderness)
     try:
         state = read_monster_activity(wilderness)
+        units = scope_part_units(wilderness, scope)
     except MonsterActivityError:  # observability: ignore R2: a malformed record still snapshots its own attribute; the write refuses before any member is read
-        return snapshot_activity_surfaces(wilderness, member_ids=())
+        return snapshot_activity_surfaces(wilderness, member_ids=(), units=None)
     return snapshot_activity_surfaces(
-        wilderness, member_ids=_scoped_individual_ids(state, scope)
+        wilderness,
+        member_ids=_scoped_individual_ids(state, scope),
+        units=units,
     )
 
 
 def snapshot_activity_surfaces(
-    wilderness: Any, *, member_ids: Iterable[int] | None = None
+    wilderness: Any,
+    *,
+    member_ids: Iterable[int] | None = None,
+    units: Iterable[str] | None = None,
 ) -> dict[int, SurfaceSnapshot]:
     """Snapshot every durable and live surface one activity write may touch.
 
     ``member_ids`` narrows the bodies to the ones a single-group write can
-    reach; omitted, every tracked individual is included.
+    reach; omitted, every tracked individual is included. ``units`` narrows
+    the activity parts to the ones a scoped pass may write; omitted, the whole
+    record is included.
     """
     from evennia.objects.models import ObjectDB
 
@@ -3804,7 +3845,7 @@ def snapshot_activity_surfaces(
         id(wilderness): SurfaceSnapshot(
             attributes={}
             if _ACTIVE_BATCH is not None
-            else activity_record_surfaces(wilderness)
+            else activity_record_surfaces(wilderness, units=units)
         )
     }
     try:
@@ -4019,6 +4060,7 @@ __all__ = [
     "retire_room_protection",
     "retire_settled_decision_receipts",
     "room_protected",
+    "scope_part_units",
     "settle_group_decisions_at",
     "settle_group_idle",
     "settle_idle_physiology",
