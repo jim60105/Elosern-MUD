@@ -32,6 +32,7 @@ _BODY_TARGETS = (
     "world.rules.npc_roster_validation.validate_npc_roster",
     "world.maps.runtime.adopt",
     "world.maps.runtime.synchronize",
+    "world.maps.population_units.warm_group_units",
     "world.lore.rites.load_published",
     "world.maps.static_references.validate_static_references",
     "world.lore.sync.sync_all",

@@ -69,7 +69,12 @@ from world.maps.tests.test_monster_activity import (
 )
 from world.maps.wilderness_provider import WILDERNESS_NAME
 from world.rules.clock import AdvanceSource, get_world_clock
-from world.rules.movement_edges import LocationRef, PhysicalEdge
+from world.rules.movement_edges import (
+    LocationRef,
+    PhysicalEdge,
+    decode_location_ref,
+    encode_location_ref,
+)
 
 REGION = "t_units_region"
 OTHER_REGION = "t_units_other_region"
@@ -578,6 +583,57 @@ class UnitResolutionTests(ActivityFixture):
             ),
             RESIDUAL_UNIT,
         )
+
+    def test_repeated_group_scans_resolve_one_area_once(self):
+        group_id, _bodies = self._group(cell=PROBE, owner_key="t_units_zone_a")
+        group = read_monster_activity(self.wilderness).groups[group_id]
+        # The activity owner answers one shared tuple per resolved area.
+        area = tuple(
+            encode_location_ref(LocationRef.wilderness(WILDERNESS_NAME, *cell))
+            for cell in (PROBE, self.second_cell)
+        )
+        both = frozenset({self.unit_a, self.unit_b})
+        with (
+            patch(
+                "world.maps.monster_activity.movable_area", return_value=area
+            ),
+            patch(
+                "world.rules.movement_edges.decode_location_ref",
+                wraps=decode_location_ref,
+            ) as decode,
+        ):
+            self.assertEqual(group_units(self.index, group, None), both)
+            self.assertEqual(decode.call_count, len(area))
+            # A fresh read of the record names the same resolved area.
+            again = read_monster_activity(self.wilderness).groups[group_id]
+            self.assertEqual(group_units(self.index, again, None), both)
+            self.assertEqual(decode.call_count, len(area))
+            # An equal but distinct index never reads the previous answer.
+            self.assertEqual(group_units(replace(self.index), group, None), both)
+            self.assertEqual(decode.call_count, 2 * len(area))
+
+    def test_a_warmed_world_resolves_no_area_on_a_later_scan(self):
+        group_id, _bodies = self._group(cell=PROBE, owner_key="t_units_zone_a")
+        area = (
+            encode_location_ref(LocationRef.wilderness(WILDERNESS_NAME, *PROBE)),
+        )
+        with (
+            patch(
+                "world.maps.monster_activity.movable_area", return_value=area
+            ),
+            patch.object(
+                regional_population, "population_provisioned", return_value=True
+            ),
+            patch(
+                "world.rules.movement_edges.decode_location_ref",
+                wraps=decode_location_ref,
+            ) as decode,
+        ):
+            population_units.warm_group_units()
+            self.assertEqual(decode.call_count, len(area))
+            group = read_monster_activity(self.wilderness).groups[group_id]
+            group_units(self.index, group, None)
+            self.assertEqual(decode.call_count, len(area))
 
     def test_an_unknown_site_is_the_residual_unit(self):
         self.assertEqual(site_unit(self.index, "t_unknown_site"), RESIDUAL_UNIT)

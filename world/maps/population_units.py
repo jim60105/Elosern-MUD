@@ -349,10 +349,40 @@ def site_unit(index: UnitIndex, site_key: str) -> str:
     return index.unit_of_cell(regional_population.cell_region(cell), cell)
 
 
+#: Units of one resolved movable area, pinned to the unit index and the
+#: published geography that classify its cells.
+_AREA_UNITS = SourceMemo()
+
+
+def _area_units(index: UnitIndex, area: Any) -> frozenset[str]:
+    """Every unit one resolved movable area touches.
+
+    A movable area holds hundreds of cells and every group names one, so
+    resolving each cell again on every group scan made one scan cost seconds of
+    reactor time. The activity owner answers one shared immutable tuple per
+    resolved area, so the answer is kept by that tuple's identity; the memo
+    holds the tuple itself, which rules out a recycled identity. Any other
+    sequence is resolved without the memo.
+    """
+    from world.maps.geography import current as current_geography
+    from world.rules.movement_edges import decode_location_ref
+
+    def resolve() -> tuple[Any, frozenset[str]]:
+        found: set[str] = set()
+        for locator in area:
+            unit = unit_of_location(index, decode_location_ref(locator))
+            if unit is not None:
+                found.add(unit)
+        return area, frozenset(found)
+
+    if type(area) is not tuple:
+        return resolve()[1]
+    return _AREA_UNITS.resolve((index, current_geography()), id(area), resolve)[1]
+
+
 def group_units(index: UnitIndex, group: Any, journey: Any | None) -> frozenset[str]:
     """Every unit one group touches: home, position, journey, area and owner."""
     from world.maps import monster_activity
-    from world.rules.movement_edges import decode_location_ref
 
     units: set[str] = set()
     for location in (group.home, group.position):
@@ -367,10 +397,9 @@ def group_units(index: UnitIndex, group: Any, journey: Any | None) -> frozenset[
     # A group whose own decision cannot move it contributes no area unit: the
     # owner answers a lawful scheduled stay for every one of those bindings, so
     # it can never reach a cell outside the units its own record names.
-    for locator in monster_activity.movable_area(group) or ():
-        unit = unit_of_location(index, decode_location_ref(locator))
-        if unit is not None:
-            units.add(unit)
+    area = monster_activity.movable_area(group)
+    if area:
+        units |= _area_units(index, area)
     kind, key = group.home_owner
     if kind == "zone":
         unit = index.unit_of_zone.get(key)
@@ -394,6 +423,24 @@ def group_units_map(index: UnitIndex, state: Any) -> dict[str, frozenset[str]]:
         )
         for group_id in state.groups
     }
+
+
+def warm_group_units() -> None:
+    """Resolve every group's units once so no later scan pays the first cost.
+
+    A world with no provisioned population has nothing to scan. The answers are
+    kept by :func:`_area_units`; nothing is written.
+    """
+    from world.maps import monster_activity
+
+    wilderness = regional_population.live_wilderness()
+    if wilderness is None or not regional_population.population_provisioned(
+        wilderness
+    ):
+        return
+    group_units_map(
+        current_unit_index(), monster_activity.read_monster_activity(wilderness)
+    )
 
 
 def _closure_over(
@@ -1097,6 +1144,7 @@ __all__ = [
     "unit_cursor",
     "unit_of_location",
     "units_around",
+    "warm_group_units",
     "write_unit_cursors",
     "zone_bound_areas",
 ]
