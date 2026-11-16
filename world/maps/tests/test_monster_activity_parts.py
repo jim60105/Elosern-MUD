@@ -270,6 +270,67 @@ class StoredPartsTests(ScopedSettlementFixture):
             state.settled_through_tick + 5,
         )
 
+    def test_a_failed_header_store_never_serves_the_stale_memo(self):
+        self._reset_activity(tick=START)
+        group_a, _bodies_a = self._group(cell=WANDER_A)
+        state = self._state()
+        handler = self.wilderness.attributes
+        real_add = handler.add
+
+        def failing_header_store(key, value, **kwargs):
+            if key == monster_activity.MONSTER_ACTIVITY_ATTRIBUTE:
+                raise RuntimeError("header store failed")
+            return real_add(key, value, **kwargs)
+
+        with patch.object(handler, "add", side_effect=failing_header_store):
+            with self.assertRaises(RuntimeError):
+                self._write_groups(
+                    {
+                        **state.groups,
+                        group_a: replace(state.groups[group_a], sequence=42),
+                    }
+                )
+
+        # The part was stored before the header failed; the header still names
+        # that part, so the next read must assemble from the stored rows.
+        self.assertEqual(self._state().groups[group_a].sequence, 42)
+
+    def test_an_unchanged_part_is_not_decoded_again(self):
+        self._reset_activity(tick=START)
+        self._group(cell=WANDER_A)
+        self._group(cell=WANDER_B)
+        self._state()
+
+        with patch.object(
+            monster_activity,
+            "_part_from_dict",
+            wraps=monster_activity._part_from_dict,
+        ) as decoded:
+            self.wilderness.db.monster_activity["settled_through_tick"] = 777
+            self.assertEqual(self._state().settled_through_tick, 777)
+
+        self.assertFalse(decoded.called)
+
+    def test_removing_the_last_entry_keeps_the_empty_part_listed(self):
+        self._reset_activity(tick=START)
+        group_a, _bodies_a = self._group(cell=WANDER_A)
+        state = self._state()
+
+        self._write_groups(
+            {
+                key: value
+                for key, value in state.groups.items()
+                if key != group_a
+            }
+        )
+
+        self.assertIn(self.unit_a, self._header_value()["units"])
+        self.assertEqual(self._part(self.unit_a)["groups"], {})
+        self.wilderness.attributes.reset_cache()
+        self.assertEqual(self._state().groups, {})
+        group_b, _bodies_b = self._group(cell=WANDER_A)
+        self.assertIn(group_b, self._part(self.unit_a)["groups"])
+
     # -- an incomplete record refuses --------------------------------------
 
     def test_a_malformed_header_refuses_and_rewrites_nothing(self):
