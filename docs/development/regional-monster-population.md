@@ -3230,24 +3230,32 @@ while the player reads or idles.
 
 ## The drain run
 
-`drain_population_backlog(slice_seconds)` settles at most one closed set and
-answers `True` when it settled something:
+`drain_population_backlog(slice_seconds, max_steps=1)` performs a bounded number
+of settlement steps and answers how many settled (an `int`; `0` when nothing
+settled):
 
 1. The slice must be a positive integer number of game seconds; any other value
    is an argument error, never a silent clamp.
 2. A world with no wilderness, no population seed or no cursor record answers
-   `False` and writes nothing.
+   `0` and writes nothing.
 3. `population_units.lagging_sets(wilderness, now)` names every closed set
    behind the world tick. A set is a `unit_closure` of the authored geometry:
    distinct answers are disjoint and every unit of the index belongs to exactly
    one. A set's cursor is its lowest unit cursor, because a set with unequal
    cursors is lawful and is settled from its lowest one. The pairs are sorted by
    cursor and then by the set's smallest unit identifier.
-4. The first `MAX_SETS_PER_RUN` (3) lagging sets are attempted in that order.
-   For one set the run settles from its cursor to
+4. One run performs at most `max_steps` settlement steps
+   (`POPULATION_DRAIN_STEPS_PER_RUN` for the periodic caller). Each step
+   re-selects the set with the lowest cursor -- ties broken by the set's
+   smallest unit identifier -- from the cursors this run has already advanced,
+   and settles it from that cursor to
    `min(world tick, cursor + slice_seconds)`: one bounded slice of game time,
    never past the current tick. The pass is scoped (`contact=False`), so it
-   admits no field contact, and it never moves the world tick.
+   admits no field contact, and it never moves the world tick. A step that
+   reaches the world tick removes its set; a set that still lags stays a
+   candidate at its new cursor. The run stops when no candidate lags, when it
+   has settled `max_steps` steps, or after three failed sets, so one run
+   attempts at most `max_steps + MAX_FAILED_SETS_PER_RUN - 1` settlements.
 
 The set envelope (`build_scope`) and the pre-run surface registry
 (`snapshot_population_lifecycle_surfaces(start, target, scope=scope)`) are
@@ -3265,13 +3273,14 @@ A set whose settlement raises keeps its complete prior durable and live state:
 the transaction rolls back and `restore_advance_registry` restores every
 surface the pass wrote in memory. The run emits one
 `population_backlog_drain_failed` error event naming the set's unit count and
-both ticks, then tries the next most lagging set, so one bad set cannot starve
-the others. The failing set is retried by the next run, which is the intended
-signal.
+both ticks, then continues with the next most lagging set, so one bad set
+cannot starve the others. A failed set is not retried in the same run; three
+failed sets end the run. The failing set is retried by the next run, which is
+the intended signal.
 
 A world-level fault (an unreadable or malformed cursor or activity record) has
 no unit to name: the same error event is emitted with `units: 0` and
-`tick_from`/`tick_to` `0`, and the run answers `False`. The function never
+`tick_from`/`tick_to` `0`, and the run answers `0`. The function never
 raises a world or settlement fault, so the periodic caller always survives.
 
 `restore_advance_registry` is also why the drain must not run inside an
@@ -3282,12 +3291,13 @@ with a pass.
 
 ## The event
 
-One `population_backlog_drained` info event is scheduled on durable commit,
-carrying the settled unit count, both ticks and `remaining` -- the number of
-units whose own cursor is still behind the world tick after this run. The
-settled count is the closed set's size, so a linked set that holds an
-already-current unit reports it in `units` but not in `remaining`. A run that
-settles nothing emits nothing.
+One `population_backlog_drained` info event is scheduled on durable commit per
+settled step, carrying the settled unit count, both ticks and `remaining` --
+the number of units whose own cursor is still behind the world tick after that
+step, counting the ticks this run's earlier steps already advanced. The settled
+count is the closed set's size, so a linked set that holds an already-current
+unit reports it in `units` but not in `remaining`. A run that settles nothing
+emits nothing.
 
 ## The periodic caller
 
@@ -3302,6 +3312,7 @@ performs one drain run while `POPULATION_DRAIN_ENABLED` is true.
 | `POPULATION_DRAIN_INTERVAL_SECONDS` | `2` | Real seconds between repeats |
 | `POPULATION_DRAIN_SLICE_SECONDS` | `600` | Game seconds one run advances |
 | `POPULATION_DRAIN_IDLE_SECONDS` | `20` | Real seconds without player input before a repeat drains |
+| `POPULATION_DRAIN_STEPS_PER_RUN` | `4` | Settlement steps one repeat may perform |
 
 Each has an environment override of the same name; see
 `docs/development/settings-and-environment.md`. A disabled drain changes no
@@ -3327,7 +3338,21 @@ while drain_population_backlog(600):
     pass
 ```
 
+The function answers an `int`, so the loop stays valid; pass a larger
+`max_steps`, for example `drain_population_backlog(600, 16)`, to settle more
+than one slice per call.
+
 Every partition of the same elapsed interval gives the same per-unit result,
 so paying the debt in slices changes no outcome. The caveat is the synchronous
 catch-up: a long time skip followed at once by travel into another unit still
 pays that unit's whole lag in one step, because the drain does not bound it.
+
+## Shared group units
+
+`group_units_map` computes every group's units once per unchanged activity
+record, unit index and published geography, and keeps the answer in a memo
+keyed on those three objects. The record is immutable and every write replaces
+it, so the memo can never answer from a stale record. `lagging_sets`, the
+drain's `build_scope` and the pass's own `build_scope` therefore share one
+computation instead of repeating it, and `warm_group_units` fills the same memo
+at startup for the record it reads.
