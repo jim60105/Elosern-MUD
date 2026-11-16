@@ -222,7 +222,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "601f15b761a428caa5a907df5161735e2d95c8811af7fc71075321403fc4e131",
+  "fingerprint": "739d435dbbaf0989831e1e1fedd2389fba3cd9d428b9520453153c9fb66b1eed",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -16159,7 +16159,7 @@
     "world/lore/player_presets/validation.py": "00632b7182757820f6cfef2317f9d2b67f59238c187b333b44c0dbc8b7287251",
     "world/lore/player_presets/vocab.py": "a9563a1af1e464e4f018de4a1b1158cae7aeed2573ca42a13244893d2f1bfc71",
     "world/lore/races.py": "2813a9519a7950394d0b976910d61ba1d3debe725f56c276f688272e0955e752",
-    "world/lore/registry_index.py": "3d087f6ef42b1ebf3d0ce16ce695674269d4c07525b8b6d31df16970de9b33ee",
+    "world/lore/registry_index.py": "4250547fb0506cd9f26e82b84935e4b44f6d0d4b8a66f2f6f56ca9929ed79f9d",
     "world/lore/registry_refs.py": "26bf919f94ae5cd7a451570d734c5d13bd2080137f55a111a26c4554d29646b8",
     "world/lore/rites/__init__.py": "167fddd4cd27b054638ab3ecb6def50bd16bdf5a85e7b4bb2850cbeca714cb65",
     "world/lore/rites/loader.py": "b5521462eaafd626a9d7aaaf0c16a28416208c945d3e284a396b0506c5135c41",
@@ -16180,6 +16180,7 @@
     "world/lore/sex.py": "41636022009a201f954611dbea378438a0469ca166eff54034a87489c5c2cda4",
     "world/lore/sexual_vocab.py": "a67052bc4741ea037f4209977c618486b5870c439a0d84c1e8575f06146d922b",
     "world/lore/social_identities.py": "d51416b9f27807211f96754514e25c83fb7291f7b68eb88011bc9f5a4050d034",
+    "world/lore/start_locations.py": "9fbd595adcab7054154dba8ad4e35786836695812c8969d97e36f9d2ab85362f",
     "world/lore/starting_kits.py": "7a030a0bc4cdf985868f6cdb5dd6bf7362afdbba3e4194f2316431fc84571fa8",
     "world/lore/sync.py": "045d594a1f3eb873eef1567fb7a2a9c62332b50dc76eb59b1e0b18554796bf66",
     "world/lore/titles.py": "5878ad1e457a6a644a0ad9b93035c55d6f7a7649e266049b2bfd66d4dc860793",
@@ -16463,6 +16464,7 @@
     "world/rules/sleep_receipt.py": "1b6b08ee59c2bc7f99cece1548f9e33864e003a7d258779786e6adadb10b36f5",
     "world/rules/social_identity.py": "51a80969f1d78aa1ce06ed5c4b6d5cdec9e55608ad4b25234645fa46b076f9bf",
     "world/rules/spell_conditions.py": "76f567b6f19671550b20a4c40d54721ef26ad2356eeca8be8410b1ebae63807e",
+    "world/rules/start_location.py": "05b7019e8d8325da4b3a1a4855b8b156c80d7c42d1b501c787a1e34849bd34ae",
     "world/rules/starting_companions.py": "c3620c30054c787f1747bddee53c45951be8a20b176a0f700af7bd61ca340c5b",
     "world/rules/state_derived_roll.py": "a2750faa8d5e9eeeddcd20a7c711e4d76be0b13a7f8dae6413f84f0c3ecfce99",
     "world/rules/state_reactions.py": "488f3d36ba86ee9c2e0694c2c5835c114926c270715d53c1a36afa3e9ed9c89d",

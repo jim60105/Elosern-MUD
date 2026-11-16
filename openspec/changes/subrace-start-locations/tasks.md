@@ -81,9 +81,9 @@ Requirement IDs: take the exact strings from
 
 ## 5. Verification
 
-- [ ] 5.1 `uv run --locked python -m tools.shard_register fix` (two new test modules),
+- [x] 5.1 `uv run --locked python -m tools.shard_register fix` (two new test modules),
   then `uv run --locked python -m tools.contract_gate --change subrace-start-locations`.
   It must exit 0.
-- [ ] 5.2 Run `EV world.maps.tests.test_settlement_reload` and
+- [x] 5.2 Run `EV world.maps.tests.test_settlement_reload` and
   `EV world.lore.tests.test_registry_index_contract`. Both must pass.
-- [ ] 5.3 `openspec validate subrace-start-locations --strict` passes.
+- [x] 5.3 `openspec validate subrace-start-locations --strict` passes.

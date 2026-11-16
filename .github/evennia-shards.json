@@ -818,7 +818,8 @@
         "world.lore.tests.test_wilderness_entry",
         "world.lore.tests.test_wilderness_regions",
         "world.narrative.tests.test_dialogue_reading",
-        "world.narrative.tests.test_dialogue_unread"
+        "world.narrative.tests.test_dialogue_unread",
+        "world.lore.tests.test_start_locations"
       ]
     },
     {
@@ -1482,7 +1483,8 @@
       "name": "rules-11-4",
       "workers": 4,
       "labels": [
-        "world.rules.tests.test_map_knowledge_integration.test_pruning"
+        "world.rules.tests.test_map_knowledge_integration.test_pruning",
+        "world.rules.tests.test_start_location"
       ]
     }
   ]
