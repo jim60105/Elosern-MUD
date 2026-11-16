@@ -132,6 +132,7 @@ Why 5 seconds: the repeat interval is 2 seconds and the observed gap between a p
 
 - [A player who acts more often than the window never lets the drain run, so the backlog grows while they play] → Intended: the debt is then paid in the next pause or by the synchronous catch-up. `population-drain-batched-runs` raises how much one idle repeat pays.
 - [A run that starts just after the window can still collide with the next input] → The collision is bounded by one run's duration; the window only lowers how often it happens.
+- [After a reload the record is empty, so the first repeats may drain while players are acting] → Bounded by one idle window: the first input after the reload sets the record. The documentation of D5 says so.
 - [The record is shared process state, so one test can leak into another] → `reset_player_input()` in the `setUp` of every test class that calls `at_repeat` or the input functions (tasks 1.2, 2.2, 3.2).
 
 ## Open Questions
