@@ -25,7 +25,7 @@ Do not edit `world/maps/population_lifecycle.py`, `world/maps/monster_activity.p
 ## 4. Gates
 
 - [x] 4.1 Run `uv run --locked python -m tools.observability_lint check`, `uv run --locked python -m tools.test_data_lint check`, `uv run --locked python -m tools.contract_gate` and `openspec validate population-drain-batched-runs --strict`. Verify: all exit 0.
-- [ ] 4.2 Observation, recorded in the hand-off as information only and never a gate: when a provisioned development database is available, from `evennia shell` time one `drain_population_backlog(600, 4)` call, count its SQL statements with `django.test.utils.CaptureQueriesContext`, and note both numbers with the `remaining` value of its last event. Skip and say so when no such database exists.
+- [x] 4.2 Observation, recorded in the hand-off as information only and never a gate: when a provisioned development database is available, from `evennia shell` time one `drain_population_backlog(600, 4)` call, count its SQL statements with `django.test.utils.CaptureQueriesContext`, and note both numbers with the `remaining` value of its last event. Skip and say so when no such database exists. Resolved by skip: `server/db/evennia.db3` has zero tables, so no provisioned development database exists; recorded in the 2026-11-16 hand-off.
 
 ## Workflow follow-up
 
