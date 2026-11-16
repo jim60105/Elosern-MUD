@@ -66,6 +66,7 @@ STARTUP_STEP_ORDER: tuple[str, ...] = (
     "verify_population_state",
     "restore_persisted_sessions",
     "sync_wilderness",
+    "warm_population_units",
     "sync_connected_encounters",
     "load_prompt_library",
     "register_narrator_layer",
@@ -562,6 +563,17 @@ def at_server_start():
     # session restoration.
     _startup_step("restore_persisted_sessions", restore_persisted_sessions)
     _startup_step("sync_wilderness", sync_wilderness)
+    # The first group scan of a process resolves every movable area once, which
+    # costs seconds on a populated world. Paying it here keeps it off the
+    # reactor: otherwise the first drain repeat or player action pays it while
+    # a player waits. Tolerant: the scan only fills a memo, so a failure can
+    # never abort the deterministic startup and the first consumer resolves it.
+    _startup_step(
+        "warm_population_units",
+        lambda: _late("world.maps.population_units", "warm_group_units"),
+        fail_loud=False,
+        tolerant_on=_ALL_ERRORS,
+    )
     # Connected owners' published encounters are synchronized at their actual
     # current positions, including a publication whose fan-out was lost while
     # nobody was connected (dream-story-dispatch §7). Tolerant: a scene store
