@@ -1,6 +1,7 @@
 # Tasks
 
-Precondition: `subrace-start-settlements` is archived on master. Test commands follow
+Precondition: `subrace-start-settlements` and `entrance-probe-fixtures` are archived on
+master. Test commands follow
 AGENTS.md: run each command on its own. `EV` stands for
 `uv run --locked --env-file=.env.evennia-test evennia test --settings test_settings.py --keepdb`.
 
@@ -34,23 +35,20 @@ AGENTS.md: run each command on its own. `EV` stands for
 
 ## 4. Fixtures and synthetic kit (design D4)
 
-- [ ] 4.1 Add `entrance_refs` and `first_entrance_ref` to `world/tests/geography_fixture.py`.
-- [ ] 4.2 Synthetic kit: update `vocab.py::_shipped_first_gate_ref`, and delete
-  `SYNTH_CITY_GATES`, `make_city_gate` and the `city_gates` target rows, as in D4.
-  Acceptance: `EV world.tests.test_synthetic_data` passes.
-- [ ] 4.3 Rewrite each probe call site listed in D4:
-  `world/maps/tests/_bootstrap_fixtures.py`, `world/maps/tests/test_bootstrap/{_support,test_bootstrap_grid,test_bootstrap_selection}.py`,
+- [ ] 4.1 Synthetic kit: delete `SYNTH_CITY_GATES`, `make_city_gate` and the
+  `city_gates` target rows, as in D4. Acceptance: `EV world.tests.test_synthetic_data`
+  passes.
+- [ ] 4.2 Map-knowledge fixtures: edit `_support.py`, `test_recording.py` and
+  `_knowledge_probes.py` as in D4. Then run each module of
+  `world/rules/tests/test_map_knowledge_integration` with `EV`.
+- [ ] 4.3 Rewrite the remaining call sites from D4:
+  `world/maps/tests/_bootstrap_fixtures.py`,
+  `world/maps/tests/test_bootstrap/{_support,test_bootstrap_grid,test_bootstrap_selection}.py`,
+  `world/maps/tests/test_bootstrap_sync.py`,
+  `world/maps/tests/test_static_map_references.py`,
   `world/maps/tests/_editor_adoption_fixtures.py`,
-  `world/rules/tests/_knowledge_probes.py`,
-  `world/rules/tests/test_map_knowledge_integration/_support.py`,
   `world/rules/tests/test_met_people.py`,
-  `commands/tests/test_localized/test_xyz_grid_and_help.py`,
-  `web/webclient/actions/tests/test_node_ids.py`,
-  `web/webclient/actions/tests/test_exploration_actions/test_move_and_look.py`,
-  `web/webclient/presentation/tests/test_affordances/test_vocabulary.py`,
-  `web/webclient/presentation/tests/test_local_map/{_support,test_gateway_resolution}.py`,
-  `web/tests/browser/{fixtures,browser_helpers,incremental_sync_fixture}.py`,
-  `web/tests/browser/seed/{exploration_fixture,minimap_fixture}.py`.
+  `web/tests/browser/fixtures.py` and `web/tests/browser/incremental_sync_fixture.py`.
 - [ ] 4.4 Delete or retarget the gate-behavior tests listed in D5 in
   `world/maps/tests/test_bootstrap_sync.py`, `test_bootstrap/test_bootstrap_grid.py`,
   `test_bootstrap/test_bootstrap_selection.py`, `test_settlement_sources.py` and

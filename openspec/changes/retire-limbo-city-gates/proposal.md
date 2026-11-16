@@ -27,16 +27,18 @@ village paths from 虛境.
   `sync_grid()`. It is the room's own declarative convergence, not a migration: 虛境
   owns no exits.
 - `LimboRoom`'s hard gate (no non-superuser character may enter) is unchanged.
-- Test fixtures that used "the sorted-first city-gate row" to find a materialized city
-  room switch to one shared probe, `world/tests/geography_fixture.py::first_entrance_ref()`.
-  It returns the first gate of the sorted-first wilderness entry, which today is the
-  same node.
+- The remaining gate-registry fixtures (gate labels, gate-map sets, the kit's gate row,
+  the closure tests) are removed or retargeted onto the `entrance_refs` probe that
+  `entrance-probe-fixtures` adds.
 
 ## Batch:
 
 - depends-on: subrace-start-settlements (homes are set at activation; this change's
   `map-knowledge` delta copies the text that change archives)
-- Followed by `drop-settlement-city-gate-field` (depends on this change).
+- depends-on: entrance-probe-fixtures (the shared probe)
+- Batch order: `subrace-start-locations`, `subrace-start-settlements`,
+  `entrance-probe-fixtures`, `retire-limbo-city-gates` (this change),
+  `drop-settlement-city-gate-field`.
 - Conflict notes: this change and `subrace-start-settlements` both edit
   `world/maps/static_references.py`, `world/tests/synthetic_data/{__init__,targets}.py`
   and `web/tests/browser/fixtures.py`. Apply after it.

@@ -127,72 +127,49 @@ when no settlement is selected, and `sync_limbo` already runs on every start bef
   Nothing else in the codebase writes `home` inside a movement settlement; confirm with
   `rg -n "\.home\s*=" world/rules typeclasses`.
 
-### D4. One shared node probe for fixtures
+### D4. Remaining fixture call sites
 
-Add to `world/tests/geography_fixture.py`:
+`entrance-probe-fixtures` (a dependency) already added
+`world/tests/geography_fixture.py::entrance_refs(count)` and `first_entrance_ref()`, and
+moved every single-node probe onto them. What is left here are the fixtures that use gate
+labels, gate-map sets or the kit's gate row:
 
-```python
-def entrance_refs(count: int) -> tuple:
-    """First gate destinations of the ``count`` sorted-first wilderness entries.
-
-    The node probe for fixtures that need materialized settlement rooms at a
-    wilderness gateway face. It names no shipped key: the registry is looked up
-    by attribute string, the same idiom ``synthetic_data.vocab`` uses. Every
-    wilderness entry comes from a settlement document, so each ref lies on a
-    distinct settlement map.
-    """
-
-    import importlib
-
-    module = importlib.import_module(".".join(("world", "lore", "wilderness_entry")))
-    registry = getattr(module, "WILDERNESS" + "_ENTRY_REGISTRY")
-    return tuple(registry[key].gates[0].destination for key in sorted(registry)[:count])
-
-
-def first_entrance_ref():
-    """The first gate destination of the sorted-first wilderness entry."""
-
-    return entrance_refs(1)[0]
-```
-
-Call sites:
-- An expression `registry[sorted(registry)[0]].gate`, where `registry` is the gate
-  registry, becomes `first_entrance_ref()`.
-- `web/webclient/presentation/tests/test_local_map/_support.py::_city_gate_row_for(gate)`
-  is deleted. Its users take `gate.destination` directly. For `_NORTH_FACE` that is the
-  same node, because the helper asserted that the row stood at `_NORTH_FACE`'s room.
-  Users in `test_gateway_resolution.py` that read `.gate` from the row now use
-  `_NORTH_FACE.destination`.
-- `world/rules/tests/test_map_knowledge_integration/_support.py`: replace
-  `self.gate_row = live_city_gate_registry()[self.map]` and its use with the map's own
-  entry gate whose `return_direction == "n"`. Find the entry with
-  `_entry_with_west_gate_on(self.map)` (already in that file) and take
-  `entry.gate_for("n").destination`. Delete `live_city_gate_registry` from
-  `world/rules/tests/_knowledge_probes.py` and from its `__all__`.
-- `world/tests/synthetic_data/vocab.py::_shipped_first_gate_ref` reads the wilderness
-  registry in the same way (same body as `first_entrance_ref`, kept local, because the
-  kit must not import test fixtures). Its docstring says it borrows the first entry
-  gate.
+- `world/rules/tests/test_map_knowledge_integration/_support.py`: delete
+  `self.gate_row`. In `test_recording.py`, delete
+  `test_limbo_bridge_records_grid_node`, which builds an Exit from
+  `gate_row.exit_key`/`exit_aliases` and establishes the Limbo-bridge wording this
+  change removes from `map-knowledge`. Ordinary-exit recording is already covered by the
+  test that uses `exit_key="in"` (near line 59). Delete `live_city_gate_registry` from
+  `world/rules/tests/_knowledge_probes.py` and its `__all__`.
 - `world/tests/synthetic_data`: delete `SYNTH_CITY_GATES`, `make_city_gate`, the
-  `city_gates` content row in `targets.py`, the `SETTLEMENT_TARGETS["city_gates"]` row
+  `city_gates` content row in `targets.py`, the `SETTLEMENT_TARGETS["city_gates"]` row,
   and the `CityGateDef` imports and exports in `data_world.py`, `factories.py`,
   `__init__.py` and `targets.py`.
-- `world/maps/tests/_bootstrap_fixtures.py`: rename `CITY_GATE_MAP_IDS` to `PROBE_MAP_IDS`
-  and set it to `(first_entrance_ref().map_id,)`. Update the other gate helpers there,
-  and every importer in `world/maps/tests/test_bootstrap/*`, to the new name.
+- `world/maps/tests/_bootstrap_fixtures.py`: `CITY_GATE_MAP_IDS` (four gate maps today:
+  the capital and three villages) becomes `PROBE_MAP_IDS = tuple(sorted({ref.map_id for ref in entrance_refs(2)}))`.
+  Delete `SELECTED_GATE_ROW_COUNT` and every helper that reads `CITY_GATE_REGISTRY`.
+  Update every importer in `world/maps/tests/test_bootstrap/{_support,test_bootstrap_grid,test_bootstrap_selection}.py`
+  and `world/maps/tests/test_bootstrap_sync.py`; `_support.py` also drops its
+  `CityGateDef`/`CITY_GATE_REGISTRY` import. The set shrinks from four maps to two, so
+  re-read every assertion that used `CITY_GATE_MAP_IDS` or `SELECTED_GATE_ROW_COUNT`.
+  Keep the ones that are about settlement selection, with counts derived from
+  `PROBE_MAP_IDS`. Delete the ones that count gate exits or need a village (D5).
+- `world/maps/tests/test_static_map_references.py`: delete the `CITY_GATE_REGISTRY` /
+  `city_gates` patch tests (near lines 43, 202-208, 325-381 and 423-440). They establish
+  the closure family and the `binding_signature` part that D2 removes. If one of them also
+  establishes another family through the same fixture, retarget it to the
+  `anchor_placements` family instead of deleting it.
 - `web/tests/browser/fixtures.py::journey_settlement_scope`: the base set becomes
-  `{ref.map_id for ref in entrance_refs(2)}`. Today that is the capital and the
-  second-sorted settlement, which replaces the gate maps. `second_map_xyz()` below needs
-  a second materialized map. Keep the creation-only union that
-  `subrace-start-settlements` added, and rewrite the docstring to match.
+  `{ref.map_id for ref in entrance_refs(2)}` (today the capital and the second-sorted
+  settlement) instead of the gate maps. Keep the creation-only union from
+  `subrace-start-settlements`, and rewrite the docstring.
 - `web/tests/browser/incremental_sync_fixture.py`: `_gate_registry` and
-  `gate_positions` become `entrance_positions()`. It returns
+  `gate_positions` become `entrance_positions()`, which returns
   `(f"entrance{index}", x, y, map_id)` for each ref of `entrance_refs(2)`, with the
-  coordinate from `settlement_node_xyz(ref)`. `first_gate_xyz` and `second_map_xyz`
-  read it, and their names stay the same.
-- `web/tests/browser/seed/minimap_fixture.py`, `seed/exploration_fixture.py` and
-  `web/tests/browser/browser_helpers.py`: replace the sorted-first gate-row expression
-  with `first_entrance_ref()`. Fix the comments that call it "the city-gate row".
+  coordinate from `settlement_node_xyz(ref)`. `first_gate_xyz` and `second_map_xyz` keep
+  their names and read it. `second_map_xyz` now points at the second-sorted settlement's
+  gate room instead of the village path. Re-read `web/tests/browser/test_incremental_sync.py`
+  (near line 869) for any assertion about the destination's identity.
 
 ### D5. Tests that asserted gate behavior
 
@@ -249,8 +226,10 @@ Call sites:
 
 ## Risks / Trade-offs
 
-- [A fixture probe changes node and shifts browser expectations.] The probe resolves to
-  the same node today (see Context). Task 5.3 runs the affected browser classes.
+- [The materialized map sets shrink (bootstrap tests: four maps to two; browser journeys:
+  gate maps to two entrance maps), and `second_map_xyz` moves to another settlement.]
+  D4 says to re-read each dependent assertion, and task 5.3 runs the affected browser
+  classes.
 - [A developer database keeps characters whose `home` is 虛境.] Accepted. There are no
   released users, and AGENTS.md forbids migrations. Such characters would be refused by
   `LimboRoom` on `home`. Recreate the database.
