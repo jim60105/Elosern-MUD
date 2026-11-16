@@ -9,7 +9,8 @@ A13 top-navigation placement, tool tooltip and place-card hierarchy, §5.4;
 revised 2026-09-30 with the A14 settings reading preview and switches, §6.4,
 and the A15 full-log frame and return-to-latest control, §6.3; revised 2026-09-30
 with the A16 zh-TW copy and labels, §5.3 and §5.4; revised 2026-09-30
-with the A19 proportional chrome scale, §5.1)
+with the A19 proportional chrome scale, §5.1; revised 2026-11-16 with the
+current single-model background-removal design, "Update notes")
 Status: approved by the requester in the brainstorming session
 Related: `openspec/specs/webclient-contextual-hud/spec.md` (the H1–H5 shell this
 design replaces), `openspec/specs/webclient-dialogue-session/spec.md`,
@@ -1033,7 +1034,9 @@ Standing notes:
   prompts → `world/art/cutout.remove_background` → `world.art.formats.encode`)
   via a one-shot tool; the permissive `isnet-anime` cutout model is pinned for
   the committed output, and `FALLBACK_FACE_RECTS` is re-authored against the
-  new pixels. No runtime pipeline change.
+  new pixels. No runtime pipeline change. **Superseded 2026-11-16: the cutout
+  has one fixed model again and no model-selection escape hatch exists — see
+  "Update notes".**
 - A9 deliberately amends the current horizontal combat-root contracts
   (`webclient-combat-menu`, `webclient-contextual-hud`,
   `webclient-pointer-activation`); the approved keyboard hierarchy of the
@@ -1046,3 +1049,62 @@ Standing notes:
   blocking findings (orphaned combat-root contracts, the two local-map delta
   scenario restorations, and the 2560-scaling viewport qualifications) are
   applied in the artifacts.
+
+## Update notes
+
+Append-only notes recording where a shipped contract no longer matches the text
+above. The dated section the note names stays as written; the note is the
+current statement.
+
+### 2026-11-16 — the cutout stage has exactly one model, chosen by the image
+
+This supersedes the A2 standing note in §16 (the one that named `isnet-anime`
+as the pinned cutout model). It is a record of the code as it stands today, not
+a new design proposal.
+
+- **No model-selection setting exists.** `ART_REMBG_MODEL` was retired on
+  2026-10-13 in `0a861981 feat(art): use rembg's sole default model and bake it
+  into the image`. `server/conf/settings.py` defines neither the setting nor any
+  model-choice validation, and importing the module with the former environment
+  name present changes nothing.
+- **The one model is `bria-rmbg`** (BRIA RMBG-2.0), the locked rembg 2.0.84
+  library default. `world/art/cutout.py` names it as fixed identity metadata
+  (`REMBG_MODEL_NAME`), calls `new_session()` with no model argument and
+  `providers=["CPUExecutionProvider"]`, and builds at most one session per
+  process.
+- **The image carries the weight; nothing downloads at runtime.** The
+  `Containerfile` builder stage fetches it into a stage output directory
+  (`BriaRmBgSession.download_models()` with checksum verification, then
+  `test -s /rembg/models/bria-rmbg/bria-rmbg.onnx`) before any application
+  source is copied, and the app-layout stage installs that tree at
+  `/app/server/.rembg` as ordinary image content (`root:0`, dirs 0755, files
+  0644). No `VOLUME` covers that path and compose mounts nothing over it, so an
+  old rembg volume can neither mask nor migrate the weight.
+- **The remaining runtime knobs are the four behavioural ones** —
+  `ART_REMBG_ENABLED` (default `False`), `ART_REMBG_DOWNLOAD_ENABLED` (default
+  `True`; `false` makes a missing artifact an immediate bounded
+  `art_cutout_unavailable` before any rembg import or network access, and both
+  the `models/bria-rmbg/bria-rmbg.onnx` and flat `bria-rmbg.onnx` layouts are
+  accepted), `ART_REMBG_ALLOWANCE_SECONDS`, and `ART_REMBG_THREADS`. The two
+  paths stay code-only: `ART_REMBG_BACKEND` and `ART_REMBG_MODEL_DIR`
+  (`<GAME_DIR>/server/.rembg`), overridable only through
+  `secret_settings.py`. `.env.example` advertises no model knob.
+- **The one-shot default-portrait tool pins nothing.**
+  `tools/regenerate_default_art.py` runs the runtime seams against whatever the
+  single configured model is (`SDWebUIClient.generate` →
+  `world/art/cutout.remove_background` → `world.art.formats.encode`), with
+  `FALLBACK_FACE_RECTS` re-authored against the new pixels. A missing weight
+  requires both `--allow-download` and `ART_REMBG_DOWNLOAD_ENABLED=true`.
+- **Licence consequence, stated plainly.** The six committed default portraits
+  were produced with `isnet-anime` *before* the escape hatch was removed, so
+  they carry no BRIA obligation. Any future run of that tool publishes
+  BRIA-licensed pixels, and whoever publishes or redistributes them owns the
+  applicable rights; the project has no permissively licensed substitute.
+- **The contracts are pinned against this state.** The main specs
+  `settings-environment-overrides` ("No `ART_REMBG_MODEL` setting or
+  model-choice validation SHALL exist"; the former environment name is an
+  unsupported variable) and `art-portrait-cutout` ("no `ART_REMBG_MODEL` setting
+  or override is consulted", the real backend still uses `bria-rmbg`) state it,
+  and `server/conf/tests/test_art_settings.py` asserts
+  `not hasattr(settings, "ART_REMBG_MODEL")` plus the retired-name injection
+  case.
