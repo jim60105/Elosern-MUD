@@ -150,7 +150,7 @@ TERMINAL_KINDS = (TERMINAL_ALPHA_MASK, TERMINAL_SCENE_IMAGE)
 
 # --- Stable source layers -------------------------------------------------
 
-#: The classic-artwork request ceiling: one exact original is the whole layer.
+#: The exact-gallery request ceiling: one exact original is the whole layer.
 MAX_SOURCE_LAYERS_PER_SUBJECT = 2
 #: The shared media-URL ceiling every canonical resource must fit on the wire.
 #: Card and fallback identities are bounded by the subject-key contract, but an

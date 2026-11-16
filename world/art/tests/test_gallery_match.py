@@ -499,7 +499,7 @@ class _ProvenanceEntity:
 
 
 class OfficialDefaultStepTests(EvenniaTestCase):
-    """Chain step 6: the mounted catalog's official default (task 1.1)."""
+    """Chain step 5: the mounted catalog's official default (task 1.1)."""
 
     def setUp(self):
         super().setUp()

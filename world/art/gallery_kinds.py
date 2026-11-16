@@ -33,9 +33,9 @@ kind's set plus card deletion and without the two geometry facts.
 selection, suppression and preference-routing decision reads instead of
 comparing subject kinds: the official-reference policy (entity provenance,
 visual species, or scene archetype), the official-preference owner (subject or
-entity), the terminal policy (person alpha or scene bundled/terminal), and the
-temporary classic-source support flag. The policies are closed string
-vocabularies, imported by nothing, and a gallery-less kind declares ``none``.
+entity), and the terminal policy (person alpha or scene bundled/terminal). The
+policies are closed string vocabularies, imported by nothing, and a gallery-less
+kind declares ``none``.
 
 This module lives HERE — with zero imports — exactly like
 ``world/art/fallback_keys.py`` and for the same reason: ``world/art/subjects.py``

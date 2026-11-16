@@ -15,10 +15,9 @@ the entity's stored equipment — never the environment, never a write):
    player's explicit choice outranks the gallery default, and every
    equipment-bound card still outranks it), else the card named by the
    record's ``default_image_id``;
-5. the temporarily supported classic ``done`` asset record;
-6. the mounted catalog's official default for the subject's own content
+5. the mounted catalog's official default for the subject's own content
    reference;
-7. the declared terminal seam and the non-image placeholder, owned by the
+6. the declared terminal seam and the non-image placeholder, owned by the
    canonical presenters.
 
 Monster subjects skip steps 1-3 entirely — no equipment snapshot is ever
@@ -30,11 +29,11 @@ resolves to ``None`` here — a declaration consequence, never a kind
 comparison.
 
 ``resolve_display_chain`` is the ONE ordered subject-slot enumerator: it emits
-ORDERED SLOTS (``bound`` | ``personal`` | ``default`` | ``classic`` |
-``official``) that name each source position and carry the bounded faults it
-reached at that position. The default walk stops at the first presentable
-candidate; ``complete=True`` enumerates every lower position too (the scene
-presenter's browser-side cascade). ``resolve_display`` is the steps 1-4
+ORDERED SLOTS (``bound`` | ``personal`` | ``default`` | ``official``) that name
+each source position and carry the bounded faults it reached at that position.
+The default walk stops at the first presentable candidate; ``complete=True``
+enumerates every lower position too (the scene presenter's browser-side
+cascade). ``resolve_display`` is the steps 1-4
 two-tuple projection (``card`` | ``official`` | ``none``) and ``resolve_card``
 the card-only projection of that. The terminal seam and the truthful
 placeholder remain presenter-owned adapters selected by the kind's declared
@@ -570,7 +569,7 @@ def official_selection_for(subject: ArtSubject, entity: Any = None) -> dict | No
 
 
 def official_default_slot(subject: ArtSubject, entity: Any = None) -> ChainSlot:
-    """Step 6 as a chain slot: the entity's content reference and its default image.
+    """Step 5 as a chain slot: the entity's content reference and its default image.
 
     ``source_identity`` is the entity's official content reference as
     ``"<content-kind>/<content-key>"`` — the identity its candidate and its
@@ -622,7 +621,7 @@ def official_default_slot(subject: ArtSubject, entity: Any = None) -> ChainSlot:
 
 
 def official_default_for(subject: ArtSubject, entity: Any = None) -> dict | None:
-    """Step 6 of the chain: the mounted catalog's default official image, or ``None``.
+    """Step 5 of the chain: the mounted catalog's default official image, or ``None``.
 
     The facts-only projection of :func:`official_default_slot`, so the
     availability guard the art service reads and the presentation the chain
