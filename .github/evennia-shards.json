@@ -281,7 +281,8 @@
       "name": "rules-8",
       "workers": 4,
       "labels": [
-        "world.rules.tests.test_guild_economy_sync.test_service_host_batch_rollback"
+        "world.rules.tests.test_guild_economy_sync.test_service_host_batch_rollback",
+        "world.rules.tests.test_player_input"
       ]
     },
     {
