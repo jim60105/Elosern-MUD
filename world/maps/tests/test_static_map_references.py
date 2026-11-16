@@ -203,6 +203,7 @@ class StaticFamilyMovementTests(EvenniaTest):
             import world.lore.anchor_placement as anchor_placement
             import world.lore.map_districts as map_districts
             import world.lore.settlements.places as places
+            import world.lore.start_locations as start_locations
             import world.lore.wilderness_entry as wilderness_entry
             import world.maps.city_gates as city_gates
             import world.maps.room_art as room_art
@@ -214,6 +215,9 @@ class StaticFamilyMovementTests(EvenniaTest):
                     {"t_broken": mock.Mock(gate=settlement_node_ref(MAP, "nowhere"))},
                 ),
                 mock.patch.object(anchor_placement, "ANCHOR_PLACEMENT_REGISTRY", {}),
+                mock.patch.object(
+                    start_locations, "SUBRACE_START_LOCATION_REGISTRY", {}
+                ),
                 mock.patch.object(wilderness_entry, "WILDERNESS_ENTRY_REGISTRY", {}),
                 mock.patch.object(places, "PLACE_REGISTRY", {}),
                 mock.patch.object(
