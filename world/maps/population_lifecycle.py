@@ -632,8 +632,11 @@ def snapshot_population_lifecycle_surfaces(
         monster_sites.snapshot_monster_site_surfaces(
             start_tick, end_tick, scope=scope
         ),
+        # With a scope the regional registry contributes the header only; the
+        # activity owner's registry contributes the scoped parts, and the merge
+        # below unites them by object identity.
         regional_population.snapshot_regional_population_surfaces(
-            start_tick, end_tick
+            start_tick, end_tick, activity_units=None if scope is None else ()
         ),
         monster_activity.snapshot_monster_activity_surfaces(
             start_tick, end_tick, scope=scope

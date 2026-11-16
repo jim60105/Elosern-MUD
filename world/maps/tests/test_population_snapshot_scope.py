@@ -16,24 +16,33 @@ from dataclasses import replace
 from types import MappingProxyType
 from unittest.mock import patch
 
-from world.maps import monster_activity, population_units
+from django.db import transaction
+
+from world.maps import monster_activity, population_units, regional_population
 from world.maps.monster_activity import (
+    MONSTER_ACTIVITY_ATTRIBUTE,
     MONSTER_ACTIVITY_PART_CATEGORY,
     ActivityReceipt,
     MonsterActivityState,
     part_key,
 )
-from world.maps.population_lifecycle import settle_population_scope
+from world.maps.population_lifecycle import (
+    settle_population_scope,
+    snapshot_population_lifecycle_surfaces,
+)
 from world.maps.tests.test_monster_activity import GROUP_ACTIVITY
+from world.maps.tests.test_population_catch_up import _drop_attribute_caches
 from world.maps.tests.test_scoped_population_settlement import (
     ACTIVITY_B_WANDER,
     END,
     START,
     WANDER_A,
     WANDER_B,
+    ZONE_B,
     ScopedSettlementFixture,
 )
 from world.maps.wilderness_provider import WILDERNESS_NAME
+from world.rules.clock import restore_advance_registry
 from world.rules.movement_edges import LocationRef
 
 ORPHAN_RECEIPT = "t_scope_orphan_operation"
@@ -181,3 +190,103 @@ class ScopedActivitySurfaceTests(SnapshotScopeFixture):
         self.assertTrue(stored.call_count)
         written = {call.args[1] for call in stored.call_args_list}
         self.assertTrue(written <= named)
+
+
+class LifecycleRegistryTests(SnapshotScopeFixture):
+    """The merged lifecycle registry carries the scoped parts exactly once."""
+
+    def test_growing_the_far_zone_names_the_same_activity_entries(self):
+        self._build_scenario()
+        scope = self._scope(self.unit_a)
+        first = snapshot_population_lifecycle_surfaces(START, END, scope=scope)
+        first_keys = self._activity_keys(self._wilderness_attributes(first))
+
+        for _ in range(5):
+            self._group(
+                cell=WANDER_B,
+                activity=ACTIVITY_B_WANDER,
+                owner_key=ZONE_B,
+                tick=START,
+            )
+        with patch.object(
+            monster_activity,
+            "_db_safe_attribute_snapshot",
+            wraps=monster_activity._db_safe_attribute_snapshot,
+        ) as snapshot:
+            second = snapshot_population_lifecycle_surfaces(START, END, scope=scope)
+        second_keys = self._activity_keys(self._wilderness_attributes(second))
+
+        expected = {
+            part_key(unit)
+            for unit in monster_activity.scope_part_units(self.wilderness, scope)
+        }
+        self.assertEqual(first_keys, second_keys)
+        self.assertEqual(second_keys, expected)
+        self.assertNotIn(part_key(self.unit_b), second_keys)
+        copies = [
+            call
+            for call in snapshot.call_args_list
+            if call.args[1] == part_key(self.unit_a)
+        ]
+        self.assertEqual(len(copies), 1)
+
+    def test_a_failed_scoped_pass_removes_the_part_it_created(self):
+        self._reset_activity(tick=START)
+        scope = self._scope(self.unit_b)
+        before = monster_activity.state_to_dict(
+            monster_activity.read_stored_monster_activity(self.wilderness)
+        )
+        registry = snapshot_population_lifecycle_surfaces(START, END, scope=scope)
+        self.assertEqual(
+            self._wilderness_attributes(registry)[
+                (part_key(self.unit_b), MONSTER_ACTIVITY_PART_CATEGORY)
+            ],
+            (False, None),
+        )
+
+        try:
+            with transaction.atomic():
+                self._group(
+                    cell=WANDER_B,
+                    activity=ACTIVITY_B_WANDER,
+                    owner_key=ZONE_B,
+                    tick=START,
+                )
+                raise RuntimeError("the scoped pass failed")
+        except RuntimeError:
+            pass
+        restore_advance_registry(registry, (self.wilderness,))
+
+        self.assertIsNone(
+            self.wilderness.attributes.get(
+                part_key(self.unit_b), category=MONSTER_ACTIVITY_PART_CATEGORY
+            )
+        )
+        self.assertEqual(
+            monster_activity.state_to_dict(
+                monster_activity.read_stored_monster_activity(self.wilderness)
+            ),
+            before,
+        )
+        _drop_attribute_caches(self.wilderness)
+        self.assertEqual(
+            monster_activity.state_to_dict(
+                monster_activity.read_stored_monster_activity(self.wilderness)
+            ),
+            before,
+        )
+
+    def test_an_unscoped_population_snapshot_keeps_every_part(self):
+        self._build_scenario()
+
+        attributes = self._wilderness_attributes(
+            regional_population.snapshot_population_surfaces(self.wilderness)
+        )
+
+        self.assertIn((MONSTER_ACTIVITY_ATTRIBUTE, None), attributes)
+        self.assertIn(
+            (part_key(self.unit_a), MONSTER_ACTIVITY_PART_CATEGORY), attributes
+        )
+        self.assertIn(
+            (part_key(self.unit_b), MONSTER_ACTIVITY_PART_CATEGORY), attributes
+        )
