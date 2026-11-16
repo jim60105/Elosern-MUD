@@ -370,11 +370,59 @@ class CharacterActivationTests(EvenniaTest):
                 raise RuntimeError("start_location")
 
         with stub_start_room():
+            from world.rules import start_location
+
+            stub_room = start_location.resolve_start_room(None)
             with self.assertRaisesRegex(RuntimeError, "start_location"):
                 activate_player_character(
                     self.account, character, self.request(), write_observer=fail
                 )
         self._assert_unplaced(character, None, old_home)
+        self.assertNotIn(character, stub_room.contents)
+
+    def test_arrival_effects_are_isolated_best_effort_steps(self):
+        from typeclasses.rooms import Room
+        from world.rules.character_creation import _run_start_arrival_effects
+
+        room = create_object(Room, key="t_arrival_room")
+        origin = create_object(Room, key="t_arrival_origin")
+        self.character.location = room
+        with patch.object(
+            room, "at_object_receive", side_effect=RuntimeError("receive")
+        ) as receive, patch(
+            "world.quests.room_observation.observe_arrival_lore"
+        ) as lore, patch(
+            "world.quests.encounter_dispatch.activate_for_move"
+        ) as encounters, patch.object(
+            self.character, "msg"
+        ) as msg, patch(
+            "world.rules.character_creation.log_warn"
+        ) as warn:
+            _run_start_arrival_effects(self.character, room, origin)
+        receive.assert_called_once_with(self.character, origin, move_type="teleport")
+        # The failed first step neither raises nor stops the later steps.
+        lore.assert_called_once_with(self.character, room)
+        encounters.assert_called_once_with(self.character)
+        msg.assert_called_once()
+        self.assertEqual(msg.call_args.kwargs["text"][1], {"type": "look"})
+        warn.assert_called_once()
+        self.assertEqual(warn.call_args.args[0], "character_start_arrival_effect_failed")
+        self.assertEqual(warn.call_args.kwargs["context"]["step"], "receive")
+
+    def test_a_refused_restore_move_is_logged_and_never_raised(self):
+        from typeclasses.rooms import Room
+        from world.rules.character_creation import restore_activation_placement
+
+        origin = create_object(Room, key="t_restore_origin")
+        elsewhere = create_object(Room, key="t_restore_elsewhere")
+        self.character.location = elsewhere
+        with patch.object(self.character, "move_to", return_value=False), patch(
+            "world.rules.character_creation.log_warn"
+        ) as warn:
+            restore_activation_placement(self.character, origin)
+        warn.assert_called_once()
+        self.assertEqual(warn.call_args.args[0], "rollback_restore_failed")
+        self.assertEqual(warn.call_args.kwargs["context"]["key"], "location")
 
     def test_arrival_effects_run_once_after_a_committed_activation(self):
         from world.rules.start_location import resolve_start_room
