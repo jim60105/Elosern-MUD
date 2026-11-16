@@ -62,6 +62,10 @@ None.
 - `sample-city-altoria`: the "exactly one bridging exit from Limbo" requirement is
   replaced by a wilderness-gate-only connectivity requirement.
 - `map-knowledge`: the grid-traversal scenario no longer names the Limbo bridge.
+- `village-ciaran-map`: the entrance requirement, which describes the arrival from 虛境
+  and the registry slot, is replaced by one where the wilderness entrance is the only
+  outside connection.
+- `test-data-independence`: the synthetic kit no longer has a city-gates catalog.
 
 ## Impact
 

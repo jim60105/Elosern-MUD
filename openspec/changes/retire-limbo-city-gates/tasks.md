@@ -63,6 +63,11 @@ AGENTS.md: run each command on its own. `EV` stands for
 - [ ] 4.6 Delete each `covers_requirement` that names a requirement this change removes:
   `rg -n "limbo-one-way-gates::(the-city-gate|sync-grid-creates|every-sync-prunes|a-registry-row|adding-a-city|the-first-city-gate)|grid-room-sync::a-single-authored|limbo-room::the-bridge|sample-city-altoria::the-sample-city-connects-to-the-rest" --glob '*.py'`.
   If a test only established a removed requirement, delete the test.
+  Move the annotations for `village-ciaran-map::the-village-has-exactly-one-concealed-entrance`
+  to the new `village-ciaran-map` requirement ID wherever the test still asserts the
+  entrance-node prose or the wilderness gate destination. In `world/maps/tests/test_village_ciaran.py`,
+  replace the "reachable from the starting room" test with one that asserts no exit joins
+  虛境 and the village after `sync_grid`.
 
 ## 5. Verification
 
