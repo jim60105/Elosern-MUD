@@ -106,17 +106,12 @@ class AffordanceVocabularyTests(VocabularyTestCase):
         from web.webclient.presentation import affordances as module
         from world.tests.geography_fixture import sync_test_settlements
 
-        # The capital's city-gate row coordinate, probed from the live
-        # registry (test-data gate: mirrors test_limbo_room.py::_gate_row).
-        import importlib
-
-        registry = getattr(
-            importlib.import_module("world.maps." + "city_gates"),
-            "CITY" + "_GATE_REGISTRY",
-        )
+        # The first wilderness entrance's coordinate, probed from the live
+        # registry (test-data gate: no shipped key is named).
         from world.maps.static_references import settlement_node_xyz
+        from world.tests.geography_fixture import first_entrance_ref
 
-        gate_xyz = settlement_node_xyz(registry[sorted(registry)[0]].gate)
+        gate_xyz = settlement_node_xyz(first_entrance_ref())
 
         sync_test_settlements((gate_xyz[2],))
         grid = GridRoom.objects.filter_xyz(xyz=gate_xyz).first()
