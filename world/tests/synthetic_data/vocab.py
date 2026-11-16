@@ -43,22 +43,23 @@ _SYNTH_MAP_KEY = sorted(KNOWN_GRID_MAP_KEYS)[0]
 
 
 def _shipped_first_gate_ref():
-    """The shipped city-gate row's own node identity, borrowed at kit assembly.
+    """The first shipped wilderness entrance's node, borrowed at kit assembly.
 
     The kit's city-gate, placement and wilderness-gate rows must land on a
     node ``sync_grid()`` really materializes — the fixtures' registry probes
     then resolve a real room. The shipped grid is still live when the kit
     module imports (install patches registries afterwards), so the borrowed
     identity follows the shipped gate wherever the map data is re-planned,
-    and the kit never names shipped coordinates literally. The row is selected
-    by the SAME sorted-first key contract the fixtures' registry probes use, so
-    kit identity and probed home can never diverge.
+    and the kit never names shipped coordinates literally. The node is the
+    first gate destination of the sorted-first wilderness entry: the SAME
+    contract as ``geography_fixture.first_entrance_ref``, so kit identity and
+    probed home can never diverge.
     """
     module = importlib.import_module(
-        ".".join(("world", "maps", "city_gates"))
+        ".".join(("world", "lore", "wilderness_entry"))
     )
-    registry = getattr(module, "CITY" + "_GATE_REGISTRY")
-    return registry[sorted(registry)[0]].gate
+    registry = getattr(module, "WILDERNESS" + "_ENTRY_REGISTRY")
+    return registry[sorted(registry)[0]].gates[0].destination
 
 
 _SYNTH_GATE_REF = _shipped_first_gate_ref()
@@ -79,7 +80,7 @@ def _shipped_second_wilderness_gate_ref():
     A synthetic wilderness gate must land on a node ``sync_grid()`` really
     materializes, or the fixtures' ``filter_xyz`` probe resolves no room and
     the gateway silently disappears from the seeded map knowledge. The kit's
-    first gate already borrows the shipped city-gate node; its second gate
+    first gate already borrows that entry's first gate node; its second gate
     borrows the same entry's remaining gate, resolved from the live registry
     (still shipped when this module imports).
     """
