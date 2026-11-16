@@ -436,8 +436,9 @@ binding 綁上這個宣告，seed 行程則在整個生命週期套用同一份�
 hook wrapper，shipped 與 synthetic 兩種 catalog 模式因此都走同一條宣告路徑；
 synthetic install 本身仍只由 `ELOSERN_BROWSER_SYNTH_CATALOGS=1` 決定。
 
-宣告推導自 registry，不是複製 roster：今日是兩個 gate map（起始城市與
-`elven_village_ciaran`），裝上 synthetic kit 而多出一列 gate 時會自動變寬。瀏覽器
+宣告推導自 registry，不是複製 roster：今天的 gate map 涵蓋起始城市與精靈三村
+（`elven_village_ciaran`、`elven_village_eolas`、`elven_village_fionnen`），裝上
+synthetic kit 而多出一列 gate 時會自動變寬。瀏覽器
 journey 只透過 registry 的城門進入持久世界（其餘面板讀的是完整 bundle，
 不需要房間），因此這個宣告就是目前檢查過的 journey 真正需要的地圖集合。
 這不是「任何遺漏都會立刻失敗」的保證：fixture 對可選層本來就有早期返回，

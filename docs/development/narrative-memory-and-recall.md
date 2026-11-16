@@ -71,7 +71,7 @@ NPC 收件人轉為 `delivered`；玩家收件人轉為 `available`，沒有領�
 
 ## 玩家書信介面（W2）
 
-`world.narrative.player_correspondence` 是玩家生命週期的唯一寫入者。作者設定的 `PlaceDefinition.letter_service` 能力沿用既有帶唯一標籤的永久室內錨點；描述性的 `PlaceKind` 永不授予服務。兩個聚落各有一個無宿主（hostless）的銀羽驛站分部。任何分部都能領取該玩家身分名下全部可領取的信件，並保留未讀狀態。元資料每頁最多二十筆已領取或已讀列，外加一個不透明的數字型 next 游標；清單從不抓取內文、也不建立時鐘。
+`world.narrative.player_correspondence` 是玩家生命週期的唯一寫入者。作者設定的 `PlaceDefinition.letter_service` 能力沿用既有帶唯一標籤的永久室內錨點；描述性的 `PlaceKind` 永不授予服務。每個設有銀羽驛站的聚落都有一個無宿主（hostless）的分部。任何分部都能領取該玩家身分名下全部可領取的信件，並保留未讀狀態。元資料每頁最多二十筆已領取或已讀列，外加一個不透明的數字型 next 游標；清單從不抓取內文、也不建立時鐘。
 
 `read` 在交易內把關擁有者與領取條件，條件式地把 `collected` 改為 `read`，並一併提交首次閱讀的 tick、一筆私人 `correspondence:<source_id>:read` 事件、該事件的版本 2 進度列，以及擁有者的 told 記憶。事件參照不可變的原信，不複製內文。在任何地方重讀都不產生正典寫入，而該完成列代表重播不會新增認知。領取不建立內容知識，也不產生閱讀事件；通用的版本 1 投射器無法消費這個佇列。
 
