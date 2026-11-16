@@ -157,6 +157,31 @@ def sync_test_settlements(settlement_ids: Iterable[str]) -> SyncReport:
     return sync_grid(settlement_ids=ids)
 
 
+def entrance_refs(count: int) -> tuple:
+    """First gate destinations of the ``count`` sorted-first wilderness entries.
+
+    The node probe for fixtures that need materialized settlement rooms at a
+    wilderness gateway face. It names no shipped key: the registry is looked up
+    by attribute string, the same idiom ``synthetic_data.vocab`` uses. Every
+    wilderness entry comes from a settlement document, so each ref lies on a
+    distinct settlement map. Like every helper here, it publishes the shipped
+    map world first when nothing is published yet.
+    """
+
+    import importlib
+
+    publish_shipped_map_world()
+    module = importlib.import_module(".".join(("world", "lore", "wilderness_entry")))
+    registry = getattr(module, "WILDERNESS" + "_ENTRY_REGISTRY")
+    return tuple(registry[key].gates[0].destination for key in sorted(registry)[:count])
+
+
+def first_entrance_ref():
+    """The first gate destination of the sorted-first wilderness entry."""
+
+    return entrance_refs(1)[0]
+
+
 def zones_for_settlements(settlement_ids: Iterable[str]) -> tuple[str, ...]:
     """Every ecology zone of the terrain region a declared settlement stands in.
 
@@ -297,6 +322,8 @@ class GeographyPublicationMixin:
 __all__ = [
     "GeographyPublicationMixin",
     "clear_published_map_world",
+    "entrance_refs",
+    "first_entrance_ref",
     "publish_districts",
     "publish_geography",
     "publish_interiors",

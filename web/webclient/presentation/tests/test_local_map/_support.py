@@ -22,7 +22,6 @@ def _live(module: str, attribute: str):
 
 # The shipped gate coordinates are probed from the live registries rather
 # than imported as authored constants (test-data gate). Idiom mirrors
-# world/maps/tests/test_limbo_room.py::_gate_row and
 # typeclasses/tests/test_exits.py::live_gateway_entry.
 def _live_gateway_entry():
     """The settlement entry authoring both gateway faces (north + west).
@@ -46,27 +45,11 @@ def _live_gateway_entry():
     return candidates[0]
 
 
-def _city_gate_row_for(gate):
-    """The city-gate row standing at ``gate``'s grid room (uniqueness
-    asserted, so a settlement reorder cannot silently misbind the row)."""
-    from world.maps.static_references import settlement_node_xyz
-
-    registry = _live("world.maps." + "city_gates", "CITY" + "_GATE_REGISTRY")
-    matches = [
-        row
-        for row in registry.values()
-        if settlement_node_xyz(row.gate) == settlement_node_xyz(gate.destination)
-    ]
-    if len(matches) != 1:
-        raise AssertionError("exactly one city gate row stands at a gateway face")
-    return matches[0]
-
-
 _ENTRY = _live_gateway_entry()
 _NORTH_FACE = _ENTRY.gate_for("n")
 _EAST_GATE = _ENTRY.gate_for("w")
 SOUTH_GATE_XYZ = _live("world.maps." + "static_references", "settlement_node_xyz")(
-    _city_gate_row_for(_NORTH_FACE).gate
+    _NORTH_FACE.destination
 )
 EAST_GATE_XYZ = _live("world.maps." + "static_references", "settlement_node_xyz")(
     _EAST_GATE.destination
@@ -84,7 +67,7 @@ _T_MAP_KEY = SOUTH_GATE_XYZ[2]
 _T_PLAZA_XYZ = (
     *_live("world.maps" + ".static_references", "anchor_entrance_xyz")(
         _live("world.lore" + ".anchor_placement", "ANCHOR_PLACEMENT" + "_REGISTRY")[
-            _city_gate_row_for(_NORTH_FACE).gate.map_id
+            _NORTH_FACE.destination.map_id
         ]
     ),
 )

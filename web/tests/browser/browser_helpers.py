@@ -22,28 +22,23 @@ BROWSER_PASSWORD = "ElosernBrowserTest!2026"
 def fixture_home_node_id() -> str:
     """The grid node id of the fixtures' seeded home room.
 
-    Derived at call time from the shipped city-gate registry module — a pure
-    module-constant read, no ORM — rather than a coordinate literal. The
-    synthetic kit's gate row borrows the very same cell, so the value matches
-    the server's live registry in either boot mode and follows the shipped
-    map data wherever it is re-planned.
+    Derived at call time from the first wilderness entrance of the published
+    map world — a pure registry read, no ORM — rather than a coordinate
+    literal. The synthetic kit's gate row borrows the very same cell, so the
+    value matches the server's live registry in either boot mode and follows
+    the shipped map data wherever it is re-planned.
     """
-    import importlib
-
     from world.quests.definitions import KNOWN_GRID_MAP_KEYS
     from world.maps import runtime
 
     runtime.ensure_published()
 
     z_map = sorted(KNOWN_GRID_MAP_KEYS)[0]
-    registry = getattr(
-        importlib.import_module(".".join(("world", "maps", "city_gates"))),
-        "CITY" + "_GATE_REGISTRY",
-    )
     from world.maps.static_references import settlement_node_xyz
     from world.rules.map_knowledge import encode_grid
+    from world.tests.geography_fixture import first_entrance_ref
 
-    x, y, map_id = settlement_node_xyz(registry[sorted(registry)[0]].gate)
+    x, y, map_id = settlement_node_xyz(first_entrance_ref())
     return encode_grid(map_id, x, y)
 
 

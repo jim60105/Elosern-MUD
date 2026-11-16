@@ -53,10 +53,10 @@ class _MapKnowledgeFixture(EvenniaTest):
         sync_test_settlements((self.map,))
         sync_test_wilderness((self.map,))
         self.gate_row = live_city_gate_registry()[self.map]
-        # The city-gate row's own identity is the south gate room's
-        # coordinate — read from the live registry, not a shipped constant.
-        self.south_gate_xyz = settlement_node_xyz(self.gate_row.gate)
         entry, west_row = _entry_with_west_gate_on(self.map)
+        # The south gate room is the same entry's north-returning gate
+        # destination — read from the live registry, not a shipped constant.
+        self.south_gate_xyz = settlement_node_xyz(entry.gate_for("n").destination)
         self.east_gate_xyz = settlement_node_xyz(west_row.destination)
         self.entry_xy = entry.approach_cell(west_row)
         self.wild = getattr(wilderness_provider, "WILDERNESS_NAME")

@@ -59,37 +59,27 @@ from world.rules.tests.combat_fixtures import BattlefieldIsolation
 from world.tests.synthetic_data import make_item, synthetic_registries
 
 
-def _gate_row():
-    import importlib
-
-    registry = getattr(
-        importlib.import_module("world.maps." + "city_gates"),
-        "CITY" + "_GATE_REGISTRY",
-    )
-    keys = sorted(registry)
-    if not keys:
-        raise AssertionError("no city gate row exists")
-    return registry[keys[0]]
-
-
 class LocalizedXyzGridCommandTests(EvenniaCommandTestMixin, EvenniaTest):
     def setUp(self):
         super().setUp()
         from world.maps.limbo import LIMBO_KEY
-        from world.tests.geography_fixture import sync_test_settlements
+        from world.tests.geography_fixture import (
+            first_entrance_ref,
+            sync_test_settlements,
+        )
 
         self.room1.key = "Room1"
         self.room2.key = "Room2"
         self.room1.save()
         self.room2.save()
         create_object(Room, key=LIMBO_KEY, location=None)
-        sync_test_settlements((_gate_row().gate.map_id,))
+        sync_test_settlements((first_entrance_ref().map_id,))
         from typeclasses.rooms import GridRoom
 
         from world.maps.static_references import settlement_node_xyz
 
         self.south_gate = GridRoom.objects.filter_xyz(
-            xyz=settlement_node_xyz(_gate_row().gate)
+            xyz=settlement_node_xyz(first_entrance_ref())
         ).first()
         self.char1.location = self.south_gate
 

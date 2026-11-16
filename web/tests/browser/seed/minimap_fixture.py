@@ -36,20 +36,13 @@ def _minimap_fixture(character) -> None:
         return XYZRoom.objects.filter_xyz(xyz=xyz).first()
 
     # Registry probes (mirror the browser_fixtures_data harness idiom): the
-    # city-gate row is the South Gate; the capital's wilderness entry authors
-    # a second gate (the East Gate) whose grid room serves as the distant
-    # remembered node.
-    import importlib
-
-    city_gate_registry = getattr(
-        importlib.import_module("world.maps." + "city_gates"),
-        "CITY" + "_GATE_REGISTRY",
-    )
+    # first wilderness entrance is the South Gate; the capital's wilderness
+    # entry authors a second gate (the East Gate) whose grid room serves as
+    # the distant remembered node.
     from world.maps.static_references import settlement_node_xyz
+    from world.tests.geography_fixture import first_entrance_ref
 
-    SOUTH_GATE_XYZ = settlement_node_xyz(
-        city_gate_registry[sorted(city_gate_registry)[0]].gate
-    )
+    SOUTH_GATE_XYZ = settlement_node_xyz(first_entrance_ref())
 
     from web.browser_support.browser_fixtures_data import (
         first_live_wilderness_entry,

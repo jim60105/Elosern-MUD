@@ -25,20 +25,12 @@ from world.rules.map_knowledge import encode_grid, encode_room, encode_wild
 
 
 def _south_gate_xyz():
-    """The capital's city-gate row coordinate, probed from the live registry
-    (test-data gate: mirrors test_limbo_room.py::_gate_row)."""
-    import importlib
-
-    registry = getattr(
-        importlib.import_module("world.maps." + "city_gates"),
-        "CITY" + "_GATE_REGISTRY",
-    )
-    keys = sorted(registry)
-    if not keys:
-        raise AssertionError("no city gate row exists")
+    """The first wilderness entrance's settlement-node coordinate, probed from
+    the live registry (test-data gate: no shipped key is named)."""
     from world.maps.static_references import settlement_node_xyz
+    from world.tests.geography_fixture import first_entrance_ref
 
-    return settlement_node_xyz(registry[keys[0]].gate)
+    return settlement_node_xyz(first_entrance_ref())
 
 
 class NodeIdEncoderTests(EvenniaTestCase):

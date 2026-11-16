@@ -152,19 +152,12 @@ def _exploration_fixture(character) -> None:
 
     sync_grid()
     sync_interiors()
-    # The capital's city-gate row coordinate, probed from the live registry
-    # (mirrors test_limbo_room.py::_gate_row).
-    import importlib
-
-    city_gate_registry = getattr(
-        importlib.import_module("world.maps." + "city_gates"),
-        "CITY" + "_GATE_REGISTRY",
-    )
+    # The first wilderness entrance's coordinate, probed from the live
+    # registry (no shipped key is named).
     from world.maps.static_references import settlement_node_xyz
+    from world.tests.geography_fixture import first_entrance_ref
 
-    south_gate_xyz = settlement_node_xyz(
-        city_gate_registry[sorted(city_gate_registry)[0]].gate
-    )
+    south_gate_xyz = settlement_node_xyz(first_entrance_ref())
     south_gate = XYZRoom.objects.filter_xyz(xyz=south_gate_xyz).first()
     if south_gate is None:
         return
