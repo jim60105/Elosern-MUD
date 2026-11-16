@@ -1103,7 +1103,8 @@
       "name": "maps-30",
       "workers": 4,
       "labels": [
-        "world.maps.tests.test_editor_final_yaml_adoption"
+        "world.maps.tests.test_editor_final_yaml_adoption",
+        "world.maps.tests.test_monster_activity_parts"
       ]
     },
     {
