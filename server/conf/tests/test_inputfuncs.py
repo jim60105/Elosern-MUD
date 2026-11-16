@@ -354,17 +354,26 @@ class PlayerInputIngressTests(EvenniaTest):
 
         return evennia.SESSION_HANDLER
 
+    @covers_requirement(
+        "population-settlement-units::player-input-is-recorded-at-command-and-action-ingress"
+    )
     def test_text_command_records_player_input(self):
         with patch("server.conf.inputfuncs.cmdhandler", return_value=succeed(None)):
             inputfuncs.text(self.ws_session, "look")
         self.assertIsNotNone(player_input.seconds_since_player_input())
 
+    @covers_requirement(
+        "population-settlement-units::player-input-is-recorded-at-command-and-action-ingress"
+    )
     def test_idle_keepalive_records_no_player_input(self):
         with patch("server.conf.inputfuncs.cmdhandler") as fake:
             inputfuncs.text(self.ws_session, "idle")
         fake.assert_not_called()
         self.assertIsNone(player_input.seconds_since_player_input())
 
+    @covers_requirement(
+        "population-settlement-units::player-input-is-recorded-at-command-and-action-ingress"
+    )
     def test_puppeted_ui_action_records_player_input(self):
         session = self.ws_session
         session.puppet = self.char1
@@ -381,6 +390,9 @@ class PlayerInputIngressTests(EvenniaTest):
         handle.assert_called_once()
         self.assertIsNotNone(player_input.seconds_since_player_input())
 
+    @covers_requirement(
+        "population-settlement-units::player-input-is-recorded-at-command-and-action-ingress"
+    )
     def test_sync_and_unpuppeted_action_record_no_player_input(self):
         session = self.ws_session
         session.puppet = self.char1

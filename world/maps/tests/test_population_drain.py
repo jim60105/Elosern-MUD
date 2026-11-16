@@ -15,10 +15,9 @@ Script's own functions with deterministic inputs, never by starting a timer or
 sleeping. Because ``default`` is also the residual unit's cursor, every scenario
 writes the cursor record explicitly so exactly the intended units lag.
 
-The four ADDED requirements of this change have no canonical identifiers before
-the archive sync, so this module carries no ``covers_requirement`` annotation;
-the hand-off from each test to its requirement and scenario is in the apply
-report.
+The ``covers_requirement`` annotations of this module were added by the archive
+workflow, after the delta sync gave the requirements their canonical
+identifiers.
 """
 
 from __future__ import annotations
@@ -488,6 +487,9 @@ class PeriodicCallerTests(DrainFixture):
         drain.assert_called_once_with(SLICE)
         self.assertEqual(self.settled_through(self.unit_a), START + SLICE)
 
+    @covers_requirement(
+        "population-settlement-units::the-periodic-drain-yields-to-recent-player-input"
+    )
     def test_recent_input_repeat_reads_nothing_and_drains_nothing(self):
         self.set_world_tick(700)
         self.write_cursors(700, {self.unit_a: START})
@@ -517,6 +519,9 @@ class PeriodicCallerTests(DrainFixture):
         info.assert_not_called()
         self.assertEqual(self.settled_through(self.unit_a), START)
 
+    @covers_requirement(
+        "population-settlement-units::the-periodic-drain-yields-to-recent-player-input"
+    )
     def test_a_window_old_input_repeat_drains_once(self):
         self.set_world_tick(700)
         self.write_cursors(700, {self.unit_a: START})
@@ -537,6 +542,9 @@ class PeriodicCallerTests(DrainFixture):
         drain.assert_called_once_with(SLICE)
         self.assertEqual(self.settled_through(self.unit_a), START + SLICE)
 
+    @covers_requirement(
+        "population-settlement-units::the-periodic-drain-yields-to-recent-player-input"
+    )
     def test_no_recorded_input_repeat_drains_once(self):
         self.set_world_tick(700)
         self.write_cursors(700, {self.unit_a: START})
@@ -569,6 +577,9 @@ class PeriodicCallerTests(DrainFixture):
 class IdleWindowBypassTests(DrainFixture):
     """The catch-up and a direct drain ignore the recorded player input."""
 
+    @covers_requirement(
+        "population-settlement-units::catch-up-and-direct-drains-ignore-the-idle-window"
+    )
     def test_catch_up_during_activity_settles_to_the_world_tick(self):
         self.set_world_tick(700)
         self.write_cursors(700, {self.unit_a: START})
@@ -581,6 +592,9 @@ class IdleWindowBypassTests(DrainFixture):
             )
         self.assertEqual(self.settled_through(self.unit_a), self.world_tick())
 
+    @covers_requirement(
+        "population-settlement-units::catch-up-and-direct-drains-ignore-the-idle-window"
+    )
     def test_direct_drain_during_activity_settles_one_slice(self):
         self.set_world_tick(700)
         self.write_cursors(700, {self.unit_a: START})
