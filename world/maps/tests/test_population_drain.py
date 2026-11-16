@@ -45,7 +45,7 @@ from world.maps.monster_activity import (
     write_monster_activity,
 )
 from world.maps.population_drain import (
-    MAX_SETS_PER_RUN,
+    MAX_FAILED_SETS_PER_RUN,
     PopulationDrainScript,
     drain_population_backlog,
 )
@@ -96,8 +96,8 @@ class DrainFixture(ScopedSettlementFixture):
 
     # -- runs ---------------------------------------------------------------
 
-    def drain(self, slice_seconds: int = SLICE) -> bool:
-        return drain_population_backlog(slice_seconds)
+    def drain(self, slice_seconds: int = SLICE, max_steps: int = 1) -> int:
+        return drain_population_backlog(slice_seconds, max_steps)
 
     def set_world_tick(self, tick: int) -> None:
         clock = get_world_clock()
@@ -210,6 +210,37 @@ class LaggingSetTests(DrainFixture):
         self.assertEqual(self.settled_through(self.unit_a), START + SLICE)
         self.assertEqual(self.settled_through(self.unit_b), START + SLICE)
 
+    @covers_requirement(
+        "population-settlement-units::"
+        "a-drain-run-settles-the-most-lagging-closed-set-by-one-bounded-slice"
+    )
+    def test_several_sets_in_one_run(self):
+        self.set_world_tick(FAR_TICK)
+        self.write_cursors(FAR_TICK, {self.unit_a: START, self.unit_b: 400})
+        self.assertEqual(self.drain(max_steps=2), 2, "two steps settle two sets")
+        self.assertEqual(self.settled_through(self.unit_a), START + SLICE)
+        self.assertEqual(self.settled_through(self.unit_b), 1000)
+
+    @covers_requirement(
+        "population-settlement-units::"
+        "a-drain-run-settles-the-most-lagging-closed-set-by-one-bounded-slice"
+    )
+    def test_a_far_behind_set_takes_several_steps(self):
+        self.set_world_tick(FAR_TICK)
+        self.write_cursors(FAR_TICK, {self.unit_a: START})
+        self.assertEqual(self.drain(max_steps=3), 3, "every step re-selects the set")
+        self.assertEqual(self.settled_through(self.unit_a), START + 3 * SLICE)
+
+    @covers_requirement(
+        "population-settlement-units::"
+        "a-drain-run-settles-the-most-lagging-closed-set-by-one-bounded-slice"
+    )
+    def test_the_run_ends_when_nothing_lags(self):
+        self.set_world_tick(5000)
+        self.write_cursors(5000, {self.unit_a: 4800})
+        self.assertEqual(self.drain(max_steps=3), 1, "no step after the world tick")
+        self.assertEqual(self.settled_through(self.unit_a), 5000)
+
     def test_closed_sets_partition_every_index_unit(self):
         state = read_monster_activity(self.wilderness)
         index = self.index()
@@ -228,6 +259,48 @@ class LaggingSetTests(DrainFixture):
         self.assertIn(population_units.RESIDUAL_UNIT, units)
         self.assertIn(self.unit_a, units)
         self.assertIn(self.unit_b, units)
+
+
+class SharedGroupUnitsTests(DrainFixture):
+    """Every group's units are computed once per unchanged activity record."""
+
+    @covers_requirement(
+        "population-settlement-units::"
+        "group-units-are-computed-once-per-activity-record"
+    )
+    def test_lagging_sets_and_scopes_share_one_computation(self):
+        self.set_world_tick(FAR_TICK)
+        self.write_cursors(FAR_TICK, {self.unit_a: START})
+        # Rewriting a stored group replaces the record object even with the same
+        # home, so the memo cannot answer from an earlier computation.
+        self.link_group_home(self.group_ids[ZONE_A][0], WANDER_A)
+        recorded = len(read_monster_activity(self.wilderness).groups)
+        with patch.object(
+            population_units, "group_units", wraps=population_units.group_units
+        ) as units:
+            lagging_sets(self.wilderness, FAR_TICK)
+            population_units.build_scope(self.wilderness, {self.unit_a})
+            population_units.build_scope(self.wilderness, {self.unit_a})
+        self.assertEqual(
+            units.call_count,
+            recorded,
+            "one computation per group, however many queries read it",
+        )
+
+    @covers_requirement(
+        "population-settlement-units::"
+        "group-units-are-computed-once-per-activity-record"
+    )
+    def test_a_written_record_is_computed_again(self):
+        first = population_units.build_scope(self.wilderness, {self.unit_a})
+        self.assertNotIn(self.unit_b, first.units)
+        self.link_group_home(self.group_ids[ZONE_A][0], WANDER_B)
+        second = population_units.build_scope(self.wilderness, {self.unit_a})
+        self.assertIn(
+            self.unit_b,
+            second.units,
+            "the group now touches the second unit; the memo must not answer first",
+        )
 
 
 class DrainEquivalenceTests(DrainFixture):
@@ -256,6 +329,24 @@ class DrainEquivalenceTests(DrainFixture):
         self.write_cursors(COMPLETION_TICK, {self.unit_a: START, self.unit_b: START})
         runs = 0
         while self.drain():
+            runs += 1
+            if runs >= 200:
+                self.fail("the drain did not converge within 200 runs")
+        self.assertEqual(lagging_sets(self.wilderness, COMPLETION_TICK), ())
+        drained = settlement_projection(self.wilderness)
+
+        self._build_scenario(end_tick=COMPLETION_TICK)
+        settle_population_lifecycle(START, COMPLETION_TICK)
+        self.assertEqual(settlement_projection(self.wilderness), drained)
+
+    @covers_requirement(
+        "population-settlement-units::draining-gives-the-whole-world-result"
+    )
+    def test_a_multi_step_run_reaches_the_whole_world_result(self):
+        self.set_world_tick(COMPLETION_TICK)
+        self.write_cursors(COMPLETION_TICK, {self.unit_a: START, self.unit_b: START})
+        runs = 0
+        while self.drain(max_steps=3):
             runs += 1
             if runs >= 200:
                 self.fail("the drain did not converge within 200 runs")
@@ -445,6 +536,85 @@ class DrainReportTests(DrainFixture):
             },
         )
 
+    @covers_requirement(
+        "population-settlement-units::a-drain-run-is-atomic-and-reports-itself"
+    )
+    def test_one_event_per_step(self):
+        self.set_world_tick(FAR_TICK)
+        self.write_cursors(FAR_TICK, {self.unit_a: START, self.unit_b: 400})
+        with (
+            patch.object(population_drain, "log_info") as info,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            self.assertEqual(self.drain(max_steps=2), 2)
+        events = self.events(info)
+        self.assertEqual(len(events), 2, "one info event per settled step")
+        self.assertEqual(
+            [event.kwargs["context"] for event in events],
+            [
+                {
+                    "units": 1,
+                    "tick_from": START,
+                    "tick_to": START + SLICE,
+                    "remaining": 2,
+                },
+                {
+                    "units": 1,
+                    "tick_from": 400,
+                    "tick_to": 1000,
+                    "remaining": 2,
+                },
+            ],
+        )
+
+    @covers_requirement(
+        "population-settlement-units::a-drain-run-is-atomic-and-reports-itself"
+    )
+    def test_a_completed_set_is_not_lagging_in_a_later_step_report(self):
+        self.set_world_tick(5000)
+        self.write_cursors(5000, {self.unit_a: 4900, self.unit_b: 4950})
+        with (
+            patch.object(population_drain, "log_info") as info,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            self.assertEqual(self.drain(max_steps=2), 2)
+        contexts = [event.kwargs["context"] for event in self.events(info)]
+        self.assertEqual(contexts[0]["remaining"], 1)
+        self.assertEqual(
+            contexts[1]["remaining"],
+            0,
+            "the unit the first step settled to the world tick is not lagging",
+        )
+
+    @covers_requirement(
+        "population-settlement-units::a-drain-run-is-atomic-and-reports-itself"
+    )
+    def test_three_failed_sets_end_the_run(self):
+        self.set_world_tick(700)
+        self.write_cursors(700, {self.unit_a: START})
+        # Four candidates, each failing: the run stops after three failures.
+        repeated = (
+            (START, frozenset({self.unit_a})),
+            (START, frozenset({self.unit_b})),
+            (START, frozenset({population_units.RESIDUAL_UNIT})),
+            (START, frozenset({self.unit_a})),
+        )
+        with (
+            patch.object(population_units, "lagging_sets", return_value=repeated),
+            patch.object(
+                population_lifecycle,
+                "settle_population_scope",
+                side_effect=RuntimeError("injected set fault"),
+            ) as settle,
+            patch.object(population_drain, "log_error") as error,
+            patch.object(population_drain, "log_info") as info,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            self.assertEqual(self.drain(max_steps=4), 0)
+        self.assertEqual(settle.call_count, MAX_FAILED_SETS_PER_RUN)
+        self.assertEqual(len(self.events(error)), MAX_FAILED_SETS_PER_RUN)
+        info.assert_not_called()
+
 
 class PeriodicCallerTests(DrainFixture):
     """The periodic caller repeats once per interval and honours its switch."""
@@ -485,7 +655,9 @@ class PeriodicCallerTests(DrainFixture):
             self.captureOnCommitCallbacks(execute=True),
         ):
             PopulationDrainScript.at_repeat(Mock())
-        drain.assert_called_once_with(SLICE)
+        drain.assert_called_once_with(
+            SLICE, django_settings.POPULATION_DRAIN_STEPS_PER_RUN
+        )
         self.assertEqual(self.settled_through(self.unit_a), START + SLICE)
 
     @covers_requirement(
@@ -540,7 +712,9 @@ class PeriodicCallerTests(DrainFixture):
         ):
             player_input.note_player_input()
             PopulationDrainScript.at_repeat(Mock())
-        drain.assert_called_once_with(SLICE)
+        drain.assert_called_once_with(
+            SLICE, django_settings.POPULATION_DRAIN_STEPS_PER_RUN
+        )
         self.assertEqual(self.settled_through(self.unit_a), START + SLICE)
 
     @covers_requirement(
@@ -562,7 +736,9 @@ class PeriodicCallerTests(DrainFixture):
             self.captureOnCommitCallbacks(execute=True),
         ):
             PopulationDrainScript.at_repeat(Mock())
-        drain.assert_called_once_with(SLICE)
+        drain.assert_called_once_with(
+            SLICE, django_settings.POPULATION_DRAIN_STEPS_PER_RUN
+        )
         self.assertEqual(self.settled_through(self.unit_a), START + SLICE)
 
     def test_script_creation_reads_the_configured_interval(self):
@@ -572,7 +748,7 @@ class PeriodicCallerTests(DrainFixture):
             script.interval, django_settings.POPULATION_DRAIN_INTERVAL_SECONDS
         )
         self.assertTrue(script.persistent)
-        self.assertGreater(MAX_SETS_PER_RUN, 0)
+        self.assertGreater(MAX_FAILED_SETS_PER_RUN, 0)
 
 
 class IdleWindowBypassTests(DrainFixture):
@@ -616,6 +792,12 @@ class QuietRunTests(DrainFixture):
             with self.subTest(slice_seconds=bad):
                 with self.assertRaises(ValueError):
                     drain_population_backlog(bad)
+
+    def test_steps_must_be_a_positive_integer(self):
+        for bad in (0, -1, True):
+            with self.subTest(max_steps=bad):
+                with self.assertRaises(ValueError):
+                    drain_population_backlog(SLICE, bad)
 
     def test_no_world_settles_nothing_without_an_event(self):
         with (

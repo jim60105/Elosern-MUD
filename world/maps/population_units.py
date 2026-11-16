@@ -410,19 +410,34 @@ def group_units(index: UnitIndex, group: Any, journey: Any | None) -> frozenset[
     return frozenset(units)
 
 
-def group_units_map(index: UnitIndex, state: Any) -> dict[str, frozenset[str]]:
-    """Every group's units, computed exactly once for one settlement record.
+#: Every group's units for one activity record, pinned to the unit index, the
+#: published geography and the record itself. The record is immutable and every
+#: write replaces it, so its identity proves the answer current.
+_GROUP_UNITS = SourceMemo()
+_GROUP_UNITS_KEY = "group-units"
+
+
+def group_units_map(index: UnitIndex, state: Any) -> Mapping[str, frozenset[str]]:
+    """Every group's units, computed once per unchanged settlement record.
 
     Public because the scoped pass needs the same answers twice -- once for the
     closure and once for the groups it may settle -- and the cost note on
     :func:`unit_closure` forbids computing them twice.
     """
-    return {
-        group_id: group_units(
-            index, state.groups[group_id], state.journeys.get(state.groups[group_id].journey_id)
-        )
-        for group_id in state.groups
-    }
+    from world.maps.geography import current as current_geography
+
+    return _GROUP_UNITS.resolve(
+        (index, current_geography(), state),
+        _GROUP_UNITS_KEY,
+        lambda: MappingProxyType(
+            {
+                group_id: group_units(
+                    index, group, state.journeys.get(group.journey_id)
+                )
+                for group_id, group in state.groups.items()
+            }
+        ),
+    )
 
 
 def warm_group_units() -> None:

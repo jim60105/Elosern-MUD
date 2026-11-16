@@ -672,6 +672,7 @@ POPULATION_DRAIN_ENABLED = _env_bool("POPULATION_DRAIN_ENABLED", True)
 POPULATION_DRAIN_INTERVAL_SECONDS = _env_int("POPULATION_DRAIN_INTERVAL_SECONDS", 2)
 POPULATION_DRAIN_SLICE_SECONDS = _env_int("POPULATION_DRAIN_SLICE_SECONDS", 600)
 POPULATION_DRAIN_IDLE_SECONDS = _env_int("POPULATION_DRAIN_IDLE_SECONDS", 20)
+POPULATION_DRAIN_STEPS_PER_RUN = _env_int("POPULATION_DRAIN_STEPS_PER_RUN", 4)
 
 # The periodic art drain Script. It survives reloads and is recreated
 # automatically; at_script_creation reads the interval from the settings above.

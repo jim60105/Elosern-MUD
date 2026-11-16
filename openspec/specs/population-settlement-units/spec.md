@@ -276,10 +276,10 @@ One clock advance SHALL NOT read, snapshot, write or otherwise name any individu
 - **THEN** neither advance issues a statement that names an individual of the unobserved zone, while the same world enumerated whole does name them
 
 ### Requirement: A drain run settles the most lagging closed set by one bounded slice
-One drain run SHALL select the closed set of units with the lowest settled-through tick, ties broken by the smallest unit identifier, and SHALL settle it forward by at most the configured slice of game time and never past the world tick, admitting no field contact and leaving the world tick unchanged. A world with no lagging unit SHALL be left untouched.
+One drain run SHALL perform at most the configured number of settlement steps. Each step SHALL select the closed set of units with the lowest settled-through tick, ties broken by the smallest unit identifier, and SHALL settle it forward by at most the configured slice of game time and never past the world tick, admitting no field contact and leaving the world tick unchanged. A world with no lagging unit SHALL be left untouched.
 
 #### Scenario: One slice
-- **WHEN** one unit is at 100, another at 400, the world tick is 5000 and the slice is 600
+- **WHEN** one unit is at 100, another at 400, the world tick is 5000, the slice is 600 and the run may perform one step
 - **THEN** one run moves the first unit to 700, leaves the second at 400 and the world tick at 5000
 
 #### Scenario: Slice ends at the world tick
@@ -294,6 +294,18 @@ One drain run SHALL select the closed set of units with the lowest settled-throu
 - **WHEN** the most lagging unit is linked to a second unit by a group that touches both
 - **THEN** one run moves both units by the same slice
 
+#### Scenario: Several sets in one run
+- **WHEN** one unit is at 100, another at 400, the world tick is 5000, the slice is 600 and the run may perform two steps
+- **THEN** one run moves the first unit to 700 and the second to 1000, and reports two settled steps
+
+#### Scenario: A far-behind set takes several steps
+- **WHEN** one unit is at 100, every other unit is at the world tick 5000, the slice is 600 and the run may perform three steps
+- **THEN** one run moves the unit to 1900 and reports three settled steps
+
+#### Scenario: The run ends when nothing lags
+- **WHEN** the only lagging unit is at 4800, the world tick is 5000, the slice is 600 and the run may perform three steps
+- **THEN** one run moves the unit to 5000 and reports one settled step
+
 ### Requirement: Draining gives the whole-world result
 A world whose lagging units were settled by drain runs SHALL have the same activity record, zone records, site records and per-individual position, gauges, reserve, posture and sleep receipt as the same world settled by one whole-world pass to the same tick.
 
@@ -302,10 +314,10 @@ A world whose lagging units were settled by drain runs SHALL have the same activ
 - **THEN** both state projections are equal
 
 ### Requirement: A drain run is atomic and reports itself
-A drain run that settled something SHALL emit one `population_backlog_drained` info event on durable commit with the number of units, both ticks and the number of units still lagging. A set whose settlement fails SHALL keep its complete prior durable state and live caches and SHALL cause one `population_backlog_drain_failed` error event; the same run SHALL then try the next most lagging set, up to three sets per run.
+Each drain step that settled a set SHALL emit one `population_backlog_drained` info event on durable commit with the number of units, both ticks and the number of units still lagging. A set whose step fails SHALL keep its complete prior durable state and live caches, SHALL cause one `population_backlog_drain_failed` error event and SHALL NOT be tried again in the same run. The run SHALL continue with the next most lagging set and SHALL stop after three failed sets.
 
 #### Scenario: Reported slice
-- **WHEN** a run moves one of two lagging units from 100 to 700
+- **WHEN** a run of one step moves one of two lagging units from 100 to 700
 - **THEN** one info event carries one unit, 100, 700 and one unit still lagging
 
 #### Scenario: Failed run
@@ -316,8 +328,16 @@ A drain run that settled something SHALL emit one `population_backlog_drained` i
 - **WHEN** the most lagging set fails on every attempt and a second set is also behind
 - **THEN** one run emits one error event for the first set, moves the second set by one slice and reports it
 
+#### Scenario: One event per step
+- **WHEN** a run of two steps moves one unit from 100 to 700 and another from 400 to 1000
+- **THEN** two info events are emitted, the first carrying 100 and 700, the second carrying 400 and 1000
+
+#### Scenario: A failed set is not retried in the same run
+- **WHEN** the only lagging set fails on every attempt and the run may perform three steps
+- **THEN** one run emits exactly one error event and reports no settled step
+
 ### Requirement: The periodic drain honours its switch
-The periodic caller SHALL perform one drain run per repeat while the drain is enabled and SHALL perform none while it is disabled.
+The periodic caller SHALL perform one drain run per repeat, with the configured slice and the configured number of steps, while the drain is enabled and SHALL perform none while it is disabled.
 
 #### Scenario: Disabled
 - **WHEN** the periodic caller repeats with the drain disabled and a unit lagging
@@ -325,7 +345,7 @@ The periodic caller SHALL perform one drain run per repeat while the drain is en
 
 #### Scenario: Enabled
 - **WHEN** the periodic caller repeats once with the drain enabled and a unit lagging
-- **THEN** exactly one drain run happens with the configured slice
+- **THEN** exactly one drain run happens with the configured slice and the configured number of steps
 
 ### Requirement: Player input is recorded at command and action ingress
 The server SHALL record the time of the last player input when a session sends a non-idle text command and when a session with a puppet sends a WebClient UI action. An idle keepalive, a synchronization request and a UI action from a session without a puppet SHALL NOT be recorded.
@@ -464,3 +484,14 @@ A population or activity snapshot taken without a scope SHALL hold the header an
 #### Scenario: Whole snapshot
 - **WHEN** the population surfaces are snapshotted without a scope in a world whose two zones each hold stored groups
 - **THEN** the snapshot holds the header and both zones' parts
+
+### Requirement: Group units are computed once per activity record
+The units of every group SHALL be computed at most once while the activity record, the settlement-unit index and the published geography are unchanged, however many lagging-set, closure and scope queries read them. A changed record SHALL be computed again.
+
+#### Scenario: Lagging sets and scopes share one computation
+- **WHEN** the lagging sets are resolved and two scopes are then built over the same unchanged record
+- **THEN** each group's units were computed once
+
+#### Scenario: A written record is computed again
+- **WHEN** a group's home is rewritten to a cell of another unit and the record is written between two scope builds
+- **THEN** the second scope reflects the rewritten home
