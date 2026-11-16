@@ -15,6 +15,8 @@ from unittest.mock import patch
 
 from django.db import transaction
 
+from tools.spec_traceability import covers_requirement
+
 from world.maps import monster_activity
 from world.maps.monster_activity import (
     MONSTER_ACTIVITY_PART_CATEGORY,
@@ -128,6 +130,9 @@ class StoredPartsTests(ScopedSettlementFixture):
 
     # -- one part per settlement unit --------------------------------------
 
+    @covers_requirement(
+        "population-settlement-units::the-activity-record-is-stored-in-one-part-per-settlement-unit"
+    )
     def test_a_written_record_round_trips_through_the_stored_parts(self):
         self._reset_activity(tick=START)
         group_a, bodies_a = self._group(cell=WANDER_A)
@@ -148,6 +153,9 @@ class StoredPartsTests(ScopedSettlementFixture):
         self.assertEqual(set(self._part(self.unit_a)["groups"]), {group_a})
         self.assertEqual(set(self._part(self.unit_b)["groups"]), {group_b})
 
+    @covers_requirement(
+        "population-settlement-units::the-activity-record-is-stored-in-one-part-per-settlement-unit"
+    )
     def test_a_group_is_stored_in_the_part_of_its_home_unit(self):
         self._reset_activity(tick=START)
         group_a, _bodies_a = self._group(cell=WANDER_A)
@@ -160,6 +168,9 @@ class StoredPartsTests(ScopedSettlementFixture):
         self.assertEqual(set(part_b["groups"]), {group_b})
         self.assertNotIn(group_a, part_b["groups"])
 
+    @covers_requirement(
+        "population-settlement-units::the-activity-record-is-stored-in-one-part-per-settlement-unit"
+    )
     def test_a_group_keeps_its_part_when_its_home_is_rewritten(self):
         self._reset_activity(tick=START)
         group_a, _bodies_a = self._group(cell=WANDER_A)
@@ -178,6 +189,9 @@ class StoredPartsTests(ScopedSettlementFixture):
 
     # -- only the changed parts are written --------------------------------
 
+    @covers_requirement(
+        "population-settlement-units::an-activity-write-stores-only-the-parts-it-changed"
+    )
     def test_another_units_part_is_not_rewritten(self):
         self._reset_activity(tick=START)
         group_a, _bodies_a = self._group(cell=WANDER_A)
@@ -195,6 +209,9 @@ class StoredPartsTests(ScopedSettlementFixture):
 
         self.assertIs(self._part_object(self.unit_b).db_value, before)
 
+    @covers_requirement(
+        "population-settlement-units::an-activity-write-stores-only-the-parts-it-changed"
+    )
     def test_a_batched_pass_stores_the_changed_part_once(self):
         self._reset_activity(tick=START)
         group_a, _bodies_a = self._group(cell=WANDER_A)
@@ -218,6 +235,9 @@ class StoredPartsTests(ScopedSettlementFixture):
         self.assertEqual([call.args[1] for call in counted.call_args_list], [self.unit_a])
         self.assertEqual(self._state().groups[group_a].sequence, 3)
 
+    @covers_requirement(
+        "population-settlement-units::an-activity-write-stores-only-the-parts-it-changed"
+    )
     def test_writing_the_state_read_back_unchanged_stores_nothing(self):
         self._reset_activity(tick=START)
         self._group(cell=WANDER_A)
@@ -333,6 +353,9 @@ class StoredPartsTests(ScopedSettlementFixture):
 
     # -- an incomplete record refuses --------------------------------------
 
+    @covers_requirement(
+        "population-settlement-units::a-stored-activity-record-that-is-incomplete-is-refused"
+    )
     def test_a_malformed_header_refuses_and_rewrites_nothing(self):
         self._reset_activity(tick=START)
         self._group(cell=WANDER_A)
@@ -358,6 +381,9 @@ class StoredPartsTests(ScopedSettlementFixture):
                 self.assertFalse(counted.called)
                 self.assertIs(self._header().db_value, before)
 
+    @covers_requirement(
+        "population-settlement-units::a-stored-activity-record-that-is-incomplete-is-refused"
+    )
     def test_a_missing_part_refuses_and_rewrites_nothing(self):
         self._reset_activity(tick=START)
         self._group(cell=WANDER_A)
@@ -380,6 +406,9 @@ class StoredPartsTests(ScopedSettlementFixture):
         self.assertFalse(counted.called)
         self.assertIs(self._header().db_value, before)
 
+    @covers_requirement(
+        "population-settlement-units::a-stored-activity-record-that-is-incomplete-is-refused"
+    )
     def test_two_parts_holding_one_group_refuse_and_rewrite_nothing(self):
         self._reset_activity(tick=START)
         group_a, _bodies_a = self._group(cell=WANDER_A)
@@ -424,6 +453,9 @@ class RolledBackActivityWriteTests(ScopedSettlementFixture):
         )
         return list(stored.db_value["units"])
 
+    @covers_requirement(
+        "population-settlement-units::a-rolled-back-activity-write-restores-every-part"
+    )
     def test_a_rolled_back_group_change_restores_the_record(self):
         self._reset_activity(tick=START)
         group_a, _bodies_a = self._group(cell=WANDER_A)
@@ -462,6 +494,9 @@ class RolledBackActivityWriteTests(ScopedSettlementFixture):
         self.wilderness.attributes.reset_cache()
         self.assertEqual(self._record(), before)
 
+    @covers_requirement(
+        "population-settlement-units::a-rolled-back-activity-write-restores-every-part"
+    )
     def test_a_rolled_back_created_part_is_removed(self):
         self._reset_activity(tick=START)
         self._group(cell=WANDER_A)
