@@ -505,7 +505,13 @@ class ForecastPurityTests(_BoundaryBase):
 
         before = {
             "tick": int(self.clock.tick),
-            "activity": dict(self.wilderness.db.monster_activity or {}),
+            "activity": (
+                monster_activity.state_to_dict(
+                    monster_activity.read_stored_monster_activity(self.wilderness)
+                )
+                if monster_activity.activity_provisioned(self.wilderness)
+                else {}
+            ),
             "zones": dict(self.wilderness.db.regional_population or {}),
             "sites": dict(self.wilderness.db.monster_sites or {}),
             "timeline": read_population_timeline(self.wilderness),
@@ -520,7 +526,16 @@ class ForecastPurityTests(_BoundaryBase):
         # No write, no entity, no draw: the same inputs still describe the
         # same world.
         self.assertEqual(int(self.clock.tick), before["tick"])
-        self.assertEqual(dict(self.wilderness.db.monster_activity or {}), before["activity"])
+        self.assertEqual(
+            (
+                monster_activity.state_to_dict(
+                    monster_activity.read_stored_monster_activity(self.wilderness)
+                )
+                if monster_activity.activity_provisioned(self.wilderness)
+                else {}
+            ),
+            before["activity"],
+        )
         self.assertEqual(dict(self.wilderness.db.regional_population or {}), before["zones"])
         self.assertEqual(dict(self.wilderness.db.monster_sites or {}), before["sites"])
         self.assertEqual(read_population_timeline(self.wilderness), before["timeline"])

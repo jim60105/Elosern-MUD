@@ -466,8 +466,8 @@ class FailedContactInsidePassTests(_ContactBase):
             group_id: replace(group, next_decision_tick=CONTACT_TICK)
             for group_id, group in state.groups.items()
         }
-        self.wilderness.db.monster_activity = state_to_dict(
-            replace(state, groups=groups)
+        activity_owner.write_monster_activity(
+            self.wilderness, replace(state, groups=groups)
         )
         self.player.location = self.destination
         self.destination.contents_cache.add(self.player)

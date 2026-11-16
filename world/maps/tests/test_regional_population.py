@@ -824,7 +824,9 @@ class RegionalPopulationTests(RegistryIsolationMixin, EvenniaTest):
             for key, value in self.wilderness.db.regional_population.items()
         }
         baseline_coordinates = dict(self.wilderness.db.itemcoordinates)
-        baseline_activity = dict(self.wilderness.db.monster_activity)
+        baseline_activity = activity_owner.state_to_dict(
+            activity_owner.read_stored_monster_activity(self.wilderness)
+        )
         baseline_contents = {obj.pk for obj in room.contents}
         monsters_before = sorted(Monster.objects.values_list("pk", flat=True))
 
@@ -850,7 +852,12 @@ class RegionalPopulationTests(RegistryIsolationMixin, EvenniaTest):
             baseline_state,
         )
         self.assertEqual(dict(self.wilderness.db.itemcoordinates), baseline_coordinates)
-        self.assertEqual(dict(self.wilderness.db.monster_activity), baseline_activity)
+        self.assertEqual(
+            activity_owner.state_to_dict(
+                activity_owner.read_stored_monster_activity(self.wilderness)
+            ),
+            baseline_activity,
+        )
         self.assertEqual({obj.pk for obj in room.contents}, baseline_contents)
         self.assertEqual(
             sorted(Monster.objects.values_list("pk", flat=True)), monsters_before
