@@ -11,13 +11,14 @@ Facts established while planning, by reading the code and by a throwaway run of 
 - `elven_village` locations are already hidden by `world/rules/wilderness_disclosure.py`.
 - With the coordinates, directions and bends below, `python -m tools.settlement_synthesis lint` reports `fit: 0 errors, 0 warnings` for all three village maps, and `check_map_sources.py` reports no structure error and no cross-file problem.
 - Adding a settlement document makes two generated artifacts stale: `world/maps/data/district_partition.json` and `world/maps/data/road_network.json`. Adding the Python rows makes `content/map-reference-context.json` stale. In the scratch run the road network regenerated with only its `source_signature` line changed.
-- The four test assertions listed in Decision 7 are the only failures found among the lore, correspondence, service-host-roster, quest-definition and map suites run in the scratch clone. Task group 7 reruns those suites.
+- The five test assertions rewritten in Decision 9 (9a to 9d and 9f) are the only failures found among the lore, correspondence, service-host-roster, quest-definition, bootstrap, adoption and interior suites run in the scratch clone. With the rewrites applied, those suites and `tools.contract_gate` passed there. The one addition made after that run, the `anchors()` assertion in 9d, was not run. Task groups 7 and 10 rerun everything.
+- Every 暗影谷村 road must be straight: `test_village_ciaran.test_every_segment_length_is_its_meter_endpoint_distance` requires each road's length to equal the distance between its endpoints. A trial road with a bend failed it.
 - `world/maps/tests/test_settlement_sources.py` and `world/maps/tests/test_settlement_reload.py` bind a synthetic document to `elven_village_eolas`. Both compose that document in isolation, without the shipped settlement files, so the real 幽月谷村 map does not collide with them.
 
 Existing rules the new content must satisfy, each already enforced by an existing test:
 
 - `world.lore.tests.test_room_prose_language`: every node `desc` and room `desc_zh` is Traditional Chinese prose, the name and the description are in the same language, and no description carries an authoring note or the character `§`.
-- `world.maps.tests.test_village_ciaran`, for 暗影谷村 only: the graph is a tree; every node `key` has at least 2 Han characters and every `desc` at least 4; no `key` or `desc` contains an ASCII word or any of `wall`, `gate`, `guard`, `marketplace`, `shop`, `store`, `城牆`, `城門`, `衛兵`, `市集`, `市場`, `店`.
+- `world.maps.tests.test_village_ciaran`, for 暗影谷村 only: the graph is a tree; no road has bends; every node `key` has at least 2 Han characters and every `desc` at least 4; no `key` or `desc` contains an ASCII word or any of `wall`, `gate`, `guard`, `marketplace`, `shop`, `store`, `城牆`, `城門`, `衛兵`, `市集`, `市場`, `店`.
 
 ## Goals / Non-Goals
 
@@ -202,6 +203,8 @@ The source design says 幽月谷村's entrance faces north and 翠綠森林村's
 
 This also keeps the exit names clear: `forest_trail` has one road, direction `s`, so the outward alias `n` is free; `leaf_veiled_path` has one road, direction `w`, so the outward alias `e` is free. The alternative values `n` and `e` would give the gate rooms an outward alias equal to their only road direction.
 
+The `city_gate` blocks come from the source design and have a player-visible effect, the same one 暗影谷村 has today. `world/maps/bootstrap.py` creates a one-way exit from the starting room 虛境 for every city gate row, so 虛境 gains the exits 深林獸徑 and 葉隱小徑. The first time a character takes one, that gate room becomes the character's `home` (`world/rules/city_gates.py`). No character-creation code reads the registry. This change keeps the city gates, following the 暗影谷村 precedent, and the review document states the effect so the human reviewer can confirm it is wanted.
+
 ### Decision 6: Eight host-less interiors, one room each
 
 Each interior file is `content/maps/interiors/<interior_id>.yaml`. The room ID equals the interior ID. No `art_key` line. Shape, verbatim except the placeholders:
@@ -260,16 +263,12 @@ and append to `roads`:
   - source: stream_bend
     destination: bathing_pool
     direction: se
-    bends:
-      - {x_m: 731, y_m: 38}
   - source: bathing_pool
     destination: stream_bend
     direction: nw
-    bends:
-      - {x_m: 731, y_m: 38}
 ```
 
-`stream_bend` sits at (689, 85) and has one outgoing road, `w`. The new node shares no `x_m` or `y_m` with any existing node, so it lies off the map's existing lines. It is a leaf, so the graph stays a tree. Its description is an open-air pool where the stream widens below the village and must satisfy the `test_village_ciaran` text rules listed in Context. The coordinate and bend are a planning choice; the source design fixes only the ID, the name and the neighbour.
+`stream_bend` sits at (689, 85) and has one outgoing road, `w`. The new node shares no `x_m` or `y_m` with any existing node, so it lies off the map's existing lines. It is a leaf, so the graph stays a tree. The road has no bends, because every 暗影谷村 road must be straight (see Context). Its description is an open-air pool where the stream widens below the village and must satisfy the `test_village_ciaran` text rules listed in Context. The coordinate is a planning choice; the source design fixes only the ID, the name and the neighbour.
 
 ### Decision 8: Python rows for the courier stations
 
@@ -307,7 +306,7 @@ In `world/lore/settlements/places.py`, add two `PlaceDefinition` entries inside 
 
 No new slice module is created: the two rows sit beside the two existing courier rows. The alternative, `places_eolas.py` and `places_fionnen.py` slices, is deferred to the later host design, which is when those villages get rows of their own.
 
-### Decision 9: Four data-pinning assertions become logic assertions
+### Decision 9: Five data-dependent assertions become logic assertions
 
 Each test keeps its name and its `@covers_requirement` decorators. Only the method body changes. No new key is appended anywhere.
 
@@ -384,7 +383,7 @@ Each test keeps its name and its `@covers_requirement` decorators. Only the meth
         self._assert_rows_follow_the_places(validate_service_hosts())
 ```
 
-**9d.** `world/quests/tests/test_definitions.py`, `test_lore_known_but_unplaced_anchor_is_rejected`. This test is not in the source design. It asserts that `elven_village_fionnen` has no placement, which stops being true when the village gets a map. Add `from unittest import mock` under the existing `import unittest` line. Keep the decorator. Replace the method body with:
+**9d.** `world/quests/tests/test_definitions.py`, `test_lore_known_but_unplaced_anchor_is_rejected`. This test is not in the source design. It asserts that `elven_village_fionnen` has no placement, which stops being true when the village gets a map. Add `from unittest import mock` under the existing `import unittest` line, and add `from world.lore.anchors import anchors` under the existing `from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY` line. Keep the decorator. Replace the method body with:
 
 ```python
     def test_lore_known_but_unplaced_anchor_is_rejected(self):
@@ -392,6 +391,7 @@ Each test keeps its name and its `@covers_requirement` decorators. Only the meth
         # registry the validator reads, so the case never depends on which
         # locations ship a local map.
         unplaced_key = anchor_locator().anchor_key
+        self.assertIn(unplaced_key, anchors())
         self.assertIn(unplaced_key, ANCHOR_PLACEMENT_REGISTRY)
         remaining = {
             key: row
@@ -430,6 +430,29 @@ Each test keeps its name and its `@covers_requirement` decorators. Only the meth
 
 No assertion in that file changes.
 
+**9f.** `world/maps/tests/test_bootstrap/test_bootstrap_selection.py`, `MetricCutoverTests.test_real_startup_converges_places_scene_art_and_quest_targets`. This test is not in the source design. It starts the world with only the capital and 暗影谷村 selected and then expects every `PLACE_REGISTRY` row to have a room. That stops being true when a place sits in another settlement. Change only the head of the final loop. Replace:
+
+```python
+        # Every service place's exterior resolves to its converged room and
+        # every interior keeps its bidirectional doorway.
+        for place in PLACE_REGISTRY.values():
+            exterior = GridRoom.objects.filter_xyz(xyz=place_exterior_xyz(place)).first()
+```
+
+with:
+
+```python
+        # Every service place of a selected settlement resolves its exterior
+        # to the converged room and keeps its bidirectional doorway. A place
+        # whose settlement was not selected has no room to resolve.
+        for place in PLACE_REGISTRY.values():
+            if place_exterior_xyz(place)[2] not in CAPITAL_VILLAGE_MAP_IDS:
+                continue
+            exterior = GridRoom.objects.filter_xyz(xyz=place_exterior_xyz(place)).first()
+```
+
+The rest of the loop body is unchanged. `CAPITAL_VILLAGE_MAP_IDS` and `place_exterior_xyz` are already imported in that file.
+
 Other pins of shipped data in these files (for example `PRE_SPLIT_PLACE_CAPTURE`) keep passing and are left alone: this change removes a pin only where the pin breaks.
 
 ### Decision 10: Regeneration order
@@ -446,12 +469,13 @@ The road network is not in the source design; the scratch run showed it goes sta
 
 Node and room descriptions in both new villages, and the new 暗影谷村 node, follow the register of the existing 暗影谷村 nodes and interiors (`content/maps/settlements/elven_village_ciaran.yaml`, `content/maps/interiors/ciaran_*.yaml`): landscape, livelihood and daily life, with each place written as a lived-in scene, not a service building. No signboards, no shopkeeper wording, no building of worship. Each description is one to three sentences of Traditional Chinese, written with the `chinese-content-writing-guideline` and `writing-style-guideline` skills. Magic is practised in one spot per village (試法坪, 靶道); no description invents a site per element.
 
-Whether the prose reads well and whether the maps look irregular are human judgements. They are recorded in `docs/lore/elven-villages-map-review.md`, written in English, with these sections:
+Whether the prose reads well and whether the maps look irregular are human judgements. They are recorded in `docs/lore/elven-villages-map-review.md`, written in English, with these five sections:
 
 1. **Scope**: the files this change authored.
 2. **Map images**: for each of the three village maps, the capture command used, and what the image shows when read: which nodes connect, where the bends are, and whether any part reads as a grid.
 3. **Prose review**: for each new node and room, one line confirming it follows the guideline above, or the correction made.
 4. **Lore checks**: no temple, no signboard, one magic practice spot per village, entrances that do not read as gates.
+5. **For the reviewer's decision**: one paragraph stating that the two new city gates add the exits 深林獸徑 and 葉隱小徑 to the starting room 虛境 and that the first traversal sets the character's `home` (Decision 5).
 
 No test reads this document.
 
@@ -464,24 +488,32 @@ All edits are Traditional Chinese, in the document's existing voice.
 | Line 58, table cell `〔已實作〕3 座，其中暗影谷村有地圖` | Say all three villages have a local map and shared places. |
 | Line 87, matrix row 公共浴場, last column `無` | Change to `變`. |
 | Line 92, matrix row 魔法學院與圖書館, last column `無` | Change to `變`. |
-| Line 393, 〈公共浴場〉 聚落差異, the sentences from 「精靈村落完全沒有『公共浴場』這個概念」 to the end of the paragraph | Rewrite: all three villages have a public bath. It is an open-air pool at a natural water source (hot spring, forest pool, stream pool), with no separate areas and no keeper; washing, laundry and talk happen there as part of the day. Name the three: 溫泉浴場, 林泉浴場, 溪池浴場. Keep the sentence about 獸王國城邑 unchanged. |
-| Line 495, 〈魔法學院與圖書館〉 聚落差異 | Take 精靈村落 out of the "全部沒有" list and add: 幽月谷村 alone keeps a library, because the Eolas write their experiments down; it is a room of notes that nobody runs, not an academy. The other two villages pass knowledge by word of mouth. No elven village has an academy. |
-| Line 521, 〈聚落差異深論〉, the list 「公會分會、商會、光明教會神殿、公共浴場、衛兵城門、魔法學院、港口」 | Remove 公共浴場 from the list. Keep 魔法學院. |
-| Line 521, same paragraph, after the sentence that ends 「不套用單一『精靈村』模板。」 | Add a short case description of each new village, drawn from Decisions 3 and 4: what the village lives on, its gathering place, its bath, its practice ground, and its shared rooms. |
+| Line 393, 〈公共浴場〉 聚落差異, the sentences from `精靈村落完全沒有「公共浴場」這個概念` to the end of the paragraph | Rewrite: all three villages have a public bath. It is an open-air pool at a natural water source (hot spring, forest pool, stream pool), with no separate areas and no keeper; washing, laundry and talk happen there as part of the day. Name the three: 溫泉浴場, 林泉浴場, 溪池浴場. Keep the sentence about 獸王國城邑 unchanged. |
+| Line 495, 〈魔法學院與圖書館〉 聚落差異 | Take 精靈村落 out of the "全部沒有" list and add: 幽月谷村 alone keeps a library, because the Eolas write their experiments down; it is a room of notes that nobody runs, not an academy. The other two villages pass knowledge by word of mouth. No elven village has an academy. Reword the paragraph's closing sentence about 獸人 and 精靈 so it says neither has a reason to found a formal academy (學院), which stays true beside the library. |
+| Line 521, 〈聚落差異深論〉, the list `公會分會、商會、光明教會神殿、公共浴場、衛兵城門、魔法學院、港口` | Remove 公共浴場 from the list. Keep 魔法學院. |
+| Line 521, same paragraph, after the sentence that ends `不套用單一「精靈村」模板。` | Add a short case description of each new village, drawn from Decisions 3 and 4: what the village lives on, its gathering place, its bath, its practice ground, and its shared rooms. |
 | Line 591, last item of 〈未來擴充方向〉 | Rewrite: all three villages now have maps and shared places; personal homes and service hosts for 幽月谷村 and 翠綠森林村 are still to come. |
 
 The line numbers are those on `master` at `6deac2f4`; find each passage by its quoted text.
 
-A search of `docs/`, `README.md` and the `AGENTS.md` files for other statements that only 暗影谷村 has a map found none.
+Two other documents carry a count that this change makes false. Each gets a one-sentence edit, in Traditional Chinese:
+
+| File and current text | Edit |
+| --- | --- |
+| `docs/development/evennia-testing-guide.md`, the sentence that begins `宣告推導自 registry，不是複製 roster：今日是兩個 gate map` | Say the gate maps are the starting city and the three elven villages, with no number that the next map would falsify. |
+| `docs/development/narrative-memory-and-recall.md`, the sentence `兩個聚落各有一個無宿主（hostless）的銀羽驛站分部。` | Say every settlement that has a courier station has one host-less 銀羽驛站 branch, with no count. |
+
+A search of `docs/`, `README.md` and the `AGENTS.md` files found no other statement that only 暗影谷村 has a map. The scenario title "The registry carries exactly two rows today" in `openspec/specs/limbo-one-way-gates/spec.md` is left alone: its body already says the row count follows the source documents, and this change edits no spec.
 
 ## Risks / Trade-offs
 
-- [The partition or road network is regenerated before the last settlement edit and goes stale] → Task group 6 regenerates after all source edits, and task 8.1 rechecks freshness at the end. A stale partition makes every test that loads the world fail, which is a loud failure.
+- [The partition or road network is regenerated before the last settlement edit and goes stale] → Task group 6 regenerates after all source edits, and task 10.1 rechecks freshness at the end. A stale partition makes every test that loads the world fail, which is a loud failure.
 - [A description trips an existing prose rule, such as the character 店 in the 暗影谷村 node] → The rules are listed in Context and each authoring task names its test.
 - [The lint objects to a coordinate after prose or other edits] → The scratch run was clean with these exact values. If the lint reports an error, move only the node it names by the smallest amount that clears it, keep the coordinate off the `x_m` and `y_m` values of every other node, and record the move in the review document.
-- [Another existing test pins data this change alters and was not run in the scratch clone] → Task 8.2 runs the wider map and presentation suites. If one fails on a data pin, rewrite it to its logic as in Decision 9 and never append a new key; if it fails for another reason, stop and report.
-- [Rewriting 9a to 9c loosens three data guards] → Intended. The project rule is that tests do not pin game data; the mechanisms (slice order, closed kind vocabulary, all-or-nothing host group) stay asserted.
-- [The other two open changes move `master` while this one is applied] → They touch only art code and art specs; no file overlaps.
+- [Another existing test pins data this change alters and was not run in the scratch clone] → Task group 10 runs the wider map, sight and presentation suites, which were not run while planning. If one fails because it compares against a literal roster, count or name, or because it walks a whole registry after starting only some of the maps, rewrite it to its logic as in Decision 9 and never append a new key; if it fails for another reason, stop and report.
+- [Rewriting 9a to 9c loosens three data guards, and 9c now restates the registry validator's all-or-nothing host rule] → Intended. The project rule is that tests do not pin game data; the mechanisms (slice order, closed kind vocabulary, all-or-nothing host group) stay asserted.
+- [The browser fixtures derive their map set from the city gate registry, so browser journeys seed four gate maps where they seeded two] → Slower seeding only. Not run while planning; task 10.6 names the check.
+- [`retire-classic-art-assets` moves `master` while this change is applied] → It touches only art code and art specs; no file overlaps.
 
 ## Migration Plan
 
