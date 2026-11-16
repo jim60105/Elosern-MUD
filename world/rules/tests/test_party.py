@@ -428,6 +428,15 @@ class ActivationBoundParityTests(QuestRegistryIsolation, EvenniaTest):
     """
 
     def setUp(self):
+        # Activation's start room is the shell's own room1, so the bound twin
+        # shares a room with the invited NPC exactly as before placement
+        # existed (subrace-start-settlements D6).
+        self.enterContext(
+            patch(
+                "world.rules.start_location.resolve_start_room",
+                new=lambda subrace_key: self.room1,
+            )
+        )
         # Scope before construction: entity races, the activation card, and
         # the quest anchor all resolve through the patched registries, so no
         # shipped grid content is consulted (the anchor room is built locally

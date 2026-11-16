@@ -12,6 +12,7 @@ from world.rules.character_creation import (
     activate_player_character,
 )
 from world.tests.synthetic_data import SYNTH_PRESETS, synthetic_registries
+from world.tests.start_room_fixture import stub_start_room
 
 # Kit preset used to exercise per-character activation against the patched
 # catalog chain (race/subrace/kit/skill/item rows all resolve in scope).
@@ -30,6 +31,7 @@ _PRESET_SCOPE = (
 )
 
 
+@stub_start_room()
 class AccountCapacityTests(EvenniaTest):
     account_typeclass = Account
     character_typeclass = PlayerCharacter

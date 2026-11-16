@@ -56,6 +56,7 @@ from ._support import (
     _race_key,
     balanced_allocations,
 )
+from world.tests.start_room_fixture import stub_start_room
 
 
 class AffinityCreationTests(EvenniaTest):
@@ -68,6 +69,7 @@ class AffinityCreationTests(EvenniaTest):
     """
 
     def setUp(self):
+        self.enterContext(stub_start_room())
         super().setUp()
         # The elf rule keys off the literal race; borrow the kit profile's
         # bands under the production key so the whole activation path still

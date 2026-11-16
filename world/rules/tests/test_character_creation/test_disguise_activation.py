@@ -60,8 +60,10 @@ from ._support import (
     _race_key,
     balanced_allocations,
 )
+from world.tests.start_room_fixture import stub_start_room
 
 
+@stub_start_room()
 @synthetic_registries(
     "races",
     "static_tiers",

@@ -10,6 +10,7 @@ from evennia.utils.test_resources import EvenniaTest
 from typeclasses.accounts import Account
 from typeclasses.characters import PlayerCharacter
 from typeclasses.rooms import Room
+from world.tests.start_room_fixture import stub_start_room
 
 _PRESET_KEY = "t_pale_wren"  # kit preset card
 _PRESET_SCOPE = (
@@ -50,6 +51,7 @@ class LoginIntroductionTests(EvenniaTest):
     character_typeclass = PlayerCharacter
 
     def setUp(self):
+        self.enterContext(stub_start_room())
         super().setUp()
         self.account.at_post_create_character(self.char1)
 

@@ -58,6 +58,7 @@ from world.tests.synthetic_data import (
     SYNTH_PRESETS,
     SYNTH_STARTER_EPITHET,
 )
+from world.tests.start_room_fixture import stub_start_room
 
 # Kit item key used as an invented transfer token in intent tests (the
 # dialogue seam moves whatever key the intent carries; no shipped item
@@ -727,6 +728,7 @@ class PresetPersonaDialogueTests(EvenniaTest):
     """
 
     def setUp(self):
+        self.enterContext(stub_start_room())
         super().setUp()
         from world.quests.catalog import register_catalog
 

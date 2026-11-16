@@ -55,12 +55,14 @@ from ._support import (
     _race_key,
     balanced_allocations,
 )
+from world.tests.start_room_fixture import stub_start_room
 
 
 class PersonaActivationTests(EvenniaTest):
     """Activation-time persona persistence (creation-persona-persistence D3)."""
 
     def setUp(self):
+        self.enterContext(stub_start_room())
         super().setUp()
         open_synthetic_scope(
             self,
@@ -315,6 +317,7 @@ class SexCreationTests(EvenniaTest):
     (namegen-creation-ui D1)."""
 
     def setUp(self):
+        self.enterContext(stub_start_room())
         super().setUp()
         open_synthetic_scope(
             self,
@@ -436,6 +439,7 @@ class RaceBoundedSexTests(EvenniaTest):
     """
 
     def setUp(self):
+        self.enterContext(stub_start_room())
         super().setUp()
         self.elf = replace(
             SYNTH_RACES["t_duskmari"], key="elf", allowed_sexes=("female",)

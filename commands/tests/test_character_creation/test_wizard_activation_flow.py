@@ -38,6 +38,7 @@ from typeclasses.accounts import Account
 from typeclasses.characters import PlayerCharacter
 from world.art.store import ArtAssetStatus, GalleryJobRecord
 from world.ai.character_creation import CharacterProposal
+from world.tests.start_room_fixture import STUB_START_ROOM_KEY
 
 from ._support import (
     QueuedDeferLater,
@@ -359,7 +360,7 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
             self.char1.msg = original_msg
 
     def test_custom_wizard_activates_the_existing_shell(self):
-        old_id, old_location = self.char1.id, self.char1.location
+        old_id = self.char1.id
         replies = [
             "自訂者", "20", "20", _BOUNDED_RACE, _BOUNDED_BRANCH,
             _SYNTH_ELEMENT, *_balanced_replies(_BOUNDED_RACE, _BOUNDED_BRANCH),
@@ -371,7 +372,7 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertIn("已建立", output)
         self.assertEqual(self.char1.key, "自訂者")
         self.assertEqual(self.char1.id, old_id)
-        self.assertEqual(self.char1.location, old_location)
+        self.assertEqual(self.char1.location.key, STUB_START_ROOM_KEY)
         self.assertIn(self.char1, self.account.characters)
 
     def test_abandoned_prompt_keeps_the_shell_unchanged(self):
