@@ -13,6 +13,36 @@ This design gives both villages a local map and their shared interiors, adds a
 public bath to all three villages, and revises
 `docs/lore/settlement-locations.md` to match.
 
+## Status
+
+This design became the OpenSpec change `elven-villages-eolas-fionnen`. The
+change's own `design.md` is the authority for implementation. Planning found
+facts this document did not have, and where the two differ the change is
+right:
+
+- **Tests.** Five existing assertions pin shipped data, not three. The two
+  this document missed are in `world/quests/tests/test_definitions.py`, which
+  names `elven_village_fionnen` as a location without a map, and in
+  `world/maps/tests/test_bootstrap/test_bootstrap_selection.py`, which walks
+  every place after syncing two maps. All five become logic assertions.
+- **Entrance directions.** `return_direction` is `s` for 幽月谷村 and `w` for
+  翠綠森林村. The check script accepts any direction, so it cannot confirm
+  the choice as sections 4 and 5 say; the outward exit is the opposite of
+  `return_direction`.
+- **Regeneration.** `world/maps/data/road_network.json` goes stale as well as
+  the partition and the reference context.
+- **暗影谷村 bath node.** It sits at (781, 14), direction `se` from
+  `stream_bend`, on a straight road. An existing test requires every road in
+  that village to be straight.
+- **City gates.** Each new `city_gate` adds a one-way exit from the starting
+  room 虛境, and a character's first traversal sets `home` to that village.
+  暗影谷村 already works this way. Whether new characters should be able to
+  start in the two hidden villages is an open decision.
+- **Other documents.** One sentence each in
+  `docs/development/evennia-testing-guide.md` and
+  `docs/development/narrative-memory-and-recall.md` counts gate maps or
+  courier stations and is corrected by the change.
+
 ## 2. Scope
 
 In scope:
