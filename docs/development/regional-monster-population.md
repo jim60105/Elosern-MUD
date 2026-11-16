@@ -3150,6 +3150,53 @@ placement row. A provisioned world whose cursor record is malformed refuses
 through the owner's error, and the section reports itself unavailable instead
 of the placement ledger.
 
+# Activity record storage
+
+`world/maps/monster_activity.py` stores the activity record as one small header
+attribute plus one part attribute per settlement unit. Both live on the
+wilderness script.
+
+| Attribute key | Category | Value |
+| --- | --- | --- |
+| `monster_activity` | none | the header: exactly `{"units": [...], "room_protection": [...], "settled_through_tick": int}` |
+| `part_key(unit_id)` | `monster_activity_part` | one part: exactly `{"unit": unit_id, "groups": {...}, "journeys": {...}, "receipts": {...}}` |
+
+`units` is the sorted list of every unit identifier that has a stored part, and
+it is the authoritative list a read loads. `part_key` is `"p"` plus the first
+40 hexadecimal characters of the unit identifier's SHA-256: Evennia lower-cases
+attribute keys, and a unit identifier is built from authored keys whose case
+this module does not control. The part's own `unit` field carries the real
+identifier.
+
+**Placement.** Every stored entry belongs to one part. A group is placed by the
+settlement unit of its home the first time it is stored, and an entry that has a
+recorded part never moves: rewriting a group's home leaves it in the part it was
+first stored in. A new journey belongs to its group's part, and a new receipt to
+the part of the group it names (the residual unit when that group is not in the
+record). A part is never deleted, and groups never move between parts.
+
+**The identity rule.** Every stored change to any part is accompanied by a new
+header value object: a write always stores the header when it stores anything, a
+rollback restore re-adds it, and an attribute cache reset reloads it. One
+identity comparison on the header therefore proves the assembled record current,
+and a part whose stored value object is unchanged is not decoded again.
+
+**Changed parts.** A write walks the entries once, compares each with the stored
+entry by object identity and then by equality, and stores only the parts that
+gained, lost or changed a group, journey or receipt, plus the header. A part
+that did not change is not encoded, pickled or saved, and a write of a state
+equal to the stored state stores nothing.
+
+**Rollback.** `activity_record_surfaces` names the header and every part a
+rollback must restore: the parts the header lists and one entry per unit of the
+current settlement-unit index, so a part a failed operation creates is named
+before it exists. Restoring re-adds a part that existed -- overwriting the value
+a cached attribute kept from the failed transaction -- and removes a part that
+did not, which also evicts it from the attribute cache.
+
+`state_to_dict` is not the stored form: it is the whole-record comparison
+projection that the owner's tests and the settlement projection use.
+
 # Background drain
 
 Developer document for the `population-backlog-drain` change. After

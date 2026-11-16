@@ -155,12 +155,15 @@ class ActivityRecordTests(RegistryIsolationMixin, EvenniaTest):
     def test_missing_and_malformed_state_refuse_without_reset(self):
         self._seed()
         self.assertTrue(monster_activity.activity_provisioned(self.wilderness))
-        saved = dict(self.wilderness.db.monster_activity)
+        header = dict(self.wilderness.db.monster_activity)
+        before = state_to_dict(
+            monster_activity.read_stored_monster_activity(self.wilderness)
+        )
 
         for malformed in (
-            {**saved, "groups": []},
-            {**saved, "unknown": 1},
-            {**saved, "settled_through_tick": True},
+            {**header, "unknown": 1},
+            {**header, "settled_through_tick": True},
+            {**header, "units": list(header["units"]) + ["t_no_such_unit"]},
         ):
             with self.subTest(malformed=malformed):
                 self.wilderness.db.monster_activity = malformed
@@ -169,8 +172,10 @@ class ActivityRecordTests(RegistryIsolationMixin, EvenniaTest):
                     read_monster_activity,
                     self.wilderness,
                 )
-        self.wilderness.db.monster_activity = saved
-        self.assertEqual(state_to_dict(read_monster_activity(self.wilderness)), saved)
+        self.wilderness.db.monster_activity = header
+        self.assertEqual(
+            state_to_dict(read_monster_activity(self.wilderness)), before
+        )
 
     @covers_requirement(
         "monster-journeys::journey-operations-restore-complete-state-on-failure-and-replay"

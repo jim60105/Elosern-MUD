@@ -19,6 +19,7 @@ named ``monster_activity_state_invalid`` reason instead of being reset.
 
 from __future__ import annotations
 
+import hashlib
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from fractions import Fraction
@@ -51,6 +52,20 @@ from world.rules.travel_cost import (
 
 #: The wilderness Attribute this owner writes and reads.
 MONSTER_ACTIVITY_ATTRIBUTE = "monster_activity"
+
+#: The category of one stored part, one per settlement unit.
+MONSTER_ACTIVITY_PART_CATEGORY = "monster_activity_part"
+
+
+def part_key(unit_id: str) -> str:
+    """The Attribute key of one settlement unit's stored part.
+
+    Evennia lower-cases and strips attribute keys, and a unit identifier is
+    built from authored keys whose case this module does not control, so the
+    key is a hex digest. The part's own ``unit`` field carries the identifier.
+    """
+    return "p" + hashlib.sha256(unit_id.encode("utf-8")).hexdigest()[:40]
+
 
 #: The named refusal for a missing or malformed owner record.
 STATE_INVALID = "monster_activity_state_invalid"
@@ -123,6 +138,10 @@ _MAX_POSTURE_SEGMENTS = 64
 _STATE_FIELDS = frozenset(
     {"groups", "journeys", "receipts", "room_protection", "settled_through_tick"}
 )
+#: The keys of the one stored header attribute.
+_HEADER_FIELDS = frozenset({"units", "room_protection", "settled_through_tick"})
+#: The keys of one stored part attribute.
+_PART_FIELDS = frozenset({"unit", "groups", "journeys", "receipts"})
 _GROUP_FIELDS = frozenset(
     {
         "member_ids",
@@ -770,7 +789,11 @@ def _room_protection_from_dict(value: Any, index: int) -> RoomProtection:
 
 
 def state_to_dict(state: MonsterActivityState) -> dict[str, Any]:
-    """The exact persisted owner record mapping."""
+    """The whole-record projection this owner's tests compare.
+
+    This is the canonical projection, not the stored form: storage keeps one
+    header beside one part per settlement unit (see :func:`part_key`).
+    """
     if not isinstance(state, MonsterActivityState):
         raise TypeError(f"expected a MonsterActivityState, got {state!r}")
     return {
@@ -790,33 +813,11 @@ def state_to_dict(state: MonsterActivityState) -> dict[str, Any]:
     }
 
 
-def state_from_dict(value: Any) -> MonsterActivityState:
-    """Parse and cross-check one exact persisted owner record mapping."""
-    data = _require_keys(value, _STATE_FIELDS, "monster_activity")
-    groups_raw = data["groups"]
-    journeys_raw = data["journeys"]
-    receipts_raw = data["receipts"]
-    if not (
-        isinstance(groups_raw, Mapping)
-        and isinstance(journeys_raw, Mapping)
-        and isinstance(receipts_raw, Mapping)
-    ):
-        raise _invalid("groups, journeys and receipts must be mappings")
-    protection_raw = data["room_protection"]
-    if not _is_sequence(protection_raw):
-        raise _invalid("room_protection must be a list")
-    groups = {
-        key: group_from_dict(key, value) for key, value in groups_raw.items()
-    }
-    for key, group in groups.items():
-        if not isinstance(key, str) or not key or group.group_id != key:
-            raise _invalid("a group's key must equal its group id")
-    journeys = {
-        key: journey_from_dict(key, value) for key, value in journeys_raw.items()
-    }
+def _cross_check(
+    groups: Mapping[str, MonsterGroup], journeys: Mapping[str, MonsterJourney]
+) -> None:
+    """The record-level consistency checks of groups against journeys."""
     for key, journey in journeys.items():
-        if not isinstance(key, str) or not key or journey.journey_id != key:
-            raise _invalid("a journey's key must equal its journey id")
         group = groups.get(journey.group_id)
         if group is None:
             raise _invalid(f"journey {key!r} names a missing group")
@@ -845,6 +846,36 @@ def state_from_dict(value: Any) -> MonsterActivityState:
             if member_id in seen_members:
                 raise _invalid(f"member {member_id} belongs to more than one group")
             seen_members.add(member_id)
+
+
+def state_from_dict(value: Any) -> MonsterActivityState:
+    """Parse and cross-check one whole-record projection mapping."""
+    data = _require_keys(value, _STATE_FIELDS, "monster_activity")
+    groups_raw = data["groups"]
+    journeys_raw = data["journeys"]
+    receipts_raw = data["receipts"]
+    if not (
+        isinstance(groups_raw, Mapping)
+        and isinstance(journeys_raw, Mapping)
+        and isinstance(receipts_raw, Mapping)
+    ):
+        raise _invalid("groups, journeys and receipts must be mappings")
+    protection_raw = data["room_protection"]
+    if not _is_sequence(protection_raw):
+        raise _invalid("room_protection must be a list")
+    groups = {
+        key: group_from_dict(key, value) for key, value in groups_raw.items()
+    }
+    for key, group in groups.items():
+        if not isinstance(key, str) or not key or group.group_id != key:
+            raise _invalid("a group's key must equal its group id")
+    journeys = {
+        key: journey_from_dict(key, value) for key, value in journeys_raw.items()
+    }
+    for key, journey in journeys.items():
+        if not isinstance(key, str) or not key or journey.journey_id != key:
+            raise _invalid("a journey's key must equal its journey id")
+    _cross_check(groups, journeys)
     receipts = {
         key: _receipt_from_dict(key, value) for key, value in receipts_raw.items()
     }
@@ -893,13 +924,6 @@ def initialize_monster_activity(wilderness: Any, *, tick: int) -> MonsterActivit
     return state
 
 
-#: The last decoded record and the stored value it came from. Every write,
-#: including an in-place saver mutation and a rollback restore, replaces the
-#: stored value object, so its identity proves the decode is still current and
-#: an unchanged record is never decoded twice. The state it holds is read-only.
-_DECODED_STATE: tuple[Any, MonsterActivityState] | None = None
-
-
 def read_monster_activity(wilderness: Any) -> MonsterActivityState:
     """Read the complete owner record; missing or malformed state refuses."""
     _require_wilderness(wilderness)
@@ -909,9 +933,128 @@ def read_monster_activity(wilderness: Any) -> MonsterActivityState:
     return read_stored_monster_activity(wilderness)
 
 
+@dataclass(frozen=True, slots=True)
+class _Part:
+    """The decoded entries of one stored part."""
+
+    groups: Mapping[str, MonsterGroup]
+    journeys: Mapping[str, MonsterJourney]
+    receipts: Mapping[str, ActivityReceipt]
+
+
+@dataclass(frozen=True, slots=True)
+class _Assembled:
+    """The last assembled record and the stored objects it came from."""
+
+    header_raw: Any
+    state: MonsterActivityState
+    placement: Mapping[tuple[str, str], str]
+    #: unit id -> (stored part value object, its decode)
+    parts: Mapping[str, tuple[Any, _Part]]
+
+
+#: The last assembled record. Every stored change to any part is accompanied by
+#: a new header value object, so one identity comparison on the header proves
+#: the whole assembled record current.
+_ASSEMBLED: _Assembled | None = None
+
+
+def _part_from_dict(unit: str, value: Any) -> _Part:
+    """Parse one exact stored part mapping."""
+    data = _require_keys(value, _PART_FIELDS, f"the part of unit {unit!r}")
+    if data["unit"] != unit:
+        raise _invalid(f"the part of unit {unit!r} names another unit")
+    groups_raw = data["groups"]
+    journeys_raw = data["journeys"]
+    receipts_raw = data["receipts"]
+    if not (
+        isinstance(groups_raw, Mapping)
+        and isinstance(journeys_raw, Mapping)
+        and isinstance(receipts_raw, Mapping)
+    ):
+        raise _invalid("a part's groups, journeys and receipts must be mappings")
+    groups = {
+        key: group_from_dict(key, value) for key, value in groups_raw.items()
+    }
+    for key, group in groups.items():
+        if not isinstance(key, str) or not key or group.group_id != key:
+            raise _invalid("a group's key must equal its group id")
+    journeys = {
+        key: journey_from_dict(key, value) for key, value in journeys_raw.items()
+    }
+    for key, journey in journeys.items():
+        if not isinstance(key, str) or not key or journey.journey_id != key:
+            raise _invalid("a journey's key must equal its journey id")
+    receipts = {
+        key: _receipt_from_dict(key, value) for key, value in receipts_raw.items()
+    }
+    return _Part(groups, journeys, receipts)
+
+
+def _assemble(wilderness: Any, header_raw: Any) -> _Assembled:
+    """Assemble the record from one stored header and the parts it lists."""
+    header = _require_keys(header_raw, _HEADER_FIELDS, MONSTER_ACTIVITY_ATTRIBUTE)
+    units_raw = header["units"]
+    if not _is_sequence(units_raw):
+        raise _invalid("units must be a list")
+    units: list[str] = []
+    listed: set[str] = set()
+    for unit in units_raw:
+        name = _require_name(unit, "part unit")
+        if name in listed:
+            raise _invalid(f"unit {name!r} is listed more than once")
+        listed.add(name)
+        units.append(name)
+    protection_raw = header["room_protection"]
+    if not _is_sequence(protection_raw):
+        raise _invalid("room_protection must be a list")
+    settled = _require_int(header["settled_through_tick"], "settled_through_tick")
+    previous = _ASSEMBLED
+    groups: dict[str, MonsterGroup] = {}
+    journeys: dict[str, MonsterJourney] = {}
+    receipts: dict[str, ActivityReceipt] = {}
+    placement: dict[tuple[str, str], str] = {}
+    parts: dict[str, tuple[Any, _Part]] = {}
+    for unit in units:
+        stored = wilderness.attributes.get(
+            part_key(unit), category=MONSTER_ACTIVITY_PART_CATEGORY, return_obj=True
+        )
+        raw = None if stored is None else stored.db_value
+        if raw is None:
+            raise _invalid(f"the part of unit {unit!r} is missing")
+        reuse = None if previous is None else previous.parts.get(unit)
+        part = reuse[1] if reuse is not None and reuse[0] is raw else _part_from_dict(unit, raw)
+        parts[unit] = (raw, part)
+        for kind, entries, merged in (
+            ("g", part.groups, groups),
+            ("j", part.journeys, journeys),
+            ("r", part.receipts, receipts),
+        ):
+            for key, value in entries.items():
+                if key in merged:
+                    raise _invalid(f"{key!r} is stored in more than one part")
+                merged[key] = value
+                placement[(kind, key)] = unit
+    _cross_check(groups, journeys)
+    protection = tuple(
+        _room_protection_from_dict(value, index)
+        for index, value in enumerate(protection_raw)
+    )
+    state = MonsterActivityState(
+        MappingProxyType(groups),
+        MappingProxyType(journeys),
+        MappingProxyType(receipts),
+        protection,
+        settled,
+    )
+    return _Assembled(
+        header_raw, state, MappingProxyType(placement), MappingProxyType(parts)
+    )
+
+
 def read_stored_monster_activity(wilderness: Any) -> MonsterActivityState:
     """The stored record, ignoring any in-flight batched state."""
-    global _DECODED_STATE
+    global _ASSEMBLED
     _require_wilderness(wilderness)
     stored = wilderness.attributes.get(MONSTER_ACTIVITY_ATTRIBUTE, return_obj=True)
     raw = None if stored is None else stored.db_value
@@ -919,12 +1062,11 @@ def read_stored_monster_activity(wilderness: Any) -> MonsterActivityState:
         raise _invalid(
             f"{MONSTER_ACTIVITY_ATTRIBUTE!r} is missing from this provisioned world"
         )
-    decoded = _DECODED_STATE
-    if decoded is not None and decoded[0] is raw:
-        return decoded[1]
-    state = state_from_dict(raw)
-    _DECODED_STATE = (raw, state)
-    return state
+    assembled = _ASSEMBLED
+    if assembled is not None and assembled.header_raw is raw:
+        return assembled.state
+    _ASSEMBLED = _assemble(wilderness, raw)
+    return _ASSEMBLED.state
 
 
 def activity_provisioned(wilderness: Any) -> bool:
@@ -942,7 +1084,161 @@ def _write_state(wilderness: Any, state: MonsterActivityState) -> None:
     if batch is not None and batch.wilderness is wilderness:
         batch.state = state
         return
-    wilderness.db.monster_activity = state_to_dict(state)
+    _store_state(wilderness, state)
+
+
+def _empty_assembled() -> _Assembled:
+    """The baseline of a world whose activity header does not exist yet."""
+    return _Assembled(
+        None,
+        MonsterActivityState(
+            MappingProxyType({}),
+            MappingProxyType({}),
+            MappingProxyType({}),
+            (),
+            0,
+        ),
+        MappingProxyType({}),
+        MappingProxyType({}),
+    )
+
+
+def _placement_unit(
+    kind: str, value: Any, placement: Mapping[tuple[str, str], str]
+) -> str:
+    """The part a new entry belongs to (design D2)."""
+    from world.maps import population_units
+
+    if kind == "g":
+        unit = population_units.unit_of_location(
+            population_units.current_unit_index(), value.home
+        )
+        return population_units.RESIDUAL_UNIT if unit is None else unit
+    unit = placement.get(("g", value.group_id))
+    return population_units.RESIDUAL_UNIT if unit is None else unit
+
+
+def _store_part(wilderness: Any, unit: str, mapping: Mapping[str, Any]) -> None:
+    """Store one part. The one function a test counts."""
+    wilderness.attributes.add(
+        part_key(unit), dict(mapping), category=MONSTER_ACTIVITY_PART_CATEGORY
+    )
+
+
+def _store_state(wilderness: Any, state: MonsterActivityState) -> None:
+    """Store the changed parts and the header; an unchanged record writes nothing."""
+    global _ASSEMBLED
+
+    header_exists = wilderness.attributes.has(MONSTER_ACTIVITY_ATTRIBUTE)
+    if header_exists:
+        read_stored_monster_activity(wilderness)
+        previous = _ASSEMBLED
+    else:
+        previous = _empty_assembled()
+    previous_state = previous.state
+    if state is previous_state:
+        return
+    # Drop the memo before storing: a store that fails midway must leave the
+    # next read assembling from what is stored instead of trusting a memo whose
+    # parts changed under an unchanged header.
+    _ASSEMBLED = None
+    placement = dict(previous.placement)
+    dirty: set[str] = set()
+    for kind, entries, old_entries in (
+        ("g", state.groups, previous_state.groups),
+        ("j", state.journeys, previous_state.journeys),
+        ("r", state.receipts, previous_state.receipts),
+    ):
+        for key, value in entries.items():
+            old = old_entries.get(key)
+            if old is value or old == value:
+                continue
+            unit = placement.get((kind, key))
+            if unit is None:
+                unit = _placement_unit(kind, value, placement)
+            placement[(kind, key)] = unit
+            dirty.add(unit)
+        for key in old_entries:
+            if key in entries:
+                continue
+            removed = placement.pop((kind, key), None)
+            if removed is not None:
+                dirty.add(removed)
+    units = sorted(set(previous.parts) | set(placement.values()))
+    if (
+        header_exists
+        and not dirty
+        and state.room_protection == previous_state.room_protection
+        and state.settled_through_tick == previous_state.settled_through_tick
+    ):
+        return
+    # Group the placement once, so each part costs one walk of its own entries.
+    by_unit: dict[str, dict[str, dict[str, Any]]] = {
+        unit: {"groups": {}, "journeys": {}, "receipts": {}}
+        for unit in dirty
+    }
+    for (kind, key), unit in placement.items():
+        target = by_unit.get(unit)
+        if target is None:
+            continue
+        if kind == "g":
+            target["groups"][key] = group_to_dict(state.groups[key])
+        elif kind == "j":
+            target["journeys"][key] = journey_to_dict(state.journeys[key])
+        else:
+            target["receipts"][key] = _receipt_to_dict(state.receipts[key])
+    for unit in sorted(dirty):
+        entries = by_unit[unit]
+        _store_part(
+            wilderness,
+            unit,
+            {
+                "unit": unit,
+                "groups": dict(sorted(entries["groups"].items())),
+                "journeys": dict(sorted(entries["journeys"].items())),
+                "receipts": dict(sorted(entries["receipts"].items())),
+            },
+        )
+    wilderness.attributes.add(
+        MONSTER_ACTIVITY_ATTRIBUTE,
+        {
+            "units": units,
+            "room_protection": [
+                _room_protection_to_dict(value) for value in state.room_protection
+            ],
+            "settled_through_tick": state.settled_through_tick,
+        },
+    )
+    header_obj = wilderness.attributes.get(
+        MONSTER_ACTIVITY_ATTRIBUTE, return_obj=True
+    )
+    header_raw = None if header_obj is None else header_obj.db_value
+    parts: dict[str, tuple[Any, _Part]] = {}
+    for unit in units:
+        if unit not in dirty:
+            parts[unit] = previous.parts[unit]
+            continue
+        stored = wilderness.attributes.get(
+            part_key(unit), category=MONSTER_ACTIVITY_PART_CATEGORY, return_obj=True
+        )
+        entries = by_unit[unit]
+        parts[unit] = (
+            None if stored is None else stored.db_value,
+            _Part(
+                MappingProxyType(
+                    {key: state.groups[key] for key in entries["groups"]}
+                ),
+                MappingProxyType(
+                    {key: state.journeys[key] for key in entries["journeys"]}
+                ),
+                MappingProxyType(
+                    {key: state.receipts[key] for key in entries["receipts"]}
+                ),
+            ),
+        )
+    _ASSEMBLED = _Assembled(
+        header_raw, state, MappingProxyType(placement), MappingProxyType(parts)
+    )
 
 
 def write_monster_activity(wilderness: Any, state: MonsterActivityState) -> None:
@@ -3410,6 +3706,41 @@ def _tracked_individual_ids(state: MonsterActivityState) -> tuple[int, ...]:
     return tuple(sorted(members))
 
 
+def activity_record_surfaces(
+    wilderness: Any,
+) -> dict[tuple[str, str | None], tuple[bool, Any]]:
+    """The header and every part as rollback surface entries.
+
+    One entry for the header, one for each part the header lists, and one for
+    each unit of the current settlement-unit index, so a part the operation
+    creates is named before it exists. An entry of a part that is not stored is
+    ``(False, None)``: restoring it removes the part.
+    """
+    from world.maps import population_units
+
+    surfaces: dict[tuple[str, str | None], tuple[bool, Any]] = {
+        (MONSTER_ACTIVITY_ATTRIBUTE, None): _db_safe_attribute_snapshot(
+            wilderness, MONSTER_ACTIVITY_ATTRIBUTE
+        ),
+    }
+    units: set[str] = set()
+    stored = wilderness.attributes.get(MONSTER_ACTIVITY_ATTRIBUTE, return_obj=True)
+    raw = None if stored is None else stored.db_value
+    if isinstance(raw, Mapping):
+        listed = raw.get("units")
+        if _is_sequence(listed):
+            units.update(
+                unit for unit in listed if isinstance(unit, str) and unit
+            )
+    units.update(population_units.all_units(population_units.current_unit_index()))
+    for unit in sorted(units):
+        key = part_key(unit)
+        surfaces[(key, MONSTER_ACTIVITY_PART_CATEGORY)] = (
+            _db_safe_attribute_snapshot(wilderness, key, MONSTER_ACTIVITY_PART_CATEGORY)
+        )
+    return surfaces
+
+
 def _scoped_individual_ids(
     state: MonsterActivityState, scope: Any
 ) -> tuple[int, ...]:
@@ -3473,11 +3804,7 @@ def snapshot_activity_surfaces(
         id(wilderness): SurfaceSnapshot(
             attributes={}
             if _ACTIVE_BATCH is not None
-            else {
-                (MONSTER_ACTIVITY_ATTRIBUTE, None): _db_safe_attribute_snapshot(
-                    wilderness, MONSTER_ACTIVITY_ATTRIBUTE
-                ),
-            }
+            else activity_record_surfaces(wilderness)
         )
     }
     try:
@@ -3640,6 +3967,7 @@ __all__ = [
     "MonsterGroup",
     "MonsterJourney",
     "MONSTER_ACTIVITY_ATTRIBUTE",
+    "MONSTER_ACTIVITY_PART_CATEGORY",
     "MODE_COMBAT",
     "MODE_IDLE",
     "MODE_JOURNEY",
@@ -3656,6 +3984,7 @@ __all__ = [
     "STATE_INVALID",
     "activity_member_mode",
     "activity_provisioned",
+    "activity_record_surfaces",
     "batched_state_writes",
     "begin_monster_journey",
     "commit_group_decision",
@@ -3676,6 +4005,7 @@ __all__ = [
     "journey_to_dict",
     "mark_member_combat",
     "next_monster_activity_boundary",
+    "part_key",
     "plan_group_decision",
     "plan_from_dict",
     "plan_to_dict",

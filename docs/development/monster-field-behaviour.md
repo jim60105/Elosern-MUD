@@ -318,7 +318,7 @@ uv run --locked openspec validate monster-activity-authoring --strict
 `mapped-monster-escape` replaces the location-preserving mapped flee with an
 atomic legal departure and a durable journey. The owner is
 `world/maps/monster_activity.py` (strict group/journey/receipt codecs, the
-sole `wilderness.db.monster_activity` writer, chronological arrival and
+sole writer of the activity header and parts, chronological arrival and
 protected-arrival waiting), the pure planner is
 `world/rules/world_escape.py`, and the resolver seam is
 `world/rules/disengage.py::_handle_disengage` with
