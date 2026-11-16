@@ -1192,13 +1192,13 @@ class RegionalPopulationTests(RegistryIsolationMixin, EvenniaTest):
                 # must restore it with the records it describes.
                 (owner.POPULATION_ZONE_SCOPE_ATTRIBUTE, None),
                 ("itemcoordinates", None),
-                # The same construction/registration operations own the
-                # map-owned activity record, so a caller rollback covers it.
-                ("monster_activity", None),
                 # Every lifecycle pass advances the per-unit settlement
                 # cursors, so the same rollback owns that record too.
                 (population_units.POPULATION_UNIT_CURSORS_ATTRIBUTE, None),
-            },
+            }
+            # The same construction/registration operations own the map-owned
+            # activity record: its header and every part.
+            | set(activity_owner.activity_record_surfaces(self.wilderness)),
         )
         # Restoring the snapshot is a faithful no-op on unchanged state.
         before = dict(self.wilderness.db.itemcoordinates)
