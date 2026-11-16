@@ -218,14 +218,17 @@ class ArtPresenterTests(EvenniaTestCase):
         self.assertNotIn(self.root.as_posix(), repr(descriptor))
 
     @covers_requirement("art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root")
-    def test_scene_card_with_a_missing_file_claims_no_generated_attempt(self):
+    def test_scene_card_with_a_missing_file_reports_a_generated_output_fault(self):
         subject = _scene()
         self._append_scene_card(subject, write=False)
         descriptor = _scene_descriptor(subject.key)
         generated = _scene_attempt(descriptor, descriptors.SCENE_RANK_GENERATED)
-        # The classic output-missing branch is gone with the classic fallback:
-        # an unpresentable card simply contributes no generated attempt.
-        self.assertEqual(generated, [])
+        # An unpresentable card contributes the reached generated-output fact
+        # at its own position and authorizes no retention.
+        self.assertEqual(
+            [(entry["type"], entry["reason"]) for entry in generated],
+            [("fault", descriptors.REASON_GENERATED_OUTPUT_MISSING)],
+        )
         self.assertEqual(descriptor["generation_state"], descriptors.GENERATION_DONE)
         self.assertEqual(descriptor["retention_sources"], [])
 
@@ -1172,7 +1175,7 @@ class OfficialPayloadTests(EvenniaTestCase):
             source="generated",
         )
         with patch(
-            "world.art.presenter.official_default_slot",
+            "world.art.gallery_match.official_default_slot",
             side_effect=AssertionError("the official step must never be consulted"),
         ):
             descriptor = describe_entity(entity)
@@ -1198,7 +1201,7 @@ class OfficialPayloadTests(EvenniaTestCase):
             error=None,
         )
         with patch(
-            "world.art.presenter.official_default_slot",
+            "world.art.gallery_match.official_default_slot",
             side_effect=AssertionError("the official step must never be consulted"),
         ):
             descriptor = describe_entity(entity)
@@ -1276,7 +1279,7 @@ class OfficialPayloadTests(EvenniaTestCase):
         )
         with (
             patch.object(official, "_CATALOG", _snapshot(over_identity)),
-            patch("world.art.presenter.log_warn") as warned,
+            patch("world.art.gallery_match.log_warn") as warned,
         ):
             descriptor = describe_entity(entity)
         self.assertEqual(terminal(descriptor)["origin"], ORIGIN_SILHOUETTE)
@@ -1295,7 +1298,7 @@ class OfficialPayloadTests(EvenniaTestCase):
         entity = self._character(age=None, apparent_age=30)
         with (
             patch(
-                "world.art.presenter.official_default_slot",
+                "world.art.gallery_match.official_default_slot",
                 side_effect=AssertionError("the official step must not run"),
             ),
             patch("world.observability.log_info") as logged,

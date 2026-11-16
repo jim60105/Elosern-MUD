@@ -90,7 +90,14 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
-from world.art.subjects import MAX_SUBJECT_KEY_LENGTH, is_valid_subject_key
+import world.art.gallery_kinds as gallery_kinds
+from world.art.subjects import (
+    MAX_SUBJECT_KEY_LENGTH,
+    ArtSubjectError,
+    is_valid_subject_key,
+    monster_subject_for,
+    scene_subject_for,
+)
 from world.lore.monster_species import MONSTER_SPECIES_REGISTRY
 from world.lore.npc_profiles import NPC_PROFILE_REGISTRY
 from world.lore.monster_visuals import is_registered_monster_visual_key
@@ -103,10 +110,12 @@ from world.observability import log_warn
 OFFICIAL_KIND_MONSTER = "monster"
 OFFICIAL_KIND_PRESET = "preset"
 OFFICIAL_KIND_NPC = "npc"
+OFFICIAL_KIND_SCENE = "scene"
 OFFICIAL_CONTENT_KINDS = (
     OFFICIAL_KIND_MONSTER,
     OFFICIAL_KIND_PRESET,
     OFFICIAL_KIND_NPC,
+    OFFICIAL_KIND_SCENE,
 )
 
 # The entity-carried provenance attribute names this resolver reads. The preset
@@ -237,6 +246,10 @@ def _registry_for(kind: str) -> Mapping[str, Any] | None:
         return PLAYER_PRESET_REGISTRY
     if kind == OFFICIAL_KIND_NPC:
         return NPC_PROFILE_REGISTRY
+    if kind == OFFICIAL_KIND_SCENE:
+        from world.art.subjects import SCENE_ARCHETYPE_REGISTRY
+
+        return SCENE_ARCHETYPE_REGISTRY
     return None
 
 
@@ -364,6 +377,46 @@ def official_content_reference_for_entity(entity: Any) -> OfficialContentReferen
     return _species_content_reference(entity)
 
 
+def official_content_reference_for_subject(
+    subject: Any, entity: Any = None
+) -> OfficialContentReference | None:
+    """The official content reference one typed art subject declares.
+
+    Registry-backed kinds derive their reference from the validated typed
+    subject alone, so a bare startup subject with no spawned entity resolves
+    the same official artwork its presentation does: a monster visual species
+    revalidates through the monster subject producer and names
+    ``monster/<species>``; a scene archetype revalidates through the scene
+    producer and names ``scene/<archetype>``. The kind's declared
+    ``official_reference_policy`` decides which arm runs — never a comparison
+    against a subject kind literal.
+
+    The entity-provenance policy delegates to the existing entity resolver, so
+    a character's preset/NPC reference comes only from stored provenance and
+    never from a stable key, display name or numeric identity. A subject whose
+    key no registry declares answers ``None`` silently: this is a read-only
+    lookup, not the subject producer's named rejection.
+    """
+    policy = gallery_kinds.capabilities_for(
+        subject.kind.value
+    ).official_reference_policy
+    if policy == "entity_provenance":
+        return official_content_reference_for_entity(entity)
+    if policy == "visual_species":
+        try:
+            validated = monster_subject_for(subject.key)
+        except ArtSubjectError:  # observability: ignore R2: an unregistered read has no official reference
+            return None
+        return official_content_reference(OFFICIAL_KIND_MONSTER, validated.key)
+    if policy == "scene_archetype":
+        try:
+            validated = scene_subject_for(subject.key)
+        except ArtSubjectError:  # observability: ignore R2: an unregistered read has no official reference
+            return None
+        return official_content_reference(OFFICIAL_KIND_SCENE, validated.key)
+    return None
+
+
 __all__ = [
     "MAX_UNRESOLVED_DIAGNOSTICS",
     "NPC_PROFILE_PROVENANCE_ATTRIBUTE",
@@ -371,6 +424,7 @@ __all__ = [
     "OFFICIAL_KIND_MONSTER",
     "OFFICIAL_KIND_NPC",
     "OFFICIAL_KIND_PRESET",
+    "OFFICIAL_KIND_SCENE",
     "PRESET_PROVENANCE_ATTRIBUTE",
     "SPECIES_PROVENANCE_ATTRIBUTE",
     "UNRESOLVED_REFERENCE_EVENT",
@@ -379,5 +433,6 @@ __all__ = [
     "official_content_reference",
     "official_content_reference_for_entity",
     "official_content_reference_for_preset",
+    "official_content_reference_for_subject",
     "registered_content_key",
 ]

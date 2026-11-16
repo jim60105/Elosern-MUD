@@ -61,6 +61,7 @@ PRODUCTION_ROOTS = ("commands", "server", "typeclasses", "world", "web/webclient
 # typeclass, no transport.
 EXPECTED_PROJECT_IMPORTS = frozenset(
     {
+        "world.art.gallery_kinds",
         "world.art.subjects",
         "world.lore.monster_species",
         "world.lore.monster_visuals",
@@ -240,10 +241,15 @@ class ReferenceTypeTests(unittest.TestCase):
     @covers_requirement(
         "official-content-provenance::an-official-content-reference-is-typed-validated-and-provenance-derived"
     )
-    def test_the_vocabulary_is_exactly_the_three_kinds_in_layout_order(self):
+    def test_the_vocabulary_is_exactly_the_four_kinds_in_layout_order(self):
         self.assertEqual(
             OFFICIAL_CONTENT_KINDS,
-            (OFFICIAL_KIND_MONSTER, OFFICIAL_KIND_PRESET, OFFICIAL_KIND_NPC),
+            (
+                OFFICIAL_KIND_MONSTER,
+                OFFICIAL_KIND_PRESET,
+                OFFICIAL_KIND_NPC,
+                "scene",
+            ),
         )
 
     def test_a_reference_accepts_every_closed_kind_with_a_contract_key(self):
@@ -741,7 +747,12 @@ class MonsterBoundaryTests(unittest.TestCase):
                     "world/art/official_refs.py",
                     "_species_content_reference",
                     "_declared_reference",
-                )
+                ),
+                (
+                    "world/art/official_refs.py",
+                    "official_content_reference_for_subject",
+                    "official_content_reference",
+                ),
             },
             f"unexpected monster-kind reference sites: {sorted(locations)}",
         )

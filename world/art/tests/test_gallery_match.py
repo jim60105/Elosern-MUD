@@ -27,12 +27,13 @@ from django.test import override_settings
 from evennia.utils.test_resources import EvenniaTestCase
 from PIL import Image
 
-from world.art import gallery_kinds, official, official_refs
+from world.art import gallery_kinds, official, official_refs, subjects
 from world.art.gallery import (
     DEFAULT_FACE_RECT,
     GalleryRecord,
     append_card,
     cards_for,
+    clear_official_selection,
     official_preferences_for,
     record_for,
     record_key,
@@ -62,6 +63,7 @@ from world.art.official_refs import (
 )
 from world.art.store import ArtAssetRecord
 from world.art.subjects import ArtSubject, ArtSubjectKind
+from world.lore import monster_visuals
 
 from tools.spec_traceability import covers_requirement
 
@@ -677,6 +679,101 @@ class OfficialDefaultStepTests(EvenniaTestCase):
         self.assertTrue(all(fact is not None for fact in facts))
         self.assertTrue(all(fact == facts[0] for fact in facts))
         self.assertEqual(before, after)
+
+
+class _AttributeStore(dict):
+    """The minimal entity attribute surface the preference writers use."""
+
+    def add(self, key, value):
+        self[key] = value
+
+
+class _PreferenceEntity:
+    """One entity-shaped stand-in carrying only its own preference attributes."""
+
+    def __init__(self):
+        self.attributes = _AttributeStore()
+
+
+def _catalog_for(kind: str, key: str, identity: str) -> OfficialCatalog:
+    content = OfficialContent(
+        kind=kind, key=key, default_identity=identity, images=(identity,)
+    )
+    image = OfficialImage(
+        identity=identity,
+        kind=kind,
+        key=key,
+        fingerprint="a" * 64,
+        image_size={"width": 4, "height": 4},
+        face_rect=dict(DEFAULT_FACE_RECT),
+        stage={"scale": 1.0, "x": 0.0, "y": 0.0},
+    )
+    return OfficialCatalog({(kind, key): content}, {identity: image})
+
+
+class BareRegistrySubjectTests(EvenniaTestCase):
+    """The registry-backed official reference needs no spawned entity."""
+
+    @covers_requirement(
+        "official-art-resolution::the-extended-chain-stays-deterministic-offline-and-side-effect-free"
+    )
+    def test_bare_scene_and_species_subjects_resolve_their_catalog_defaults(self):
+        scene_key = "t_synth_scene"
+        species_key = "t_synth_species"
+        scene_identity = f"scene/{scene_key}/a.png"
+        species_identity = f"monster/{species_key}/a.png"
+        with (
+            patch.object(
+                subjects, "SCENE_ARCHETYPE_REGISTRY", {scene_key: object()}
+            ),
+            patch.object(
+                monster_visuals,
+                "get_monster_visual_registry",
+                return_value={species_key: object()},
+            ),
+            patch.object(
+                official,
+                "_CATALOG",
+                _catalog_for("scene", scene_key, scene_identity),
+            ),
+        ):
+            facts = official_default_for(_scene(scene_key), None)
+        self.assertEqual(facts["identity"], scene_identity)
+        with (
+            patch.object(
+                monster_visuals,
+                "get_monster_visual_registry",
+                return_value={species_key: object()},
+            ),
+            patch.object(
+                official,
+                "_CATALOG",
+                _catalog_for("monster", species_key, species_identity),
+            ),
+        ):
+            facts = official_default_for(_monster(species_key), None)
+        self.assertEqual(facts["identity"], species_identity)
+
+    @covers_requirement(
+        "official-art-personalization::a-personal-official-selection-is-an-entity-local-art-preference"
+    )
+    def test_monster_choices_stay_entity_local_and_never_create_a_species_record(self):
+        subject = _monster("t_synth_species")
+        identity = "monster/t_synth_species/a.png"
+        first, second = _PreferenceEntity(), _PreferenceEntity()
+        set_official_selection(subject, identity, entity=first)
+        self.assertEqual(
+            official_preferences_for(subject, entity=first).selection, identity
+        )
+        self.assertIsNone(
+            official_preferences_for(subject, entity=second).selection
+        )
+        self.assertIsNone(official_preferences_for(subject).selection)
+        self.assertIsNone(record_for(subject))
+        clear_official_selection(subject, entity=first)
+        self.assertIsNone(
+            official_preferences_for(subject, entity=first).selection
+        )
 
 
 class ImportBoundaryTests(unittest.TestCase):

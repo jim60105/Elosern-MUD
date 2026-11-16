@@ -40,7 +40,7 @@ from evennia.utils.test_resources import EvenniaTest
 
 from typeclasses.monsters import Monster
 from typeclasses.npcs import NPC
-from world.art import official, official_refs
+from world.art import official, official_refs, subjects
 from world.art.gallery import (
     GalleryRecord,
     append_card,
@@ -57,7 +57,9 @@ from world.art.official_refs import (
     OfficialContentReference,
     official_content_reference_for_entity,
     official_content_reference_for_preset,
+    official_content_reference_for_subject,
 )
+from world.lore import monster_visuals
 from world.art.store import ArtAssetRecord
 from world.art.subjects import ArtSubject, ArtSubjectKind
 from tools.spec_traceability import covers_requirement
@@ -75,6 +77,7 @@ _SYNTH_PRESET = "t_synth_preset"
 _SYNTH_PROFILE = "t_synth_profile"
 _SYNTH_TIER = "t_synth_tier"
 _SYNTH_SPECIES = "t_synth_species"
+_SYNTH_SCENE = "t_synth_scene"
 
 
 def patch_registry(name: str, value):
@@ -290,6 +293,71 @@ class MonsterBoundaryTests(EvenniaTest):
                 # this monster's tier and display text, never a stored species
                 # identity, so the species arm has no provenance to answer from.
                 self.assertIsNone(official_content_reference_for_entity(monster))
+
+
+class BareRegistrySubjectReferenceTests(EvenniaTest):
+    """Registry-backed subjects resolve their own official reference with no entity."""
+
+    def setUp(self):
+        super().setUp()
+        official_refs._reported_unresolved.clear()
+        self.addCleanup(official_refs._reported_unresolved.clear)
+
+    @covers_requirement(
+        "official-art-resolution::the-extended-chain-stays-deterministic-offline-and-side-effect-free"
+    )
+    def test_a_bare_registered_scene_subject_resolves_its_archetype_reference(self):
+        subject = ArtSubject(ArtSubjectKind.SCENE, _SYNTH_SCENE)
+        with patch.object(
+            subjects, "SCENE_ARCHETYPE_REGISTRY", {_SYNTH_SCENE: object()}
+        ):
+            reference = official_content_reference_for_subject(subject)
+            self.assertEqual(
+                reference, OfficialContentReference("scene", _SYNTH_SCENE)
+            )
+            unknown = official_content_reference_for_subject(
+                ArtSubject(ArtSubjectKind.SCENE, "t_synth_absent")
+            )
+        self.assertIsNone(unknown)
+        self.assertIsNone(record_for(subject))
+
+    @covers_requirement(
+        "official-art-resolution::the-extended-chain-stays-deterministic-offline-and-side-effect-free"
+    )
+    def test_a_bare_registered_species_subject_resolves_its_species_reference(self):
+        subject = ArtSubject(ArtSubjectKind.MONSTER, _SYNTH_SPECIES)
+        with patch.object(
+            monster_visuals,
+            "get_monster_visual_registry",
+            return_value={_SYNTH_SPECIES: object()},
+        ):
+            reference = official_content_reference_for_subject(subject)
+            self.assertEqual(
+                reference, OfficialContentReference("monster", _SYNTH_SPECIES)
+            )
+            unknown = official_content_reference_for_subject(
+                ArtSubject(ArtSubjectKind.MONSTER, "t_synth_absent")
+            )
+        self.assertIsNone(unknown)
+        self.assertIsNone(record_for(subject))
+
+    @covers_requirement(
+        "official-art-resolution::the-extended-chain-stays-deterministic-offline-and-side-effect-free"
+    )
+    def test_character_subjects_never_infer_a_reference_without_provenance(self):
+        subject = ArtSubject(ArtSubjectKind.CHARACTER, _SYNTH_PRESET)
+        with patch_registry("PLAYER_PRESET_REGISTRY", {_SYNTH_PRESET: object()}):
+            # The stable key equals a registered preset key; without an entity
+            # carrying stored provenance the character reference stays absent.
+            self.assertIsNone(official_content_reference_for_subject(subject))
+            self.assertIsNone(official_content_reference_for_subject(subject, None))
+        character = create_object(NPC, key="t_synth_character")
+        character.attributes.add(PRESET_PROVENANCE_ATTRIBUTE, _SYNTH_PRESET)
+        with patch_registry("PLAYER_PRESET_REGISTRY", {_SYNTH_PRESET: object()}):
+            self.assertEqual(
+                official_content_reference_for_subject(subject, character),
+                OfficialContentReference(OFFICIAL_KIND_PRESET, _SYNTH_PRESET),
+            )
 
 
 class PlaceholderIdentityTests(EvenniaTest):

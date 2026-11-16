@@ -144,18 +144,18 @@ OFFICIAL_CATALOG_EVENT = "official_art_catalog_loaded"
 # is ever parsed as one (the seed-metadata convention).
 OFFICIAL_MANIFEST_FILENAME = "manifest.json"
 
-# The closed ENTITY-REFERENCE content-kind vocabulary, in the documented
-# layout order. It is the vocabulary ``world.art.official_refs`` mirrors for
-# entity-carried official references (``official-content-provenance``): a kind
-# here must have a provenance attribute that resolver can map, so extending it
-# is a data-owner change, never an indexing change.
-OFFICIAL_CONTENT_KINDS = ("monster", "preset", "npc")
+# The closed CONTENT-REFERENCE kind vocabulary, in the documented layout order.
+# It is the vocabulary ``world.art.official_refs`` mirrors for subject-carried
+# official references (``official-content-provenance`` and
+# ``unify-artwork-selection``): an entity-provenance kind resolves from stored
+# attributes, a registry-backed kind from its validated typed subject.
+OFFICIAL_CONTENT_KINDS = ("monster", "preset", "npc", "scene")
 
 # The closed INDEX layout vocabulary, in the documented layout order. This is
-# the vocabulary the startup walk accepts: the reference vocabulary above plus
-# the two operator-only content kinds ``unified-scene-catalog`` adds, whose
-# entity metadata is owned by the map owner and the scene renderer.
-OFFICIAL_LAYOUT_KINDS = OFFICIAL_CONTENT_KINDS + ("scene", "room")
+# the vocabulary the startup walk accepts: the content-reference vocabulary
+# above plus the operator-only ``room`` content kind, whose authored membership
+# is owned by the map owner and the scene renderer.
+OFFICIAL_LAYOUT_KINDS = OFFICIAL_CONTENT_KINDS + ("room",)
 
 # The exact manifest key contract: anything else makes the manifest invalid.
 _MANIFEST_KEYS = frozenset({"default", "face_rect", "stage"})
@@ -502,15 +502,14 @@ def _registered_preset_keys() -> frozenset[str]:
 def _registered_scene_keys() -> frozenset[str]:
     """The authored scene-art keys — the ``scene`` kind's registry.
 
-    The closed scene-key vocabulary (every registered archetype plus the
-    explicit dream type) the bundled collection and the media boundary use, so
-    an operator ``scene/<key>/`` directory can only name a scene that actually
-    exists in the game. Imported per call (this module may not import the art
-    definitions at module level; see the module docstring).
+    The closed scene-key vocabulary is the immutable scene-archetype registry,
+    so an operator ``scene/<key>/`` directory can only name a scene that
+    actually exists in the game. Imported per call (this module may not import
+    the art definitions at module level; see the module docstring).
     """
-    from world.art.scene_definitions import SCENE_ART_DEFINITIONS
+    from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY
 
-    return frozenset(SCENE_ART_DEFINITIONS)
+    return frozenset(SCENE_ARCHETYPE_REGISTRY)
 
 
 def _registered_room_art_keys() -> frozenset[str]:

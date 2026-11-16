@@ -152,6 +152,12 @@ TERMINAL_KINDS = (TERMINAL_ALPHA_MASK, TERMINAL_SCENE_IMAGE)
 
 #: The classic-artwork request ceiling: one exact original is the whole layer.
 MAX_SOURCE_LAYERS_PER_SUBJECT = 2
+#: The shared media-URL ceiling every canonical resource must fit on the wire.
+#: Card and fallback identities are bounded by the subject-key contract, but an
+#: official identity embeds an operator-chosen filename, so selection treats an
+#: over-budget official resource as unavailable everywhere (presentation and the
+#: automatic-generation satisfaction guard alike).
+MAX_MEDIA_URL = 256
 # The exact-gallery ranks. The requested original is the subject's own image;
 # the alpha silhouette is a terminal fallback, never a competing original.
 GALLERY_RANK_ORIGINAL = 10
@@ -177,6 +183,7 @@ PORTRAIT_RANK_ALPHA = GALLERY_RANK_ALPHA
 # are positions, never attempt-array indexes, and a fault keeps the rank of the
 # source it belongs to.
 SCENE_RANK_ROOM = 10
+SCENE_RANK_SELECTED = 15
 SCENE_RANK_GENERATED = 20
 SCENE_RANK_OPERATOR = 30
 SCENE_RANK_BUNDLED = 40
@@ -189,6 +196,7 @@ SCENE_RANK_TERMINAL = 100
 # identity, or one admitted image's identity), exactly like the portrait
 # chain's own official faults, so two facts of one position never collide.
 SCENE_ROOM_SOURCE_PREFIX = "scene.room"
+SCENE_SELECTED_SOURCE_PREFIX = "scene.selected"
 SCENE_GENERATED_SOURCE_PREFIX = "scene.generated"
 SCENE_OPERATOR_SOURCE_PREFIX = "scene.operator"
 SCENE_BUNDLED_SOURCE_PREFIX = "scene.bundled"
@@ -198,6 +206,11 @@ SCENE_TERMINAL_SOURCE_PREFIX = "scene.terminal"
 def scene_room_source_id(room_art_key: str) -> str:
     """The canonical source id of one authored per-room operator override."""
     return f"{SCENE_ROOM_SOURCE_PREFIX}:{room_art_key}"
+
+
+def scene_selected_source_id(identity: str) -> str:
+    """The canonical source id of one scene archetype's explicit official choice."""
+    return f"{SCENE_SELECTED_SOURCE_PREFIX}:{identity}"
 
 
 def scene_generated_source_id(generation_subject: str) -> str:

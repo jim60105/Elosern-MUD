@@ -1950,22 +1950,82 @@ class SceneGalleryActionTests(EvenniaTest):
         self.assertEqual((result["outcome"], result["code"]), ("rejected", "subject_not_admitted"))
         self.assertEqual(queue.pending_gallery_jobs(unentered), [])
 
+    def _scene_official_catalog(self):
+        identity = f"scene/{T_SCENE}/official.png"
+        content = official.OfficialContent(
+            kind="scene",
+            key=T_SCENE,
+            default_identity=identity,
+            images=(identity,),
+        )
+        image = official.OfficialImage(
+            identity=identity,
+            kind="scene",
+            key=T_SCENE,
+            fingerprint="a" * 64,
+            image_size={"width": 16, "height": 9},
+            face_rect={"x": 0.25, "y": 0.25, "w": 0.5, "h": 0.5},
+            stage={"scale": 1.0, "x": 0.0, "y": 0.0},
+        )
+        return identity, official.OfficialCatalog(
+            {("scene", T_SCENE): content}, {identity: image}
+        )
+
     @covers_requirement(
         "webclient-gallery-management-actions::gallery-mutations-resolve-scene-subjects-through-the-scene-producer"
     )
-    def test_official_preferences_are_refused_for_a_scene_without_a_write(self):
-        self.card()
+    def test_admitted_scene_official_selection_uses_shared_state(self):
+        image_id = self.card()
+        identity, catalog = self._scene_official_catalog()
+        with patch.object(official, "_CATALOG", catalog):
+            selected = self.run_action(
+                "gallery.official.select",
+                {"subject_key": self.subject.full(), "identity": identity},
+            )
+            self.assertEqual(selected["outcome"], "success", selected)
+            self.assertEqual(
+                api.official_preferences_for(self.subject).selection, identity
+            )
+            # Selecting official artwork never erases the shared generated
+            # card or its default pointer.
+            self.assertEqual(
+                [card["image_id"] for card in api.cards_for(self.subject)],
+                [image_id],
+            )
+            self.assertEqual(
+                api.record_for(self.subject).db.default_image_id, image_id
+            )
+            cleared = self.run_action(
+                "gallery.official.clear_selection",
+                {"subject_key": self.subject.full()},
+            )
+            self.assertEqual(cleared["outcome"], "success")
+            self.assertIsNone(
+                api.official_preferences_for(self.subject).selection
+            )
+            self.assertEqual(
+                api.record_for(self.subject).db.default_image_id, image_id
+            )
+
+    @covers_requirement(
+        "webclient-gallery-management-actions::gallery-mutations-require-an-admitted-subject"
+    )
+    def test_an_unadmitted_scene_official_selection_is_rejected_without_writes(self):
+        unentered = ArtSubject(ArtSubjectKind.SCENE, T_SCENE_UNENTERED)
+        identity, catalog = self._scene_official_catalog()
         before = [
             (record.pk, {attribute.key: deepcopy(attribute.value) for attribute in record.attributes.all()})
             for record in api.GalleryRecord.objects.order_by("pk")
         ]
-        for action, payload in (
-            ("gallery.official.clear_selection", {"subject_key": self.subject.full()}),
-            ("gallery.official.select", {"subject_key": self.subject.full(), "identity": OFFICIAL_IDENTITY}),
-        ):
-            with self.subTest(action=action):
-                result = self.run_action(action, payload)
-                self.assertEqual((result["outcome"], result["code"]), ("rejected", "official_unsupported"))
+        with patch.object(official, "_CATALOG", catalog):
+            result = self.run_action(
+                "gallery.official.select",
+                {"subject_key": unentered.full(), "identity": identity},
+            )
+        self.assertEqual(
+            (result["outcome"], result["code"]),
+            ("rejected", "subject_not_admitted"),
+        )
         after = [
             (record.pk, {attribute.key: deepcopy(attribute.value) for attribute in record.attributes.all()})
             for record in api.GalleryRecord.objects.order_by("pk")

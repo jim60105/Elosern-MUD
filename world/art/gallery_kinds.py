@@ -29,6 +29,14 @@ card is replaced by regeneration); a kind without a gallery declares none.
 field selection, free text, face rectangle or stage transform — the monster
 kind's set plus card deletion and without the two geometry facts.
 
+``unify-artwork-selection`` adds the closed policy declarations every shared
+selection, suppression and preference-routing decision reads instead of
+comparing subject kinds: the official-reference policy (entity provenance,
+visual species, or scene archetype), the official-preference owner (subject or
+entity), the terminal policy (person alpha or scene bundled/terminal), and the
+temporary classic-source support flag. The policies are closed string
+vocabularies, imported by nothing, and a gallery-less kind declares ``none``.
+
 This module lives HERE — with zero imports — exactly like
 ``world/art/fallback_keys.py`` and for the same reason: ``world/art/subjects.py``
 imports ``world/art/gallery_prompt.py`` at module level, so a capability table
@@ -54,6 +62,18 @@ _SCENE_KIND_VALUE = "scene"
 _CHARACTER_KIND_VALUE = "portrait:character"
 _MONSTER_KIND_VALUE = "portrait:monster"
 
+# The closed policy vocabularies every shared selection, suppression and
+# preference-routing decision dispatches on. They are plain strings so this
+# module keeps zero imports and no runtime object references.
+OFFICIAL_REFERENCE_POLICIES = (
+    "entity_provenance",
+    "visual_species",
+    "scene_archetype",
+    "none",
+)
+OFFICIAL_PREFERENCE_SCOPES = ("subject", "entity", "none")
+TERMINAL_POLICIES = ("alpha", "scene", "none")
+
 
 class GalleryKindCapabilities:
     """One immutable capability record for one subject kind value."""
@@ -70,6 +90,10 @@ class GalleryKindCapabilities:
         "supports_face_rect",
         "supports_stage",
         "supports_card_delete",
+        "official_reference_policy",
+        "official_preference_scope",
+        "terminal_policy",
+        "supports_classic_source",
     )
 
     def __init__(
@@ -85,6 +109,10 @@ class GalleryKindCapabilities:
         supports_face_rect: bool,
         supports_stage: bool,
         supports_card_delete: bool,
+        official_reference_policy: str,
+        official_preference_scope: str,
+        terminal_policy: str,
+        supports_classic_source: bool,
     ) -> None:
         object.__setattr__(self, "kind_value", kind_value)
         object.__setattr__(self, "has_gallery", has_gallery)
@@ -97,6 +125,14 @@ class GalleryKindCapabilities:
         object.__setattr__(self, "supports_face_rect", supports_face_rect)
         object.__setattr__(self, "supports_stage", supports_stage)
         object.__setattr__(self, "supports_card_delete", supports_card_delete)
+        object.__setattr__(
+            self, "official_reference_policy", official_reference_policy
+        )
+        object.__setattr__(
+            self, "official_preference_scope", official_preference_scope
+        )
+        object.__setattr__(self, "terminal_policy", terminal_policy)
+        object.__setattr__(self, "supports_classic_source", supports_classic_source)
 
     def __setattr__(self, name: str, value: object) -> "None":
         raise TypeError(
@@ -120,7 +156,11 @@ class GalleryKindCapabilities:
             f"supports_free_text={self.supports_free_text!r}, "
             f"supports_face_rect={self.supports_face_rect!r}, "
             f"supports_stage={self.supports_stage!r}, "
-            f"supports_card_delete={self.supports_card_delete!r})"
+            f"supports_card_delete={self.supports_card_delete!r}, "
+            f"official_reference_policy={self.official_reference_policy!r}, "
+            f"official_preference_scope={self.official_preference_scope!r}, "
+            f"terminal_policy={self.terminal_policy!r}, "
+            f"supports_classic_source={self.supports_classic_source!r})"
         )
 
     def with_values(self, **changes) -> "GalleryKindCapabilities":
@@ -141,6 +181,10 @@ class GalleryKindCapabilities:
             "supports_face_rect": self.supports_face_rect,
             "supports_stage": self.supports_stage,
             "supports_card_delete": self.supports_card_delete,
+            "official_reference_policy": self.official_reference_policy,
+            "official_preference_scope": self.official_preference_scope,
+            "terminal_policy": self.terminal_policy,
+            "supports_classic_source": self.supports_classic_source,
         }
         unknown = set(changes) - set(fields)
         if unknown:
@@ -227,6 +271,10 @@ _CAPABILITIES_BY_KIND_VALUE: dict = {
         supports_face_rect=True,
         supports_stage=True,
         supports_card_delete=True,
+        official_reference_policy="entity_provenance",
+        official_preference_scope="subject",
+        terminal_policy="alpha",
+        supports_classic_source=True,
     ),
     _MONSTER_KIND_VALUE: GalleryKindCapabilities(
         kind_value=_MONSTER_KIND_VALUE,
@@ -240,6 +288,10 @@ _CAPABILITIES_BY_KIND_VALUE: dict = {
         supports_face_rect=True,
         supports_stage=True,
         supports_card_delete=False,
+        official_reference_policy="visual_species",
+        official_preference_scope="entity",
+        terminal_policy="alpha",
+        supports_classic_source=True,
     ),
     _SCENE_KIND_VALUE: GalleryKindCapabilities(
         kind_value=_SCENE_KIND_VALUE,
@@ -253,6 +305,10 @@ _CAPABILITIES_BY_KIND_VALUE: dict = {
         supports_face_rect=False,
         supports_stage=False,
         supports_card_delete=True,
+        official_reference_policy="scene_archetype",
+        official_preference_scope="subject",
+        terminal_policy="scene",
+        supports_classic_source=False,
     ),
 }
 
@@ -394,6 +450,23 @@ def validate_declaration_contract(kind_values: "tuple[str, ...]") -> list:
                 f"kind {value!r} declares card maximum {record.max_cards!r} "
                 f"outside the admitted values (None or exactly the int 1)"
             )
+        for flag in ("supports_classic_source",):
+            if not isinstance(getattr(record, flag), bool):
+                violations.append(
+                    f"kind {value!r} declares {flag} "
+                    f"{getattr(record, flag)!r}, not a bool"
+                )
+        for field, vocabulary in (
+            ("official_reference_policy", OFFICIAL_REFERENCE_POLICIES),
+            ("official_preference_scope", OFFICIAL_PREFERENCE_SCOPES),
+            ("terminal_policy", TERMINAL_POLICIES),
+        ):
+            declared = getattr(record, field)
+            if declared not in vocabulary:
+                violations.append(
+                    f"kind {value!r} declares {field} {declared!r} "
+                    f"outside the closed vocabulary {vocabulary}"
+                )
         if record.has_gallery:
             if not isinstance(record.store_directory, str) or not record.store_directory:
                 violations.append(
@@ -426,6 +499,25 @@ def validate_declaration_contract(kind_values: "tuple[str, ...]") -> list:
                     violations.append(
                         f"no-gallery kind {value!r} declares {flag}"
                     )
+            if record.official_reference_policy != "none":
+                violations.append(
+                    f"no-gallery kind {value!r} declares official reference policy "
+                    f"{record.official_reference_policy!r}"
+                )
+            if record.official_preference_scope != "none":
+                violations.append(
+                    f"no-gallery kind {value!r} declares official preference scope "
+                    f"{record.official_preference_scope!r}"
+                )
+            if record.terminal_policy != "none":
+                violations.append(
+                    f"no-gallery kind {value!r} declares terminal policy "
+                    f"{record.terminal_policy!r}"
+                )
+            if record.supports_classic_source:
+                violations.append(
+                    f"no-gallery kind {value!r} declares supports_classic_source"
+                )
     return violations
 
 
@@ -433,6 +525,9 @@ __all__ = [
     "ADMITTED_MAXIMA",
     "GALLERY_KIND_CAPABILITIES",
     "GalleryKindCapabilities",
+    "OFFICIAL_PREFERENCE_SCOPES",
+    "OFFICIAL_REFERENCE_POLICIES",
+    "TERMINAL_POLICIES",
     "capabilities_for",
     "gallery_store_directory_segments",
     "has_gallery",

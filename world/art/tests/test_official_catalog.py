@@ -1058,22 +1058,23 @@ class OfficialReferenceContractTests(unittest.TestCase):
 
         self.assertEqual(official_refs.OFFICIAL_CONTENT_KINDS, official.OFFICIAL_CONTENT_KINDS)
 
-    def test_the_layout_vocabulary_adds_exactly_the_two_operator_content_kinds(self):
+    def test_the_layout_vocabulary_adds_exactly_the_operator_only_room_kind(self):
         """The index vocabulary and the entity-reference vocabulary differ by design.
 
-        ``OFFICIAL_CONTENT_KINDS`` is the ENTITY-REFERENCE vocabulary
-        ``world.art.official_refs`` mirrors (``official-content-provenance``),
-        where every kind must have a provenance attribute the resolver can map;
-        ``OFFICIAL_LAYOUT_KINDS`` is the closed vocabulary of the startup walk,
-        which ``unified-scene-catalog`` extended with the operator-only
-        ``scene`` and ``room`` content. Growing the reference vocabulary would
-        change that resolver's contract, so it is pinned unchanged here.
+        ``OFFICIAL_CONTENT_KINDS`` is the CONTENT-REFERENCE vocabulary
+        ``world.art.official_refs`` mirrors (``official-content-provenance``
+        and ``unify-artwork-selection``); it now includes ``scene`` because a
+        scene archetype is a registry-backed official reference.
+        ``OFFICIAL_LAYOUT_KINDS`` is the closed vocabulary of the startup walk:
+        the reference kinds plus the operator-only ``room`` authored override.
         """
         from world.art import official_refs
 
-        self.assertEqual(OFFICIAL_CONTENT_KINDS, ("monster", "preset", "npc"))
         self.assertEqual(
-            OFFICIAL_LAYOUT_KINDS, OFFICIAL_CONTENT_KINDS + ("scene", "room")
+            OFFICIAL_CONTENT_KINDS, ("monster", "preset", "npc", "scene")
+        )
+        self.assertEqual(
+            OFFICIAL_LAYOUT_KINDS, OFFICIAL_CONTENT_KINDS + ("room",)
         )
         self.assertEqual(official_refs.OFFICIAL_CONTENT_KINDS, OFFICIAL_CONTENT_KINDS)
 
