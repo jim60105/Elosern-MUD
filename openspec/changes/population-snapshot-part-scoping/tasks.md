@@ -1,0 +1,30 @@
+# Tasks
+
+"The test prefix" means `uv run --locked --env-file=.env.evennia-test evennia test --settings test_settings.py --keepdb`. Run each test command standalone (no pipe, no redirect), with one dotted label.
+Do not add `covers_requirement` for the ADDED requirements of this change; that happens at archive.
+Tests use synthetic zones, areas and groups only (`ScopedSettlementFixture` of `world/maps/tests/test_scoped_population_settlement.py`). No test asserts elapsed real time.
+Do not edit any restore function, any owner operation, `world/maps/population_units.py`, `world/maps/population_drain.py`, or any caller of `snapshot_population_surfaces` or `snapshot_activity_surfaces` other than the two named in design D3 and D4.
+
+## 1. Preconditions
+
+- [ ] 1.1 Confirm `monster-activity-record-parts` is merged. Verify: `grep -c "def activity_record_surfaces\|def read_stored_monster_activity\|def part_key" world/maps/monster_activity.py` prints 3. If not, stop and report.
+
+## 2. Scoped activity surfaces
+
+- [ ] 2.1 Apply design D1, D2 and D3 to `world/maps/monster_activity.py`; export `scope_part_units` in `__all__`. Verify: `grep -c "def scope_part_units" world/maps/monster_activity.py` prints 1.
+- [ ] 2.2 Create `world/maps/tests/test_population_snapshot_scope.py` on `ScopedSettlementFixture` and register it in `.github/evennia-shards.json` directly after `"world.maps.tests.test_scoped_population_settlement"`. Tests in this task, each reading the wilderness surface as `registry[id(self.wilderness)].attributes` from `monster_activity.snapshot_monster_activity_surfaces(START, END, scope=scope)` with `scope = population_units.build_scope(self.wilderness, {self.unit_a})`: (a) another unit's part is left out: after `self._build_scenario()`, the keys with category `MONSTER_ACTIVITY_PART_CATEGORY` are exactly `{part_key(u) for u in scope_part_units(self.wilderness, scope)}`, they include `part_key(self.unit_a)` and exclude `part_key(self.unit_b)`; (b) a group stored outside its present units: create a group homed on a second-zone cell (it is stored in the second zone's part), rewrite its `home` to a first-zone cell through `write_monster_activity`, build a scope whose `group_ids` contains that group (seed it with every unit `population_units.group_units` answers for the rewritten group), and assert `part_key(self.unit_b)` is among the keys; (c) orphan receipt: write a state whose receipts hold one receipt naming a missing group, created while that group existed in the first zone; assert its part is present for `build_scope(self.wilderness, {population_units.RESIDUAL_UNIT})` and absent for a scope of the second zone's unit; (d) writes stay inside the named parts: after `self._build_scenario()`, compute `scope_part_units` for the scope of `self.unit_a`, patch `world.maps.monster_activity._store_part` with `wraps=`, run `population_lifecycle.settle_population_scope(self.wilderness, {self.unit_a}, END)`, and assert the pass stored at least one part and every unit it stored is in the computed set. Verify: the test prefix with `world.maps.tests.test_population_snapshot_scope` passes.
+
+## 3. Lifecycle registry
+
+- [ ] 3.1 Apply design D4 to `world/maps/regional_population.py` and `world/maps/population_lifecycle.py`. Add to `world/maps/tests/test_population_snapshot_scope.py`: growing the far zone (build the lifecycle registry with `population_lifecycle.snapshot_population_lifecycle_surfaces(START, END, scope=scope)` once with one second-zone group and once with six; both name the same activity entries, that is the header key and the same part keys); part created by a failed scoped pass (in a test that creates no group in the second zone before the snapshot: build the scope of `self.unit_b`, build the lifecycle registry, assert the entry for `part_key(self.unit_b)` is `(False, None)`; inside `transaction.atomic()` create a second-zone group with `self._group(cell=WANDER_B, ...)` and raise; outside, call `world.rules.clock.restore_advance_registry(registry, (self.wilderness,))`; assert the part attribute does not exist and `state_to_dict(read_stored_monster_activity(self.wilderness))` equals the prior value, before and after `_drop_attribute_caches(self.wilderness)`); whole snapshot (`regional_population.snapshot_population_surfaces(self.wilderness)` after `self._build_scenario()` holds the header key and both zones' part keys). Verify: the test prefix with `world.maps.tests.test_population_snapshot_scope` passes.
+- [ ] 3.2 Verify the consumers of the registry: the test prefix passes for each of `world.maps.tests.test_population_drain`, `world.maps.tests.test_population_catch_up`, `world.maps.tests.test_scoped_population_settlement`, `world.maps.tests.test_settlement_outer_rollback`, `world.maps.tests.test_regional_population` (one command per label; when a label discovers more than 100 tests, run its classes separately).
+- [ ] 3.3 Apply design D5. Verify: `grep -c "Scoped snapshots" docs/development/regional-monster-population.md` prints 1.
+
+## 4. Gates
+
+- [ ] 4.1 Run `uv run --locked python -m tools.observability_lint check`, `uv run --locked python -m tools.test_data_lint check`, `uv run --locked python -m tools.contract_gate` and `openspec validate population-snapshot-part-scoping --strict`. Verify: all exit 0.
+- [ ] 4.2 Observation, recorded in the hand-off as information only and never a gate: when a provisioned development database is available, run `snapshot_population_lifecycle_surfaces` for one lagging closed set under `cProfile` from `evennia shell` and note the share of each wilderness attribute (`itemcoordinates`, `population_timeline`, `regional_population`, the activity parts). Skip and say so when no such database exists.
+
+## Workflow follow-up
+
+- During archive, after the delta sync, annotate the tests of the three ADDED requirements with the identifiers printed by `uv run --locked python -m tools.spec_traceability list`.
