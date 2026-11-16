@@ -44,10 +44,10 @@ Requirement IDs: take the exact strings from
 
 ## 3. Resolver (design D3)
 
-- [ ] 3.1 Create `world/rules/start_location.py` with `StartLocationError` and
+- [x] 3.1 Create `world/rules/start_location.py` with `StartLocationError` and
   `resolve_start_room`, exactly as in D3. Add `start_location.py` to the "Character
   creation, traits, identity" row of `world/rules/AGENTS.md`.
-- [ ] 3.2 Create `world/rules/tests/test_start_location.py` (`EvenniaTest`):
+- [x] 3.2 Create `world/rules/tests/test_start_location.py` (`EvenniaTest`):
   - Call `publish_shipped_map_world()` in `setUpModule`.
   - Use the scope `synthetic_registries("subraces", "start_locations", "anchor_placements")`.
   - Read the map id from `SYNTH_ANCHOR_PLACEMENTS[SYNTH_START_LOCATIONS[k].anchor_key].node.map_id`,
