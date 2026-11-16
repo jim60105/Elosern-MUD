@@ -74,6 +74,14 @@ SETTLEMENT_REGISTRY: dict[str, SettlementDefinition] = {
         key="elven_village_ciaran",
         archetype=SettlementArchetype.ELVEN_VILLAGE,
     ),
+    "elven_village_eolas": SettlementDefinition(
+        key="elven_village_eolas",
+        archetype=SettlementArchetype.ELVEN_VILLAGE,
+    ),
+    "elven_village_fionnen": SettlementDefinition(
+        key="elven_village_fionnen",
+        archetype=SettlementArchetype.ELVEN_VILLAGE,
+    ),
 }
 
 validate_settlement_registry(SETTLEMENT_REGISTRY)

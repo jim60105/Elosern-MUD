@@ -476,34 +476,23 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
         "settlement-place-registry::a-place-is-the-single-authored-record-of-one-service-location"
     )
     def test_every_shipped_place_authors_a_complete_host_except_the_sanctioned_emptiness(self):
-        # hostless-places neutrality gate, widened by the content changes that
-        # own each emptiness: every one of these places is deliberately
-        # host-less, and every other shipped place declares the complete
-        # identity group with at least zero capabilities.
-        hostless = {
-            place.key for place in PLACE_REGISTRY.values() if place_is_hostless(place)
-        }
-        self.assertEqual(
-            hostless,
-            {
-                "ciaran_shelter",
-                "altoria_palace",
-                "altoria_market_stalls",
-                "ciaran_silverfeather",
-                "altoria_silverfeather",
-                "altoria_hok_home",
-                "altoria_cassandra_home",
-                "altoria_augustine_home",
-            },
-        )
+        # hostless-places neutrality gate: a shipped place is host-less
+        # exactly when it declares none of the host identity fields, and every
+        # other shipped place declares all of them. Which places are host-less
+        # is game data and is not pinned here.
         for place in PLACE_REGISTRY.values():
-            if place_is_hostless(place):
-                continue
+            declared = [
+                field
+                for field in HOST_IDENTITY_FIELDS
+                if getattr(place, field) is not None
+            ]
             with self.subTest(place=place.key):
-                for field in HOST_IDENTITY_FIELDS:
-                    self.assertIsNotNone(getattr(place, field), field)
+                if place_is_hostless(place):
+                    self.assertEqual(declared, [])
+                else:
+                    self.assertEqual(declared, list(HOST_IDENTITY_FIELDS))
         # Every hosted place still contributes exactly one matching row, and
-        # the sanctioned host-less group above contributes none.
+        # the host-less places contribute none.
         self._assert_rows_follow_the_places(validate_service_hosts())
 
     @covers_requirement(

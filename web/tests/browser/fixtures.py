@@ -234,7 +234,7 @@ def journey_settlement_scope() -> tuple[str, ...]:
     time than the journeys it serves.
 
     The declaration is derived from the live gate registry, never copied from
-    the roster: it is the two shipped gate maps today, and it widens by itself
+    the roster: it is the shipped gate maps today, and it widens by itself
     when the installed catalogs (the synthetic kit) register another gate. The
     seed process and the server process both read it, so seeding and booting
     cannot disagree, and ``sync_grid``/``sync_wilderness`` still converge these

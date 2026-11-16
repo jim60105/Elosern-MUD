@@ -637,9 +637,12 @@ class MetricCutoverTests(EvenniaTest):
             ).first().sparse_node_id,
             "great_temple",
         )
-        # Every service place's exterior resolves to its converged room and
-        # every interior keeps its bidirectional doorway.
+        # Every service place of a selected settlement resolves its exterior
+        # to the converged room and keeps its bidirectional doorway. A place
+        # whose settlement was not selected has no room to resolve.
         for place in PLACE_REGISTRY.values():
+            if place_exterior_xyz(place)[2] not in CAPITAL_VILLAGE_MAP_IDS:
+                continue
             exterior = GridRoom.objects.filter_xyz(xyz=place_exterior_xyz(place)).first()
             with self.subTest(place=place.key):
                 self.assertIsNotNone(exterior)

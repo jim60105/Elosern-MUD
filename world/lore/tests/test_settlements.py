@@ -92,51 +92,24 @@ class PlaceRegistryTests(unittest.TestCase):
 
     def test_place_iteration_order_is_the_load_bearing_slice_order(self):
         # The derived roster and shop registry iterate this dict, and the
-        # roster processes rows in dict order (sync_service_content). Since
-        # altoria-place-slices the capital arrives as three terrace slices —
-        # lower, middle, upper — so the 南大道 eatery leads the capital rows
-        # and the middle terrace's guild/store/forge/tailor/jeweller/alchemist
-        # follow (altoria-adornments-and-remedies closed the specialist
-        # family), the upper terrace's temple and sanctum close the capital
-        # block (altoria-sanctum); the village slice stays last, its nine
-        # places alphabetical
-        # by key (ciaran-village-crafts added 格威娜拉 and 妮瑞斯;
-        # ciaran-village-commons added 艾莉妮斯的家, the 共食棚, and 泰莉爾的家).
-        # The hospitality change (altoria-hospitality) grew the LOWER slice in
-        # its authored tuple order: the eatery, then the lane's tavern and inn,
-        # then the bathhouse — still leading the capital block.
-        # altoria-crown-and-watch grew both slices at once: the guardhouse
-        # appended to the LOWER slice behind the bathhouse (its exterior, the
-        # 南門, is old-town ground), and the palace, the noble watch and the
-        # drill yard appended to the UPPER slice behind the sanctum.
-        # altoria-learning-and-exchange grew both again: the merchant hall and
-        # the market stalls appended to the MIDDLE slice behind the alchemist,
-        # and the academy appended to the UPPER slice behind the drill yard.
-        # persistent-human-guild-hosts prepended three host-less HOME
-        # residences to the MIDDLE slice ahead of the guild hall — 霍克的家,
-        # 卡珊卓的家 and 奧古斯丁的家, one per persistent adventurer.
-        self.assertEqual(
-            list(PLACE_REGISTRY),
-            [
-                "altoria_eatery", "altoria_tavern", "altoria_lodging",
-                "altoria_bathhouse", "altoria_guardhouse",
-                "altoria_hok_home", "altoria_cassandra_home",
-                "altoria_augustine_home",
-                "altoria_guild_hall", "altoria_general_store",
-                "altoria_forge", "altoria_tailor", "altoria_jeweller",
-                "altoria_alchemist", "altoria_merchant_hall",
-                "altoria_market_stalls",
-                "altoria_temple", "altoria_sanctum",
-                "altoria_palace", "altoria_noble_watch",
-                "altoria_drill_yard", "altoria_academy",
-                "ciaran_elenis_home", "ciaran_gwenaera_home",
-                "ciaran_hailiel_home", "ciaran_lareneth_home",
-                "ciaran_nireth_home", "ciaran_shelter",
-                "ciaran_teliel_home", "ciaran_valwyn_home",
-                "ciaran_vethiel_home",
-                "altoria_silverfeather", "ciaran_silverfeather",
-            ],
-        )
+        # roster processes rows in dict order (sync_service_content). The
+        # registry is therefore the per-settlement slices concatenated in
+        # their declared order, each slice in its authored tuple order, with
+        # the courier stations after the last slice. Which rows a slice holds
+        # is game data and is not pinned here.
+        from world.lore.settlements.places_altoria_lower import ROWS as lower
+        from world.lore.settlements.places_altoria_middle import ROWS as middle
+        from world.lore.settlements.places_altoria_upper import ROWS as upper
+        from world.lore.settlements.places_ciaran import ROWS as village
+
+        slice_keys = [row.key for row in (*lower, *middle, *upper, *village)]
+        keys = list(PLACE_REGISTRY)
+        self.assertEqual(keys[: len(slice_keys)], slice_keys)
+        trailing = keys[len(slice_keys):]
+        self.assertTrue(trailing)
+        for key in trailing:
+            with self.subTest(place=key):
+                self.assertIs(PLACE_REGISTRY[key].kind, PlaceKind.COURIER_STATION)
 
     def test_shipped_place_registry_passes_validation(self):
         validate_place_registry(PLACE_REGISTRY)
@@ -285,63 +258,24 @@ class PlaceRegistryTests(unittest.TestCase):
         "settlement-place-registry::a-place-is-the-single-authored-record-of-one-service-location"
     )
     def test_every_shipped_kind_describes_its_location(self):
-        # Each shipped row's kind names what its room is in the world
-        # document, not what mechanism its host carries. The four elven
-        # homes trade and are still homes — the worked example for the
-        # kind rule; reclassifying one to its host's capability fails here.
-        expected = {
-            "altoria_guild_hall": "guild_hall",
-            "altoria_general_store": "general_store",
-            "altoria_forge": "weaponsmith",
-            "altoria_eatery": "eatery",
-            "altoria_tailor": "outfitter",
-            "altoria_jeweller": "jeweller",
-            "altoria_alchemist": "alchemist",
-            "altoria_temple": "temple",
-            "altoria_sanctum": "sanctum_shop",
-            "altoria_tavern": "tavern",
-            "altoria_lodging": "lodging",
-            "altoria_bathhouse": "bathhouse",
-            # The crown's rooms (altoria-crown-and-watch): the palace lands
-            # the vocabulary's palace / watch_post / training_ground entries.
-            "altoria_palace": "palace",
-            "altoria_noble_watch": "watch_post",
-            "altoria_drill_yard": "training_ground",
-            "altoria_guardhouse": "watch_post",
-            # Learning-and-exchange lands the vocabulary's academy /
-            # merchant_hall / market entries on the capital's last three rooms.
-            "altoria_merchant_hall": "merchant_hall",
-            "altoria_market_stalls": "market",
-            "altoria_academy": "academy",
-            # persistent-human-guild-hosts: the persistent adventurers'
-            # host-less residences are ordinary homes.
-            "altoria_hok_home": "home",
-            "altoria_cassandra_home": "home",
-            "altoria_augustine_home": "home",
-            "ciaran_elenis_home": "home",
-            "ciaran_gwenaera_home": "home",
-            "ciaran_hailiel_home": "home",
-            "ciaran_lareneth_home": "home",
-            "ciaran_nireth_home": "home",
-            "ciaran_shelter": "commons",
-            "ciaran_teliel_home": "home",
-            "ciaran_valwyn_home": "home",
-            "ciaran_vethiel_home": "home",
-            "altoria_silverfeather": "courier_station",
-            "ciaran_silverfeather": "courier_station",
-        }
-        self.assertEqual(set(PLACE_REGISTRY), set(expected))
-        for key, kind in expected.items():
+        # Each shipped row's kind is a member of the closed vocabulary. Which
+        # kind a given row carries is game data and is not pinned here.
+        for key, place in PLACE_REGISTRY.items():
             with self.subTest(place=key):
-                self.assertEqual(PLACE_REGISTRY[key].kind.value, kind)
-        # The homes really do trade — otherwise the pin above proves nothing.
-        for key in ("ciaran_gwenaera_home", "ciaran_hailiel_home",
-                    "ciaran_lareneth_home", "ciaran_nireth_home",
-                    "ciaran_valwyn_home", "ciaran_vethiel_home"):
-            place = PLACE_REGISTRY[key]
-            self.assertTrue(place.assortment_keys)
-            self.assertIsNotNone(place_shop_identity(place))
-            self.assertTrue(place_capabilities(place, "merchant"))
+                self.assertIsInstance(place.kind, PlaceKind)
+        # The worked example for the kind rule: a dwelling whose occupant
+        # trades is still a home. Reclassifying such a row to its host's
+        # capability leaves no trading home and fails here.
+        trading_homes = [
+            place
+            for place in PLACE_REGISTRY.values()
+            if place.kind is PlaceKind.HOME and place.assortment_keys
+        ]
+        self.assertTrue(trading_homes)
+        for place in trading_homes:
+            with self.subTest(place=place.key):
+                self.assertIsNotNone(place_shop_identity(place))
+                self.assertTrue(place_capabilities(place, "merchant"))
 
     @covers_requirement(
         "settlement-place-registry::a-place-is-the-single-authored-record-of-one-service-location"

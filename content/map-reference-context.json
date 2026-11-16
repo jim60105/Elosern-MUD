@@ -162,7 +162,9 @@
     ],
     "settlements": [
       "capital_altoria",
-      "elven_village_ciaran"
+      "elven_village_ciaran",
+      "elven_village_eolas",
+      "elven_village_fionnen"
     ],
     "shops": [
       "altoria_alchemist",
@@ -220,7 +222,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "d3d7b6a7e7cda4ba6ac88c144205db83a114f055dd319d616965b92bb7eb336a",
+  "fingerprint": "601f15b761a428caa5a907df5161735e2d95c8811af7fc71075321403fc4e131",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -923,6 +925,32 @@
           "domain": "interior_room",
           "map_id": "ciaran_vethiel_home",
           "object_id": "ciaran_vethiel_home"
+        }
+      }
+    ],
+    "interior_room:eolas_silverfeather:eolas_silverfeather": [
+      {
+        "source": "place:eolas_silverfeather",
+        "source_domain": "places",
+        "source_file": "world/lore/settlements/places.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "eolas_silverfeather",
+          "object_id": "eolas_silverfeather"
+        }
+      }
+    ],
+    "interior_room:fionnen_silverfeather:fionnen_silverfeather": [
+      {
+        "source": "place:fionnen_silverfeather",
+        "source_domain": "places",
+        "source_file": "world/lore/settlements/places.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "fionnen_silverfeather",
+          "object_id": "fionnen_silverfeather"
         }
       }
     ]
@@ -16142,12 +16170,12 @@
     "world/lore/settlements/_prose_lang.py": "7cf3638af425039e2568341c9f4159385225b07c5b6fb688bb73eda0aeb66692",
     "world/lore/settlements/assortments.py": "4eb6bc1d2393e93dfe92370c3c3b24a032986b9a46cf29733d6bb73cc3026ece",
     "world/lore/settlements/capability_declarations.py": "190fc2ce62a335fe7906968e0e10f86ce9fedadf5873476b3b1742fd552c5861",
-    "world/lore/settlements/places.py": "dfb9be75fe067a59190423529b58bc5e2490ac0e89589367c629162a1c02fe94",
+    "world/lore/settlements/places.py": "722d6632efc03e4cfed5693ffe599898ecc2b710c6d2cadc0a7285788d2f10e3",
     "world/lore/settlements/places_altoria_lower.py": "e1502c9c0d8346c2c69b52d75a877f30d5e6d66a9f1f13a228f97595c6cb03b2",
     "world/lore/settlements/places_altoria_middle.py": "51cefb1e5f27a72c3e63fd7b4d9f71ea55494583d0dea057e455446c8b069662",
     "world/lore/settlements/places_altoria_upper.py": "278fb7af1e89be3df25543547fbd3fad3f59ffd36830304af1a9b67627a540eb",
     "world/lore/settlements/places_ciaran.py": "c076e49271811a95d306856ae43b76f62f2fe1c8b23df97059726673e3b5adc8",
-    "world/lore/settlements/settlements.py": "427774e5c5b3a4662d70850b54a9e41f0222136cb7ddba4c70cc82453856ebe0",
+    "world/lore/settlements/settlements.py": "4176d2a10150142f6159d8adbd35db6611ff28b225a5ca7710e6ed040ad01117",
     "world/lore/settlements/shops.py": "940f04d7c6db2dbcef7e3a14cd2716cde8b753dcd0e73aafffb9b8433854ab1d",
     "world/lore/sex.py": "41636022009a201f954611dbea378438a0469ca166eff54034a87489c5c2cda4",
     "world/lore/sexual_vocab.py": "a67052bc4741ea037f4209977c618486b5870c439a0d84c1e8575f06146d922b",

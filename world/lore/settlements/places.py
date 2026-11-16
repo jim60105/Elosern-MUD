@@ -463,6 +463,20 @@ PLACE_REGISTRY: dict[str, PlaceDefinition] = {
             room=interior_room_ref("ciaran_silverfeather", "ciaran_silverfeather"),
             letter_service=True,
         ),
+        PlaceDefinition(
+            key="eolas_silverfeather",
+            settlement_key="elven_village_eolas",
+            kind=PlaceKind.COURIER_STATION,
+            room=interior_room_ref("eolas_silverfeather", "eolas_silverfeather"),
+            letter_service=True,
+        ),
+        PlaceDefinition(
+            key="fionnen_silverfeather",
+            settlement_key="elven_village_fionnen",
+            kind=PlaceKind.COURIER_STATION,
+            room=interior_room_ref("fionnen_silverfeather", "fionnen_silverfeather"),
+            letter_service=True,
+        ),
     )
 }
 
