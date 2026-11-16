@@ -25,11 +25,11 @@ The server SHALL record the time of the last player input when a session sends a
 The periodic caller SHALL perform no drain run while the last recorded player input is more recent than the configured idle window. It SHALL drain as usual when no input has been recorded or when the window has passed. A skipped repeat SHALL read no population record and emit no event.
 
 #### Scenario: Recent input
-- **WHEN** the periodic caller repeats with the drain enabled, a unit lagging, an idle window of 5 seconds and a player input recorded 2 seconds earlier
+- **WHEN** the periodic caller repeats with the drain enabled, a unit lagging, an idle window of 20 seconds and a player input recorded 2 seconds earlier
 - **THEN** no drain run happens and the unit's settled-through tick is unchanged
 
 #### Scenario: Window passed
-- **WHEN** the periodic caller repeats with the same world and a player input recorded 5 seconds earlier
+- **WHEN** the periodic caller repeats with the same world and a player input recorded 20 seconds earlier
 - **THEN** exactly one drain run happens
 
 #### Scenario: No input recorded

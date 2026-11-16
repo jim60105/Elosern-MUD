@@ -110,7 +110,7 @@ The comparison is `idle < window`: an input exactly one window old no longer blo
 In `server/conf/settings.py`, directly after the `POPULATION_DRAIN_SLICE_SECONDS` line:
 
 ```python
-POPULATION_DRAIN_IDLE_SECONDS = _env_int("POPULATION_DRAIN_IDLE_SECONDS", 5)
+POPULATION_DRAIN_IDLE_SECONDS = _env_int("POPULATION_DRAIN_IDLE_SECONDS", 20)
 ```
 
 Extend the comment block above the three existing lines with one sentence: "A repeat is skipped while a player sent input within the idle window (real seconds)."
@@ -118,23 +118,23 @@ Extend the comment block above the three existing lines with one sentence: "A re
 Mirror every place the three existing names appear:
 
 - `server/conf/test_settings.py`: add `"POPULATION_DRAIN_IDLE_SECONDS",` after `"POPULATION_DRAIN_SLICE_SECONDS",` in `_ENV_OVERRIDES`.
-- `.env.example`: after `#POPULATION_DRAIN_SLICE_SECONDS=600` add a comment "Real seconds without player input before a repeat may drain. Type: positive integer. Default: 5." and the line `#POPULATION_DRAIN_IDLE_SECONDS=5`.
-- `server/conf/tests/test_env_overrides/_support.py`: add the name beside each existing `POPULATION_DRAIN_SLICE_SECONDS` entry: the name map, the defaults map (`"5"`), the override cases (`("POPULATION_DRAIN_IDLE_SECONDS", "POPULATION_DRAIN_IDLE_SECONDS", "9", "9")`), the invalid values (`("POPULATION_DRAIN_IDLE_SECONDS", "0", "expected a positive integer")`) and the environment filter tuple. Find them with `grep -n POPULATION_DRAIN_SLICE_SECONDS server/conf/tests/test_env_overrides/_support.py` (five places).
+- `.env.example`: after `#POPULATION_DRAIN_SLICE_SECONDS=600` add a comment "Real seconds without player input before a repeat may drain. Type: positive integer. Default: 20." and the line `#POPULATION_DRAIN_IDLE_SECONDS=20`.
+- `server/conf/tests/test_env_overrides/_support.py`: add the name beside each existing `POPULATION_DRAIN_SLICE_SECONDS` entry: the name map, the defaults map (`"20"`), the override cases (`("POPULATION_DRAIN_IDLE_SECONDS", "POPULATION_DRAIN_IDLE_SECONDS", "9", "9")`), the invalid values (`("POPULATION_DRAIN_IDLE_SECONDS", "0", "expected a positive integer")`) and the environment filter tuple. Find them with `grep -n POPULATION_DRAIN_SLICE_SECONDS server/conf/tests/test_env_overrides/_support.py` (five places).
 
-Why 5 seconds: the repeat interval is 2 seconds and the observed gap between a player's actions is a few seconds, so 5 keeps a run from starting between two quick clicks while still draining during ordinary reading pauses. The value is a tuning knob; see Open Questions.
+Why 20 seconds: the repeat interval is 2 seconds, and one exchange with a room takes longer than that — the player reads the description, composes a command or clicks a panel action. A 20-second window spans a whole exchange, so a run cannot start between the parts of one turn, while a pause to read or think still releases the drain within one repeat (at most 2 seconds later). The value is a tuning knob; see Open Questions.
 
 ### D5. Documentation
 
-- `docs/development/settings-and-environment.md`: add one table row after the `POPULATION_DRAIN_SLICE_SECONDS` row, same columns, written in zh-TW like its neighbours: name, env name, 整數, `5`, and the meaning (positive integer; real seconds without player input before a repeat may drain; the synchronous catch-up is unaffected).
-- `docs/development/regional-monster-population.md`, section "The periodic caller": add the setting to the table (`POPULATION_DRAIN_IDLE_SECONDS` | `5` | Real seconds without player input before a repeat drains) and one paragraph: what counts as input (D2), that the record is in memory and a reload reads as idle, and that the catch-up and a direct `drain_population_backlog` call ignore it.
+- `docs/development/settings-and-environment.md`: add one table row after the `POPULATION_DRAIN_SLICE_SECONDS` row, same columns, written in zh-TW like its neighbours: name, env name, 整數, `20`, and the meaning (positive integer; real seconds without player input before a repeat may drain; the synchronous catch-up is unaffected).
+- `docs/development/regional-monster-population.md`, section "The periodic caller": add the setting to the table (`POPULATION_DRAIN_IDLE_SECONDS` | `20` | Real seconds without player input before a repeat drains) and one paragraph: what counts as input (D2), that the record is in memory and a reload reads as idle, and that the catch-up and a direct `drain_population_backlog` call ignore it.
 
 ## Risks / Trade-offs
 
-- [A player who acts more often than the window never lets the drain run, so the backlog grows while they play] → Intended: the debt is then paid in the next pause or by the synchronous catch-up. `population-drain-batched-runs` raises how much one idle repeat pays.
+- [A player who acts more often than the window never lets the drain run, so the backlog grows while they play] → Intended, and the wider 20-second window makes it more likely: a player acting at least every 20 seconds suppresses up to ten consecutive repeats. The debt is then paid in the next pause or by the synchronous catch-up. `population-drain-batched-runs` raises how much one idle repeat pays.
 - [A run that starts just after the window can still collide with the next input] → The collision is bounded by one run's duration; the window only lowers how often it happens.
 - [After a reload the record is empty, so the first repeats may drain while players are acting] → Bounded by one idle window: the first input after the reload sets the record. The documentation of D5 says so.
 - [The record is shared process state, so one test can leak into another] → `reset_player_input()` in the `setUp` of every test class that calls `at_repeat` or the input functions (tasks 1.2, 2.2, 3.2).
 
 ## Open Questions
 
-- The default of 5 seconds is a starting value. It can be tuned through the environment without a code change.
+- The default of 20 seconds is a starting value. It can be tuned through the environment without a code change.
