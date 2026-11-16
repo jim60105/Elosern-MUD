@@ -14,7 +14,7 @@ cards instead of failing.
 ## Requirements
 
 ### Requirement: One gallery record per art subject carries an ordered card list and a default
-One lazily created gallery record per subject SHALL carry typed subject kind/key, ordered cards, nullable default image id, capability-scoped official preferences and last generation error/timestamp. Subject-scoped character/scene preferences SHALL create cardless records on explicit writes; monster preferences SHALL stay entity-local. Presentation and startup scans SHALL NOT create records.
+One lazily created gallery record per subject SHALL carry typed subject kind/key, ordered cards, nullable default image id, capability-scoped official preferences and last generation error/timestamp. Presentation and startup scanning SHALL NOT create records; append, explicit preferences/defaults and generation errors SHALL use the established writer.
 
 #### Scenario: A subject with no record yields an empty gallery
 - **WHEN** the card list is read for a subject that has never been written
@@ -33,7 +33,7 @@ One lazily created gallery record per subject SHALL carry typed subject kind/key
 - **THEN** a typed validation error is raised and the record's `default_image_id` is unchanged
 
 #### Scenario: The first official preference creates a card-less record
-- **WHEN** a character or scene writes its first official preference or a monster writes one through a valid entity context
+- **WHEN** a character or scene subject writes its first official preference or a monster writes one through a valid entity context
 - **THEN** a subject-scoped owner gets a cardless record; a monster stores only entity-local preference state and creates no species record or card
 
 #### Scenario: Clearing an unset preference creates nothing
@@ -46,7 +46,7 @@ One lazily created gallery record per subject SHALL carry typed subject kind/key
 
 #### Scenario: Record creation follows the documented lazy triggers
 - **WHEN** gallery record creation is exercised
-- **THEN** card append, recorded generation error and explicit card default retain their existing triggers; official writes create character or scene subject records according to declared scope, while monster writes stay entity-local; startup and presentation never manufacture a record
+- **THEN** card append, recorded generation error and explicit card default retain their triggers; official writes create character or scene subject records according to declared scope, while monster writes stay entity-local; startup and presentation never manufacture a record
 
 #### Scenario: An explicit default set names an existing card
 - **WHEN** an explicit default set is submitted
@@ -145,7 +145,7 @@ with `default_face_rect` of its established `image_size`.
 - **THEN** a typed validation error is raised and the rect is not adjusted
 
 #### Scenario: Validation without a known image size stays bounds-only
-- **WHEN** the classic-asset presentation path validates `DEFAULT_FACE_RECT` with no image size
+- **WHEN** unknown-size fallback composition validates `DEFAULT_FACE_RECT` with no image size
 - **THEN** validation succeeds — an anchor with no image to square keeps today's contract
 
 #### Scenario: The stored rect is verbatim and no second image exists
@@ -166,7 +166,7 @@ with `default_face_rect` of its established `image_size`.
 
 #### Scenario: One shared constant serves card-less presentation
 - **WHEN** presentation needs a rect without a card image size
-- **THEN** `world/art/gallery.py` SHALL keep one `DEFAULT_FACE_RECT` constant equal to `{"x": 0.25, "y": 0.06, "w": 0.5, "h": 0.5}` for card-less presentation use (the classic-asset and unknown-size composition anchor and the fallback-map gap fill)
+- **THEN** `world/art/gallery.py` SHALL keep one `DEFAULT_FACE_RECT` constant equal to `{"x": 0.25, "y": 0.06, "w": 0.5, "h": 0.5}` for card-less presentation use (the unknown-size composition anchor and the fallback-map gap fill)
 
 #### Scenario: One validator enforces bounds always and squareness when the size is known
 - **WHEN** a rect passes through the single validator `validate_face_rect`

@@ -317,6 +317,9 @@ class SceneBuilderMaterializationTests(SceneBuilderTestBase):
 
     @covers_requirement("scene-builder::the-occupant-spawn-path-exposes-a-post-commit-portrait-eligibility-seam-with-unchanged-atomicity")
     @covers_requirement("spawn-named-portraits::the-scenebuilder-applies-blueprint-characterization-to-named-occupants")
+    @covers_requirement(
+        "art-gallery-autogen::validated-named-npc-spawn-schedules-its-guarded-gallery-request-after-the-spawn-transaction-commits"
+    )
     def test_named_policy_occupant_schedules_after_commit_only(self):
         payload = _instance_bound_payload()
         payload["stages"][0]["npc_req"][0].update(

@@ -104,6 +104,9 @@ class PortraitFinalizationTests(EvenniaTest):
             if str(record.db.gallery_image_id or "")
         ]
 
+    @covers_requirement(
+        "art-gallery-autogen::every-player-activation-path-finalizes-the-portrait-lifecycle"
+    )
     def test_activation_sets_the_named_policy_and_schedules_exactly_one_ensure(self):
         from world.art.store import GalleryJobRecord
 
@@ -125,6 +128,9 @@ class PortraitFinalizationTests(EvenniaTest):
             GalleryJobRecord.objects.filter(db_key=self._portrait_key()).count(), 0
         )
 
+    @covers_requirement(
+        "art-gallery-autogen::every-player-activation-path-finalizes-the-portrait-lifecycle"
+    )
     def test_web_activation_produces_identical_portrait_state(self):
         from web.webclient.actions.creation_actions import (
             _creation_activate_adapter,

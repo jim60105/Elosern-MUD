@@ -71,6 +71,7 @@ class ArtMediaViewTests(EvenniaTestCase):
         with override_settings(ART_STORE_ROOT=str(self.root)):
             return Client().get(f"/art/{identity}")
 
+    @covers_requirement("art-queue-worker::runtime-media-serves-gallery-card-identities-only")
     def test_formerly_fixed_identities_return_404_even_when_files_exist(self):
         for identity in (
             "scene/t_synth_bazaar.png",
@@ -151,6 +152,7 @@ class GalleryIdentityServingTests(EvenniaTestCase):
 
         return Client().get(f"/art/{identity}")
 
+    @covers_requirement("art-queue-worker::runtime-media-serves-gallery-card-identities-only")
     def test_a_card_referenced_gallery_identity_is_served_with_its_type(self):
         media_types = {
             ".png": "image/png",
@@ -178,6 +180,7 @@ class GalleryIdentityServingTests(EvenniaTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response["Content-Type"], "image/png")
 
+    @covers_requirement("art-queue-worker::runtime-media-serves-gallery-card-identities-only")
     def test_unreferenced_gallery_identity_returns_404(self):
         subject = self._subject(key="gallery-unref")
         stray = f"gallery/character/{subject.key}/{uuid.uuid4()}.png"

@@ -60,7 +60,7 @@ GET /gm/api/dashboard SHALL return one success-envelope snapshot with independen
 
 #### Scenario: The art, world, and error sections report runtime state
 - **WHEN** the snapshot's art, world, and errors sections are built
-- **THEN** art carries counts per status, drain-script running, and newest 10 failures with subject key/time; world carries existing tick/date/daypart, connected sessions, active combats, live instances; and errors.recent lists the newest 50 issues with time/level/event/caller/context/exception summary
+- **THEN** art carries current gallery-job counts per existing status vocabulary, drain-script running, and newest 10 recorded gallery errors with subject key/error time; settled jobs are absent from live counts; world carries existing tick/date/daypart, connected sessions, active combats, live instances; and errors.recent lists the newest 50 issues with time/level/event/caller/context/exception summary
 
 #### Scenario: The process section reports health and buffers
 - **WHEN** the snapshot's process section is built
@@ -69,6 +69,10 @@ GET /gm/api/dashboard SHALL return one success-envelope snapshot with independen
 #### Scenario: Statistics stay within the retained buffer
 - **WHEN** counts and latency statistics are computed after eviction has occurred
 - **THEN** they cover the retained bounded buffer, do not claim lifetime totals, and buffers are not rebuilt from transcript history
+
+#### Scenario: Gallery errors survive terminal job deletion
+- **WHEN** a synthetic gallery job fails and its terminal job is removed
+- **THEN** dashboard failure rows still report its recorded gallery error without restoring a job; successful later publication clears that row and dashboard reads mutate nothing
 
 ### Requirement: Validated retained call detail
 GET /gm/api/llm/calls/<call_id> SHALL accept only ^[0-9a-f]{32}$, rejecting malformed identifiers with HTTP 400 invalid_call_id. Valid lookup SHALL return success data {"outcome":<record|null>,"exchanges":[<records>]} from S2a retained records, preserving exchange order. No records SHALL return HTTP 404 transcript_not_found; disabled transcripts SHALL return HTTP 409 transcript_disabled. An exchange-only or outcome-only call SHALL return available records without fabricated payloads.

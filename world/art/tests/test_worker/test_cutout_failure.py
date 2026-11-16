@@ -115,6 +115,7 @@ class CutoutFailureTests(WorkerStoreIsolation):
         self.assertEqual(gallery_api.cards_for(subject), [])
         self.assertIsNone(self._job_for(job))
 
+    @covers_requirement("art-portrait-cutout::gallery-cutout-failure-preserves-existing-cards")
     def test_a_failing_gallery_cutout_appends_no_card(self):
         character = self._subject("42", ArtSubjectKind.CHARACTER)
         image_id = "cccccccc-3333-4333-8333-333333333333"

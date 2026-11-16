@@ -301,6 +301,9 @@ class WorkerStoreIsolationTests(WorkerStoreIsolation):
             ["sd_internal_error"],
         )
 
+    @covers_requirement(
+        "art-queue-worker::gallery-workers-publish-confined-immutable-image-outputs"
+    )
     def test_out_of_root_store_directory_is_rejected(self):
         subject = self._subject("t_synth_mountain")
         job = self._record(subject)
@@ -464,6 +467,7 @@ class WorkerStoreIsolationTests(WorkerStoreIsolation):
         for job in jobs:
             self.assertIsNone(self._job_for(job))
 
+    @covers_requirement("art-queue-worker::gallery-jobs-share-one-lock-and-worker-slot")
     def test_only_one_worker_runs_at_a_time(self):
         subject = self._subject("t_synth_forest")
         job = self._record(subject)

@@ -80,6 +80,9 @@ class GalleryWorkerTests(WorkerStoreIsolation):
                 f"gallery/character/42/{job.db.gallery_image_id}.webp",
             )
 
+    @covers_requirement(
+        "art-queue-worker::gallery-workers-publish-confined-immutable-image-outputs"
+    )
     def test_a_successful_gallery_job_publishes_exactly_one_card(self):
         job = self._gallery_job()
         image_id = job.db.gallery_image_id

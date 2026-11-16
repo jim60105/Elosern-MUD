@@ -20,6 +20,10 @@ Each canonical descriptor SHALL carry stable subject identity, source revision, 
 - **WHEN** the same descriptor is built repeatedly
 - **THEN** no queue, gallery, room, character, asset status, file or narrative state changes
 
+#### Scenario: Generation state derives only from gallery state
+- **WHEN** a subject has official artwork and a live job, recorded gallery error or stored card
+- **THEN** state is pending for a live job, else failed for recorded error, else done for a card, else missing; official artwork never completes it
+
 ### Requirement: Descriptors reveal only authorized exact subjects
 Consolidated descriptors SHALL be built only for subjects already authorized for the requested view. A gallery request SHALL identify its exact original image, never silently select another card. Unsupported or unavailable panels SHALL remain availability failures rather than invented generation progress.
 

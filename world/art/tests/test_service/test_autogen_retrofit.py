@@ -126,6 +126,9 @@ class AutogenRetrofitTests(EvenniaTestCase):
         with self.captureOnCommitCallbacks(execute=True):
             schedule_portrait_ensure(self.player)
 
+    @covers_requirement(
+        "art-gallery-autogen::automatic-generation-publishes-gallery-defaults-only"
+    )
     def test_a_committed_path_drains_to_exactly_one_unbound_default_card(self):
         self._schedule()
         self.assertEqual(len(self._gallery_jobs()), 1)
@@ -202,6 +205,7 @@ class AutogenRetrofitTests(EvenniaTestCase):
         art_sync_all()
         self.assertEqual(len(self._gallery_jobs()), 2)
 
+    @covers_requirement("art-gallery-autogen::queue-failure-never-rolls-back-gameplay")
     def test_a_failing_request_never_rolls_back_gameplay_and_logs_bounded(self):
         with (
             patch(

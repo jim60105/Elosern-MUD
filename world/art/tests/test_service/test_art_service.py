@@ -73,6 +73,9 @@ class ArtServiceTests(EvenniaTestCase):
             if record.db_key.startswith(f"art:scene:{archetype}:gen:")
         )
 
+    @covers_requirement(
+        "art-gallery-autogen::startup-synchronization-requests-gallery-art-for-every-registered-scene-and-species"
+    )
     def test_startup_sync_requests_one_gallery_card_per_registered_scene(self):
         art_sync_all()
         records = self._records()
@@ -192,6 +195,9 @@ class ArtServiceTests(EvenniaTestCase):
                 art_sync_all()
         self.assertEqual(len(self._scene_job_keys(_SYNTH_SCENE)), 0)
 
+    @covers_requirement(
+        "art-gallery-autogen::startup-recovery-rescans-explicit-unique-portrait-policies"
+    )
     def test_recovery_requests_a_gallery_job_for_a_missing_named_policy(self):
         self.player.db.portrait_policy = {"mode": "named", "stable_key": str(self.player.pk)}
         art_sync_all()
@@ -209,6 +215,9 @@ class ArtServiceTests(EvenniaTestCase):
         # The retrofit: no classic fixed-identity record is ever created.
         self.assertNotIn(f"art:portrait:character:{self.player.pk}", self._records())
 
+    @covers_requirement(
+        "art-gallery-autogen::the-age-check-runs-on-every-lifecycle-path-and-rejects-deterministically-without-a-persisted-marker"
+    )
     def test_recovery_skips_an_ineligible_subject_deterministically(self):
         self.player.db.portrait_policy = {"mode": "named", "stable_key": str(self.player.pk)}
         self.player.attributes.remove("age")
@@ -218,6 +227,9 @@ class ArtServiceTests(EvenniaTestCase):
         art_sync_all()
         self.assertNotIn(key, self._records())
 
+    @covers_requirement(
+        "art-gallery-autogen::successful-player-creation-and-validated-import-schedule-an-eligible-unique-portrait-through-transaction-on-commit"
+    )
     def test_schedule_portrait_ensure_runs_the_gate_and_enqueues_one_gallery_job(self):
         self.player.db.portrait_policy = {"mode": "named", "stable_key": str(self.player.pk)}
         with self.captureOnCommitCallbacks(execute=True) as callbacks:
@@ -234,6 +246,9 @@ class ArtServiceTests(EvenniaTestCase):
         self.assertEqual(jobs[0].db.status, ArtAssetStatus.PENDING)
         self.assertNotIn(key, self._records())
 
+    @covers_requirement(
+        "art-gallery-autogen::portrait-character-enqueue-validates-canonical-age-attributes-immediately-before-enqueue"
+    )
     def test_rejected_portrait_produces_no_record_and_no_worker_call(self):
         self.player.db.portrait_policy = {"mode": "named", "stable_key": str(self.player.pk)}
         self.player.attributes.remove("age")
@@ -250,6 +265,7 @@ class ArtServiceTests(EvenniaTestCase):
         key = f"art:portrait:character:{self.player.pk}"
         self.assertNotIn(key, self._records())
 
+    @covers_requirement("art-gallery-autogen::queue-failure-never-rolls-back-gameplay")
     def test_an_art_callback_exception_never_propagates_to_the_owning_workflow(self):
         self.player.db.portrait_policy = {"mode": "named", "stable_key": str(self.player.pk)}
         with (
@@ -263,6 +279,9 @@ class ArtServiceTests(EvenniaTestCase):
         self.assertEqual(len(callbacks), 1)
         self.assertTrue(self.player.creation_pending is not None)
 
+    @covers_requirement(
+        "art-gallery-autogen::successful-room-entry-ensures-the-scene-asset-for-a-validated-archetype"
+    )
     def test_ensure_scene_asset_requests_one_gallery_card_for_a_validated_archetype(self):
         ensure_scene_asset(_SYNTH_SCENE)
         job_keys = self._scene_job_keys(_SYNTH_SCENE)
@@ -276,6 +295,7 @@ class ArtServiceTests(EvenniaTestCase):
         ensure_scene_asset("not_a_scene")
         self.assertEqual(self._records(), {})
 
+    @covers_requirement("art-gallery-autogen::queue-failure-never-rolls-back-gameplay")
     def test_scene_asset_failure_is_bounded_and_never_blocks_the_move(self):
         with patch(
             "world.art.service._ensure_scene_gallery_subject",

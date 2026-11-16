@@ -79,6 +79,9 @@ class FakeResponse:
 
 
 class RequestBuildingTests(unittest.TestCase):
+    @covers_requirement(
+        "internal-art-worker::prompt-library-edits-affect-subsequent-gallery-requests-only"
+    )
     def test_scene_request_renders_the_scene_prompt_with_16_9_dimensions(self):
         request = build_txt2img_request(_scene("t_synth_tavern"), "a description")
         self.assertIn("a description", request["prompt"])
@@ -93,6 +96,9 @@ class RequestBuildingTests(unittest.TestCase):
         )
         self.assertIs(request["override_settings_restore_afterwards"], True)
 
+    @covers_requirement(
+        "internal-art-worker::prompt-library-edits-affect-subsequent-gallery-requests-only"
+    )
     def test_portrait_request_renders_the_portrait_prompt_with_3_4_dimensions(self):
         request = build_txt2img_request(_monster("low"), "a monster description")
         self.assertIn("a monster description", request["prompt"])

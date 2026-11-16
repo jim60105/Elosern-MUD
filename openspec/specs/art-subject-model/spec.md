@@ -6,10 +6,7 @@ Defines typed, namespaced, pre-validated art subject keys (ArtSubjectKind and fr
 ## Requirements
 
 ### Requirement: Art subject keys are typed, namespaced, and validated before queue access
-`world/art/subjects.py` SHALL define `ArtSubjectKind` (`scene`, `portrait:character`,
-`portrait:monster`) and a frozen `ArtSubject(kind, key)` whose serialized full key is
-`<kind>:<key>`. No queue, store, worker, command, or presenter function SHALL accept a raw
-full-key string; every access path SHALL go through a parsed `ArtSubject`.
+Art accesses SHALL use frozen parsed subject identities with the existing scene, portrait:character and portrait:monster namespaces. Queue jobs and gallery cards SHALL retain those identities. No fixed subject-output identity or subject-keyed classic record SHALL be produced; invalid raw keys SHALL reject before any access.
 
 #### Scenario: Known kinds parse into typed subjects
 - **WHEN** `scene:forest_path`, `portrait:character:42`, and `portrait:monster:gray_wolf` are parsed

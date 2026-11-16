@@ -260,6 +260,9 @@ class ArtPresenterTests(EvenniaTestCase):
         self.assertEqual(len(fault), 1)
         self.assertEqual(fault[0]["reason"], descriptors.REASON_GENERATION_FAILED)
 
+    @covers_requirement(
+        "art-gallery-autogen::rejected-prompt-content-never-reaches-the-presenter-or-browser"
+    )
     def test_malformed_subject_ages_resolve_only_to_the_unavailable_placeholder(self):
         self.player.db.portrait_policy = {"mode": "named", "stable_key": str(self.player.pk)}
         self.player.age = "twenty-two"
@@ -655,6 +658,9 @@ class StagePayloadTests(_CardPayloadCase):
 class FaceRectPayloadTests(_CardPayloadCase):
     """``face_rect`` on every payload (art-gallery-resolution)."""
 
+    @covers_requirement(
+        "art-gallery-resolution::gallery-and-official-resources-carry-their-own-geometry"
+    )
     def test_a_resolved_card_payload_carries_its_own_rectangle(self):
         explicit = {"x": 0.1, "y": 0.2, "w": 0.4, "h": 0.3}
         subject, image_id, identity = self._append_card_with_file(face_rect=explicit)
@@ -1066,6 +1072,9 @@ class OfficialPayloadTests(EvenniaTestCase):
     )
     @covers_requirement(
         "official-art-resolution::official-payloads-are-catalog-derived-confined-and-fall-through-when-unresolvable"
+    )
+    @covers_requirement(
+        "art-gallery-resolution::gallery-and-official-resources-carry-their-own-geometry"
     )
     def test_an_official_default_presents_with_its_metadata_geometry(self):
         identity = self._index(face_rect=dict(_OFFICIAL_RECT), stage=dict(_OFFICIAL_STAGE))

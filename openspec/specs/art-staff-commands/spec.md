@@ -5,64 +5,6 @@ Defines the staff-only @art command surface — status listing with filters and 
 
 ## Requirements
 
-### Requirement: @art status lists and filters records without leaking sensitive data
-`commands/art.py::CmdArtStatus` (`@art status [scene|portrait]`) SHALL list asset records filtered by
-subject kind, showing subject key, status, aspect ratio, attempt count, bounded error code, and —
-only when the record carries one — the persisted generation seed. Output
-SHALL NOT include persona text, prompt content, absolute filesystem paths, or the store root.
-
-#### Scenario: Staff can list scene and portrait records
-- **WHEN** staff runs `@art status` and `@art status portrait`
-- **THEN** scene and portrait records are listed with their statuses, and no persona text or absolute
-  path appears in the output
-
-#### Scenario: A completed record shows its generation seed
-- **WHEN** a `done` record persists seed `42` and staff runs `@art status`
-- **THEN** that record's line includes the seed `42`
-
-#### Scenario: A seedless record shows no seed field
-- **WHEN** a record has no persisted seed (missing, pending, or a done record generated without a
-  server-reported seed)
-- **THEN** its line shows no seed value and the listing renders normally
-
-#### Scenario: A failed gallery generation is visible to staff
-- **WHEN** a subject's gallery carries a recorded generation error and staff runs `@art status`
-- **THEN** the gallery section names that subject with its bounded error code, and no prompt text or stored identity appears
-
-#### Scenario: Gallery job records stay invisible
-- **WHEN** a gallery job is pending for a subject and staff runs `@art status`
-- **THEN** no job row appears in any section and the subject's gallery line reports its cards only
-
-#### Scenario: A subject with a healthy gallery reports no error
-- **WHEN** a subject holds cards and carries no recorded error and staff runs `@art status`
-- **THEN** its gallery line shows the card count and default state with no error field
-
-#### Scenario: Non-staff cannot use the command
-- **WHEN** a player without staff access runs any `@art` subcommand
-- **THEN** the command is denied with a permission error
-
-#### Scenario: Gallery state is reported in its own separated section
-- **WHEN** staff runs `@art status`
-- **THEN** the command SHALL additionally report gallery STATE in its own clearly separated
-  section, honoring the same kind filter: one line per `GalleryRecord` carrying its full subject
-  key, the number of valid cards, whether a default is set, and — only when one is recorded — the
-  bounded generation error code with the age of that error
-
-#### Scenario: Gallery job rows never appear; the section reports holdings, not queue rows
-- **WHEN** gallery state is rendered alongside records
-- **THEN** per-image gallery JOB records SHALL remain invisible in every section, as they are
-  today — this section reports what a subject's gallery holds, never queue rows
-
-#### Scenario: Cross-record gallery state is read only through module accessors
-- **WHEN** the command needs cross-record gallery state
-- **THEN** it SHALL read it exclusively through the gallery module's read-only accessors, never by
-  querying the record class from the command
-
-#### Scenario: The gallery section obeys the same non-leakage rule
-- **WHEN** the gallery section renders
-- **THEN** it SHALL obey the same non-leakage rule as the rest of the output: no prompt text, no
-  persona text, no stored identity, and no absolute path
-
 ### Requirement: @art run drains the shared queue now with an optional limit
 `commands/art.py::CmdArtRun` (`@art run [--limit N]`) SHALL drain pending records through the shared
 worker boundary asynchronously, never blocking play, honoring the queue lock, and SHALL report how
@@ -72,125 +14,6 @@ many jobs were dispatched (or the named error when the worker cannot start).
 - **WHEN** staff runs `@art run --limit 5` with pending records present
 - **THEN** at most five pending records are dispatched through the worker and the command reports the
   count dispatched
-
-### Requirement: @art retry re-enqueues failed records
-`commands/art.py::CmdArtRetry` (`@art retry`) SHALL re-enqueue every `failed` classic subject record
-of a kind that declares NO gallery to `pending` under the queue lock and SHALL, in the same pass,
-re-drive every subject whose `GalleryRecord` carries a recorded generation error through the gallery
-request seam. It SHALL report both counts.
-
-#### Scenario: Failed records are re-enqueued
-- **WHEN** staff runs `@art retry` with failed classic (scene) records present
-- **THEN** each failed record becomes `pending` and the command reports the re-enqueued count
-
-#### Scenario: A legacy failed monster classic record is never reactivated
-- **WHEN** staff runs `@art retry` with a `failed` classic monster record present
-- **THEN** that record stays `failed` with its stored state untouched, it is not counted in the re-enqueued total, and no classic generation is queued for it
-
-#### Scenario: A failed gallery generation is retried without a restart
-- **WHEN** a character subject's gallery carries a recorded generation error and staff runs `@art retry`
-- **THEN** exactly one gallery generation is requested for that subject and the command reports it
-
-#### Scenario: An ineligible erroring subject is skipped, not fatal
-- **WHEN** a subject carrying a recorded gallery error no longer satisfies the request seam's preconditions
-- **THEN** that subject is skipped with no record change, the remaining subjects are still retried, and the command reports the count it actually requested
-
-#### Scenario: A moot error on a subject that now has art is cleared
-- **WHEN** a subject carrying a recorded gallery error has since gained a card and staff runs `@art retry`
-- **THEN** no generation is requested for it, its recorded error is cleared, and it no longer appears as erroring on the status surface
-
-#### Scenario: A healthy gallery is left alone
-- **WHEN** staff runs `@art retry` and every gallery record carries no error
-- **THEN** no gallery generation is requested and the command reports zero gallery retries
-
-#### Scenario: The classic arm skips every gallery-bearing subject kind
-- **WHEN** the classic retry arm encounters a subject kind whose capability declaration carries a
-  gallery
-- **THEN** it SHALL skip that kind: such a kind's failures are retried exclusively through the
-  gallery arm, so a legacy classic monster record is never reset, re-enqueued, or newly produced by
-  any retry pass
-
-#### Scenario: No classic-character re-enqueue branch exists
-- **WHEN** the retry command's classic arm is inspected
-- **THEN** because a character subject no longer owns a classic asset record,
-  `queue.failed_keys()` can no longer yield one; the command SHALL NOT carry a classic-character
-  re-enqueue branch, and the gallery arm SHALL be the only character retry path
-
-#### Scenario: A gallery re-drive goes through the validated request seam
-- **WHEN** the gallery arm re-drives a subject
-- **THEN** the re-drive SHALL go through the same validated request seam an automatic path uses, so
-  every precondition that seam enforces still applies and a subject that no longer qualifies is
-  skipped with no record change rather than failing the whole command
-
-#### Scenario: A declined erroring subject with art now has its error cleared
-- **WHEN** the seam declines an erroring subject because its gallery is no longer empty — a seed
-  card arrived, or an operator kept an image
-- **THEN** the recorded error SHALL be cleared rather than left standing: the subject has art and
-  its automatic guard will suppress every future request, so nothing else would ever clear that
-  code and it would otherwise remain permanently on the status surface
-
-#### Scenario: A subject declined for any other reason keeps its error
-- **WHEN** the seam declines an erroring subject for any reason other than a now-non-empty gallery
-- **THEN** that subject SHALL keep its recorded error
-
-#### Scenario: Retired tier jobs and gallery errors never retry
-- **WHEN** a retry pass encounters tier-keyed monster records or errors
-- **THEN** it cannot reactivate or convert them; valid scene, character and species retries retain their normal behavior
-
-### Requirement: @art requeue accepts one validated full subject key and forces regeneration under the lock
-`commands/art.py::CmdArtRequeue` (`@art requeue <full-subject-key>`) SHALL parse and validate exactly
-one full subject key through the subject parser. An invalid key SHALL be rejected with a named error
-and no record change. A key whose subject kind declares a gallery — character, species-keyed monster and scene alike —
-SHALL request one gallery generation through the shared seam and SHALL NOT reset or create a classic
-record.
-
-#### Scenario: A validated key forces regeneration
-- **WHEN** staff runs `@art requeue scene:<archetype>` for a registered synthetic archetype that holds one card
-- **THEN** one gallery generation is requested, no classic record is reset or created, and the existing
-  card stays until the new card replaces it under the declared maximum
-
-#### Scenario: An invalid key is rejected with no record change
-- **WHEN** staff runs `@art requeue` with a malformed or unknown full subject key
-- **THEN** a named error is returned and no record is changed
-
-#### Scenario: A character key requeue adds a gallery card
-- **WHEN** staff runs `@art requeue portrait:character:<stable-key>` for a subject that already holds cards
-- **THEN** one gallery generation is requested, no classic asset record is created, and the existing cards are untouched until the new card is appended
-
-#### Scenario: A monster key requeue requests a gallery card honouring the cap
-- **WHEN** staff runs `@art requeue portrait:monster:<visual-key>` for a visual species that already holds its one card
-- **THEN** one gallery generation is requested, no classic asset record is created, and the settled card replaces the existing one under the declared maximum
-
-#### Scenario: A monster requeue never resets a classic record
-- **WHEN** staff runs `@art requeue portrait:monster:<visual-key>` for a visual species that still has a pre-existing classic asset record
-- **THEN** a gallery generation is requested and that classic record's status is unchanged
-
-#### Scenario: A gallery-bearing key issues one request through the shared seam
-- **WHEN** the requeue key's subject kind declares a gallery — character and species-keyed monster alike
-- **THEN** the command SHALL instead issue exactly one gallery generation request for that subject
-  through the shared request seam, appending a new card on success
-
-#### Scenario: Requeue deliberately bypasses the idempotency guard
-- **WHEN** requeue targets a subject that already holds cards
-- **THEN** because requeue is the staff force path, it SHALL deliberately bypass the
-  automatic-generation idempotency guard, so the subject still gets one new generation
-
-#### Scenario: The append respects the declared card maximum
-- **WHEN** the new card would exceed the kind's declared card maximum
-- **THEN** the append SHALL respect that maximum exactly as any other append does — for the monster
-  kind, replacing its single card
-
-#### Scenario: A kind with no declared maximum keeps its existing cards
-- **WHEN** the kind declares no card maximum
-- **THEN** the existing cards SHALL be untouched
-
-#### Scenario: Neither path creates a classic record for a gallery-bearing subject
-- **WHEN** either requeue path runs for a gallery-bearing subject
-- **THEN** neither path SHALL create a classic asset record for that subject
-
-#### Scenario: Retired monster tiers never requeue
-- **WHEN** staff supplies any threat-tier key as a monster requeue subject
-- **THEN** a named invalid-subject error is returned with no generation, record reset or conversion
 
 ### Requirement: Players have no access to any art control
 No `@art` subcommand SHALL be available to ordinary players. Player-triggered generation SHALL exist
@@ -240,56 +63,86 @@ one per line, with a header naming the option kind and total count.
 - **THEN** it SHALL NOT include the configured credentials or any `Authorization` material, and
   SHALL name at most the server host (never a URL containing userinfo)
 
-### Requirement: @art health reports server reachability, scheduler state, queue counts, and output policy
-`commands/art.py` SHALL provide `@art health` restricted to `Developer`, which performs exactly
-one forced connectivity probe and prints five sections in fixed order: (1) server reachability —
-`reachable` or `unreachable` with the named error code; (2) the effective scheduler state
-(`ART_SCHEDULER_ENABLED` with interval seconds and limit); (3) exact record counts by status
-(`pending`, `in_progress`, `failed`, `done`); (4) exact gallery counts; (5) the effective output
-policy.
+### Requirement: Staff status reports gallery holdings without sensitive data
+Staff status SHALL list gallery holdings/default/error state with the existing scene/portrait filter. Per-image jobs SHALL remain absent from status rows. No completed subject-record section or legacy seed row SHALL remain. Output SHALL exclude prompts, persona, stored identities and absolute paths.
 
-#### Scenario: Health shows a reachable server with full dashboard state
-- **WHEN** staff runs `@art health` against a reachable server with the scheduler enabled and a
-  mixed-status record store
-- **THEN** the output shows the forced reachability line, the scheduler line with interval and
-  limit, exact per-status counts, the gallery counts line, and the output format/quality/metadata line
+#### Scenario: Gallery state is filtered and private
+- **WHEN** staff requests status with scene or portrait filters
+- **THEN** only matching gallery holdings/default/errors appear; pending job rows and sensitive data do not
 
-#### Scenario: Health counts subjects carrying a gallery error
-- **WHEN** two subjects carry recorded gallery errors and staff runs `@art health`
-- **THEN** the gallery line reports exactly two erroring subjects alongside the record and card counts
+#### Scenario: Staff permission remains enforced
+- **WHEN** an ordinary player invokes status
+- **THEN** access is denied without queue or gallery operations
 
-#### Scenario: Health surfaces an unreachable server as the named code
-- **WHEN** staff runs `@art health` while the server is unreachable
-- **THEN** the server line reads unreachable with the named probe error code and the remaining
-  sections still print
+### Requirement: Staff retry re-drives recorded gallery failures
+Staff retry SHALL re-drive subjects with recorded gallery errors through the existing validated automatic gallery seam, report the count requested and preserve per-subject failure isolation. Existing cards SHALL suppress requests and clear moot errors; other declined requests SHALL retain errors. No classic count or record reset SHALL remain.
 
-#### Scenario: Health is read-only
-- **WHEN** `@art health` runs against a store with pending and failed records
-- **THEN** every record's status, attempt count, and output identity are unchanged afterwards, and no gallery record, card, or recorded error is altered
+#### Scenario: Gallery errors retry without restart
+- **WHEN** eligible subjects have recorded gallery errors and no cards, in-flight jobs or satisfying official defaults
+- **THEN** each gets one new image request and the command reports the requested count
 
-#### Scenario: Health leaks nothing sensitive
-- **WHEN** Basic auth is configured and staff runs `@art health`
-- **THEN** no credential value, URL userinfo, or absolute path appears in the output
+#### Scenario: Moot errors clear
+- **WHEN** an erroring subject has gained a valid card
+- **THEN** no request occurs and its error clears
 
-#### Scenario: Non-staff cannot run health
-- **WHEN** a player without staff access runs `@art health`
-- **THEN** the command is denied and no probe request is sent
+#### Scenario: Other declines preserve errors
+- **WHEN** an erroring subject is official-satisfied, already in flight or ineligible
+- **THEN** its error stays and no job is added; other eligible subjects continue
 
-#### Scenario: The gallery counts section is exact
-- **WHEN** the gallery counts section renders
-- **THEN** it reports gallery records, total valid cards, and subjects currently carrying a
-  recorded generation error
+### Requirement: Staff requeue forces one validated gallery request
+Staff requeue SHALL parse one full typed subject key and request one gallery image, bypassing automatic satisfaction by cards or official defaults while retaining capability preconditions. Invalid or gallery-less subjects SHALL reject without writes. Capped subjects SHALL replace on successful settlement; uncapped subjects SHALL retain existing cards.
 
-#### Scenario: The output policy section names the effective settings
-- **WHEN** the output policy section renders
-- **THEN** it reports `ART_SD_OUTPUT_FORMAT`, `ART_SD_OUTPUT_QUALITY`, and whether
-  generation-metadata preservation is on
+#### Scenario: A validated key forces regeneration
+- **WHEN** staff runs `@art requeue scene:<archetype>` for a registered synthetic archetype that holds one card
+- **THEN** one gallery generation is requested, no fixed-output record is created, and the existing
+  card stays until the new card replaces it under the declared maximum
 
-#### Scenario: Health mutates nothing and leaks nothing
-- **WHEN** `@art health` runs
-- **THEN** the command SHALL mutate no record, queue entry, or setting, and its output SHALL NOT
-  contain credentials, URL userinfo, absolute paths, prompt text, or persona text
+#### Scenario: An invalid key is rejected with no record change
+- **WHEN** staff runs `@art requeue` with a malformed or unknown full subject key
+- **THEN** a named error is returned and no record is changed
 
-#### Scenario: The reachability line attests the probe ran just now
-- **WHEN** the server reachability section renders
-- **THEN** it reports that the check ran just now
+#### Scenario: A character key requeue adds a gallery card
+- **WHEN** staff runs `@art requeue portrait:character:<stable-key>` for a subject that already holds cards
+- **THEN** one gallery generation is requested, no fixed-output record is created, and the existing cards are untouched until the new card is appended
+
+#### Scenario: A monster key requeue requests a gallery card honouring the cap
+- **WHEN** staff runs `@art requeue portrait:monster:<visual-key>` for a visual species that already holds its one card
+- **THEN** one gallery generation is requested, no fixed-output record is created, and the settled card replaces the existing one under the declared maximum
+
+#### Scenario: A gallery-bearing key issues one request through the shared seam
+- **WHEN** the requeue key's subject kind declares a gallery — character and species-keyed monster alike
+- **THEN** the command SHALL instead issue exactly one gallery generation request for that subject
+  through the shared request seam, appending a new card on success
+
+#### Scenario: Requeue deliberately bypasses the idempotency guard
+- **WHEN** requeue targets a subject that already holds cards
+- **THEN** because requeue is the staff force path, it SHALL deliberately bypass the
+  automatic-generation idempotency guard, so the subject still gets one new generation
+
+#### Scenario: The append respects the declared card maximum
+- **WHEN** the new card would exceed the kind's declared card maximum
+- **THEN** the append SHALL respect that maximum exactly as any other append does — for the monster
+  kind, replacing its single card
+
+#### Scenario: A kind with no declared maximum keeps its existing cards
+- **WHEN** the kind declares no card maximum
+- **THEN** the existing cards SHALL be untouched
+
+#### Scenario: Every force request creates a per-image job
+- **WHEN** either requeue path runs for a gallery-bearing subject
+- **THEN** only a per-image gallery job SHALL be created for that subject
+
+#### Scenario: Retired monster tiers never requeue
+- **WHEN** staff supplies any threat-tier key as a monster requeue subject
+- **THEN** a named invalid-subject error is returned with no generation, record reset or conversion
+
+### Requirement: Staff health separates live jobs from gallery outcome state
+Developer health SHALL perform one forced connectivity probe and report reachability, scheduler policy, live gallery-job pending/in_progress counts, gallery holdings/card/error counts, and output policy in that order. Deleted terminal jobs SHALL NOT be represented as persistent done/failed queue rows. It SHALL remain read-only and leak no credentials, paths or prompts.
+
+#### Scenario: Live counts reflect actual job lifetime
+- **WHEN** one job is pending, another claimed and a previous failed job has been removed
+- **THEN** health reports one pending and one in_progress job, the recorded gallery error separately, and no terminal queue history
+
+#### Scenario: Probe failure does not hide other sections
+- **WHEN** the forced probe fails
+- **THEN** the bounded error appears with scheduler, gallery and output sections; no state changes

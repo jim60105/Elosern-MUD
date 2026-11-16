@@ -55,6 +55,9 @@ class ArtOfflineAcceptanceContract(unittest.TestCase):
                 self.assertNotIn("world.art", source)
                 self.assertNotIn("from world.art", source)
 
+    @covers_requirement(
+        "art-gallery-autogen::gallery-lifecycle-writes-stay-inside-the-deterministic-art-owner"
+    )
     def test_art_package_has_no_forbidden_transport_fragments(self):
         for path in sorted((REPO_ROOT / "world" / "art").rglob("*.py")):
             if "tests" in path.parts:

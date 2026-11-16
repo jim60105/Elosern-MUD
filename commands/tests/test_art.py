@@ -81,6 +81,9 @@ def _fallback_text() -> str:
 
 @_ART_SCOPE
 class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
+    @covers_requirement(
+        "art-staff-commands::staff-status-reports-gallery-holdings-without-sensitive-data"
+    )
     def test_staff_can_list_gallery_holdings_without_persona_or_paths(self):
         gallery_api.record_error(_scene(_SCENE_KEY), "sd_connection_error")
         output = self.call(CmdArtStatus(), "scene")
@@ -184,6 +187,9 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertIn("not_registered", output)
         self.assertEqual(GalleryJobRecord.objects.count(), 0)
 
+    @covers_requirement(
+        "art-gallery-autogen::the-age-check-runs-on-every-lifecycle-path-and-rejects-deterministically-without-a-persisted-marker"
+    )
     def test_requeue_character_with_missing_canonical_age_is_rejected_with_no_record_change(self):
         from evennia.utils.create import create_object
 
@@ -200,6 +206,7 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertIn("無法重新排入", output)
         self.assertEqual(GalleryJobRecord.objects.count(), 0)
 
+    @covers_requirement("art-staff-commands::staff-requeue-forces-one-validated-gallery-request")
     def test_requeue_character_requests_a_gallery_job_without_touching_cards(self):
         from evennia.utils.create import create_object
 
@@ -352,6 +359,7 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertEqual(GalleryJobRecord.objects.count(), 0)
         self.assertEqual(gallery_api.erroring_subjects(), [])
 
+    @covers_requirement("art-staff-commands::staff-retry-re-drives-recorded-gallery-failures")
     def test_retry_re_requests_an_erroring_character_exactly_once(self):
         player = self._portrait_player("retry-gallery-ok")
         subject = ArtSubject(ArtSubjectKind.CHARACTER, str(player.pk))
@@ -456,6 +464,9 @@ class ArtStatusGalleryTests(EvenniaCommandTestMixin, EvenniaTest):
         portrait_output = self.call(CmdArtStatus(), "portrait")
         self.assertNotIn(":gen:", portrait_output)
 
+    @covers_requirement(
+        "art-staff-commands::staff-status-reports-gallery-holdings-without-sensitive-data"
+    )
     def test_a_failed_gallery_generation_is_visible_with_its_bounded_code(self):
         subject = ArtSubject(ArtSubjectKind.CHARACTER, "42")
         gallery_api.record_error(subject, "sd_connection_error")
@@ -573,6 +584,9 @@ class ArtHealthCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertEqual(lines[3], "gallery: records=0 cards=0 erroring=0")
         self.assertEqual(lines[4], "output: png q=80 metadata=on")
 
+    @covers_requirement(
+        "art-staff-commands::staff-health-separates-live-jobs-from-gallery-outcome-state"
+    )
     def test_the_gallery_line_counts_records_cards_and_erroring_subjects(self):
         one = ArtSubject(ArtSubjectKind.CHARACTER, "42")
         image_id = str(uuid.uuid4())
@@ -594,6 +608,9 @@ class ArtHealthCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         output, _, _ = self._health(self._verdict())
         self.assertIn("gallery: records=2 cards=1 erroring=2", output)
 
+    @covers_requirement(
+        "art-staff-commands::staff-health-separates-live-jobs-from-gallery-outcome-state"
+    )
     def test_a_claimed_job_is_reported_in_progress(self):
         enqueue_gallery_job(
             _scene(_SCENE_KEY),

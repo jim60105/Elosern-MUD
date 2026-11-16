@@ -27,10 +27,16 @@ class CharacterAgesTests(EvenniaTestCase):
         self.character.age = 22
         self.character.apparent_age = 22
 
+    @covers_requirement(
+        "art-gallery-autogen::portrait-character-enqueue-validates-canonical-age-attributes-immediately-before-enqueue"
+    )
     def test_valid_canonical_ages_pass(self):
         age, apparent_age = character_ages(self.character)
         self.assertEqual((age, apparent_age), (22, 22))
 
+    @covers_requirement(
+        "art-gallery-autogen::portrait-character-enqueue-validates-canonical-age-attributes-immediately-before-enqueue"
+    )
     def test_zero_ages_pass(self):
         self.character.age = 0
         self.character.apparent_age = 0

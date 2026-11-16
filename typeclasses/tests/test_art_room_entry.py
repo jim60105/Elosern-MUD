@@ -74,6 +74,9 @@ class ArtRoomEntryTests(EvenniaTestCase):
         self._move(room)
         self.assertEqual(GalleryJobRecord.objects.count(), 0)
 
+    @covers_requirement(
+        "art-gallery-autogen::successful-room-entry-ensures-the-scene-asset-for-a-validated-archetype"
+    )
     def test_a_second_entry_while_a_job_is_pending_requests_nothing(self):
         with synthetic_registries("archetypes"):
             first, errors = AnchorRoom.create(
@@ -117,6 +120,7 @@ class ArtRoomEntryTests(EvenniaTestCase):
             self._move(room)
             self.assertEqual(len(self._scene_job_keys(_BAZAAR)), 1)
 
+    @covers_requirement("art-gallery-autogen::queue-failure-never-rolls-back-gameplay")
     def test_art_failure_during_movement_leaves_the_move_committed(self):
         with synthetic_registries("archetypes"):
             self._movement_survives_art_failure()

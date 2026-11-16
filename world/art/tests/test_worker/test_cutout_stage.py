@@ -103,6 +103,9 @@ class CutoutStageTests(WorkerStoreIsolation):  # noqa: E501
         self.assertEqual(len(cards), 1)
         self.assertEqual(cards[0]["image_id"], image_id)
 
+    @covers_requirement(
+        "art-portrait-cutout::gallery-portraits-publish-background-removed-artifacts"
+    )
     def test_gallery_portrait_jobs_are_cut_out_on_the_same_terms(self):
         monster = self._subject(_SYNTH_MONSTER, ArtSubjectKind.MONSTER)
         character_image_id = "aaaaaaaa-1111-4111-8111-111111111111"

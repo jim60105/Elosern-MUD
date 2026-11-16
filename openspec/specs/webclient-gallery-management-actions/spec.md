@@ -199,7 +199,7 @@ adapter SHALL NOT synthesize a replacement default.
 #### Scenario: Deleting the default falls through to the chain
 
 - **WHEN** the only card of a subject is deleted
-- **THEN** the record's default is null, the panel lists no card, and resolution falls to the classic/fallback chain
+- **THEN** the record's default is null, the panel lists no card, and resolution falls to the official-default and declared-terminal chain
 
 #### Scenario: A second delete of the same card refuses
 

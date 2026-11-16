@@ -473,6 +473,9 @@ def terminal(descriptor: dict) -> dict | None:
 
 
 class SeamPayloadTests(EvenniaTestCase):
+    @covers_requirement(
+        "art-gallery-fallback::declared-terminal-resources-retain-geometry-and-observability"
+    )
     def test_the_presenter_carries_a_fallback_image_and_logs_one_event(self):
         subject = _character("fallbackhero")
         with patch("world.observability.log_info") as logged:

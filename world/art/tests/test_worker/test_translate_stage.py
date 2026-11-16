@@ -82,6 +82,9 @@ class TranslationStageTests(WorkerStoreIsolation):
             self.assertIsNone(self._job_for(job))
             self.assertEqual(len(gallery_api.cards_for(subject)), 1)
 
+    @covers_requirement(
+        "art-prompt-translation::gallery-descriptions-pass-through-configured-prompt-translation"
+    )
     def test_enabled_stage_translates_gallery_without_mutating_the_spent_job(self):
         subject = self._subject("42", ArtSubjectKind.CHARACTER)
         description = "畫像漢字"

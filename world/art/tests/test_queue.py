@@ -52,6 +52,7 @@ def _job_count() -> int:
 class GalleryJobQueueTests(EvenniaTestCase):
     """Per-image gallery jobs share the queue machinery and carry request state."""
 
+    @covers_requirement("art-queue-worker::gallery-image-requests-own-independent-queue-jobs")
     def test_two_requests_for_one_subject_produce_two_independent_jobs(self):
         subject = _character("42")
         first = _enqueue_gallery(subject, "11111111-1111-4111-8111-111111111111")
@@ -67,6 +68,7 @@ class GalleryJobQueueTests(EvenniaTestCase):
         self.assertTrue(is_gallery_job(first) and is_gallery_job(second))
         self.assertEqual(_job_count(), 2)
 
+    @covers_requirement("art-queue-worker::gallery-jobs-carry-transient-request-state-only")
     def test_a_gallery_job_carries_the_card_metadata_and_no_output_identity(self):
         subject = _character("42")
         binding = {
@@ -155,6 +157,7 @@ class GalleryJobQueueTests(EvenniaTestCase):
         self.assertEqual(failed_keys(), ["scene:t_synth_cave"])
         self.assertFalse(GalleryJobRecord.objects.filter(db_key=bad_job.db_key).exists())
 
+    @covers_requirement("art-queue-worker::gallery-jobs-share-one-lock-and-worker-slot")
     def test_concurrent_drains_serialize_and_never_hold_the_lock_across_a_worker_wait(self):
         from world.art.queue import settle_gallery_failed
 

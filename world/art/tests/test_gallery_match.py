@@ -246,6 +246,9 @@ class ChainBindingTests(_ChainBase):
         )
         self.assertEqual(record_for(subject).db.cards, cards_before)
 
+    @covers_requirement(
+        "art-gallery-resolution::all-artwork-subjects-use-the-gallery-only-deterministic-chain"
+    )
     def test_no_binding_match_falls_through_to_the_default(self):
         subject = _character("fallthrough")
         fallback_default = self._append_present(subject)  # first append = default
@@ -303,6 +306,9 @@ class MonsterChainTests(_ChainBase):
     def test_a_monster_with_no_card_resolves_to_nothing(self):
         self.assertIsNone(resolve_card(_monster("bare"), _FakeEntity()))
 
+    @covers_requirement(
+        "art-gallery-resolution::declared-binding-support-gates-shared-resolution"
+    )
     def test_the_binding_skip_follows_the_declaration_not_the_kind(self):
         # A CHARACTER whose declaration is patched to drop binding support
         # must resolve through the chain with the binding steps skipped — no

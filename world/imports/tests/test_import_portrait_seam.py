@@ -59,6 +59,9 @@ class ImportPortraitSeamTests(EvenniaTestCase):
             records.append(record)
         return records
 
+    @covers_requirement(
+        "art-gallery-autogen::successful-player-creation-and-validated-import-schedule-an-eligible-unique-portrait-through-transaction-on-commit"
+    )
     def test_committed_batch_schedules_one_post_commit_ensure_per_record(self):
         first = example_record()
         second = example_record()

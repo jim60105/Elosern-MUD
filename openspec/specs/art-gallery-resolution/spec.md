@@ -13,8 +13,61 @@ identities under the same store-root confinement discipline.
 
 ## Requirements
 
-### Requirement: Display resolution is one deterministic chain from equipment to fallback
-Every gallery-bearing subject SHALL use one read-only deterministic chain of stored state and startup snapshots. Order SHALL be matching binding where declared, explicit official selection, gallery default, classic source while supported, official catalog default, declared terminal, then non-image placeholder. Kind differences SHALL come only from capabilities; authored room overrides remain outside and ahead of the subject chain.
+### Requirement: An unbound card is never auto-selected
+Unbound cards SHALL be eligible only as the explicit gallery default. With no matching binding or named default, resolution SHALL continue through official selection/default and declared terminal sources without choosing an unselected card.
+
+#### Scenario: Unbound cards with no default are not shown
+- **WHEN** a subject holds only unbound cards and `default_image_id` is `None`
+- **THEN** the chain resolves past them to the official default, declared terminal or placeholder
+
+#### Scenario: An unbound card set as default is shown
+- **WHEN** an unbound card is the subject's `default_image_id` and no binding matches
+- **THEN** that card is resolved
+
+### Requirement: The chain ends at one fallback seam
+One declared terminal seam SHALL follow all subject image sources and precede the non-image placeholder. Person terminals SHALL retain demographic alpha selection; scene terminals SHALL retain required bundled illustration and distinct town/forest fallback. Kind-specific terminal policy SHALL be selected by capabilities.
+
+#### Scenario: The seam returning nothing preserves today's placeholder
+- **WHEN** no person alpha terminal is admitted
+- **THEN** identity text remains as the terminal non-image result; scenes use their declared scene terminal adapter in the shared chain rather than a person silhouette
+
+#### Scenario: The seam still runs when the official step resolves nothing
+- **WHEN** a subject reaches the official-default step and its reference is absent from the snapshot
+- **THEN** the chain consults the terminal seam exactly as before the official step existed
+
+#### Scenario: The seam was introduced inert and is now filled
+- **WHEN** the current person chain is read
+- **THEN** one authoritative deterministic alpha selector supplies its terminal without duplicate selector or legacy aliases
+
+#### Scenario: The filled seam serves persons and declines scenes
+- **WHEN** the common terminal seam dispatches to its declared adapter
+- **THEN** the person-alpha adapter resolves person identity/geometry and declines scene inputs; the common seam dispatches scene subjects to the scene bundled/terminal adapter instead
+
+### Requirement: Gallery URLs are built only from validated card identities
+The presenter SHALL build a gallery media URL only from a card's stored identity that it has
+validated against the subject's own `gallery/<kind>/<subject-key>/` prefix, the closed set of store
+extensions, and the store-root confinement check (rejecting symlinks and out-of-root resolutions).
+The presenter SHALL never expose an absolute path or the store root.
+
+#### Scenario: A card whose file vanished is skipped, not emitted
+- **WHEN** the resolved card's file has been deleted from the store
+- **THEN** the chain continues to the next step and the payload never carries that card's URL
+
+#### Scenario: A cross-subject or out-of-root identity is never served
+- **WHEN** a card carries an identity whose path segments address a different subject, or that resolves outside the store root or through a symlink
+- **THEN** the card is skipped and no URL is produced from it
+
+#### Scenario: An invalid card never yields a broken URL
+- **WHEN** a card's file no longer exists or its identity fails validation
+- **THEN** the card SHALL be skipped, with resolution continuing at the next remaining candidate of
+  the current step or the next step, rather than the chain emitting a broken URL
+
+#### Scenario: Exact requested card remains attributable after loss
+- **WHEN** a readable gallery card record has missing or rejected output
+- **THEN** its exact requested descriptor contains a bounded source fault and no broken original URL; previews may use alpha but cannot change the original image id
+
+### Requirement: All artwork subjects use the gallery-only deterministic chain
+Every gallery-bearing subject SHALL use one read-only deterministic chain of stored state and startup snapshots. Order SHALL be matching binding where declared, explicit official selection, gallery default, official catalog default, declared terminal, then non-image placeholder. Kind differences SHALL come only from capabilities; authored room overrides remain outside and ahead of the subject chain.
 
 #### Scenario: The most specific matching binding wins
 - **WHEN** one card binds `armor` alone and another binds `armor` and `weapon_main`, and the entity's current equipment matches both
@@ -49,7 +102,7 @@ Every gallery-bearing subject SHALL use one read-only deterministic chain of sto
 - **THEN** the card is resolved and the official step is never consulted
 
 #### Scenario: Nothing runtime falls through to the official default
-- **WHEN** no binding matches, no official selection or default card exists, the classic record is absent, and the entity's content reference has a valid catalog entry
+- **WHEN** no binding matches, no official selection or default card exists, the entity's content reference has a valid catalog entry
 - **THEN** the official default resolves ahead of the fallback seam
 
 #### Scenario: Step 1 computes the equipment snapshot
@@ -73,27 +126,23 @@ Every gallery-bearing subject SHALL use one read-only deterministic chain of sto
   entry (see the `official-art-personalization` capability), else the card named by
   `default_image_id`
 
-#### Scenario: Step 5 falls to the classic done asset record
-- **WHEN** the chain reaches step 5, meaning no personal official selection resolved
-- **THEN** it resolves the subject's classic `done` asset record, exactly as it is today
-
-#### Scenario: Step 6 resolves the official default or falls through
-- **WHEN** the chain reaches step 6
+#### Scenario: Official position resolves the official default or falls through
+- **WHEN** the chain reaches the official position
 - **THEN** it takes the official default for the entity's official content reference (see the
   `official-art-resolution` capability), resolved from the startup official snapshot, and an entity
   with no reference, or a reference the snapshot does not hold, falls through with no diagnostic
   beyond the bounded catalog vocabulary
 
-#### Scenario: Step 7 consults the terminal fallback seam
-- **WHEN** the chain reaches step 7
+#### Scenario: Terminal position consults the terminal fallback seam
+- **WHEN** the chain reaches the terminal position
 - **THEN** it consults the terminal fallback seam
 
-#### Scenario: Step 8 ends at the truthful placeholder
-- **WHEN** the chain reaches step 8 with nothing resolved
+#### Scenario: Placeholder position ends at the truthful placeholder
+- **WHEN** the chain reaches the placeholder position with nothing resolved
 - **THEN** it produces the existing truthful placeholder
 
 #### Scenario: Failures keep their source position
-- **WHEN** an explicit selection/default/classic source cannot resolve
+- **WHEN** an explicit selection/default source cannot resolve
 - **THEN** the canonical internal attempts retain its bounded fault before remaining candidates, while first valid candidate selection preserves existing deterministic policy and no mutation occurs
 
 #### Scenario: Scene and portrait share precedence
@@ -104,30 +153,12 @@ Every gallery-bearing subject SHALL use one read-only deterministic chain of sto
 - **WHEN** a scene target declares a valid room override and its archetype has a generated default
 - **THEN** the room override remains first; removing it exposes the archetype chain without changing its shared preferences
 
-### Requirement: An unbound card is never auto-selected
-A card whose `binding` is `None` SHALL be eligible ONLY as the subject's explicit default. When no
-binding matches the current equipment and `default_image_id` is `None`, the chain SHALL fall through
-to the classic asset record, the fallback seam, and finally the placeholder — even when unbound cards
-exist — so no image the player has not chosen is ever displayed as a surprise.
-
-#### Scenario: Unbound cards with no default are not shown
-- **WHEN** a subject holds only unbound cards and `default_image_id` is `None`
-- **THEN** the chain resolves past them to the classic asset, fallback, or placeholder
-
-#### Scenario: An unbound card set as default is shown
-- **WHEN** an unbound card is the subject's `default_image_id` and no binding matches
-- **THEN** that card is resolved
-
-### Requirement: Monster subjects resolve through the chain without the binding steps
+### Requirement: Declared binding support gates shared resolution
 Every kind SHALL skip binding reads and selection unless its capability declares binding support. The remaining chain SHALL be identical across kinds, with preference ownership and terminal policy declared in capabilities. A non-binding kind SHALL never compute an equipment snapshot.
 
 #### Scenario: A monster resolves its single card
 - **WHEN** a monster subject holds its one card
 - **THEN** that card is resolved with no equipment read
-
-#### Scenario: A monster with no card falls through unchanged
-- **WHEN** a monster subject holds no card and its classic asset record is `done`
-- **THEN** the classic asset is resolved exactly as it is today
 
 #### Scenario: The binding steps follow the declaration
 - **WHEN** display resolution runs for a kind whose declaration does not support bindings
@@ -152,34 +183,15 @@ Every kind SHALL skip binding reads and selection unless its capability declares
 - **THEN** its own registered visual species official default can resolve; an absent package falls through only to monster_anon after same-species runtime resolution fails
 
 #### Scenario: Tier records cannot outrank a species default
-- **WHEN** a species has an official image while its monster's tier has an old gallery or classic image on disk
+- **WHEN** a species has an official image while its monster's tier has an unauthorized old gallery image on disk
 - **THEN** those tier records are never read or applied and the species image resolves
 
 #### Scenario: A redeclared kind changes selection policy
 - **WHEN** a synthetic gallery-bearing kind declares no bindings and subject-scoped official preferences
 - **THEN** it resolves official selection, gallery default and official default without equipment or entity-age reads
 
-### Requirement: The chain ends at one fallback seam
-One declared terminal seam SHALL follow all subject image sources and precede the non-image placeholder. Person terminals SHALL retain demographic alpha selection; scene terminals SHALL retain required bundled illustration and distinct town/forest fallback. Kind-specific terminal policy SHALL be selected by capabilities.
-
-#### Scenario: The seam returning nothing preserves today's placeholder
-- **WHEN** no person alpha terminal is admitted
-- **THEN** identity text remains as the terminal non-image result; scenes use their declared scene terminal adapter in the shared chain rather than a person silhouette
-
-#### Scenario: The seam still runs when the official step resolves nothing
-- **WHEN** a subject reaches the official-default step and its reference is absent from the snapshot
-- **THEN** the chain consults the terminal seam exactly as before the official step existed
-
-#### Scenario: The seam was introduced inert and is now filled
-- **WHEN** the current person chain is read
-- **THEN** one authoritative deterministic alpha selector supplies its terminal without duplicate selector or legacy aliases
-
-#### Scenario: The filled seam serves persons and declines scenes
-- **WHEN** the common terminal seam dispatches to its declared adapter
-- **THEN** the person-alpha adapter resolves person identity/geometry and declines scene inputs; the common seam dispatches scene subjects to the scene bundled/terminal adapter instead
-
-### Requirement: Every resolution payload carries a face rectangle or null
-Canonical portrait resources SHALL carry each original candidate or alpha terminal's own validated face rectangle in its geometry, not a top-level shared payload field. Existing card/fallback pixel-square and classic shared-anchor semantics SHALL remain. Scene geometry SHALL have null face rectangle. Metadata remains placement-only without server crop/transform or second pixels.
+### Requirement: Gallery and official resources carry their own geometry
+Each original portrait candidate and alpha terminal SHALL carry its own validated face rectangle in resource geometry. Card pixel-square and fallback anchor semantics SHALL remain. Scene geometry SHALL have null face rectangle. Geometry SHALL remain placement-only metadata without server cropping, transforms or second images.
 
 #### Scenario: A resolved card carries its own rectangle
 - **WHEN** a card with explicit rectangle becomes a canonical candidate
@@ -193,10 +205,6 @@ Canonical portrait resources SHALL carry each original candidate or alpha termin
 - **WHEN** stored card rectangle is malformed or nonsquare
 - **THEN** safe fitted candidate geometry is used with an attributed metadata fault and bounded diagnostic
 
-#### Scenario: A classic-asset payload keeps the shared constant
-- **WHEN** a classic (non-card) asset resolves
-- **THEN** the payload carries the shared default constant rectangle, bounds-validated with no image size
-
 #### Scenario: An official payload carries validated metadata geometry
 - **WHEN** an official default with a valid declared manifest rectangle and a non-identity declared stage resolves
 - **THEN** the payload carries that rectangle validated against the image's decoded dimensions, and that declared stage — the identity triple only when none is declared or it is invalid
@@ -205,11 +213,6 @@ Canonical portrait resources SHALL carry each original candidate or alpha termin
 - **WHEN** a card resolves
 - **THEN** the payload carries the resolved card's normalized rectangle, validated through the
   gallery face-rect validator against that card's recorded `image_size`
-
-#### Scenario: A classic payload carries the shared composition anchor
-- **WHEN** a classic asset resolves
-- **THEN** the payload carries the shared default rectangle — the card-less composition anchor, which
-  knows no image size
 
 #### Scenario: A fallback payload carries the seam's rectangle
 - **WHEN** a fallback image resolved
@@ -232,26 +235,3 @@ Canonical portrait resources SHALL carry each original candidate or alpha termin
 #### Scenario: All geometry locations use the exact canonical schema
 - **WHEN** roster/art catalog descriptors are serialized
 - **THEN** face_rect is inside each applicable resource.geometry; obsolete flat url/face_rect/stage fields fail validation
-
-### Requirement: Gallery URLs are built only from validated card identities
-The presenter SHALL build a gallery media URL only from a card's stored identity that it has
-validated against the subject's own `gallery/<kind>/<subject-key>/` prefix, the closed set of store
-extensions, and the store-root confinement check (rejecting symlinks and out-of-root resolutions).
-The presenter SHALL never expose an absolute path or the store root.
-
-#### Scenario: A card whose file vanished is skipped, not emitted
-- **WHEN** the resolved card's file has been deleted from the store
-- **THEN** the chain continues to the next step and the payload never carries that card's URL
-
-#### Scenario: A cross-subject or out-of-root identity is never served
-- **WHEN** a card carries an identity whose path segments address a different subject, or that resolves outside the store root or through a symlink
-- **THEN** the card is skipped and no URL is produced from it
-
-#### Scenario: An invalid card never yields a broken URL
-- **WHEN** a card's file no longer exists or its identity fails validation
-- **THEN** the card SHALL be skipped, with resolution continuing at the next remaining candidate of
-  the current step or the next step, rather than the chain emitting a broken URL
-
-#### Scenario: Exact requested card remains attributable after loss
-- **WHEN** a readable gallery card record has missing or rejected output
-- **THEN** its exact requested descriptor contains a bounded source fault and no broken original URL; previews may use alpha but cannot change the original image id
