@@ -1,0 +1,20 @@
+# Permanent interior authored source (schema version 1).
+# The sole authority for the room's identity, name, prose, scene metadata and
+# its one exterior entrance relationship. The room id is the stable place key
+# a service record joins to, so a service record declares no geometry.
+version: 1
+kind: interior
+id: fionnen_honey_house
+rooms:
+  fionnen_honey_house:
+    name_zh: 蜜漬房
+    desc_zh: 屋裡擱著一排陶罐，罐口封著蠟，裝的是蜜漬的花瓣與果實。熬煮的鍋還留在灶上，甜味留在木頭上，很久不散。
+    scene_archetype: tavern_interior
+connections: []
+exterior:
+  settlement: elven_village_fionnen
+  node: blossom_garden
+  room: fionnen_honey_house
+  doorway_key: 蜜漬房
+  doorway_aliases:
+  - honey house

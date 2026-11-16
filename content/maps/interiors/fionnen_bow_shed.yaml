@@ -1,0 +1,20 @@
+# Permanent interior authored source (schema version 1).
+# The sole authority for the room's identity, name, prose, scene metadata and
+# its one exterior entrance relationship. The room id is the stable place key
+# a service record joins to, so a service record declares no geometry.
+version: 1
+kind: interior
+id: fionnen_bow_shed
+rooms:
+  fionnen_bow_shed:
+    name_zh: 弓棚
+    desc_zh: 棚子裡掛著弓與成捆的箭，弦繞在木軸上，誰需要就自己取。用完的人把弓掛回原位，棚角堆著待修的舊弓與換下來的弦。
+    scene_archetype: tavern_interior
+connections: []
+exterior:
+  settlement: elven_village_fionnen
+  node: archery_lane
+  room: fionnen_bow_shed
+  doorway_key: 弓棚
+  doorway_aliases:
+  - bow shed
