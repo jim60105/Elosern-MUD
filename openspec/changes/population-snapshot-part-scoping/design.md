@@ -109,7 +109,7 @@ regional_population.snapshot_regional_population_surfaces(
 )
 ```
 
-With a scope, the regional registry contributes the header only and the activity owner's registry (D3) contributes the scoped parts; the merge by object identity unites them. With no scope (no wilderness or an unprovisioned world) nothing changes.
+With a scope, the regional registry contributes the header only and the activity owner's registry (D3) contributes the scoped parts; the merge by object identity unites them. Put a one-line comment at this call saying exactly that. `activity_units` is a merge-only parameter: a registry built with `activity_units=()` and restored without the activity owner's registry would restore the header without its parts. Say so in both docstrings; no other caller may pass it. With no scope (no wilderness or an unprovisioned world) nothing changes.
 
 The clock registers this function as the stage's `surfaces` contract with the signature `(start_tick, end_tick)`; that signature does not change.
 
@@ -120,6 +120,8 @@ In `docs/development/regional-monster-population.md`, section "Activity record s
 ## Risks / Trade-offs
 
 - [A scoped pass writes a part the registry did not name, and a failure then leaves that part ahead of the database] → The three rules of D2 follow the writers' own guards: a scoped pass settles only `scope.group_ids` and groups it creates (`settling_group_ids`), creation is refused outside the scope's units (`require_units_in_active_scope`), and an orphan receipt is consumed only under the residual unit. Task 2.2 adds a test that runs real scoped passes and compares the parts they stored against `scope_part_units`.
+- [The scope the registry was built for differs from the scope the stage later builds, because an earlier stage of the same advance wrote the activity record] → The same exposure the registry's individual surfaces already have; `snapshot_population_lifecycle_surfaces` documents why the two scopes name the same set. Not widened by this change.
+- [A write-time guard that refuses a part outside the named set was considered] → Not added: the batched record is stored when `batched_state_writes` exits, after `population_units.scoped` has already exited in `_run_pass`, so the guard would need the pass's context order changed. The writers' existing scope guards and test (d) of task 2.2 cover the rule.
 - [The remaining whole records in the registry (`itemcoordinates`, the timeline, the zone records) still cost a full copy] → Out of scope; task 3.2 records their share so a later change can be justified with a measurement.
 
 ## Migration Plan
