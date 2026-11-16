@@ -18,6 +18,8 @@ from unittest.mock import patch
 
 from django.db import transaction
 
+from tools.spec_traceability import covers_requirement
+
 from world.maps import monster_activity, population_units, regional_population
 from world.maps.monster_activity import (
     MONSTER_ACTIVITY_ATTRIBUTE,
@@ -69,6 +71,9 @@ class SnapshotScopeFixture(ScopedSettlementFixture):
 class ScopedActivitySurfaceTests(SnapshotScopeFixture):
     """The activity owner's scoped snapshot names exactly the writable parts."""
 
+    @covers_requirement(
+        "population-settlement-units::a-scoped-settlement-snapshots-only-its-own-activity-parts"
+    )
     def test_another_units_part_is_left_out(self):
         self._build_scenario()
         scope = self._scope(self.unit_a)
@@ -86,6 +91,9 @@ class ScopedActivitySurfaceTests(SnapshotScopeFixture):
         self.assertIn(part_key(self.unit_a), keys)
         self.assertNotIn(part_key(self.unit_b), keys)
 
+    @covers_requirement(
+        "population-settlement-units::a-scoped-settlement-snapshots-only-its-own-activity-parts"
+    )
     def test_a_group_stored_outside_its_present_units_is_named(self):
         self._reset_activity(tick=START)
         group_id, _bodies = self._group(
@@ -128,6 +136,9 @@ class ScopedActivitySurfaceTests(SnapshotScopeFixture):
             self._activity_keys(self._wilderness_attributes(registry)),
         )
 
+    @covers_requirement(
+        "population-settlement-units::a-scoped-snapshot-names-the-parts-its-pass-may-create-or-retire-from"
+    )
     def test_an_orphan_receipt_is_named_only_under_a_residual_scope(self):
         self._reset_activity(tick=START)
         group_id, _bodies = self._group(cell=WANDER_A, tick=START)
@@ -177,6 +188,9 @@ class ScopedActivitySurfaceTests(SnapshotScopeFixture):
             self._activity_keys(self._wilderness_attributes(other)),
         )
 
+    @covers_requirement(
+        "population-settlement-units::a-scoped-snapshot-names-the-parts-its-pass-may-create-or-retire-from"
+    )
     def test_a_scoped_pass_writes_only_named_parts(self):
         self._build_scenario()
         scope = self._scope(self.unit_a)
@@ -195,6 +209,9 @@ class ScopedActivitySurfaceTests(SnapshotScopeFixture):
 class LifecycleRegistryTests(SnapshotScopeFixture):
     """The merged lifecycle registry carries the scoped parts exactly once."""
 
+    @covers_requirement(
+        "population-settlement-units::a-scoped-settlement-snapshots-only-its-own-activity-parts"
+    )
     def test_growing_the_far_zone_names_the_same_activity_entries(self):
         self._build_scenario()
         scope = self._scope(self.unit_a)
@@ -230,6 +247,9 @@ class LifecycleRegistryTests(SnapshotScopeFixture):
         ]
         self.assertEqual(len(copies), 1)
 
+    @covers_requirement(
+        "population-settlement-units::a-scoped-snapshot-names-the-parts-its-pass-may-create-or-retire-from"
+    )
     def test_a_failed_scoped_pass_removes_the_part_it_created(self):
         self._reset_activity(tick=START)
         scope = self._scope(self.unit_b)
@@ -276,6 +296,9 @@ class LifecycleRegistryTests(SnapshotScopeFixture):
             before,
         )
 
+    @covers_requirement(
+        "population-settlement-units::unscoped-snapshots-keep-the-whole-activity-record"
+    )
     def test_an_unscoped_population_snapshot_keeps_every_part(self):
         self._build_scenario()
 
