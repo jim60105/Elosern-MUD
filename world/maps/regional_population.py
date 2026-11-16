@@ -2993,40 +2993,39 @@ def _db_safe_attribute_snapshot(obj: Any, key: str) -> tuple[bool, Any]:
 
 def snapshot_population_surfaces(wilderness: Any) -> dict[int, SurfaceSnapshot]:
     """Snapshot the durable population surfaces one owner write may touch."""
+    from world.maps import monster_activity
+
     _require_wilderness(wilderness)
+    attributes: dict[tuple[str, str | None], tuple[bool, Any]] = {
+        (REGIONAL_POPULATION_ATTRIBUTE, None): _db_safe_attribute_snapshot(
+            wilderness, REGIONAL_POPULATION_ATTRIBUTE
+        ),
+        (POPULATION_SEED_ATTRIBUTE, None): _db_safe_attribute_snapshot(
+            wilderness, POPULATION_SEED_ATTRIBUTE
+        ),
+        (ITEMCOORDINATES_ATTRIBUTE, None): _db_safe_attribute_snapshot(
+            wilderness, ITEMCOORDINATES_ATTRIBUTE
+        ),
+        (POPULATION_TIMELINE_ATTRIBUTE, None): _db_safe_attribute_snapshot(
+            wilderness, POPULATION_TIMELINE_ATTRIBUTE
+        ),
+        (POPULATION_ZONE_SCOPE_ATTRIBUTE, None): _db_safe_attribute_snapshot(
+            wilderness, POPULATION_ZONE_SCOPE_ATTRIBUTE
+        ),
+        # The per-unit settlement cursors are advanced by every lifecycle
+        # pass, so the same rollback must restore them. The literal avoids an
+        # import of the population_units constant here, which would close an
+        # import cycle.
+        ("population_unit_cursors", None): _db_safe_attribute_snapshot(
+            wilderness, "population_unit_cursors"
+        ),
+    }
+    # The map-owned activity record is written by the same
+    # construction/registration operations; a caller-owned rollback must restore
+    # its header and every part with the population surfaces it belongs to.
+    attributes.update(monster_activity.activity_record_surfaces(wilderness))
     return {
-        id(wilderness): SurfaceSnapshot(
-            attributes={
-                (REGIONAL_POPULATION_ATTRIBUTE, None): _db_safe_attribute_snapshot(
-                    wilderness, REGIONAL_POPULATION_ATTRIBUTE
-                ),
-                (POPULATION_SEED_ATTRIBUTE, None): _db_safe_attribute_snapshot(
-                    wilderness, POPULATION_SEED_ATTRIBUTE
-                ),
-                (ITEMCOORDINATES_ATTRIBUTE, None): _db_safe_attribute_snapshot(
-                    wilderness, ITEMCOORDINATES_ATTRIBUTE
-                ),
-                (POPULATION_TIMELINE_ATTRIBUTE, None): _db_safe_attribute_snapshot(
-                    wilderness, POPULATION_TIMELINE_ATTRIBUTE
-                ),
-                (POPULATION_ZONE_SCOPE_ATTRIBUTE, None): _db_safe_attribute_snapshot(
-                    wilderness, POPULATION_ZONE_SCOPE_ATTRIBUTE
-                ),
-                # The map-owned activity record is written by the same
-                # construction/registration operations; a caller-owned rollback
-                # must restore it with the population surfaces it belongs to.
-                ("monster_activity", None): _db_safe_attribute_snapshot(
-                    wilderness, "monster_activity"
-                ),
-                # The per-unit settlement cursors are advanced by every
-                # lifecycle pass, so the same rollback must restore them. The
-                # literal matches "monster_activity" above: importing the
-                # population_units constant here would close an import cycle.
-                ("population_unit_cursors", None): _db_safe_attribute_snapshot(
-                    wilderness, "population_unit_cursors"
-                ),
-            }
-        )
+        id(wilderness): SurfaceSnapshot(attributes=attributes)
     }
 
 
