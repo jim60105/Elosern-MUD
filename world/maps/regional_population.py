@@ -2991,8 +2991,17 @@ def _db_safe_attribute_snapshot(obj: Any, key: str) -> tuple[bool, Any]:
     return db_safe_attribute_snapshot(obj, key)
 
 
-def snapshot_population_surfaces(wilderness: Any) -> dict[int, SurfaceSnapshot]:
-    """Snapshot the durable population surfaces one owner write may touch."""
+def snapshot_population_surfaces(
+    wilderness: Any, *, activity_units: Iterable[str] | None = None
+) -> dict[int, SurfaceSnapshot]:
+    """Snapshot the durable population surfaces one owner write may touch.
+
+    ``activity_units`` narrows the merged activity parts to the units a scoped
+    registry may write. It is merge-only: a registry built with ``()`` and
+    restored without the activity owner's registry would restore the header
+    without its parts, so no caller other than the lifecycle coordinator may
+    pass it.
+    """
     from world.maps import monster_activity
 
     _require_wilderness(wilderness)
@@ -3023,7 +3032,9 @@ def snapshot_population_surfaces(wilderness: Any) -> dict[int, SurfaceSnapshot]:
     # The map-owned activity record is written by the same
     # construction/registration operations; a caller-owned rollback must restore
     # its header and every part with the population surfaces it belongs to.
-    attributes.update(monster_activity.activity_record_surfaces(wilderness))
+    attributes.update(
+        monster_activity.activity_record_surfaces(wilderness, units=activity_units)
+    )
     return {
         id(wilderness): SurfaceSnapshot(attributes=attributes)
     }
@@ -3094,7 +3105,7 @@ def restore_population_surfaces(snapshot: Mapping[int, SurfaceSnapshot]) -> None
 
 
 def snapshot_regional_population_surfaces(
-    start_tick: int, end_tick: int
+    start_tick: int, end_tick: int, *, activity_units: Iterable[str] | None = None
 ) -> dict[int, SurfaceSnapshot]:
     """The clock advance-surface contract for this owner.
 
@@ -3105,11 +3116,14 @@ def snapshot_regional_population_surfaces(
     :func:`restore_population_surfaces` with this exact mapping, which also
     reconciles the room contents caches and rolled-back instances the generic
     clock restore cannot see.
+
+    ``activity_units`` is merge-only and narrows the merged activity parts;
+    see :func:`snapshot_population_surfaces`.
     """
     wilderness = _wilderness()
     if wilderness is None:
         return {}
-    return snapshot_population_surfaces(wilderness)
+    return snapshot_population_surfaces(wilderness, activity_units=activity_units)
 
 
 __all__ = [

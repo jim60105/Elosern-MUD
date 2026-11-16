@@ -1113,7 +1113,8 @@
       "workers": 4,
       "labels": [
         "world.maps.tests.test_editor_final_yaml_moved_location",
-        "world.maps.tests.test_editor_final_yaml_rejection"
+        "world.maps.tests.test_editor_final_yaml_rejection",
+        "world.maps.tests.test_population_snapshot_scope"
       ]
     },
     {

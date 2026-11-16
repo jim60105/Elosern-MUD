@@ -3194,6 +3194,27 @@ before it exists. Restoring re-adds a part that existed -- overwriting the value
 a cached attribute kept from the failed transaction -- and removes a part that
 did not, which also evicts it from the attribute cache.
 
+## Scoped snapshots
+
+A rollback registry built for a scoped settlement names only the parts the
+pass may write. `scope_part_units(wilderness, scope)` answers that set by three
+rules:
+
+1. Every unit of the scope. A group the pass creates is placed in its home unit,
+   which lies inside the scope.
+2. The part holding each group of the scope. A group stays in the part it was
+   first stored in, even after its home is rewritten, so a group of the scope
+   may be held by the part of a unit outside the scope.
+3. When the scope holds `RESIDUAL_UNIT`, every part storing a receipt whose
+   group no longer exists. Only a residual scope may retire such a receipt.
+
+The scoped snapshot still names the header and names a unit of the scope with
+no stored part as absent, so restoring it removes a part a failed pass created.
+The three scoped callers are the clock advance over the observed units, the
+synchronous catch-up, and the background drain. Every unscoped caller -- a
+single-group operation, registration, bootstrap, a GM tool, movement
+settlement -- keeps the whole activity record it has always snapshotted.
+
 `state_to_dict` is not the stored form: it is the whole-record comparison
 projection that the owner's tests and the settlement projection use.
 
