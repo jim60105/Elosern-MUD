@@ -10,15 +10,15 @@
 #   podman-map-editor.sh [options]
 #
 # Options:
-#   --host HOST       Host address to bind (default: 127.0.0.1, loopback only)
+#   --host HOST       Host address to bind (default: 0.0.0.0, every interface)
 #   --port PORT       Host port to serve on (default: 8765)
 #   --workspace DIR   Checkout the editor reads and writes (default: this repo)
 #   --no-build        Reuse the local image instead of rebuilding it
 #   -h, --help        Show this help
 #
 # The container shares the host network namespace and the service binds HOST
-# there, so the default 127.0.0.1 keeps the editor loopback only and
-# --host 0.0.0.0 serves every interface of this host. A request must still name
+# there. The default 0.0.0.0 serves every interface of this host; pass
+# --host 127.0.0.1 to keep the editor loopback only. A request must still name
 # an IP address (or localhost) carrying the port in Host, and a mutating request
 # must match that origin and carry the launch token. The checkout is mounted
 # read-write at /workspace and is owned by the invoking user (--userns=keep-id),
@@ -36,7 +36,7 @@ readonly IGNOREFILE="tools/map-editor/.containerignore"
 readonly READY_TIMEOUT_SECONDS=90
 
 PORT=8765
-HOST=127.0.0.1
+HOST=0.0.0.0
 WORKSPACE="$PROJECT_DIR"
 BUILD=1
 
@@ -48,15 +48,15 @@ Usage:
   podman-map-editor.sh [options]
 
 Options:
-  --host HOST       Host address to bind (default: 127.0.0.1, loopback only)
+  --host HOST       Host address to bind (default: 0.0.0.0, every interface)
   --port PORT       Host port to serve on (default: 8765)
   --workspace DIR   Checkout the editor reads and writes (default: this repo)
   --no-build        Reuse the local image instead of rebuilding it
   -h, --help        Show this help
 
 The container shares the host network namespace and the service binds HOST
-there, so the default 127.0.0.1 keeps the editor loopback only and
---host 0.0.0.0 serves every interface of this host. A request must still name
+there. The default 0.0.0.0 serves every interface of this host; pass
+--host 127.0.0.1 to keep the editor loopback only. A request must still name
 an IP address (or localhost) carrying the port in Host, and a mutating request
 must match that origin and carry the launch token. The checkout is mounted
 read-write at /workspace and is owned by the invoking user (--userns=keep-id),

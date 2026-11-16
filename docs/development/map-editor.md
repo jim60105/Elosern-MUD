@@ -51,8 +51,8 @@ the editor in a container, mirroring `scripts/podman-build-run.sh` for the game.
 Node and pnpm stay inside the build stage, so the host needs only Podman:
 
 ```console
-./scripts/podman-map-editor.sh                 # build, then serve on 127.0.0.1:8765
-./scripts/podman-map-editor.sh --host 0.0.0.0  # serve every host interface
+./scripts/podman-map-editor.sh                 # build, then serve every host interface on :8765
+./scripts/podman-map-editor.sh --host 127.0.0.1  # serve loopback only
 ./scripts/podman-map-editor.sh --no-build      # reuse the existing local image
 ./scripts/podman-map-editor.sh --port 9000     # another port
 ./scripts/podman-map-editor.sh --workspace /path/to/repo
@@ -61,12 +61,11 @@ Node and pnpm stay inside the build stage, so the host needs only Podman:
 The image carries the service environment and the built workspace; the checkout
 itself is mounted read-write at `/workspace`, so autosaved YAML lands in the
 working tree. The container shares the host network namespace and binds
-`--host` there, so the default `127.0.0.1` keeps the editor local and an
-explicit `--host 0.0.0.0` serves every host interface (another machine then
-opens `http://<this-host-ip>:<port>/`). It runs with `--userns=keep-id` so saved
-files stay owned by the invoking user, and it is independent of the game
-container. Logs: `podman logs -f elosern-map-editor`; stop:
-`podman stop elosern-map-editor`.
+`--host` there, so the default `0.0.0.0` serves every host interface (another
+machine opens `http://<this-host-ip>:<port>/`) and `--host 127.0.0.1` keeps the
+editor loopback only. It runs with `--userns=keep-id` so saved files stay owned
+by the invoking user, and it is independent of the game container. Logs:
+`podman logs -f elosern-map-editor`; stop: `podman stop elosern-map-editor`.
 
 Checks:
 
@@ -1062,8 +1061,9 @@ _pending_.
 ## 4. Security Model and Limitations
 
 - **Bind address and Host.** `--host` takes an IP address or `localhost` and
-  defaults to `127.0.0.1`; the Podman script passes it through with the same
-  default. The service answers `Host` values of exactly `127.0.0.1:<port>`,
+  defaults to `127.0.0.1`; the Podman script passes it through and defaults to
+  `0.0.0.0` (every interface). The service answers `Host` values of exactly
+  `127.0.0.1:<port>`,
   `localhost:<port>` or `[::1]:<port>`, plus the concrete bind address when it
   is not a wildcard. Under an explicit wildcard bind (`0.0.0.0`/`::`) any IP
   literal carrying the port is answered, because the address a client dialled
