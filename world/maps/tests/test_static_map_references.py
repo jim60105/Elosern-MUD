@@ -590,6 +590,12 @@ class StartLocationFamilyTests(unittest.TestCase):
             problem for problem in world.problems() if problem.startswith("start location")
         ]
 
+    @covers_requirement(
+
+        "character-start-location::start-settlements-resolve-before-map-world-adoption"
+
+    )
+
     def test_a_start_anchor_without_a_placement_rejects_the_world(self):
         world = self._world(start_locations={"t_wayfarer": "t_nowhere"})
 
@@ -600,6 +606,12 @@ class StartLocationFamilyTests(unittest.TestCase):
         with self.assertRaises(StaticReferenceError) as captured:
             validate_static_world(world)
         self.assertIn("start location t_wayfarer", str(captured.exception))
+
+    @covers_requirement(
+
+        "character-start-location::start-settlements-resolve-before-map-world-adoption"
+
+    )
 
     def test_a_start_anchor_whose_node_does_not_resolve_rejects_the_world(self):
         world = self._world(
@@ -617,8 +629,20 @@ class StartLocationFamilyTests(unittest.TestCase):
         with self.assertRaises(StaticReferenceError):
             validate_static_world(world)
 
+    @covers_requirement(
+
+        "character-start-location::start-settlements-resolve-before-map-world-adoption"
+
+    )
+
     def test_the_published_world_has_no_start_location_problem(self):
         self.assertEqual(self._start_problems(published_static_world()), [])
+
+    @covers_requirement(
+
+        "character-start-location::start-settlements-resolve-before-map-world-adoption"
+
+    )
 
     def test_a_changed_start_anchor_changes_the_fingerprint(self):
         published = published_static_world()

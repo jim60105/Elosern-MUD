@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import unittest
 
+from tools.spec_traceability import covers_requirement
 from world.lore.start_locations import SubraceStartLocation, validate_start_locations
 from world.tests.synthetic_data import make_subrace
 
@@ -17,6 +18,9 @@ def _subraces(*keys: str) -> dict[str, object]:
 
 
 class ValidateStartLocationsTests(unittest.TestCase):
+    @covers_requirement(
+        "character-start-location::every-subrace-declares-exactly-one-start-settlement"
+    )
     def test_one_well_formed_row_per_subrace_is_accepted(self):
         subraces = _subraces("t_dawnfolk", "t_tidefolk")
         registry = {
@@ -25,6 +29,12 @@ class ValidateStartLocationsTests(unittest.TestCase):
         }
 
         self.assertIsNone(validate_start_locations(registry, subraces))
+
+    @covers_requirement(
+
+        "character-start-location::every-subrace-declares-exactly-one-start-settlement"
+
+    )
 
     def test_a_subrace_without_a_row_is_rejected_by_name(self):
         subraces = _subraces("t_dawnfolk", "t_tidefolk")
@@ -35,6 +45,12 @@ class ValidateStartLocationsTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "without a start location.*t_tidefolk"):
             validate_start_locations(registry, subraces)
 
+    @covers_requirement(
+
+        "character-start-location::every-subrace-declares-exactly-one-start-settlement"
+
+    )
+
     def test_a_row_for_an_unknown_subrace_is_rejected_by_name(self):
         subraces = _subraces("t_dawnfolk")
         registry = {
@@ -44,6 +60,12 @@ class ValidateStartLocationsTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "'t_ghostfolk' names an unknown subrace"):
             validate_start_locations(registry, subraces)
+
+    @covers_requirement(
+
+        "character-start-location::every-subrace-declares-exactly-one-start-settlement"
+
+    )
 
     def test_a_row_whose_key_and_subrace_differ_is_rejected(self):
         subraces = _subraces("t_dawnfolk", "t_tidefolk")
@@ -57,6 +79,12 @@ class ValidateStartLocationsTests(unittest.TestCase):
         ):
             validate_start_locations(registry, subraces)
 
+    @covers_requirement(
+
+        "character-start-location::every-subrace-declares-exactly-one-start-settlement"
+
+    )
+
     def test_an_empty_or_non_string_anchor_key_is_rejected(self):
         subraces = _subraces("t_dawnfolk")
         for anchor in ("", None, 7):
@@ -66,6 +94,12 @@ class ValidateStartLocationsTests(unittest.TestCase):
                     ValueError, "'t_dawnfolk' must name a non-empty anchor key"
                 ):
                     validate_start_locations(registry, subraces)
+
+    @covers_requirement(
+
+        "character-start-location::every-subrace-declares-exactly-one-start-settlement"
+
+    )
 
     def test_a_value_that_is_not_a_start_location_is_rejected(self):
         subraces = _subraces("t_dawnfolk")

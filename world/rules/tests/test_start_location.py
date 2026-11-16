@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from elosern_map_core.references import settlement_node_ref
 from evennia.utils.test_resources import EvenniaTest
+from tools.spec_traceability import covers_requirement
 
 from typeclasses.rooms import GridRoom
 from world.lore.anchor_placement import AnchorPlacement
@@ -58,12 +59,24 @@ class ResolveStartRoomTests(EvenniaTest):
             sorted({PLACEMENT.node.map_id, MOVED_PLACEMENT.node.map_id})
         )
 
+    @covers_requirement(
+
+        "character-start-location::a-subrace-s-start-room-is-its-settlement-s-anchor-room"
+
+    )
+
     def test_resolution_returns_the_anchor_room_of_the_start_settlement(self):
         expected = _room_at(PLACEMENT)
         self.assertIsNotNone(expected, "the borrowed node was not materialized")
 
         with _scope():
             self.assertEqual(resolve_start_room(SUBRACE), expected)
+
+    @covers_requirement(
+
+        "character-start-location::a-subrace-s-start-room-is-its-settlement-s-anchor-room"
+
+    )
 
     def test_a_moved_anchor_node_moves_the_start_room(self):
         original = _room_at(PLACEMENT)
@@ -74,6 +87,12 @@ class ResolveStartRoomTests(EvenniaTest):
         with _scope(anchor_placements={ANCHOR: MOVED_PLACEMENT}):
             self.assertEqual(resolve_start_room(SUBRACE), moved)
 
+    @covers_requirement(
+
+        "character-start-location::a-subrace-s-start-room-is-its-settlement-s-anchor-room"
+
+    )
+
     def test_a_subrace_without_a_start_row_raises(self):
         with _scope():
             for subrace_key in ("t_unlisted_subrace", None, ""):
@@ -83,12 +102,24 @@ class ResolveStartRoomTests(EvenniaTest):
                     ):
                         resolve_start_room(subrace_key)
 
+    @covers_requirement(
+
+        "character-start-location::a-subrace-s-start-room-is-its-settlement-s-anchor-room"
+
+    )
+
     def test_a_start_anchor_without_a_placement_raises(self):
         row = SubraceStartLocation("t_wayfarer", "t_nowhere")
 
         with _scope(start_locations={row.subrace_key: row}):
             with self.assertRaisesRegex(StartLocationError, "has no map placement"):
                 resolve_start_room(row.subrace_key)
+
+    @covers_requirement(
+
+        "character-start-location::a-subrace-s-start-room-is-its-settlement-s-anchor-room"
+
+    )
 
     def test_a_placement_node_that_does_not_resolve_raises(self):
         broken = AnchorPlacement(
@@ -98,6 +129,12 @@ class ResolveStartRoomTests(EvenniaTest):
         with _scope(anchor_placements={ANCHOR: broken}):
             with self.assertRaisesRegex(StartLocationError, "does not resolve"):
                 resolve_start_room(SUBRACE)
+
+    @covers_requirement(
+
+        "character-start-location::a-subrace-s-start-room-is-its-settlement-s-anchor-room"
+
+    )
 
     def test_a_placement_whose_room_was_deleted_raises(self):
         room = _room_at(PLACEMENT)
