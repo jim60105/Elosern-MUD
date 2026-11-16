@@ -287,8 +287,7 @@ and no new test: specifications and tests in this project define logic, not
 game data. The only test edits are the three rewrites in section 6, which
 remove data pins.
 
-Work happens in a worktree under `.claude/worktrees/`, not the primary
-checkout. Order:
+Order of work:
 
 1. Run the check script once for a baseline.
 2. 幽月谷村: settlement document, then its four interiors.
