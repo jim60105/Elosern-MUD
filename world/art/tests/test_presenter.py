@@ -55,8 +55,8 @@ from world.art.presenter import (
     media_url_for,
 )
 from world.art import descriptors, gallery as gallery_api, subjects
-from world.art.queue import claim, enqueue_gallery_job, ensure, record_key, settle
-from world.art.store import ArtAssetRecord, ArtAssetStatus
+from world.art.queue import claim, enqueue_gallery_job
+from world.art.store import ArtAssetStatus, GalleryJobRecord
 from world.art.subjects import ArtSubject, ArtSubjectKind
 from world.rules.art_view import SceneTarget
 from world.tests.synthetic_data import (
@@ -281,20 +281,25 @@ class ArtPresenterTests(EvenniaTestCase):
     @covers_requirement("art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root")
     def test_valid_character_portrait_resolves_to_a_same_origin_url(self):
         subject = ArtSubject(ArtSubjectKind.CHARACTER, "42")
-        ensure(subject, "desc")
-        self._write_asset("portrait/character/42.png")
-        claimed = claim(10)
-        settle(
+        image_id = str(uuid.uuid4())
+        identity = f"gallery/character/42/{image_id}.png"
+        self._write_asset(identity)
+        append_card(
             subject,
-            generation_token=str(claimed[0].db.generation_token),
-            status=ArtAssetStatus.DONE,
-            output_identity="portrait/character/42.png",
-            error=None,
+            image_id=image_id,
+            stored_identity=identity,
+            prompt=None,
+            seed=None,
+            checkpoint=None,
+            requested_fields=[],
+            binding=None,
+            source="generated",
+            image_size={"width": 4, "height": 4},
         )
         self.player.db.portrait_policy = {"mode": "named", "stable_key": "42"}
         descriptor = describe_entity(self.player)
         self.assertIsNotNone(candidate(descriptor))
-        self.assertEqual(candidate(descriptor)["url"], "/art/portrait/character/42.png")
+        self.assertEqual(candidate(descriptor)["url"], f"/art/{identity}")
 
     def test_unresolvable_archetype_is_the_malformed_metadata_case(self):
         """A room whose authored archetype cannot be honored says so."""
@@ -320,8 +325,8 @@ class ArtPresenterTests(EvenniaTestCase):
         descriptor = _scene_descriptor(subject.key)
         self.assertEqual(descriptor["generation_state"], descriptors.GENERATION_PENDING)
         self.assertEqual(_scene_attempt(descriptor, descriptors.SCENE_RANK_GENERATED), [])
-        record = ArtAssetRecord.objects.filter(
-            db_key__startswith=f"{record_key(subject)}:gen:"
+        record = GalleryJobRecord.objects.filter(
+            db_key__startswith=f"art:{subject.full()}:gen:"
         ).first()
         self.assertEqual(record.db.status, ArtAssetStatus.IN_PROGRESS)
 
@@ -345,7 +350,7 @@ class ArtPresenterTests(EvenniaTestCase):
         self.assertIsNone(candidate(descriptor))
         self.assertIsNone(candidate(descriptor))
         self.assertFalse(
-            ArtAssetRecord.objects.filter(
+            GalleryJobRecord.objects.filter(
                 db_key="art:portrait:character:a/b"
             ).exists()
         )
@@ -357,19 +362,21 @@ class ArtPresenterTests(EvenniaTestCase):
 
     @covers_requirement("art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root")
     def test_existing_png_asset_survives_a_switch_to_another_format(self):
-        # The classic store's identity validation now serves the portrait
-        # chain only (the scene chain reads gallery cards).
         subject = ArtSubject(ArtSubjectKind.CHARACTER, "format-switch")
-        identity = "portrait/character/format-switch.png"
-        ensure(subject, "desc")
+        image_id = str(uuid.uuid4())
+        identity = f"gallery/character/format-switch/{image_id}.png"
         self._write_asset(identity)
-        claimed = claim(10)
-        settle(
+        append_card(
             subject,
-            generation_token=str(claimed[0].db.generation_token),
-            status=ArtAssetStatus.DONE,
-            output_identity=identity,
-            error=None,
+            image_id=image_id,
+            stored_identity=identity,
+            prompt=None,
+            seed=None,
+            checkpoint=None,
+            requested_fields=[],
+            binding=None,
+            source="generated",
+            image_size={"width": 4, "height": 4},
         )
         # Store mid-way through a format switch: the configured format is
         # webp, but the existing png asset must keep presenting until this
@@ -382,48 +389,24 @@ class ArtPresenterTests(EvenniaTestCase):
         self.assertEqual(resource["url"], f"/art/{identity}")
 
     @covers_requirement("art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root")
-    def test_foreign_directory_identity_resolves_to_unavailable(self):
-        subject = ArtSubject(ArtSubjectKind.MONSTER, _SYNTH_SPECIES)
-        ensure(subject, "desc")
-        self._write_asset(f"scene/{_SYNTH_SPECIES}.png")
-        claimed = claim(10)
-        settle(
-            subject,
-            generation_token=str(claimed[0].db.generation_token),
-            status=ArtAssetStatus.DONE,
-            output_identity=f"scene/{_SYNTH_SPECIES}.png",
-            error=None,
-        )
-        # A monster identity living outside portrait/monster/ fails the
-        # subject-shape validation no matter which format is configured.
-        # Filled seam (gallery-builtin-fallbacks): the unusable identity falls
-        # through to the built-in silhouette, which rides the decorative
-        # `fallback` field beside the subject's true unavailable state and
-        # never becomes this payload's own image
-        # (builtin-silhouette-stage-fallback).
-        with patch("world.observability.log_info"):
-            descriptor = describe_portrait(subject)
-        # A monster identity living outside the portrait store resolves no
-        # candidate; the terminal carries the built-in silhouette.
-        self.assertIsNone(candidate(descriptor))
-        self.assertEqual(terminal(descriptor)["origin"], ORIGIN_SILHOUETTE)
-        self.assertTrue(terminal(descriptor)["url"].startswith("/art/defaults/"))
-
-    @covers_requirement("art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root")
     def test_all_four_store_extensions_present_as_assets(self):
         for extension in (".png", ".webp", ".jpg", ".avif"):
             key = f"mixed_store_{extension[1:]}"
             subject = ArtSubject(ArtSubjectKind.CHARACTER, key)
-            identity = f"portrait/character/{key}{extension}"
-            ensure(subject, "desc")
+            image_id = str(uuid.uuid4())
+            identity = f"gallery/character/{key}/{image_id}{extension}"
             self._write_asset(identity)
-            claimed = claim(10)
-            settle(
+            append_card(
                 subject,
-                generation_token=str(claimed[0].db.generation_token),
-                status=ArtAssetStatus.DONE,
-                output_identity=identity,
-                error=None,
+                image_id=image_id,
+                stored_identity=identity,
+                prompt=None,
+                seed=None,
+                checkpoint=None,
+                requested_fields=[],
+                binding=None,
+                source="generated",
+                image_size={"width": 4, "height": 4},
             )
             descriptor = describe_portrait(subject)
             resource = candidate(descriptor)
@@ -501,7 +484,14 @@ class ResolveEntityTests(EvenniaTestCase):
 
         subject = character_subject_for(self.player)
         self.assertIsNotNone(subject)
-        ensure(subject, "desc")
+        enqueue_gallery_job(
+            subject,
+            "desc",
+            image_id=str(uuid.uuid4()),
+            binding=None,
+            face_rect=None,
+            requested_fields=[],
+        )
         fake = FakeSDWebUIClient()
         self._drain_with_fake(fake)
         generated = {generated_subject.full() for generated_subject, _ in fake.calls}
@@ -707,22 +697,24 @@ class FaceRectPayloadTests(_CardPayloadCase):
     @covers_requirement(
         "art-gallery-resolution::every-resolution-payload-carries-a-face-rectangle-or-null"
     )
-    def test_a_classic_asset_payload_carries_the_shared_default_rectangle(self):
+    def test_a_card_payload_carries_its_shared_default_rectangle(self):
         subject = self._subject()
-        from world.art.queue import claim, ensure, settle
-        from world.art.store import ArtAssetStatus
-
-        ensure(subject, "desc")
-        target = self.root / f"portrait/character/{subject.key}.png"
+        image_id = str(uuid.uuid4())
+        identity = f"gallery/character/{subject.key}/{image_id}.png"
+        target = self.root / identity
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(b"asset")
-        claimed = claim(10)
-        settle(
+        append_card(
             subject,
-            generation_token=str(claimed[0].db.generation_token),
-            status=ArtAssetStatus.DONE,
-            output_identity=f"portrait/character/{subject.key}.png",
-            error=None,
+            image_id=image_id,
+            stored_identity=identity,
+            prompt=None,
+            seed=None,
+            checkpoint=None,
+            requested_fields=[],
+            binding=None,
+            source="generated",
+            image_size={"width": 1000, "height": 1000},
         )
         descriptor = describe_entity(self.player)
         self.assertIsNotNone(candidate(descriptor))
@@ -819,16 +811,17 @@ class SilhouettePayloadTests(EvenniaTestCase):
         )
         pending_subject = ArtSubject(ArtSubjectKind.CHARACTER, pending)
         failed_subject = ArtSubject(ArtSubjectKind.CHARACTER, failed)
-        ensure(pending_subject, "desc")
-        ensure(failed_subject, "desc")
-        tokens = {record.db_key: str(record.db.generation_token) for record in claim(10)}
-        settle(
-            failed_subject,
-            generation_token=tokens[record_key(failed_subject)],
-            status=ArtAssetStatus.FAILED,
-            output_identity=None,
-            error="boom",
+        enqueue_gallery_job(
+            pending_subject,
+            "desc",
+            image_id=str(uuid.uuid4()),
+            binding=None,
+            face_rect=None,
+            requested_fields=[],
         )
+        gallery_api.record_error(failed_subject, "boom")
+        claimed = claim(10)
+        self.assertEqual(len(claimed), 1)
         cases = (
             (missing, ArtAssetStatus.MISSING),
             (pending, ArtAssetStatus.PENDING),
@@ -875,16 +868,15 @@ class SilhouettePayloadTests(EvenniaTestCase):
                 # Presentation writes nothing: the persisted record keeps the
                 # status it had (a claimed one stays in progress for its
                 # worker; the wire-stable pending is presentation only).
-                record = ArtAssetRecord.objects.filter(db_key=record_key(subject)).first()
-                stored = {
-                    ArtAssetStatus.MISSING: None,
-                    ArtAssetStatus.PENDING: ArtAssetStatus.IN_PROGRESS,
-                    ArtAssetStatus.FAILED: ArtAssetStatus.FAILED,
-                }[expected_status]
-                if stored is None:
-                    self.assertIsNone(record)
+                if expected_status == ArtAssetStatus.PENDING:
+                    self.assertEqual(claimed[0].db.status, ArtAssetStatus.IN_PROGRESS)
+                elif expected_status == ArtAssetStatus.FAILED:
+                    self.assertEqual(
+                        gallery_api.record_for(failed_subject).db.last_error_code,
+                        "boom",
+                    )
                 else:
-                    self.assertEqual(record.db.status, stored)
+                    self.assertIsNone(gallery_api.record_for(subject))
 
     @covers_requirement(
         "art-gallery-fallback::the-fallback-seam-supplies-a-url-and-a-face-rectangle-and-reports-its-use"
@@ -929,7 +921,7 @@ class SilhouettePayloadTests(EvenniaTestCase):
         "webclient-art-panel::the-portrait-catalog-is-server-authored-age-checked-and-bounded"
     )
     def test_a_policy_less_entity_carries_its_attribute_selected_silhouette(self):
-        before = ArtAssetRecord.objects.count()
+        before = GalleryJobRecord.objects.count()
         woman = create_object(PlayerCharacter, key="no-policy-woman")
         woman.sex = "female"
         woman.apparent_age = 30
@@ -943,14 +935,14 @@ class SilhouettePayloadTests(EvenniaTestCase):
         # a shared shape, and installs nothing.
         self.assertEqual(terminal(descriptor)["origin"], ORIGIN_SILHOUETTE)
         self.assertIn("woman", terminal(descriptor)["url"])
-        self.assertEqual(ArtAssetRecord.objects.count(), before)
+        self.assertEqual(GalleryJobRecord.objects.count(), before)
         self.assertIsNone(woman.db.portrait_policy)
 
     @covers_requirement(
         "webclient-art-panel::the-portrait-catalog-is-server-authored-age-checked-and-bounded"
     )
     def test_a_monster_without_a_resolvable_tier_carries_monster_anon(self):
-        before = ArtAssetRecord.objects.count()
+        before = GalleryJobRecord.objects.count()
         monster = create_object(Monster, key="silhouette-monster")
         monster.threat_tier = "mythical"
         descriptor = describe_entity(monster)
@@ -961,7 +953,7 @@ class SilhouettePayloadTests(EvenniaTestCase):
             terminal(descriptor)["url"],
             f"/art/defaults/monster_anon{FALLBACK_EXTENSION}",
         )
-        self.assertEqual(ArtAssetRecord.objects.count(), before)
+        self.assertEqual(GalleryJobRecord.objects.count(), before)
 
     @covers_requirement(
         "webclient-art-panel::the-portrait-catalog-is-server-authored-age-checked-and-bounded"
@@ -969,7 +961,7 @@ class SilhouettePayloadTests(EvenniaTestCase):
     def test_a_rejected_age_pair_carries_the_decoration_and_writes_nothing(self):
         # The malformed-age rung of the same terminal path: no subject key, no
         # URL, no record — and the entity's own attribute-selected silhouette.
-        before = ArtAssetRecord.objects.count()
+        before = GalleryJobRecord.objects.count()
         rejected = self._character("silhouette-bad-age")
         rejected.age = "twenty"
         descriptor = describe_entity(rejected)
@@ -980,7 +972,7 @@ class SilhouettePayloadTests(EvenniaTestCase):
         self.assertIsNone(candidate(descriptor))
         self.assertEqual(terminal(descriptor)["origin"], ORIGIN_SILHOUETTE)
         self.assertEqual(terminal(descriptor)["url"], f"/art/defaults/man{FALLBACK_EXTENSION}")
-        self.assertEqual(ArtAssetRecord.objects.count(), before)
+        self.assertEqual(GalleryJobRecord.objects.count(), before)
         self.assertNotIn("twenty", str(descriptor))
 
 
@@ -1138,7 +1130,7 @@ class OfficialPayloadTests(EvenniaTestCase):
         # No path, license, manifest, or prompt text, and no state acquired.
         for leaked in ("ART_OFFICIAL_ROOT", str(self.official_root), "LICENSE", "prompt"):
             self.assertNotIn(leaked, str(descriptor))
-        self.assertEqual(ArtAssetRecord.objects.count(), 0)
+        self.assertEqual(GalleryJobRecord.objects.count(), 0)
         self.assertEqual(GalleryRecord.objects.count(), 0)
         self.assertEqual(
             sorted(path.relative_to(self.store).as_posix() for path in self.store.rglob("*")),
@@ -1182,31 +1174,6 @@ class OfficialPayloadTests(EvenniaTestCase):
         self.assertEqual(candidate(descriptor)["origin"], ORIGIN_RUNTIME)
         self.assertEqual(candidate(descriptor)["url"], f"/art/{identity}")
         self.assertEqual(descriptor["generation_state"], ArtAssetStatus.DONE)
-
-    def test_a_classic_done_asset_outranks_the_official_default(self):
-        self._index(face_rect=dict(_OFFICIAL_RECT), stage=dict(_OFFICIAL_STAGE))
-        entity = self._character("classic-first")
-        subject = self._subject("classic-first")
-        ensure(subject, "desc")
-        token = str(claim(10)[0].db.generation_token)
-        identity = f"portrait/character/{subject.key}.png"
-        target = self.store / identity
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(b"asset")
-        settle(
-            subject,
-            generation_token=token,
-            status=ArtAssetStatus.DONE,
-            output_identity=identity,
-            error=None,
-        )
-        with patch(
-            "world.art.gallery_match.official_default_slot",
-            side_effect=AssertionError("the official step must never be consulted"),
-        ):
-            descriptor = describe_entity(entity)
-        self.assertEqual(candidate(descriptor)["origin"], ORIGIN_RUNTIME)
-        self.assertEqual(candidate(descriptor)["url"], f"/art/{identity}")
 
     @covers_requirement(
         "official-art-resolution::official-payloads-are-catalog-derived-confined-and-fall-through-when-unresolvable"
@@ -1320,7 +1287,7 @@ class OfficialPayloadTests(EvenniaTestCase):
             ),
             1,
         )
-        self.assertEqual(ArtAssetRecord.objects.count(), 0)
+        self.assertEqual(GalleryJobRecord.objects.count(), 0)
         self.assertNotIn("portrait rejected", repr(descriptor))
 
     def test_a_tier_only_monster_never_presents_an_official_origin(self):
@@ -1369,9 +1336,9 @@ class OfficialPayloadTests(EvenniaTestCase):
         with ExitStack() as stack:
             for tripwire in tripwires:
                 stack.enter_context(tripwire)
-            before = (GalleryRecord.objects.count(), ArtAssetRecord.objects.count(), self._state(entity))
+            before = (GalleryRecord.objects.count(), GalleryJobRecord.objects.count(), self._state(entity))
             payloads = [describe_entity(entity) for _ in range(100)]
-            after = (GalleryRecord.objects.count(), ArtAssetRecord.objects.count(), self._state(entity))
+            after = (GalleryRecord.objects.count(), GalleryJobRecord.objects.count(), self._state(entity))
         self.assertTrue(all(payload == payloads[0] for payload in payloads))
         self.assertEqual(candidate(payloads[0])["origin"], ORIGIN_OFFICIAL)
         self.assertEqual(before, after)
@@ -1469,23 +1436,6 @@ class PersonalOfficialPayloadTests(EvenniaTestCase):
         target.write_bytes(b"runtime-image")
         return append_card(subject, **fields)
 
-    def _classic_done_asset(self, subject) -> str:
-        """A classic ``done`` asset record with its file, for step 5."""
-        ensure(subject, "desc")
-        identity = f"portrait/character/{subject.key}.png"
-        target = self.store / identity
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(b"classic-asset")
-        claimed = claim(10)
-        settle(
-            subject,
-            generation_token=str(claimed[0].db.generation_token),
-            status=ArtAssetStatus.DONE,
-            output_identity=identity,
-            error=None,
-        )
-        return identity
-
     # -- payload shape ----------------------------------------------------
     @covers_requirement(
         "official-art-resolution::every-presentation-payload-distinguishes-official-runtime-and-silhouette-origin"
@@ -1546,22 +1496,24 @@ class PersonalOfficialPayloadTests(EvenniaTestCase):
     @covers_requirement(
         "official-art-personalization::stale-official-selections-are-retained-but-ignored-for-resolution"
     )
-    def test_a_selection_resolves_ahead_of_the_classic_asset_and_falls_back_when_stale(self):
+    def test_a_selection_resolves_ahead_of_a_runtime_card_and_falls_back_when_stale(self):
         identity = self._index()
         entity = self._character()
         subject = self._subject()
-        classic = self._classic_done_asset(subject)
+        card = self._card(subject)
         set_official_selection(subject, identity)
-        # Step 4 outranks step 5 while the selection resolves...
+        # The personal selection outranks the default card while it resolves...
         self.assertEqual(candidate(describe_entity(entity))["origin"], ORIGIN_OFFICIAL)
         # ...and a maintenance update that removes the directory (no restart
-        # gap) falls through to the classic asset with the preference retained.
+        # gap) falls through to the default card with the preference retained.
         shutil.rmtree(self.official_root / "preset")
         load_catalog()
         descriptor = describe_entity(entity)
-        self.assertEqual(candidate(descriptor)["origin"], ORIGIN_RUNTIME)
-        self.assertEqual(candidate(descriptor)["url"], f"/art/{classic}")
-        self.assertEqual(descriptor["generation_state"], ArtAssetStatus.DONE)
+        # Setting a personal selection deliberately cleared the character's
+        # gallery default, so a stale selection falls through to the declared
+        # terminal while the preference itself stays stored.
+        self.assertIsNone(candidate(descriptor))
+        self.assertEqual(terminal(descriptor)["origin"], ORIGIN_SILHOUETTE)
         self.assertEqual(official_preferences_for(subject).selection, identity)
 
     # -- personal geometry ------------------------------------------------
@@ -1780,13 +1732,13 @@ class PersonalOfficialPayloadTests(EvenniaTestCase):
                 stack.enter_context(tripwire)
             before = (
                 GalleryRecord.objects.count(),
-                ArtAssetRecord.objects.count(),
+                GalleryJobRecord.objects.count(),
                 repr(record_for(subject).attributes.all()),
             )
             payloads = [describe_entity(entity) for _ in range(100)]
             after = (
                 GalleryRecord.objects.count(),
-                ArtAssetRecord.objects.count(),
+                GalleryJobRecord.objects.count(),
                 repr(record_for(subject).attributes.all()),
             )
         self.assertTrue(all(payload == payloads[0] for payload in payloads))

@@ -21,17 +21,13 @@ from world.art import gallery as gallery_api
 from world.art.gallery import DEFAULT_FACE_RECT
 from world.art.queue import (
     claim,
-    ensure,
     enqueue_gallery_job,
     gallery_record_key,
-    record_key,
     reclaim_expired_leases,
-    requeue,
-    settle,
-    settle_generated,
+    settle_gallery_generated,
 )
 from world.art.sd_worker import GeneratedImage, SDError, SDWebUIClient
-from world.art.store import ArtAssetRecord, ArtAssetStatus
+from world.art.store import ArtAssetStatus, GalleryJobRecord
 from world.art.subjects import ArtSubject, ArtSubjectKind
 from world.art.worker import (
     _lease_timeout,
@@ -39,7 +35,6 @@ from world.art.worker import (
     _write_temp,
     drain,
     drain_synchronous,
-    expected_output_identity,
     output_identity_for,
 )
 
@@ -51,27 +46,39 @@ from ._support import (
     _MixedOutcomeClient,
 )
 
+
 class WorkerStoreIsolationTests(WorkerStoreIsolation):
+    def _image_id_for(self, subject, image_id):
+        return self.root / (
+            f"gallery/{subject.kind.value.split(':')[-1]}/{subject.key}/{image_id}.png"
+        )
+
     @covers_requirement(
         "art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root",
         "internal-art-worker::the-client-is-injectable-and-tests-never-open-a-socket",
     )
     def test_successful_generation_completes_a_scene_job(self):
         subject = self._subject()
-        self._record(subject)
+        job = self._record(subject)
+        image_id = job.db.gallery_image_id
         with self._client(FakeSDWebUIClient()):
             dispatched = drain_synchronous(10)
         self.assertEqual(dispatched, 1)
-        record = self._record_for(subject)
-        self.assertEqual(record.db.status, ArtAssetStatus.DONE)
-        self.assertEqual(record.db.output_identity, "scene/t_synth_forest.png")
-        target = self.root / "scene" / "t_synth_forest.png"
+        cards = gallery_api.cards_for(subject)
+        self.assertEqual(len(cards), 1)
+        self.assertEqual(
+            cards[0]["stored_identity"],
+            f"gallery/scene/t_synth_forest/{image_id}.png",
+        )
+        target = self.root / cards[0]["stored_identity"]
         self.assertTrue(target.is_file())
         # The png path re-encodes through the local converter: the container
         # bytes may differ, the decoded pixels must not.
-        before = Image.open(io.BytesIO(DEFAULT_PNG)).convert("RGBA")
-        after = Image.open(target.open("rb")).convert("RGBA")
+        with Image.open(io.BytesIO(DEFAULT_PNG)) as before_img, Image.open(target) as after_img:
+            before = before_img.convert("RGBA")
+            after = after_img.convert("RGBA")
         self.assertEqual(list(before.getdata()), list(after.getdata()))
+        self.assertIsNone(self._job_for(job))
 
     @covers_requirement(
         "internal-art-worker::server-side-generated-image-retention-is-request-scoped-and-configurable"
@@ -90,30 +97,32 @@ class WorkerStoreIsolationTests(WorkerStoreIsolation):
         self.assertIs(captured["request"]["save_images"], False)
         self.assertIs(captured["request"]["do_not_save_samples"], True)
         self.assertIs(captured["request"]["do_not_save_grid"], True)
-        record = self._record_for(subject)
-        self.assertEqual(record.db.status, ArtAssetStatus.DONE)
-        self.assertTrue((self.root / "scene" / "t_synth_forest.png").is_file())
+        self.assertEqual(len(gallery_api.cards_for(subject)), 1)
 
     @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
-    def test_portrait_subject_writes_the_exact_portrait_identity(self):
+    def test_portrait_subject_writes_the_exact_gallery_identity(self):
         subject = self._subject(_SYNTH_MONSTER, ArtSubjectKind.MONSTER)
-        self._record(subject)
+        job = self._record(subject)
+        image_id = job.db.gallery_image_id
         with self._client(FakeSDWebUIClient()):
             drain_synchronous(10)
-        record = self._record_for(subject)
-        self.assertEqual(record.db.status, ArtAssetStatus.DONE)
-        self.assertEqual(record.db.output_identity, f"portrait/monster/{_SYNTH_MONSTER}.png")
-        self.assertTrue((self.root / "portrait" / "monster" / f"{_SYNTH_MONSTER}.png").is_file())
+        cards = gallery_api.cards_for(subject)
+        self.assertEqual(len(cards), 1)
+        self.assertEqual(
+            cards[0]["stored_identity"],
+            f"gallery/monster/{_SYNTH_MONSTER}/{image_id}.png",
+        )
+        self.assertTrue((self.root / cards[0]["stored_identity"]).is_file())
 
     @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     def test_atomic_write_never_leaves_a_temporary_file_behind(self):
         subject = self._subject()
-        self._record(subject)
+        job = self._record(subject)
+        image_id = job.db.gallery_image_id
         with self._client(FakeSDWebUIClient()):
             drain_synchronous(10)
-        leftovers = [
-            path for path in (self.root / "scene").iterdir() if path.name != "t_synth_forest.png"
-        ]
+        directory = self.root / "gallery" / "scene" / "t_synth_forest"
+        leftovers = [path for path in directory.iterdir() if path.name != f"{image_id}.png"]
         self.assertEqual(leftovers, [])
 
     @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
@@ -124,47 +133,50 @@ class WorkerStoreIsolationTests(WorkerStoreIsolation):
         fake.seed = 42
         with self._client(fake):
             drain_synchronous(10)
-        record = self._record_for(subject)
-        self.assertEqual(record.db.status, ArtAssetStatus.DONE)
-        self.assertEqual(record.db.seed, 42)
+        cards = gallery_api.cards_for(subject)
+        self.assertEqual(len(cards), 1)
+        self.assertEqual(cards[0]["seed"], 42)
 
     @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
-    def test_seedless_regeneration_clears_the_previous_seed(self):
+    def test_seedless_regeneration_stores_a_new_seedless_card(self):
         # A seedless regeneration must never keep advertising the old image's
-        # seed: settle_generated assigns the new (absent) seed unconditionally.
+        # seed: the new card carries the new (absent) seed.
         subject = self._subject()
         self._record(subject)
         seeded = FakeSDWebUIClient()
         seeded.seed = 42
         with self._client(seeded):
             drain_synchronous(10)
-        self.assertEqual(self._record_for(subject).db.seed, 42)
-        requeue(subject)
+        self.assertEqual(gallery_api.cards_for(subject)[0]["seed"], 42)
+        self._record(subject, "second")
         seedless = FakeSDWebUIClient()
         seedless.seed = None
         with self._client(seedless):
             drain_synchronous(10)
-        record = self._record_for(subject)
-        self.assertEqual(record.db.status, ArtAssetStatus.DONE)
-        self.assertIsNone(record.db.seed)
+        cards = gallery_api.cards_for(subject)
+        self.assertEqual(len(cards), 1)
+        self.assertIsNone(cards[0]["seed"])
 
     @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
-    def test_failed_regeneration_retains_prior_output_and_seed(self):
+    def test_failed_regeneration_retains_prior_card_and_seed(self):
         subject = self._subject()
         self._record(subject)
         seeded = FakeSDWebUIClient()
         seeded.seed = 7
         with self._client(seeded):
             drain_synchronous(10)
-        requeue(subject)
+        prior = gallery_api.cards_for(subject)
+        self.assertEqual(len(prior), 1)
         failing = FakeSDWebUIClient()
         failing.fail_every_call(SDError("sd_connection_error", "offline"))
+        self._record(subject, "failing")
         with self._client(failing):
             drain_synchronous(10)
-        record = self._record_for(subject)
-        self.assertEqual(record.db.status, ArtAssetStatus.FAILED)
-        self.assertEqual(record.db.output_identity, "scene/t_synth_forest.png")
-        self.assertEqual(record.db.seed, 7)
+        self.assertEqual(gallery_api.cards_for(subject), prior)
+        self.assertEqual(
+            [state.error_code for state in gallery_api.erroring_subjects()],
+            ["sd_connection_error"],
+        )
 
     @covers_requirement(
         "internal-art-worker::art-generation-failures-degrade-to-bounded-named-error-codes",
@@ -177,20 +189,15 @@ class WorkerStoreIsolationTests(WorkerStoreIsolation):
         fake.fail_every_call(SDError("sd_connection_error", "offline"))
         with self._client(fake):
             drain_synchronous(10)
-        record = self._record_for(subject)
-        self.assertEqual(record.db.status, ArtAssetStatus.FAILED)
-        self.assertEqual(record.db.last_error_code, "sd_connection_error")
+        self.assertEqual(
+            [state.error_code for state in gallery_api.erroring_subjects()],
+            ["sd_connection_error"],
+        )
         from world.art import descriptors
-        from world.art.gallery import record_error
         from world.art.presenter import describe_scene
         from world.art import subjects as art_subjects
         from world.rules.art_view import SceneTarget
 
-        # The scene chain reads the scene gallery only
-        # (``scene-classic-fallback-removal``), so the canonical descriptor's
-        # reached failure is the gallery record's own recorded error; the
-        # classic record's failure above stays the worker's bounded fact.
-        record_error(subject, "sd_connection_error")
         with patch.object(
             art_subjects,
             "SCENE_ARCHETYPE_REGISTRY",
@@ -235,24 +242,28 @@ class WorkerStoreIsolationTests(WorkerStoreIsolation):
         for index, code in enumerate(codes):
             key = f"subject_{index}"
             subject = self._subject(key)
-            self._record(subject)
+            job = self._record(subject)
             fake = FakeSDWebUIClient()
             fake.fail_every_call(SDError(code, "scripted"))
             with self._client(fake):
                 drain_synchronous(10)
-            record = self._record_for(subject)
             with self.subTest(code=code):
-                self.assertEqual(record.db.status, ArtAssetStatus.FAILED)
-                self.assertEqual(record.db.last_error_code, code)
-                self.assertFalse((self.root / "scene" / f"{key}.png").exists())
+                states = {
+                    state.subject.full(): state.error_code
+                    for state in gallery_api.erroring_subjects()
+                }
+                self.assertEqual(
+                    states.get(subject.full()),
+                    code,
+                )
+                self.assertEqual(gallery_api.cards_for(subject), [])
+                self.assertIsNone(self._job_for(job))
 
     @covers_requirement(
         "internal-art-worker::art-generation-failures-degrade-to-bounded-named-error-codes",
         "art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root",
     )
     def test_prompt_library_failure_settles_sd_prompt_error(self):
-        from world.art.sd_worker import SDWebUIClient
-
         subject = self._subject()
         self._record(subject)
         from world.prompts.loader import PromptUnavailableError
@@ -262,9 +273,10 @@ class WorkerStoreIsolationTests(WorkerStoreIsolation):
         with patch("world.art.sd_worker.render_prompt", side_effect=render_error):
             with self._client(client):
                 drain_synchronous(10)
-        record = self._record_for(subject)
-        self.assertEqual(record.db.status, ArtAssetStatus.FAILED)
-        self.assertEqual(record.db.last_error_code, "sd_prompt_error")
+        self.assertEqual(
+            [state.error_code for state in gallery_api.erroring_subjects()],
+            ["sd_prompt_error"],
+        )
 
     @covers_requirement(
         "internal-art-worker::art-generation-failures-degrade-to-bounded-named-error-codes",
@@ -277,9 +289,10 @@ class WorkerStoreIsolationTests(WorkerStoreIsolation):
             ART_SD_CLIENT="world.art.no_such_module.NoSuchClient"
         ):
             drain_synchronous(10)
-        record = self._record_for(subject)
-        self.assertEqual(record.db.status, ArtAssetStatus.FAILED)
-        self.assertEqual(record.db.last_error_code, "sd_client_config_error")
+        self.assertEqual(
+            [state.error_code for state in gallery_api.erroring_subjects()],
+            ["sd_client_config_error"],
+        )
 
     @covers_requirement(
         "internal-art-worker::art-generation-failures-degrade-to-bounded-named-error-codes",
@@ -294,129 +307,141 @@ class WorkerStoreIsolationTests(WorkerStoreIsolation):
         )
         with self._client(fake):
             drain_synchronous(10)
-        record = self._record_for(subject)
-        self.assertEqual(record.db.status, ArtAssetStatus.FAILED)
-        self.assertEqual(record.db.last_error_code, "sd_internal_error")
+        self.assertEqual(
+            [state.error_code for state in gallery_api.erroring_subjects()],
+            ["sd_internal_error"],
+        )
 
     @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     def test_out_of_root_store_directory_is_rejected(self):
         subject = self._subject("t_synth_mountain")
-        self._record(subject)
+        job = self._record(subject)
+        image_id = job.db.gallery_image_id
         with tempfile.TemporaryDirectory() as outside:
-            (self.root / "scene").symlink_to(outside, target_is_directory=True)
+            (self.root / "gallery").mkdir(exist_ok=True)
+            (self.root / "gallery" / "scene").symlink_to(outside, target_is_directory=True)
             with self._client(FakeSDWebUIClient()):
                 drain_synchronous(10)
-            record = self._record_for(subject)
-            self.assertEqual(record.db.status, ArtAssetStatus.FAILED)
-            self.assertEqual(record.db.last_error_code, "worker_output_out_of_root")
-            self.assertFalse((Path(outside) / "t_synth_mountain.png").exists())
+            self.assertEqual(
+                [state.error_code for state in gallery_api.erroring_subjects()],
+                ["worker_output_out_of_root"],
+            )
+            self.assertFalse((Path(outside) / image_id).exists())
+        self.assertEqual(gallery_api.cards_for(subject), [])
 
     @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     def test_atomic_write_removes_the_temp_file_when_publish_fails(self):
         subject = self._subject()
-        self._record(subject)
+        job = self._record(subject)
+        image_id = job.db.gallery_image_id
+        identity = output_identity_for(job)
         claimed = claim(10)
-        target = self.root / "scene" / "t_synth_forest.png"
-        target.parent.mkdir(parents=True)
-        target.write_bytes(b"prior")
-        tmp_path = _write_temp("scene/t_synth_forest.png", DEFAULT_PNG)
+        tmp_path = _write_temp(identity, DEFAULT_PNG)
         with patch("world.art.queue.os.replace", side_effect=OSError("disk full")):
             with self.assertRaises(OSError):
-                settle_generated(
-                    subject,
+                settle_gallery_generated(
+                    claimed[0].db_key,
                     generation_token=claimed[0].db.generation_token,
-                    output_identity="scene/t_synth_forest.png",
+                    output_identity=identity,
                     tmp_path=tmp_path,
+                    prompt={"positive": "p", "negative": "n"},
+                    seed=None,
+                    checkpoint=None,
                 )
-        self.assertEqual(target.read_bytes(), b"prior")
         self.assertFalse(Path(tmp_path).exists())
+        self.assertEqual(gallery_api.cards_for(subject), [])
+        self.assertTrue(
+            (self.root / "gallery" / "scene" / subject.key).is_dir()
+        )
 
     @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
-    def test_stale_claim_never_publishes_its_output_after_a_requeue(self):
+    def test_stale_claim_never_publishes_its_output_after_reclaim(self):
         subject = self._subject("t_synth_forest")
-        self._record(subject)
+        job = self._record(subject)
+        image_id = job.db.gallery_image_id
+        identity = output_identity_for(job)
         claimed = claim(10)
-        # A staff requeue lands while the generation is still in flight.
-        requeue(subject)
-        target = self.root / "scene" / "t_synth_forest.png"
-        target.parent.mkdir(parents=True)
-        target.write_bytes(b"prior")
-        tmp_path = _write_temp("scene/t_synth_forest.png", DEFAULT_PNG)
-        committed = settle_generated(
-            subject,
+        # A lease reclaim lands while the generation is still in flight.
+        reclaim_expired_leases(0.0)
+        tmp_path = _write_temp(identity, DEFAULT_PNG)
+        committed = settle_gallery_generated(
+            claimed[0].db_key,
             generation_token=claimed[0].db.generation_token,
-            output_identity="scene/t_synth_forest.png",
+            output_identity=identity,
             tmp_path=tmp_path,
+            prompt={"positive": "p", "negative": "n"},
+            seed=None,
+            checkpoint=None,
         )
         self.assertIsNone(committed)
         self.assertFalse(Path(tmp_path).exists())
-        self.assertEqual(target.read_bytes(), b"prior")
-        record = self._record_for(subject)
-        self.assertEqual(record.db.status, ArtAssetStatus.PENDING)
-        self.assertFalse(record.db.output_identity)
+        self.assertEqual(gallery_api.cards_for(subject), [])
+        current = self._job_for(job)
+        self.assertEqual(current.db.status, ArtAssetStatus.PENDING)
+        self.assertFalse(
+            self._image_id_for(subject, image_id).exists()
+        )
 
     @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
-    def test_stale_claimed_record_is_skipped_by_the_batch_settler(self):
+    def test_stale_claimed_job_is_skipped_by_the_batch_settler(self):
         subject = self._subject("t_synth_tavern")
-        self._record(subject)
+        job = self._record(subject)
         claimed = claim(10)
-        requeue(subject)
+        reclaim_expired_leases(0.0)
         with self._client(FakeSDWebUIClient()):
             settled = _run_and_settle_batch(
-                [(claimed[0], subject, str(claimed[0].db.generation_token))]
+                [
+                    (
+                        claimed[0],
+                        subject,
+                        str(claimed[0].db.generation_token),
+                        str(claimed[0].db_key),
+                    )
+                ]
             )
         self.assertEqual(settled, [])
-        record = self._record_for(subject)
-        self.assertEqual(record.db.status, ArtAssetStatus.PENDING)
-        self.assertFalse((self.root / "scene" / "t_synth_tavern.png").exists())
+        self.assertEqual(self._job_for(job).db.status, ArtAssetStatus.PENDING)
+        self.assertEqual(gallery_api.cards_for(subject), [])
 
     @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
-    def test_failed_regeneration_never_corrupts_the_prior_output(self):
+    def test_failed_regeneration_never_corrupts_the_prior_card(self):
         subject = self._subject("t_synth_dungeon")
         self._record(subject)
-        claimed = claim(10)
-        settle(
-            subject,
-            generation_token=str(claimed[0].db.generation_token),
-            status=ArtAssetStatus.DONE,
-            output_identity="scene/t_synth_dungeon.png",
-            error=None,
-        )
-        target = self.root / "scene" / "t_synth_dungeon.png"
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(b"prior-image")
-        requeue(subject)
+        with self._client(FakeSDWebUIClient()):
+            drain_synchronous(10)
+        prior = gallery_api.cards_for(subject)
+        prior_bytes = (self.root / prior[0]["stored_identity"]).read_bytes()
         fake = FakeSDWebUIClient()
         fake.fail_every_call(SDError("sd_timeout", "regeneration stalled"))
+        self._record(subject, "failing")
         with self._client(fake):
             drain_synchronous(10)
-        record = self._record_for(subject)
-        self.assertEqual(record.db.status, ArtAssetStatus.FAILED)
-        self.assertEqual(record.db.last_error_code, "sd_timeout")
-        self.assertEqual(record.db.prior_output_identity, "scene/t_synth_dungeon.png")
-        self.assertEqual(target.read_bytes(), b"prior-image")
+        self.assertEqual(gallery_api.cards_for(subject), prior)
+        self.assertEqual(
+            [state.error_code for state in gallery_api.erroring_subjects()],
+            ["sd_timeout"],
+        )
+        self.assertEqual((self.root / prior[0]["stored_identity"]).read_bytes(), prior_bytes)
 
     @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     def test_slow_batch_is_not_reclaimed_before_n_times_timeout_plus_margin(self):
         with override_settings(ART_SD_TIMEOUT_SECONDS=1, ART_SCHEDULER_LIMIT=2):
             subjects = [self._subject("t_synth_forest"), self._subject("t_synth_tavern")]
-            for subject in subjects:
-                self._record(subject)
+            jobs = [self._record(subject) for subject in subjects]
             claimed = claim(2)
             self.assertEqual(len(claimed), 2)
             now = time.time()
-            for record in claimed:
-                record.db.claimed_at = now - (_lease_timeout() - 0.5)
-                record.save()
+            for job in claimed:
+                job.db.claimed_at = now - (_lease_timeout() - 0.5)
+                job.save()
             # A drain's reclaim uses the worst-case batch bound
             # (2 x (timeout + 60s conversion allowance) + 5s margin): a moment
             # inside the lease keeps the batch unreclaimed, so no generation
             # is attempted.
             dispatched = drain_synchronous(10)
             self.assertEqual(dispatched, 0)
-            for subject in subjects:
-                record = self._record_for(subject)
-                self.assertEqual(record.db.status, ArtAssetStatus.IN_PROGRESS)
+            for job in jobs:
+                self.assertEqual(self._job_for(job).db.status, ArtAssetStatus.IN_PROGRESS)
             # A flat per-item bound (timeout + margin) would already have
             # reclaimed the batch, proving the sizing is worst-case not flat.
             self.assertEqual(reclaim_expired_leases(6.0), 2)
@@ -434,32 +459,33 @@ class WorkerStoreIsolationTests(WorkerStoreIsolation):
             self._subject(_SYNTH_MONSTER, ArtSubjectKind.MONSTER),
             self._subject("t_synth_city"),
         ]
-        for subject, description in zip(subjects, ("ok", "boom", "crash")):
+        jobs = [
             self._record(subject, description)
+            for subject, description in zip(subjects, ("ok", "boom", "crash"))
+        ]
         with self._client(client):
             drain_synchronous(10)
-        statuses = {}
-        for subject in subjects:
-            record = self._record_for(subject)
-            statuses[subject.key] = (record.db.status, record.db.last_error_code)
-        self.assertEqual(statuses["t_synth_forest"], (ArtAssetStatus.DONE, None))
+        self.assertEqual(len(gallery_api.cards_for(subjects[0])), 1)
+        self.assertEqual(gallery_api.cards_for(subjects[1]), [])
+        self.assertEqual(gallery_api.cards_for(subjects[2]), [])
+        errors = {state.subject.full(): state.error_code for state in gallery_api.erroring_subjects()}
+        self.assertEqual(errors.get(subjects[1].full()), "sd_http_error")
+        self.assertEqual(errors.get(subjects[2].full()), "sd_internal_error")
         self.assertEqual(
-            statuses[_SYNTH_MONSTER], (ArtAssetStatus.FAILED, "sd_http_error")
+            [
+                job
+                for job in GalleryJobRecord.objects.all()
+                if job.db.status == ArtAssetStatus.IN_PROGRESS
+            ],
+            [],
         )
-        self.assertEqual(
-            statuses["t_synth_city"], (ArtAssetStatus.FAILED, "sd_internal_error")
-        )
-        in_progress = [
-            record
-            for record in ArtAssetRecord.objects.all()
-            if record.db.status == ArtAssetStatus.IN_PROGRESS
-        ]
-        self.assertEqual(in_progress, [])
+        for job in jobs:
+            self.assertIsNone(self._job_for(job))
 
     @covers_requirement("art-queue-worker::scenes-and-portraits-share-one-serialization-lock-and-one-worker-concurrency-slot")
     def test_only_one_worker_runs_at_a_time(self):
         subject = self._subject("t_synth_forest")
-        self._record(subject)
+        job = self._record(subject)
         from world.art.worker import _try_acquire_worker_slot, _release_worker_slot
 
         self.assertTrue(_try_acquire_worker_slot())
@@ -469,8 +495,7 @@ class WorkerStoreIsolationTests(WorkerStoreIsolation):
                 self.assertEqual(drain_synchronous(10), 0)
         finally:
             _release_worker_slot()
-        record = self._record_for(subject)
-        self.assertEqual(record.db.status, ArtAssetStatus.PENDING)
+        self.assertEqual(self._job_for(job).db.status, ArtAssetStatus.PENDING)
 
     @covers_requirement("art-queue-worker::scenes-and-portraits-share-one-serialization-lock-and-one-worker-concurrency-slot")
     def test_slot_is_released_after_a_synchronous_drain(self):
@@ -505,20 +530,25 @@ class WorkerStoreIsolationTests(WorkerStoreIsolation):
                 dispatched = drain(10)
         self.assertEqual(dispatched, 1)
         self.assertEqual(dispatched_to_thread, ["_run_and_release_slot"])
-        record = self._record_for(subject)
-        self.assertEqual(record.db.status, ArtAssetStatus.DONE)
+        self.assertEqual(len(gallery_api.cards_for(subject)), 1)
 
     @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
-    def test_expected_output_identity_is_exact_per_kind(self):
-        self.assertEqual(
-            expected_output_identity(ArtSubject(ArtSubjectKind.SCENE, "x")),
-            "scene/x.png",
-        )
-        self.assertEqual(
-            expected_output_identity(ArtSubject(ArtSubjectKind.MONSTER, "x")),
-            "portrait/monster/x.png",
-        )
-        self.assertEqual(
-            expected_output_identity(ArtSubject(ArtSubjectKind.CHARACTER, "x")),
-            "portrait/character/x.png",
-        )
+    def test_output_identity_is_exact_per_kind(self):
+        for subject, directory in (
+            (ArtSubject(ArtSubjectKind.SCENE, "x"), "scene"),
+            (ArtSubject(ArtSubjectKind.MONSTER, _SYNTH_MONSTER), "monster"),
+            (ArtSubject(ArtSubjectKind.CHARACTER, "x"), "character"),
+        ):
+            job = enqueue_gallery_job(
+                subject,
+                "desc",
+                image_id="aaaaaaaa-1111-4111-8111-111111111111",
+                binding=None,
+                face_rect=None,
+                requested_fields=[],
+            )
+            self.assertEqual(
+                output_identity_for(job),
+                f"gallery/{directory}/{subject.key}/aaaaaaaa-1111-4111-8111-111111111111.png",
+            )
+            job.delete()

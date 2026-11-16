@@ -1,9 +1,7 @@
 """Same-origin media serving for validated art-store identities.
 
-The route serves five closed identity vocabularies and nothing else:
+The route serves four closed identity vocabularies and nothing else:
 
-* classic identities (``scene/``, ``portrait/monster/``, ``portrait/character/``)
-  — served only when a ``done`` asset record references them (unchanged);
 * gallery identities (``gallery/<kind>/<subject-key>/<image-id>.<ext>``) —
   served only when the gallery record addressed by the identity's OWN
   kind/subject-key segments holds a card whose stored identity equals the
@@ -61,18 +59,8 @@ from world.art.scene_definitions import (
     bundled_scene_root,
     current_bundled_scenes,
 )
-from world.art.store import ArtAssetRecord, ArtAssetStatus
 from world.art.subjects import ArtSubject, ArtSubjectError, ArtSubjectKind
 from world.lore.monster_visuals import is_registered_monster_visual_key
-
-# Only these exact store layouts are servable: the scene and portrait
-# directories with ANY of the four store extensions — the closed set of all
-# formats the engine can produce, never the currently configured format
-# alone, so a store mid-way through a format switch stays servable. Each
-# extension maps to exactly one media type; there is no sniffing.
-_ALLOWED_IDENTITY = re.compile(
-    r"^(scene|portrait/monster|portrait/character)/[^/]+\.(png|webp|jpg|avif)$"
-)
 
 # The exact gallery identity shape: kind is exactly `character`, `monster` or
 # `scene`, the subject key and image id are single clean segments, and the
@@ -120,18 +108,6 @@ _GALLERY_KINDS = {
     "monster": ArtSubjectKind.MONSTER,
     "scene": ArtSubjectKind.SCENE,
 }
-
-
-def _referenced_by_done_record(identity: str) -> bool:
-    if identity.startswith("portrait/monster/") and not any(identity.startswith(f"portrait/monster/{k}.") for k in [k for k in (identity.split("/")[2].split(".")[0],) if is_registered_monster_visual_key(k)]):
-        return False
-    for record in ArtAssetRecord.objects.all():
-        if (
-            record.db.status == ArtAssetStatus.DONE
-            and record.db.output_identity == identity
-        ):
-            return True
-    return False
 
 
 def _referenced_by_gallery_card(identity: str, kind_text: str, subject_key: str) -> bool:
@@ -267,7 +243,7 @@ def _serve_official(match: re.Match) -> FileResponse:
 
 
 def art_media(request, identity: str):
-    """Serve one validated identity from the store, gallery, defaults, official, or bundled root."""
+    """Serve one validated gallery, defaults, official, or bundled identity."""
     if not identity:
         raise Http404
     bundled_match = _BUNDLED_SCENE_IDENTITY.fullmatch(identity)
@@ -281,8 +257,4 @@ def art_media(request, identity: str):
     official_match = _OFFICIAL_IDENTITY.fullmatch(identity)
     if official_match is not None:
         return _serve_official(official_match)
-    if not _ALLOWED_IDENTITY.fullmatch(identity):
-        raise Http404
-    if not _referenced_by_done_record(identity):
-        raise Http404
-    return _serve_stored(identity)
+    raise Http404

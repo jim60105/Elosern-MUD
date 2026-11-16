@@ -8,15 +8,15 @@ from unittest.mock import patch
 from django.test import override_settings
 
 from tools.spec_traceability import covers_requirement
+from world.art import gallery as gallery_api
 from world.art.fake_sd_client import FakeSDWebUIClient
 from world.art.fake_translate import FakeTranslator
 from world.art.queue import (
     enqueue_gallery_job,
-    record_key,
-    requeue,
+    gallery_record_key,
     source_hash,
 )
-from world.art.store import ArtAssetRecord, ArtAssetStatus
+from world.art.store import ArtAssetStatus, GalleryJobRecord
 from world.art.subjects import ArtSubjectKind
 from world.art.translate import TranslateError
 import world.art.worker as worker
@@ -44,38 +44,46 @@ class TranslationStageTests(WorkerStoreIsolation):
     @covers_requirement(
         "art-prompt-translation::the-translation-stage-sits-between-the-claimed-description-and-the-generation-call"
     )
-    def test_enabled_stage_translates_classic_scene_character_and_monster(self):
+    def test_enabled_stage_translates_scene_character_and_monster_jobs(self):
         description = "含有漢字"
         subjects = (
             self._subject("t_synth_translation", ArtSubjectKind.SCENE),
             self._subject("42", ArtSubjectKind.CHARACTER),
             self._subject(_SYNTH_MONSTER, ArtSubjectKind.MONSTER),
         )
-        originals = {}
-        for subject in subjects:
-            record = self._record(subject, description)
-            originals[record.db_key] = (
-                str(record.db.source_description),
-                str(record.db.source_hash),
-            )
+        jobs = [self._record(subject, description) for subject in subjects]
+        originals = {
+            job.db_key: (str(job.db.source_description), str(job.db.source_hash))
+            for job in jobs
+        }
         fake = FakeSDWebUIClient()
         translator = FakeTranslator()
+        real_settle = worker.settle_gallery_generated
+
+        def observe_before_deletion(*args, **kwargs):
+            key = str(args[0])
+            stored = GalleryJobRecord.objects.get(db_key=key)
+            self.assertEqual(
+                (str(stored.db.source_description), str(stored.db.source_hash)),
+                originals[key],
+            )
+            return real_settle(*args, **kwargs)
+
         with self._translator(translator):
-            with self._client(fake):
-                worker.drain_synchronous(10)
+            with patch.object(
+                worker, "settle_gallery_generated", side_effect=observe_before_deletion
+            ):
+                with self._client(fake):
+                    worker.drain_synchronous(10)
 
         self.assertEqual(
             [description for _subject, description in fake.calls],
             ["[fake-translation]"] * len(subjects),
         )
         self.assertEqual(translator.calls, [(description,)] * len(subjects))
-        for subject in subjects:
-            record = ArtAssetRecord.objects.get(db_key=record_key(subject))
-            self.assertEqual(record.db.status, ArtAssetStatus.DONE)
-            self.assertEqual(
-                (str(record.db.source_description), str(record.db.source_hash)),
-                originals[record.db_key],
-            )
+        for job, subject in zip(jobs, subjects):
+            self.assertIsNone(self._job_for(job))
+            self.assertEqual(len(gallery_api.cards_for(subject)), 1)
 
     @covers_requirement(
         "art-prompt-translation::the-translation-stage-sits-between-the-claimed-description-and-the-generation-call"
@@ -97,7 +105,7 @@ class TranslationStageTests(WorkerStoreIsolation):
         real_settle = worker.settle_gallery_generated
 
         def observe_before_deletion(*args, **kwargs):
-            stored = ArtAssetRecord.objects.get(db_key=job.db_key)
+            stored = GalleryJobRecord.objects.get(db_key=job.db_key)
             self.assertEqual(
                 (str(stored.db.source_description), str(stored.db.source_hash)),
                 original,
@@ -114,7 +122,7 @@ class TranslationStageTests(WorkerStoreIsolation):
         self.assertEqual(fake.calls, [(subject, "[fake-translation]")])
         self.assertEqual(translator.calls, [(description,)])
         self.assertIsNone(
-            ArtAssetRecord.objects.filter(db_key=job.db_key).first(),
+            GalleryJobRecord.objects.filter(db_key=job.db_key).first(),
             "gallery settlement deletes only after the boundary observed source text",
         )
 
@@ -127,13 +135,13 @@ class TranslationStageTests(WorkerStoreIsolation):
     def test_disabled_stage_leaves_description_and_backend_unresolved(self):
         subject = self._subject("t_synth_disabled_translation")
         description = "原始漢字"
-        self._record(subject, description)
-        first = FakeSDWebUIClient()
-        with self._client(first):
+        first_job = self._record(subject, description)
+        first_identity = worker.output_identity_for(first_job)
+        with self._client(FakeSDWebUIClient()):
             worker.drain_synchronous(10)
-        target = self.root / "scene" / "t_synth_disabled_translation.png"
-        baseline = target.read_bytes()
-        requeue(subject)
+        baseline = (self.root / first_identity).read_bytes()
+        second_job = self._record(subject, description)
+        second_image_id = second_job.db.gallery_image_id
 
         second = FakeSDWebUIClient()
         with patch(
@@ -143,7 +151,10 @@ class TranslationStageTests(WorkerStoreIsolation):
             with self._client(second):
                 worker.drain_synchronous(10)
         self.assertEqual(second.calls, [(subject, description)])
-        self.assertEqual(target.read_bytes(), baseline)
+        cards = gallery_api.cards_for(subject)
+        self.assertEqual(len(cards), 1)
+        self.assertEqual(cards[0]["image_id"], second_image_id)
+        self.assertEqual((self.root / cards[0]["stored_identity"]).read_bytes(), baseline)
 
     @covers_requirement(
         "art-prompt-translation::translation-failure-degrades-the-prompt-and-never-costs-the-image"
@@ -170,7 +181,8 @@ class TranslationStageTests(WorkerStoreIsolation):
             with self.subTest(case=name):
                 subject = self._subject(f"t_synth_translate_{name}")
                 description = "故障漢字"
-                self._record(subject, description)
+                job = self._record(subject, description)
+                original_hash = str(job.db.source_hash)
                 client = FakeSDWebUIClient()
                 with override_settings(
                     ART_TRANSLATE_ENABLED=True, ART_TRANSLATE_BACKEND=backend
@@ -187,27 +199,21 @@ class TranslationStageTests(WorkerStoreIsolation):
                         ):
                             with self._client(client):
                                 worker.drain_synchronous(10)
-                record = ArtAssetRecord.objects.get(db_key=record_key(subject))
-                self.assertEqual(record.db.status, ArtAssetStatus.DONE)
                 self.assertEqual(client.calls, [(subject, description)])
+                self.assertEqual(original_hash, source_hash(description))
+                cards = gallery_api.cards_for(subject)
+                self.assertEqual(len(cards), 1)
+                record = gallery_api.record_for(subject)
                 self.assertFalse(
-                    str(record.db.last_error_code or "").startswith("art_translate_")
+                    str((record.db.last_error_code if record else None) or "").startswith(
+                        "art_translate_"
+                    )
                 )
-                self.assertEqual(record.db.source_hash, source_hash(description))
 
     def test_translation_enabled_does_not_change_the_lease_formula(self):
         with override_settings(
             ART_SD_TIMEOUT_SECONDS=1,
             ART_SCHEDULER_LIMIT=2,
-            ART_REMBG_ENABLED=False,
             ART_TRANSLATE_ENABLED=True,
         ):
             self.assertEqual(worker._lease_timeout(), 2 * (1 + 60) + 5)
-        with override_settings(
-            ART_SD_TIMEOUT_SECONDS=1,
-            ART_SCHEDULER_LIMIT=2,
-            ART_REMBG_ENABLED=True,
-            ART_REMBG_ALLOWANCE_SECONDS=120,
-            ART_TRANSLATE_ENABLED=True,
-        ):
-            self.assertEqual(worker._lease_timeout(), 2 * (1 + 60 + 120) + 5)

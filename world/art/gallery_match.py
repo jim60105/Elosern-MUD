@@ -231,13 +231,13 @@ def resolve_display_chain(
     The slot order is the chain's precedence, independent of any array index:
     the equipment-bound card (steps 1-3), the personal official selection
     (step 4's first half), the card named by the record's ``default_image_id``
-    (step 4's other half), the capability-declared classic source, and the
-    official catalog default for the subject's own content reference. The walk
+    (step 4's other half), and the official catalog default for the subject's
+    own content reference. The walk
     stops at the FIRST position that resolves a presentable source unless
     ``complete`` asks for every lower position too (the scene presenter's
     ordered browser cascade). It never drops a fault: an explicit stored source
     that cannot resolve — a retained personal selection, a named default card,
-    a classic record or an official default — is reported as a facts-less slot
+    or an official default — is reported as a facts-less slot
     carrying its bounded reason, BEFORE the substitute that follows it, so a
     consumer can attribute the failure to the exact position that failed. An
     unusable equipment-bound candidate is skipped operationally and contributes
@@ -280,13 +280,6 @@ def resolve_display_chain(
         slots.append(default)
     elif complete or default.faults:
         slots.append(default)
-    classic = _classic_slot(subject, capability)
-    if classic.facts is not None:
-        if not complete:
-            return DisplayChain((*slots, classic), bool(cards), failed, default.facts)
-        slots.append(classic)
-    elif complete or classic.faults:
-        slots.append(classic)
     official = official_default_slot(subject, entity)
     if official.facts is not None:
         if not complete:
@@ -302,7 +295,7 @@ def resolve_card(subject: ArtSubject, entity: Any = None) -> dict | None:
 
     The card-only projection of :func:`resolve_display`: the validated card
     dict (the tolerant read's stored form) or ``None`` when no card resolves —
-    the caller then continues the chain at the classic asset record. A
+    the caller then continues the chain at the official default. A
     resolving personal official selection is step 4's other half, so it makes
     this return ``None``; the presenter's official branch owns that payload.
     """
@@ -382,83 +375,6 @@ def _default_card_slot(subject: ArtSubject, cards: list[dict]) -> ChainSlot:
     )
 
 
-def classic_output_identity(
-    subject: ArtSubject, identity: object, *, directory: str | None = None
-) -> str | None:
-    """One classic ``done`` output identity when it is presentable, else ``None``.
-
-    The classic store convention is ``portrait/<store-directory>/<subject-key>``
-    with one of the closed store extensions — a declaration-derived directory,
-    never a kind comparison. A format-switch deployment keeps presenting every
-    existing asset until the subject is regenerated because the check uses the
-    closed extension set rather than one configured suffix.
-    """
-    capability = gallery_kinds.capabilities_for(subject.kind.value)
-    if directory is None:
-        if not capability.has_gallery or capability.store_directory is None:
-            return None
-        directory = f"portrait/{capability.store_directory}"
-    if not isinstance(directory, str) or not directory:
-        return None
-    if not isinstance(identity, str) or not identity:
-        return None
-    prefix = f"{directory}/"
-    stem = f"{subject.key}."
-    if not identity.startswith(prefix):
-        return None
-    remainder = identity[len(prefix):]
-    if not remainder.startswith(stem):
-        return None
-    extension = remainder[len(stem) - 1:]
-    if extension.lower() not in STORE_EXTENSIONS:
-        return None
-    resolved = resolved_under_store_root(identity)
-    if resolved is None or not resolved.is_file():
-        return None
-    return identity
-
-
-def _classic_slot(subject: ArtSubject, capability) -> ChainSlot:
-    """Step 5 as a chain slot: the temporarily supported classic ``done`` asset.
-
-    Only a kind whose declaration supports a classic source reads one; the scene
-    kind declares ``False`` and therefore never regains the removed classic
-    branch. The record's own validated output identity is the whole original; a
-    vanished output contributes a generated-output-missing fault and a recorded
-    failure a generation-failed one, while an absent, queued, or claimed record
-    contributes nothing. Unlike an official slot, the classic position has one
-    source identity per subject, so faults carry an empty identity and the
-    presenter attributes them to its own classic source id.
-    """
-    if not capability.supports_classic_source:
-        return ChainSlot("classic")
-    from world.art.queue import record_key
-    from world.art.store import ArtAssetRecord, ArtAssetStatus
-
-    record = ArtAssetRecord.objects.filter(db_key=record_key(subject)).first()
-    if record is None:
-        return ChainSlot("classic")
-    status = record.db.status
-    if status == ArtAssetStatus.DONE:
-        identity = classic_output_identity(subject, record.db.output_identity)
-        if identity is None:
-            log_warn("art_asset_output_missing", context={"subject": subject.full()})
-            return ChainSlot(
-                "classic",
-                None,
-                None,
-                (("", descriptors.REASON_GENERATED_OUTPUT_MISSING),),
-            )
-        return ChainSlot(
-            "classic", identity, {"record": record, "identity": identity}
-        )
-    if status == ArtAssetStatus.FAILED:
-        return ChainSlot(
-            "classic", None, None, (("", descriptors.REASON_GENERATION_FAILED),)
-        )
-    return ChainSlot("classic")
-
-
 def _official_facts_within_budget(subject: ArtSubject, facts: dict) -> bool:
     """True when an official resource fits the shared media-URL ceiling.
 
@@ -479,7 +395,7 @@ def _official_facts_within_budget(subject: ArtSubject, facts: dict) -> bool:
 
 
 def fallback_for(subject: ArtSubject, entity=None, *, report: bool = True) -> dict | None:
-    """The terminal fallback seam: consulted after the classic asset record.
+    """The terminal fallback seam: consulted after the official default.
 
     Filled by ``gallery-builtin-fallbacks`` with the deterministic built-in
     resolver: declared registry key -> sex/age band -> deterministic
@@ -668,10 +584,9 @@ def official_default_slot(subject: ArtSubject, entity: Any = None) -> ChainSlot:
     never-configured source is not a failure), and a reference the snapshot
     does not hold contributes no fault either: the mounted catalog simply has
     nothing for it, exactly as it has nothing for a subject that never had
-    artwork. ``resolve_card`` (steps 1-4) and the presenter's classic ``done``
-    asset (step 5) are consulted before this step, so a subject with runtime
-    artwork keeps presenting it and a catalog default never replaces the
-    player's own image.
+    artwork. ``resolve_card`` (steps 1-4) is consulted before this step, so a
+    subject with runtime artwork keeps presenting it and a catalog default
+    never replaces the player's own image.
 
     Imports stay local — like :func:`fallback_for` — so this module keeps its
     read-only, transport-free module-level import surface.
@@ -725,7 +640,6 @@ def official_default_for(subject: ArtSubject, entity: Any = None) -> dict | None
 __all__ = [
     "ChainSlot",
     "DisplayChain",
-    "classic_output_identity",
     "fallback_for",
     "official_default_for",
     "official_default_slot",

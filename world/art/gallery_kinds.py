@@ -93,7 +93,6 @@ class GalleryKindCapabilities:
         "official_reference_policy",
         "official_preference_scope",
         "terminal_policy",
-        "supports_classic_source",
     )
 
     def __init__(
@@ -112,7 +111,6 @@ class GalleryKindCapabilities:
         official_reference_policy: str,
         official_preference_scope: str,
         terminal_policy: str,
-        supports_classic_source: bool,
     ) -> None:
         object.__setattr__(self, "kind_value", kind_value)
         object.__setattr__(self, "has_gallery", has_gallery)
@@ -132,7 +130,6 @@ class GalleryKindCapabilities:
             self, "official_preference_scope", official_preference_scope
         )
         object.__setattr__(self, "terminal_policy", terminal_policy)
-        object.__setattr__(self, "supports_classic_source", supports_classic_source)
 
     def __setattr__(self, name: str, value: object) -> "None":
         raise TypeError(
@@ -159,8 +156,7 @@ class GalleryKindCapabilities:
             f"supports_card_delete={self.supports_card_delete!r}, "
             f"official_reference_policy={self.official_reference_policy!r}, "
             f"official_preference_scope={self.official_preference_scope!r}, "
-            f"terminal_policy={self.terminal_policy!r}, "
-            f"supports_classic_source={self.supports_classic_source!r})"
+            f"terminal_policy={self.terminal_policy!r})"
         )
 
     def with_values(self, **changes) -> "GalleryKindCapabilities":
@@ -184,7 +180,6 @@ class GalleryKindCapabilities:
             "official_reference_policy": self.official_reference_policy,
             "official_preference_scope": self.official_preference_scope,
             "terminal_policy": self.terminal_policy,
-            "supports_classic_source": self.supports_classic_source,
         }
         unknown = set(changes) - set(fields)
         if unknown:
@@ -274,7 +269,6 @@ _CAPABILITIES_BY_KIND_VALUE: dict = {
         official_reference_policy="entity_provenance",
         official_preference_scope="subject",
         terminal_policy="alpha",
-        supports_classic_source=True,
     ),
     _MONSTER_KIND_VALUE: GalleryKindCapabilities(
         kind_value=_MONSTER_KIND_VALUE,
@@ -291,7 +285,6 @@ _CAPABILITIES_BY_KIND_VALUE: dict = {
         official_reference_policy="visual_species",
         official_preference_scope="entity",
         terminal_policy="alpha",
-        supports_classic_source=True,
     ),
     _SCENE_KIND_VALUE: GalleryKindCapabilities(
         kind_value=_SCENE_KIND_VALUE,
@@ -308,7 +301,6 @@ _CAPABILITIES_BY_KIND_VALUE: dict = {
         official_reference_policy="scene_archetype",
         official_preference_scope="subject",
         terminal_policy="scene",
-        supports_classic_source=False,
     ),
 }
 
@@ -450,12 +442,6 @@ def validate_declaration_contract(kind_values: "tuple[str, ...]") -> list:
                 f"kind {value!r} declares card maximum {record.max_cards!r} "
                 f"outside the admitted values (None or exactly the int 1)"
             )
-        for flag in ("supports_classic_source",):
-            if not isinstance(getattr(record, flag), bool):
-                violations.append(
-                    f"kind {value!r} declares {flag} "
-                    f"{getattr(record, flag)!r}, not a bool"
-                )
         for field, vocabulary in (
             ("official_reference_policy", OFFICIAL_REFERENCE_POLICIES),
             ("official_preference_scope", OFFICIAL_PREFERENCE_SCOPES),
@@ -513,10 +499,6 @@ def validate_declaration_contract(kind_values: "tuple[str, ...]") -> list:
                 violations.append(
                     f"no-gallery kind {value!r} declares terminal policy "
                     f"{record.terminal_policy!r}"
-                )
-            if record.supports_classic_source:
-                violations.append(
-                    f"no-gallery kind {value!r} declares supports_classic_source"
                 )
     return violations
 

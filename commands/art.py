@@ -24,13 +24,12 @@ from commands.command import Command
 
 from world.art import gallery as gallery_api
 from world.art import gallery_kinds
-from world.art.queue import failed_keys, is_gallery_job, record_key, requeue
-from world.art.store import ArtAssetRecord
+from world.art.queue import failed_keys
+from world.art.store import GalleryJobRecord
 from world.art.subjects import (
     ArtSubjectError,
     ArtSubjectKind,
     parse_subject,
-    scene_subject_for,
 )
 
 
@@ -70,59 +69,33 @@ class CmdArtStatus(_ArtCommand):
         if kind is None and args:
             self.caller.msg("用法：art status [scene|portrait|monster]")
             return
-        records = [
-            record
-            for record in ArtAssetRecord.objects.all()
-            # Gallery job records are invisible here: the staff surface keeps
-            # reporting the classic subject queue only.
-            if not is_gallery_job(record)
-            and (kind is None or record.db.kind.startswith(kind))
-        ]
-        records.sort(key=lambda record: record.db_key)
         # Gallery STATE (change gallery-failure-visibility): one line per
         # gallery record from the gallery module's read-only state accessor —
-        # never a query of the record class, never a gallery JOB row. The
-        # same kind filter applies: portrait kinds serialize under the
-        # ``portrait`` prefix and the gallery-bearing scene kind under
-        # ``scene``, so each filter lists its own gallery rows.
+        # never a gallery JOB row. The same kind filter applies: portrait kinds
+        # serialize under the ``portrait`` prefix and the gallery-bearing scene
+        # kind under ``scene``, so each filter lists its own gallery rows.
         gallery_rows = [
             state
             for state in gallery_api.gallery_states()
             if kind is None or state.subject.kind.value.startswith(kind)
         ]
         gallery_rows.sort(key=lambda state: state.subject.full())
-        if not records and not gallery_rows:
+        if not gallery_rows:
             self.caller.msg("沒有符合的美術資產記錄。")
             return
-        lines = []
-        for record in records:
-            seed = record.db.seed
+        now = time.time()
+        lines = ["圖庫狀態:"]
+        for state in gallery_rows:
+            error = ""
+            if state.error_code is not None:
+                error_at = state.error_at if state.error_at is not None else now
+                age = max(0, int(now - error_at))
+                error = f" 錯誤:{state.error_code}({age}s)"
             lines.append(
-                f"  {record.db_key.removeprefix('art:')} "
-                f"[{record.db.status}] 次數:{record.db.attempt_count} "
-                f"比例:{record.db.aspect_ratio or '-'} "
-                f"錯誤:{record.db.last_error_code or '-'}"
-                f"{' 提示詞變更' if record.db.hash_changed else ''}"
-                f"{f' seed={seed}' if seed is not None else ''}"
+                f"  {state.subject.full()} "
+                f"卡片:{state.card_count} "
+                f"預設:{'是' if state.has_default else '否'}{error}"
             )
-        if records:
-            lines.insert(0, "經典資產記錄:")
-        if gallery_rows:
-            now = time.time()
-            lines.append("圖庫狀態:")
-            for state in gallery_rows:
-                error = ""
-                if state.error_code is not None:
-                    error_at = (
-                        state.error_at if state.error_at is not None else now
-                    )
-                    age = max(0, int(now - error_at))
-                    error = f" 錯誤:{state.error_code}({age}s)"
-                lines.append(
-                    f"  {state.subject.full()} "
-                    f"卡片:{state.card_count} "
-                    f"預設:{'是' if state.has_default else '否'}{error}"
-                )
         self.caller.msg("\n".join(lines))
 
 
@@ -170,48 +143,25 @@ class CmdArtRetry(_ArtCommand):
         if not self.is_accessible():
             self.caller.msg("你沒有權限使用 art 指令。")
             return
-        keys = failed_keys()
-        from world.art.queue import ensure
-
         from world.art.service import retry_gallery_subject
 
-        reenqueued = 0
-        for full_key in keys:
+        # Every subject whose LAST generation attempt failed is re-driven
+        # through the same validated request seam the automatic paths use, so
+        # every precondition still applies. A typed rejection (no living
+        # entity, ineligible ages, an unresolvable subject) skips that subject
+        # with no record change; the moot-error clear lives in the seam itself
+        # (declined because cards arrived). Every subject is isolated.
+        gallery_requested = 0
+        for full_key in failed_keys():
             try:
                 subject = parse_subject(full_key)
-            except ArtSubjectError:
-                continue
-            # ``gallery-monster-autogen`` / ``scene-kind-gallery``: a
-            # gallery-bearing kind never re-enters the classic pipeline. Its
-            # gallery failures are driven exclusively by the gallery arm
-            # below, so a legacy classic monster or scene record is left
-            # exactly as found — never reset, never re-ensqueued, never newly
-            # produced.
-            if gallery_kinds.has_gallery(subject.kind):
-                continue
-            record = ArtAssetRecord.objects.filter(
-                db_key=record_key(subject)
-            ).first()
-            description = record.db.source_description if record else ""
-            ensure(subject, description)
-            reenqueued += 1
-        # Gallery arm: every subject whose LAST generation attempt failed is
-        # re-driven through the same validated request seam the automatic
-        # paths use, so every precondition still applies. A typed rejection
-        # (no living entity, ineligible ages, an unresolvable subject)
-        # skips that subject with no record change; the moot-error clear
-        # lives in the seam itself (declined because cards arrived).
-        gallery_requested = 0
-        for state in gallery_api.erroring_subjects():
-            try:
-                requested = retry_gallery_subject(state.subject)
-            except ArtSubjectError:
+                requested = retry_gallery_subject(subject)
+            except (ArtSubjectError, gallery_api.GalleryRecordError):
                 continue
             if requested:
                 gallery_requested += 1
         self.caller.msg(
-            f"已重新排入 {reenqueued} 個失敗記錄，"
-            f"並重新請求 {gallery_requested} 次圖庫生成。"
+            f"已重新請求 {gallery_requested} 次圖庫生成。"
         )
 
 
@@ -233,30 +183,19 @@ class CmdArtRequeue(_ArtCommand):
         except ArtSubjectError as error:
             self.caller.msg(f"無效的 subject key：{error}")
             return
-        # Gallery-bearing kinds (changes ``gallery-monster-generation`` and
-        # ``scene-kind-gallery``) are force-regenerated through the
-        # kind-neutral gallery seam, which re-checks the kind's declared
-        # preconditions and respects the declared card cap. Only a kind
-        # declaring no gallery keeps the classic fixed-identity record reset.
-        if gallery_kinds.has_gallery(subject.kind):
-            from world.art.service import requeue_gallery_subject
+        # Gallery-bearing kinds are force-regenerated through the kind-neutral
+        # gallery seam, which re-checks the kind's declared preconditions and
+        # respects the declared card cap. A kind declaring no gallery rejects.
+        if not gallery_kinds.has_gallery(subject.kind):
+            self.caller.msg(f"無法重新排入：{subject.full()} 沒有圖庫宣告。")
+            return
+        from world.art.service import requeue_gallery_subject
 
-            try:
-                requeue_gallery_subject(subject)
-            except ArtSubjectError as error:
-                self.caller.msg(f"無法重新排入：{error}")
-                return
-            self.caller.msg(f"已將 {subject.full()} 重新排入佇列。")
-            return
-        # No shipped kind reaches this branch any more (every one declares a
-        # gallery); it is the preserved classic reset a gallery-less
-        # declaration would still use.
         try:
-            scene_subject_for(subject.key)
-        except ArtSubjectError as error:
-            self.caller.msg(f"無效的 subject key：{error}")
+            requeue_gallery_subject(subject)
+        except (ArtSubjectError, gallery_api.GalleryRecordError) as error:
+            self.caller.msg(f"無法重新排入：{error}")
             return
-        requeue(subject)
         self.caller.msg(f"已將 {subject.full()} 重新排入佇列。")
 
 
@@ -328,17 +267,16 @@ class CmdArtHealth(_ArtCommand):
                 f"interval={int(settings.ART_SCHEDULER_INTERVAL_SECONDS)}s "
                 f"limit={int(settings.ART_SCHEDULER_LIMIT)}"
             )
-            counts: dict[str, int] = {}
-            for record in ArtAssetRecord.objects.all():
-                if is_gallery_job(record):
-                    continue
+            counts: dict[str, int] = {"pending": 0, "in_progress": 0}
+            for record in GalleryJobRecord.objects.all():
                 status = str(record.db.status)
-                counts[status] = counts.get(status, 0) + 1
+                if status in counts:
+                    counts[status] += 1
             lines.append(
                 "queue: "
                 + " ".join(
                     f"{status}={counts.get(status, 0)}"
-                    for status in ("pending", "in_progress", "failed", "done")
+                    for status in ("pending", "in_progress")
                 )
             )
             # Section 4 of five (change gallery-failure-visibility): exact

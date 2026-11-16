@@ -18,27 +18,14 @@ from world.art.fake_cutout import FakeCutoutBackend
 from world.art.cutout import CutoutError
 from world.art import gallery as gallery_api
 from world.art.gallery import DEFAULT_FACE_RECT
-from world.art.queue import (
-    claim,
-    ensure,
-    enqueue_gallery_job,
-    gallery_record_key,
-    record_key,
-    reclaim_expired_leases,
-    requeue,
-    settle,
-    settle_generated,
-)
+from world.art.queue import enqueue_gallery_job
 from world.art.sd_worker import GeneratedImage, SDError
-from world.art.store import ArtAssetRecord, ArtAssetStatus
+from world.art.store import ArtAssetStatus, GalleryJobRecord
 from world.art.subjects import ArtSubject, ArtSubjectKind
 from world.art.worker import (
     _lease_timeout,
-    _run_and_settle_batch,
-    _write_temp,
     drain,
     drain_synchronous,
-    expected_output_identity,
     output_identity_for,
 )
 
@@ -50,6 +37,7 @@ from ._support import (
     _OpaqueClient,
     _opaque_portrait_png,
 )
+
 
 class CutoutStageTests(WorkerStoreIsolation):  # noqa: E501
 
@@ -71,44 +59,53 @@ class CutoutStageTests(WorkerStoreIsolation):  # noqa: E501
             ):
                 yield
 
+    def _drain_once(self, subject, description="desc"):
+        job = self._record(subject, description)
+        identity = output_identity_for(job)
+        with self._client(self.client):
+            drain_synchronous(10)
+        return job, self.root / identity
+
     @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     @covers_requirement("art-portrait-cutout::character-and-monster-portraits-are-stored-with-their-background-removed")
     def test_a_character_portrait_is_stored_transparent(self):
         subject = self._subject("42", ArtSubjectKind.CHARACTER)
-        self._record(subject)
-        with self._client(self.client):
-            drain_synchronous(10)
-        target = self.root / "portrait" / "character" / "42.png"
+        _first, target = self._drain_once(subject, "before")
         disabled_bytes = target.read_bytes()
-        requeue(subject)
+        job = self._record(subject, "after")
+        image_id = job.db.gallery_image_id
+        second_path = self.root / output_identity_for(job)
         fake = FakeCutoutBackend()
         with self._cutout(fake):
             with self._client(self.client):
                 drain_synchronous(10)
-        record = self._record_for(subject)
-        self.assertEqual(record.db.status, ArtAssetStatus.DONE)
         self.assertEqual(len(fake.calls), 1)
-        self._assert_region_transparent(target)
-        self.assertNotEqual(target.read_bytes(), disabled_bytes)
+        self._assert_region_transparent(second_path)
+        self.assertNotEqual(second_path.read_bytes(), disabled_bytes)
+        self.assertIsNone(self._job_for(job))
+        cards = gallery_api.cards_for(subject)
+        self.assertEqual(len(cards), 2)
+        self.assertEqual(cards[-1]["image_id"], image_id)
 
     @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     @covers_requirement("art-portrait-cutout::character-and-monster-portraits-are-stored-with-their-background-removed")
     def test_a_monster_portrait_is_stored_transparent(self):
         subject = self._subject(_SYNTH_MONSTER, ArtSubjectKind.MONSTER)
-        self._record(subject)
-        with self._client(self.client):
-            drain_synchronous(10)
-        target = self.root / "portrait" / "monster" / f"{_SYNTH_MONSTER}.png"
+        _first, target = self._drain_once(subject, "before")
         disabled_bytes = target.read_bytes()
-        requeue(subject)
+        job = self._record(subject, "after")
+        image_id = job.db.gallery_image_id
+        second_path = self.root / output_identity_for(job)
         fake = FakeCutoutBackend()
         with self._cutout(fake):
             with self._client(self.client):
                 drain_synchronous(10)
-        record = self._record_for(subject)
-        self.assertEqual(record.db.status, ArtAssetStatus.DONE)
-        self._assert_region_transparent(target)
-        self.assertNotEqual(target.read_bytes(), disabled_bytes)
+        self._assert_region_transparent(second_path)
+        self.assertNotEqual(second_path.read_bytes(), disabled_bytes)
+        self.assertIsNone(self._job_for(job))
+        cards = gallery_api.cards_for(subject)
+        self.assertEqual(len(cards), 1)
+        self.assertEqual(cards[0]["image_id"], image_id)
 
     @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     @covers_requirement("art-portrait-cutout::character-and-monster-portraits-are-stored-with-their-background-removed")
@@ -145,30 +142,28 @@ class CutoutStageTests(WorkerStoreIsolation):  # noqa: E501
         )
         self.assertEqual(len(gallery_api.cards_for(self._subject("42", ArtSubjectKind.CHARACTER))), 1)
         self.assertEqual(len(gallery_api.cards_for(monster)), 1)
-        self.assertIsNone(self._gallery_job_key(character_job))
-        self.assertIsNone(self._gallery_job_key(monster_job))
-
-    def _gallery_job_key(self, job):
-        return ArtAssetRecord.objects.filter(db_key=job.db_key).first()
+        self.assertIsNone(self._job_for(character_job))
+        self.assertIsNone(self._job_for(monster_job))
 
     @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     @covers_requirement("art-portrait-cutout::character-and-monster-portraits-are-stored-with-their-background-removed")
     def test_scene_art_never_reaches_the_backend(self):
         subject = self._subject()
-        self._record(subject)
-        with self._client(self.client):
-            drain_synchronous(10)
-        target = self.root / "scene" / "t_synth_forest.png"
-        disabled_bytes = target.read_bytes()
-        requeue(subject)
+        _first, first_path = self._drain_once(subject, "before")
+        disabled_bytes = first_path.read_bytes()
+        job = self._record(subject, "after")
+        image_id = job.db.gallery_image_id
+        second_path = self.root / output_identity_for(job)
         fake = FakeCutoutBackend()
         with self._cutout(fake):
             with self._client(self.client):
                 drain_synchronous(10)
-        record = self._record_for(subject)
-        self.assertEqual(record.db.status, ArtAssetStatus.DONE)
         self.assertEqual(fake.calls, [])
-        self.assertEqual(target.read_bytes(), disabled_bytes)
+        self.assertEqual(second_path.read_bytes(), disabled_bytes)
+        self.assertIsNone(self._job_for(job))
+        cards = gallery_api.cards_for(subject)
+        self.assertEqual(len(cards), 1)
+        self.assertEqual(cards[0]["image_id"], image_id)
 
     @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     @covers_requirement("art-portrait-cutout::character-and-monster-portraits-are-stored-with-their-background-removed")
@@ -186,7 +181,8 @@ class CutoutStageTests(WorkerStoreIsolation):  # noqa: E501
     @covers_requirement("art-portrait-cutout::the-background-removal-backend-is-an-injectable-cpu-only-seam")
     def test_the_stage_runs_between_generation_and_encoding(self):
         subject = self._subject("42", ArtSubjectKind.CHARACTER)
-        self._record(subject)
+        job = self._record(subject)
+        image_id = job.db.gallery_image_id
         real_encode = __import__("world.art.formats", fromlist=["encode"]).encode
         captured: dict = {}
 
@@ -199,8 +195,7 @@ class CutoutStageTests(WorkerStoreIsolation):  # noqa: E501
             with patch("world.art.worker.encode", side_effect=_spy_encode):
                 with self._client(self.client):
                     drain_synchronous(10)
-        record = self._record_for(subject)
-        self.assertEqual(record.db.status, ArtAssetStatus.DONE)
+        self.assertIsNone(self._job_for(job))
         self.assertEqual(len(self.client.calls), 1, "the generation is never re-issued")
         self.assertEqual(len(fake.calls), 1)
         # encode received the BACKEND's bytes, not the client's: the received
@@ -209,8 +204,12 @@ class CutoutStageTests(WorkerStoreIsolation):  # noqa: E501
         with Image.open(io.BytesIO(captured["bytes"])) as image:
             self.assertEqual(image.mode, "RGBA")
             self.assertEqual(image.load()[0, 0][3], 0)
-        listing = sorted(p.name for p in (self.root / "portrait" / "character").iterdir())
-        self.assertEqual(listing, ["42.png"], "exactly one artifact is published")
+        listing = sorted(
+            p.name for p in (self.root / "gallery" / "character" / "42").iterdir()
+        )
+        self.assertEqual(
+            listing, [f"{image_id}.png"], "exactly one artifact is published"
+        )
 
     @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     @covers_requirement("art-portrait-cutout::character-and-monster-portraits-are-stored-with-their-background-removed")

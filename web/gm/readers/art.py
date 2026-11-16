@@ -1,10 +1,10 @@
-"""Art record inspection reader (S3 §4 "Art asset").
+"""Gallery job inspection reader (S3 §4 "Art asset").
 
-Art records are Scripts keyed ``art:<subject-key>`` (or ``art:<subject>:
-gen:<image-id>`` for a spent gallery job), so the raw tab reports their stored
-record fields rather than Evennia object metadata. The thumbnail is served
-through the existing ``/art/`` media route and is offered only when the stored
-identity resolves to an existing file under ``ART_STORE_ROOT``.
+Art records are transient per-image gallery jobs keyed
+``art:<subject-key>:gen:<image-id>``, so the raw tab reports their stored job
+fields rather than Evennia object metadata. The thumbnail is served through
+the existing ``/art/`` media route and is offered only when the job's image id
+matches a readable card of its subject's gallery.
 """
 
 from __future__ import annotations
@@ -35,16 +35,12 @@ RECORD_FIELDS = (
     "prompt_digest",
     "generation_token",
     "status",
-    "output_identity",
-    "prior_output_identity",
     "attempt_count",
     "last_error_code",
     "enqueued_at",
     "claimed_at",
     "completed_at",
     "aspect_ratio",
-    "hash_changed",
-    "seed",
     "gallery_image_id",
     "gallery_binding",
     "gallery_face_rect",
@@ -54,28 +50,30 @@ RECORD_FIELDS = (
 
 def records() -> list[Any]:
     """Every art record Script, ordered by its stable key."""
-    from world.art.store import ArtAssetRecord
+    from world.art.store import GalleryJobRecord
 
-    return list(ArtAssetRecord.objects.all().order_by("db_key"))
+    return list(GalleryJobRecord.objects.all().order_by("db_key"))
 
 
 def _gallery_identity(record: Any, image_id: Any) -> str | None:
     """The stored identity of a gallery job's published card, when it exists."""
+    kind = read_attr(record, "kind", default=None)
     subject_key = read_attr(record, "subject_key", default=None)
-    if not isinstance(subject_key, str) or not subject_key:
+    if not isinstance(kind, str) or not kind or not isinstance(subject_key, str) or not subject_key:
         return None
-    from evennia.utils.search import search_script
+    from world.art.gallery import cards_for
+    from world.art.subjects import ArtSubject, ArtSubjectError, ArtSubjectKind
 
-    for sibling in search_script(f"art:{subject_key}"):
-        for stored_entry in sibling.db.cards or []:
-            entry = mapping_values(stored_entry)
-            if entry is None:
-                continue
-            if str(entry.get("image_id")) != str(image_id):
-                continue
-            identity = entry.get("stored_identity")
-            if isinstance(identity, str) and identity:
-                return identity
+    try:
+        subject = ArtSubject(ArtSubjectKind(kind), subject_key)
+    except (ValueError, ArtSubjectError):
+        return None
+    for entry in cards_for(subject):
+        if str(entry.get("image_id")) != str(image_id):
+            continue
+        identity = entry.get("stored_identity")
+        if isinstance(identity, str) and identity:
+            return identity
     return None
 
 
@@ -83,19 +81,15 @@ def thumbnail_url(record: Any) -> str | None:
     """``/art/<identity>`` for an existing stored file, else None."""
     from world.art.paths import resolved_under_store_root
 
-    candidates = []
-    output = read_attr(record, "output_identity", default=None)
-    if isinstance(output, str) and output:
-        candidates.append(output)
     gallery_image_id = read_attr(record, "gallery_image_id", default=None)
-    if gallery_image_id:
-        identity = _gallery_identity(record, gallery_image_id)
-        if identity:
-            candidates.append(identity)
-    for identity in candidates:
-        resolved = resolved_under_store_root(identity)
-        if resolved is not None and resolved.is_file():
-            return f"/art/{identity}"
+    if not gallery_image_id:
+        return None
+    identity = _gallery_identity(record, gallery_image_id)
+    if identity is None:
+        return None
+    resolved = resolved_under_store_root(identity)
+    if resolved is not None and resolved.is_file():
+        return f"/art/{identity}"
     return None
 
 
@@ -131,19 +125,6 @@ def detail(record: Any) -> dict[str, Any]:
             row("取得時間", json_value(read_attr(record, "claimed_at", default=None)), mono=True),
             row("完成時間", json_value(read_attr(record, "completed_at", default=None)), mono=True),
             row("長寬比", read_attr(record, "aspect_ratio", default=None) or "—", mono=True),
-            row("種子", read_attr(record, "seed", default=None) if read_attr(record, "seed", default=None) is not None else "—", mono=True),
-        ]
-        return ledger(rows)
-
-    def output_section() -> dict[str, Any]:
-        rows = [
-            row("輸出識別", read_attr(record, "output_identity", default=None) or "—", mono=True),
-            row(
-                "前一版輸出",
-                read_attr(record, "prior_output_identity", default=None) or "—",
-                mono=True,
-            ),
-            row("雜湊已變更", "是" if read_attr(record, "hash_changed", default=False) else "否"),
         ]
         return ledger(rows)
 
@@ -176,7 +157,6 @@ def detail(record: Any) -> dict[str, Any]:
             ("identity", "身分", identity_section),
             ("prompt", "來源敘述", prompt_section),
             ("generation", "生成", generation_section),
-            ("output", "輸出", output_section),
             ("gallery", "畫廊任務", gallery_section),
         ]
     )

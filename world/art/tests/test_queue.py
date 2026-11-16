@@ -1,27 +1,26 @@
-"""Tests for the idempotent subject-keyed art queue and its lock discipline."""
+"""Tests for the per-image gallery job queue and its lock discipline."""
 
 from unittest.mock import patch
 import unittest
 
+from evennia.utils.create import create_script
 from evennia.utils.test_resources import EvenniaTestCase
 
+from world.art import gallery as gallery_api
 from world.art import gallery_kinds
+from world.art.gallery import GalleryRecordError
 from world.art.queue import (
     claim,
-    ensure,
-    failed_keys,
     enqueue_gallery_job,
+    failed_keys,
     gallery_record_key,
     is_gallery_job,
     queue_lock,
     reclaim_expired_leases,
     record_key,
-    requeue,
-    settle,
     source_hash,
 )
-from world.art.gallery import GalleryRecordError
-from world.art.store import ArtAssetRecord, ArtAssetStatus
+from world.art.store import ArtAssetStatus, GalleryJobRecord
 from world.art.subjects import ArtSubject, ArtSubjectKind
 
 from tools.spec_traceability import covers_requirement
@@ -46,314 +45,12 @@ def _enqueue_gallery(subject, image_id="11111111-1111-4111-8111-111111111111", *
     )
 
 
-class ArtQueueTests(EvenniaTestCase):
-    @covers_requirement("art-queue-worker::the-queue-is-keyed-by-subject-identity-and-enqueue-is-idempotent")
-    def test_reensuring_pending_in_progress_or_done_is_a_noop(self):
-        subject = _scene()
-        first = ensure(subject, "desc-a")
-        self.assertEqual(first.db.status, ArtAssetStatus.PENDING)
-        second = ensure(subject, "desc-b")
-        self.assertEqual(second.pk, first.pk)
-        self.assertEqual(second.db.status, ArtAssetStatus.PENDING)
-        self.assertEqual(second.db.source_hash, source_hash("desc-a"))
-        self.assertEqual(len(ArtAssetRecord.objects.all()), 1)
-
-        claimed = claim(10)
-        self.assertEqual(claimed[0].db.status, ArtAssetStatus.IN_PROGRESS)
-        ensure(subject, "desc-c")
-        self.assertEqual(claimed[0].db.status, ArtAssetStatus.IN_PROGRESS)
-
-        settle(
-            subject,
-            generation_token=str(claimed[0].db.generation_token),
-            status=ArtAssetStatus.DONE,
-            output_identity="scene/t_synth_forest.png",
-            error=None,
-        )
-        ensure(subject, "desc-d")
-        done = ArtAssetRecord.objects.filter(db_key=record_key(subject)).first()
-        self.assertEqual(done.db.status, ArtAssetStatus.DONE)
-        self.assertEqual(done.db.output_identity, "scene/t_synth_forest.png")
-
-    @covers_requirement("art-queue-worker::the-queue-is-keyed-by-subject-identity-and-enqueue-is-idempotent")
-    def test_missing_and_failed_records_become_pending(self):
-        subject = _scene("t_synth_tavern")
-        created = ensure(subject, "desc")
-        self.assertEqual(created.db.status, ArtAssetStatus.PENDING)
-
-        claimed = claim(10)
-        settle(
-            subject,
-            generation_token=str(claimed[0].db.generation_token),
-            status=ArtAssetStatus.FAILED,
-            output_identity=None,
-            error="boom",
-        )
-        failed = ArtAssetRecord.objects.filter(db_key=record_key(subject)).first()
-        self.assertEqual(failed.db.status, ArtAssetStatus.FAILED)
-        retried = ensure(subject, "desc")
-        self.assertEqual(retried.db.status, ArtAssetStatus.PENDING)
-        # attempt_count: claim incremented it once, the failed->pending ensure
-        # increments it again.
-        self.assertEqual(int(retried.db.attempt_count), 2)
-
-    @covers_requirement("art-queue-worker::the-queue-is-keyed-by-subject-identity-and-enqueue-is-idempotent")
-    def test_forced_regeneration_resets_and_preserves_the_prior_output(self):
-        subject = _scene("t_synth_dungeon")
-        ensure(subject, "desc")
-        claimed = claim(10)
-        settle(
-            subject,
-            generation_token=str(claimed[0].db.generation_token),
-            status=ArtAssetStatus.DONE,
-            output_identity="scene/t_synth_dungeon.png",
-            error=None,
-        )
-        requeue(subject)
-        record = ArtAssetRecord.objects.filter(db_key=record_key(subject)).first()
-        self.assertEqual(record.db.status, ArtAssetStatus.PENDING)
-        self.assertEqual(record.db.prior_output_identity, "scene/t_synth_dungeon.png")
-        claimed = claim(10)
-        settle(
-            subject,
-            generation_token=str(claimed[0].db.generation_token),
-            status=ArtAssetStatus.FAILED,
-            output_identity=None,
-            error="boom",
-        )
-        self.assertEqual(record.db.status, ArtAssetStatus.FAILED)
-        self.assertEqual(record.db.prior_output_identity, "scene/t_synth_dungeon.png")
-
-    @covers_requirement("art-queue-worker::the-queue-is-keyed-by-subject-identity-and-enqueue-is-idempotent")
-    def test_stale_settle_for_a_requeued_record_is_a_noop(self):
-        subject = _scene("t_synth_dungeon")
-        ensure(subject, "desc")
-        held = claim(10)
-        requeue(subject)
-        stale = settle(
-            subject,
-            generation_token=str(held[0].db.generation_token),
-            status=ArtAssetStatus.DONE,
-            output_identity="scene/t_synth_dungeon.png", error=None,
-        )
-        self.assertIsNone(stale)
-        record = ArtAssetRecord.objects.filter(db_key=record_key(subject)).first()
-        self.assertEqual(record.db.status, ArtAssetStatus.PENDING)
-
-    @covers_requirement("art-queue-worker::a-changed-source-description-hash-is-reported-never-silently-applied")
-    def test_changed_hash_is_staff_noted_without_replacing_the_image(self):
-        subject = _scene("t_synth_city")
-        ensure(subject, "original description")
-        claimed = claim(10)
-        settle(
-            subject,
-            generation_token=str(claimed[0].db.generation_token),
-            status=ArtAssetStatus.DONE,
-            output_identity="scene/t_synth_city.png",
-            error=None,
-        )
-        ensure(subject, "changed description")
-        record = ArtAssetRecord.objects.filter(db_key=record_key(subject)).first()
-        self.assertEqual(record.db.status, ArtAssetStatus.DONE)
-        self.assertEqual(record.db.output_identity, "scene/t_synth_city.png")
-        self.assertTrue(record.db.hash_changed)
-
-    @covers_requirement("art-queue-worker::a-changed-source-description-hash-is-reported-never-silently-applied")
-    def test_changed_prompt_digest_is_staff_noted_without_replacing_the_image(self):
-        subject = _scene("t_synth_city")
-        ensure(subject, "same description")
-        claimed = claim(10)
-        settle(
-            subject,
-            generation_token=str(claimed[0].db.generation_token),
-            status=ArtAssetStatus.DONE,
-            output_identity="scene/t_synth_city.png",
-            error=None,
-        )
-        # Simulate an admin edit of art.scene_prompt: the stored digest no
-        # longer matches the current rendering while the source hash is
-        # untouched.
-        record = ArtAssetRecord.objects.filter(db_key=record_key(subject)).first()
-        record.db.prompt_digest = "stale-digest"
-        record.save()
-        ensure(subject, "same description")
-        record = ArtAssetRecord.objects.filter(db_key=record_key(subject)).first()
-        self.assertEqual(record.db.status, ArtAssetStatus.DONE)
-        self.assertEqual(record.db.output_identity, "scene/t_synth_city.png")
-        self.assertTrue(record.db.hash_changed)
-        self.assertEqual(record.db.source_hash, source_hash("same description"))
-
-    def test_ensure_stores_the_rendered_prompt_digest(self):
-        subject = _scene("t_synth_forest")
-        record = ensure(subject, "desc")
-        self.assertTrue(record.db.prompt_digest)
-        self.assertNotEqual(record.db.prompt_digest, source_hash("desc"))
-        again = ensure(subject, "desc")
-        self.assertEqual(again.db.prompt_digest, record.db.prompt_digest)
-        self.assertEqual(again.db.status, ArtAssetStatus.PENDING)
-
-    def test_requeue_recomputes_the_rendered_prompt_digest(self):
-        subject = _scene("t_synth_dungeon")
-        ensure(subject, "desc")
-        claimed = claim(10)
-        settle(
-            subject,
-            generation_token=str(claimed[0].db.generation_token),
-            status=ArtAssetStatus.DONE,
-            output_identity="scene/t_synth_dungeon.png",
-            error=None,
-        )
-        record = ArtAssetRecord.objects.filter(db_key=record_key(subject)).first()
-        record.db.prompt_digest = "stale-digest"
-        record.save()
-        requeue(subject)
-        record = ArtAssetRecord.objects.filter(db_key=record_key(subject)).first()
-        self.assertNotEqual(record.db.prompt_digest, "stale-digest")
-        self.assertTrue(record.db.prompt_digest)
-
-    @covers_requirement("art-queue-worker::asset-records-carry-the-full-contract-and-never-a-live-object-reference")
-    def test_claim_makes_in_progress_with_a_lease_and_increments_attempts(self):
-        subject = _scene("t_synth_mountain")
-        ensure(subject, "desc")
-        claimed = claim(10)
-        self.assertEqual(len(claimed), 1)
-        record = claimed[0]
-        self.assertEqual(record.db.status, ArtAssetStatus.IN_PROGRESS)
-        self.assertIsNotNone(record.db.claimed_at)
-        self.assertEqual(int(record.db.attempt_count), 1)
-        self.assertEqual(record.db.aspect_ratio, "16:9")
-
-    @covers_requirement("art-queue-worker::asset-records-carry-the-full-contract-and-never-a-live-object-reference")
-    def test_expired_lease_is_reclaimed_to_pending(self):
-        subject = _scene("t_synth_coast")
-        ensure(subject, "desc")
-        claim(10)
-        record = ArtAssetRecord.objects.filter(db_key=record_key(subject)).first()
-        self.assertEqual(record.db.status, ArtAssetStatus.IN_PROGRESS)
-        reclaimed = reclaim_expired_leases(0.001)
-        self.assertEqual(reclaimed, 1)
-        self.assertEqual(record.db.status, ArtAssetStatus.PENDING)
-        self.assertIsNone(record.db.claimed_at)
-
-    def test_failed_keys_lists_failed_subjects(self):
-        good = _scene("t_synth_forest")
-        bad = _scene("t_synth_cave")
-        ensure(good, "g")
-        ensure(bad, "b")
-        claimed = claim(10)
-        tokens = {record.db_key: str(record.db.generation_token) for record in claimed}
-        settle(
-            good,
-            generation_token=tokens[record_key(good)],
-            status=ArtAssetStatus.DONE,
-            output_identity="scene/t_synth_forest.png",
-            error=None,
-        )
-        settle(
-            bad,
-            generation_token=tokens[record_key(bad)],
-            status=ArtAssetStatus.FAILED,
-            output_identity=None,
-            error="boom",
-        )
-        self.assertEqual(failed_keys(), ["scene:t_synth_cave"])
-
-    def test_duplicate_records_are_consolidated_keeping_the_most_advanced(self):
-        subject = _scene("t_synth_ruin")
-        from world.art.queue import _create_record, record_key
-
-        first = _create_record(subject)
-        second = _create_record(subject)
-        second.db.status = ArtAssetStatus.DONE
-        second.db.output_identity = "scene/t_synth_ruin.png"
-        ensure(subject, "desc")
-        records = ArtAssetRecord.objects.filter(db_key=record_key(subject))
-        self.assertEqual(records.count(), 1)
-        self.assertEqual(records.first().db.status, ArtAssetStatus.DONE)
-
-    @covers_requirement("art-queue-worker::scenes-and-portraits-share-one-serialization-lock-and-one-worker-concurrency-slot")
-    def test_concurrent_drains_serialize_and_never_hold_the_lock_across_a_worker_wait(self):
-        for key in ("t_synth_forest", "t_synth_tavern", "t_synth_city"):
-            ensure(_scene(key), f"desc-{key}")
-        # A drain is claim -> worker run -> settle. The worker run must never
-        # execute while the queue lock is held: after claim() returns the lock
-        # must already be released, so the simulated worker wait and the second
-        # drain both observe a free lock and unmutated records.
-        lock_free_during_worker_wait = []
-        first_batch = claim(2)
-        self.assertEqual(len(first_batch), 2)
-        lock_free_during_worker_wait.append(not queue_lock.locked())
-        for record in first_batch:
-            settle(
-                _scene(record.db.subject_key),
-                generation_token=str(record.db.generation_token),
-                status=ArtAssetStatus.FAILED,
-                output_identity=None,
-                error="fixture",
-            )
-        second_batch = claim(2)
-        lock_free_during_worker_wait.append(not queue_lock.locked())
-        self.assertEqual(len(second_batch), 1)
-        self.assertEqual(
-            {record.db.subject_key for record in second_batch}, {"t_synth_city"}
-        )
-        self.assertTrue(all(lock_free_during_worker_wait))
-        pending = [
-            record
-            for record in ArtAssetRecord.objects.all()
-            if record.db.status == ArtAssetStatus.PENDING
-        ]
-        self.assertEqual(len(pending), 0)
-
-    @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
-    def test_a_stale_token_failure_settle_is_a_noop(self):
-        # D6a: the classic terminal-failure settle is claim-token guarded.
-        # A record claimed under token A, then re-claimed under a fresh token
-        # B (lease expiry or forced requeue), can never be failed by the
-        # obsolete worker's late terminal settle.
-        subject = _scene("t_synth_dungeon")
-        ensure(subject, "desc")
-        held = claim(10)[0]
-        token_a = str(held.db.generation_token)
-        requeue(subject)
-        fresh = claim(10)[0]
-        token_b = str(fresh.db.generation_token)
-        self.assertNotEqual(token_a, token_b)
-        self.assertEqual(
-            settle(
-                subject,
-                generation_token=token_a,
-                status=ArtAssetStatus.FAILED,
-                output_identity=None,
-                error="art_cutout_error",
-            ),
-            None,
-        )
-        record = ArtAssetRecord.objects.filter(db_key=record_key(subject)).first()
-        self.assertEqual(record.db.status, ArtAssetStatus.IN_PROGRESS)
-        self.assertEqual(record.db.generation_token, token_b)
-        self.assertIsNone(record.db.last_error_code)
-
-    @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
-    def test_the_current_token_failure_settle_still_applies(self):
-        subject = _scene("t_synth_coast")
-        ensure(subject, "desc")
-        claimed = claim(10)
-        settled = settle(
-            subject,
-            generation_token=str(claimed[0].db.generation_token),
-            status=ArtAssetStatus.FAILED,
-            output_identity=None,
-            error="art_cutout_error",
-        )
-        self.assertIsNotNone(settled)
-        record = ArtAssetRecord.objects.filter(db_key=record_key(subject)).first()
-        self.assertEqual(record.db.status, ArtAssetStatus.FAILED)
-        self.assertEqual(record.db.last_error_code, "art_cutout_error")
+def _job_count() -> int:
+    return GalleryJobRecord.objects.all().count()
 
 
 class GalleryJobQueueTests(EvenniaTestCase):
-    """Per-image gallery jobs share the queue machinery but never ``ensure``."""
+    """Per-image gallery jobs share the queue machinery and carry request state."""
 
     @covers_requirement(
         "art-queue-worker::the-queue-is-keyed-by-subject-identity-and-enqueue-is-idempotent"
@@ -371,7 +68,7 @@ class GalleryJobQueueTests(EvenniaTestCase):
         self.assertEqual(first.db.status, ArtAssetStatus.PENDING)
         self.assertEqual(second.db.status, ArtAssetStatus.PENDING)
         self.assertTrue(is_gallery_job(first) and is_gallery_job(second))
-        self.assertFalse(is_gallery_job(ensure(subject, "classic")))
+        self.assertEqual(_job_count(), 2)
 
     @covers_requirement(
         "art-queue-worker::asset-records-carry-the-full-contract-and-never-a-live-object-reference"
@@ -397,74 +94,21 @@ class GalleryJobQueueTests(EvenniaTestCase):
         self.assertTrue(job.db.prompt_digest)
         self.assertEqual(job.db.aspect_ratio, "3:4")
         self.assertEqual(job.db.status, ArtAssetStatus.PENDING)
-        self.assertFalse(job.db.output_identity)
-        self.assertFalse(job.db.prior_output_identity)
+        for forbidden in (
+            "output_identity",
+            "prior_output_identity",
+            "published_generation_token",
+            "hash_changed",
+            "seed",
+        ):
+            self.assertNotIn(forbidden, GalleryJobRecord.__dict__, forbidden)
         # No lease was taken: a reclaim pass never disturbs a pending job.
         self.assertEqual(reclaim_expired_leases(0.001), 0)
 
     @covers_requirement(
         "art-queue-worker::the-queue-is-keyed-by-subject-identity-and-enqueue-is-idempotent"
     )
-    def test_ensure_requeue_and_consolidation_never_see_a_gallery_job(self):
-        subject = _character("42")
-        job = _enqueue_gallery(subject, "44444444-4444-4444-8444-444444444444")
-        classic = ensure(subject, "classic desc")
-        self.assertEqual(classic.db_key, record_key(subject))
-        self.assertNotEqual(classic.db_key, job.db_key)
-        requeue(subject)
-        self.assertEqual(job.db.status, ArtAssetStatus.PENDING)
-        self.assertEqual(classic.db.status, ArtAssetStatus.PENDING)
-        again = ensure(subject, "classic desc")
-        self.assertEqual(again.db_key, classic.db_key)
-        self.assertEqual(
-            ArtAssetRecord.objects.filter(db_key=record_key(subject)).count(), 1
-        )
-        self.assertTrue(ArtAssetRecord.objects.filter(db_key=job.db_key).exists())
-
-    @covers_requirement(
-        "art-queue-worker::the-queue-is-keyed-by-subject-identity-and-enqueue-is-idempotent"
-    )
-    def test_failed_keys_excludes_gallery_job_records(self):
-        subject = _character("42")
-        job = _enqueue_gallery(subject, "55555555-5555-4555-8555-555555555555")
-        ensure(_scene("t_synth_cave"), "b")
-        claimed = claim(10)
-        tokens = {record.db_key: str(record.db.generation_token) for record in claimed}
-        settle(
-            _scene("t_synth_cave"),
-            generation_token=tokens[record_key(_scene("t_synth_cave"))],
-            status=ArtAssetStatus.FAILED,
-            output_identity=None,
-            error="boom",
-        )
-        self.assertEqual(failed_keys(), ["scene:t_synth_cave"])
-        self.assertNotIn(job.db_key.removeprefix("art:"), failed_keys())
-
-    @covers_requirement(
-        "art-gallery-generation::one-validated-service-seam-requests-every-gallery-image"
-    )
-    def test_a_scene_subject_queues_one_gallery_job(self):
-        # ``scene-kind-gallery``: the scene kind is gallery-bearing, so the
-        # per-image enqueue writes exactly one pending job for it.
-        subject = _scene("t_synth_forest")
-        job = _enqueue_gallery(subject)
-        jobs = [
-            record
-            for record in ArtAssetRecord.objects.all()
-            if is_gallery_job(record)
-        ]
-        self.assertEqual(jobs, [job])
-        self.assertEqual(job.db.status, ArtAssetStatus.PENDING)
-        self.assertEqual(job.db.kind, ArtSubjectKind.SCENE.value)
-        self.assertEqual(job.db.subject_key, subject.key)
-        self.assertFalse(job.db.output_identity)
-
-    @covers_requirement(
-        "art-gallery-kind-capabilities::gallery-enforcement-reads-the-declaration-instead-of-comparing-kinds"
-    )
-    def test_the_enqueue_guard_follows_the_declaration_not_the_kind(self):
-        # A MONSTER whose declaration is patched to has_gallery=False must be
-        # refused before any write — the guard reads the table, not a kind.
+    def test_enqueue_refuses_a_kind_with_no_gallery_declaration(self):
         subject = ArtSubject(ArtSubjectKind.MONSTER, "nogoblin")
         no_gallery = gallery_kinds.GALLERY_KIND_CAPABILITIES[
             ArtSubjectKind.MONSTER.value
@@ -475,20 +119,154 @@ class GalleryJobQueueTests(EvenniaTestCase):
         ):
             with self.assertRaises(GalleryRecordError):
                 _enqueue_gallery(subject)
-        self.assertEqual(ArtAssetRecord.objects.all().count(), 0)
+        self.assertEqual(_job_count(), 0)
 
     @covers_requirement(
         "art-queue-worker::asset-records-carry-the-full-contract-and-never-a-live-object-reference"
     )
-    def test_claim_and_lease_reclaim_apply_to_gallery_jobs_unchanged(self):
-        subject = _character("42")
-        _enqueue_gallery(subject, "66666666-6666-4666-8666-666666666666")
+    def test_claim_makes_in_progress_with_a_lease_and_increments_attempts(self):
+        _enqueue_gallery(_scene("t_synth_mountain"))
         claimed = claim(10)
         self.assertEqual(len(claimed), 1)
-        self.assertEqual(claimed[0].db.status, ArtAssetStatus.IN_PROGRESS)
-        self.assertIsNotNone(claimed[0].db.generation_token)
+        job = claimed[0]
+        self.assertEqual(job.db.status, ArtAssetStatus.IN_PROGRESS)
+        self.assertIsNotNone(job.db.claimed_at)
+        self.assertEqual(int(job.db.attempt_count), 1)
+        self.assertEqual(job.db.aspect_ratio, "16:9")
+        self.assertTrue(job.db.generation_token)
+
+    @covers_requirement(
+        "art-queue-worker::asset-records-carry-the-full-contract-and-never-a-live-object-reference"
+    )
+    def test_expired_lease_is_reclaimed_to_pending(self):
+        _enqueue_gallery(_scene("t_synth_coast"))
+        claim(10)
+        job = GalleryJobRecord.objects.first()
+        self.assertEqual(job.db.status, ArtAssetStatus.IN_PROGRESS)
         self.assertEqual(reclaim_expired_leases(0.001), 1)
-        self.assertEqual(claimed[0].db.status, ArtAssetStatus.PENDING)
+        self.assertEqual(job.db.status, ArtAssetStatus.PENDING)
+        self.assertIsNone(job.db.claimed_at)
+
+    @covers_requirement(
+        "art-queue-worker::the-queue-is-keyed-by-subject-identity-and-enqueue-is-idempotent"
+    )
+    def test_failed_keys_represent_recorded_gallery_errors(self):
+        good = _scene("t_synth_forest")
+        bad = _scene("t_synth_cave")
+        _enqueue_gallery(good, "11111111-1111-4111-8111-111111111111")
+        _enqueue_gallery(bad, "22222222-2222-4222-8222-222222222222")
+        claimed = {job.db_key: job for job in claim(10)}
+        bad_job = claimed[gallery_record_key(bad, "22222222-2222-4222-8222-222222222222")]
+        from world.art.queue import settle_gallery_failed
+
+        self.assertEqual(
+            gallery_api.erroring_subjects(),
+            [],
+        )
+        self.assertIsNotNone(
+            settle_gallery_failed(
+                str(bad_job.db_key),
+                generation_token=str(bad_job.db.generation_token),
+                error="boom",
+            )
+        )
+        self.assertEqual(failed_keys(), ["scene:t_synth_cave"])
+        self.assertFalse(GalleryJobRecord.objects.filter(db_key=bad_job.db_key).exists())
+
+    @covers_requirement(
+        "art-queue-worker::scenes-and-portraits-share-one-serialization-lock-and-one-worker-concurrency-slot"
+    )
+    def test_concurrent_drains_serialize_and_never_hold_the_lock_across_a_worker_wait(self):
+        from world.art.queue import settle_gallery_failed
+
+        for key, image_id in (
+            ("t_synth_forest", "11111111-1111-4111-8111-111111111111"),
+            ("t_synth_tavern", "22222222-2222-4222-8222-222222222222"),
+            ("t_synth_city", "33333333-3333-4333-8333-333333333333"),
+        ):
+            _enqueue_gallery(_scene(key), image_id)
+        lock_free_during_worker_wait = []
+        first_batch = claim(2)
+        self.assertEqual(len(first_batch), 2)
+        lock_free_during_worker_wait.append(not queue_lock.locked())
+        for job in first_batch:
+            settle_gallery_failed(
+                str(job.db_key),
+                generation_token=str(job.db.generation_token),
+                error="fixture",
+            )
+        second_batch = claim(2)
+        lock_free_during_worker_wait.append(not queue_lock.locked())
+        self.assertEqual(len(second_batch), 1)
+        self.assertEqual(
+            {job.db.subject_key for job in second_batch}, {"t_synth_city"}
+        )
+        self.assertTrue(all(lock_free_during_worker_wait))
+        self.assertEqual(GalleryJobRecord.objects.count(), 1)
+
+    @covers_requirement(
+        "art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root"
+    )
+    def test_a_stale_token_failure_settle_is_a_noop(self):
+        from world.art.queue import settle_gallery_failed
+
+        job = _enqueue_gallery(_scene("t_synth_dungeon"))
+        held = claim(10)[0]
+        token_a = str(held.db.generation_token)
+        # Reclaim and re-claim under a fresh token.
+        reclaim_expired_leases(0.0)
+        fresh = claim(10)[0]
+        token_b = str(fresh.db.generation_token)
+        self.assertNotEqual(token_a, token_b)
+        self.assertIsNone(
+            settle_gallery_failed(
+                str(job.db_key),
+                generation_token=token_a,
+                error="art_cutout_error",
+            )
+        )
+        current = GalleryJobRecord.objects.get(db_key=job.db_key)
+        self.assertEqual(current.db.status, ArtAssetStatus.IN_PROGRESS)
+        self.assertEqual(current.db.generation_token, token_b)
+        self.assertIsNone(current.db.last_error_code)
+
+    @covers_requirement(
+        "art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root"
+    )
+    def test_the_current_token_failure_settle_applies(self):
+        from world.art.queue import settle_gallery_failed
+
+        job = _enqueue_gallery(_scene("t_synth_coast"))
+        claimed = claim(10)[0]
+        subject = settle_gallery_failed(
+            str(job.db_key),
+            generation_token=str(claimed.db.generation_token),
+            error="art_cutout_error",
+        )
+        self.assertEqual(subject.full(), "scene:t_synth_coast")
+        self.assertFalse(GalleryJobRecord.objects.filter(db_key=job.db_key).exists())
+        states = {state.subject.full(): state for state in gallery_api.gallery_states()}
+        self.assertEqual(states["scene:t_synth_coast"].error_code, "art_cutout_error")
+
+    def test_is_gallery_job_rejects_a_malformed_record(self):
+        malformed = create_script(
+            GalleryJobRecord, key="art:t_synth_bad", persistent=True, interval=0
+        )
+        malformed.db.kind = ArtSubjectKind.SCENE.value
+        malformed.db.subject_key = "t_synth_bad"
+        malformed.db.gallery_image_id = "t_image"
+        self.assertFalse(is_gallery_job(malformed))
+        well_formed = create_script(
+            GalleryJobRecord,
+            key="art:t_synth_ok:gen:t_image",
+            persistent=True,
+            interval=0,
+        )
+        well_formed.db.kind = ArtSubjectKind.SCENE.value
+        well_formed.db.subject_key = "t_synth_ok"
+        well_formed.db.gallery_image_id = "t_image"
+        self.assertTrue(is_gallery_job(well_formed))
+        self.assertEqual(record_key(_scene("t_synth_ok")), "art:scene:t_synth_ok")
 
 
 if __name__ == "__main__":

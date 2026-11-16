@@ -164,15 +164,13 @@ GALLERY_RANK_ORIGINAL = 10
 GALLERY_RANK_ALPHA = 100
 # The exact-portrait-layer ranks (design §"Stable ranks and authorized
 # retention"): the selected equipment-bound card, the player's explicit
-# personal official choice, the record's default card, the classic generated
-# asset and the optional official default, in that precedence — before the
-# same authoritative alpha terminal the gallery preview uses. Positions are
-# independent of attempt-array order, and a fault keeps the rank of the source
-# it belongs to.
+# personal official choice, the record's default card and the optional
+# official default, in that precedence — before the same authoritative alpha
+# terminal the gallery preview uses. Positions are independent of
+# attempt-array order, and a fault keeps the rank of the source it belongs to.
 PORTRAIT_RANK_BOUND = 10
 PORTRAIT_RANK_PERSONAL = 20
 PORTRAIT_RANK_DEFAULT = 30
-PORTRAIT_RANK_CLASSIC = 40
 PORTRAIT_RANK_OFFICIAL = 50
 PORTRAIT_RANK_ALPHA = GALLERY_RANK_ALPHA
 # The exact scene-layer ranks (design §"Stable ranks and authorized
@@ -276,11 +274,6 @@ def portrait_personal_source_id(identity: str) -> str:
 def portrait_default_source_id(image_id: str) -> str:
     """The canonical source id of one record's named default card."""
     return f"portrait.default:{image_id}"
-
-
-def portrait_classic_source_id(generation_subject: str) -> str:
-    """The canonical source id of one subject's classic generated asset."""
-    return f"portrait.classic:{generation_subject}"
 
 
 def portrait_official_source_id(reference: str) -> str:

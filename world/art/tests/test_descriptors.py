@@ -148,10 +148,9 @@ class VocabularyTests(unittest.TestCase):
                 descriptors.PORTRAIT_RANK_BOUND,
                 descriptors.PORTRAIT_RANK_PERSONAL,
                 descriptors.PORTRAIT_RANK_DEFAULT,
-                descriptors.PORTRAIT_RANK_CLASSIC,
                 descriptors.PORTRAIT_RANK_OFFICIAL,
             ),
-            (10, 20, 30, 40, 50),
+            (10, 20, 30, 50),
         )
         self.assertEqual(descriptors.PORTRAIT_RANK_ALPHA, descriptors.GALLERY_RANK_ALPHA)
         # The decoded-size ceiling mirrors the shipped ART_SD_MAX_IMAGE_* pair.
@@ -234,10 +233,6 @@ class BuilderShapeTests(unittest.TestCase):
         )
         self.assertEqual(
             descriptors.portrait_default_source_id("img"), "portrait.default:img"
-        )
-        self.assertEqual(
-            descriptors.portrait_classic_source_id("portrait:character:7"),
-            "portrait.classic:portrait:character:7",
         )
         self.assertEqual(
             descriptors.portrait_official_source_id("preset/k"),

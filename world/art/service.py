@@ -51,34 +51,23 @@ for EVERY gallery-bearing kind, and startup synchronization routes every
 registered monster visual species through it instead of the classic
 subject-keyed ``ensure``. The
 classic generic-monster record is retired from production: the scene kind
-kept the classic subject-keyed pipeline until ``scene-asset-migration``
 switched its two producers to the same gallery ensure, retiring the classic
-record from every production path — ``@art retry``'s classic arm likewise
-skips every gallery-bearing kind, so a legacy record is never reactivated or
-reset. Pre-existing classic monster records are left in place — not deleted,
-not reset — and keep resolving through the display chain's classic step;
-pre-existing classic scene records are converted by
-``migrate_classic_scene_records`` below. Startup order guarantees a seed card
+record from every production path. Startup order guarantees a seed card
 occupies the gallery before the automatic pass: ``art_sync_all`` runs AFTER
 the gallery prune and seed synchronization.
 
-Change ``scene-asset-migration`` adds ``migrate_classic_scene_records`` — the
-startup conversion of settled classic scene outputs into scene gallery cards,
-run immediately before the gallery prune — and switches ``ensure_scene_asset``
-and the scene loop of ``_sync_registry_subjects`` to the scene gallery ensure.
-That ensure skips an archetype whose gallery record exists with no card and
-no recorded error: the record a player's deletion leaves behind, so the
-bundled image stays in effect instead of being regenerated on the next entry.
+``ensure_scene_asset`` and the scene loop of ``_sync_registry_subjects`` use
+the scene gallery ensure. That ensure skips an archetype whose gallery record
+exists with no card and no recorded error: the record a player's deletion
+leaves behind, so the bundled image stays in effect instead of being
+regenerated on the next entry.
 """
 
-import io
-import math
 import uuid
 from pathlib import Path
 
 from django.conf import settings
 from django.db import transaction
-from PIL import Image
 
 from world.observability import log_error, log_info, log_warn
 
@@ -89,17 +78,12 @@ from world.art.gallery_prompt import (
     validate_custom_prompt,
     validate_fields,
 )
-# The startup conversion reuses the seed sync's own never-overwrite copy
-# primitive (design D1 step 3) instead of hand-rolling an atomic write.
-from world.art.gallery_seed import _MAX_FILE_BYTES, _publish_under_store
 from world.art.paths import resolved_under_store_root
-from world.art.gallery_match import classic_output_identity
 from world.art.queue import (
     enqueue_gallery_job,
     gallery_job_in_flight,
-    is_gallery_job,
 )
-from world.art.store import ArtAssetRecord, ArtAssetStatus
+from world.art.store import ArtAssetStatus, GalleryJobRecord
 from world.art.subjects import (
     ArtSubjectError,
     ArtSubject,
@@ -516,13 +500,10 @@ def _sync_registry_subjects() -> None:
 
     Every registered scene archetype and every registered monster visual
     species routes through the shared automatic-ensure helper under the same
-    gallery guard every character path uses (change ``scene-asset-migration``
-    switched the scene loop from the classic ``ensure``), so startup never
-    writes a classic record for either kind. The scene loop uses the
-    scene-specific ensure that honors a player's deletion; a pre-existing
-    classic monster record is left in place and keeps resolving through the
-    display chain's classic step. Every failure is bounded per subject so one
-    bad entry never aborts the remaining sync.
+    gallery guard every character path uses, so startup never writes a
+    subject-keyed record for either kind. The scene loop uses the
+    scene-specific ensure that honors a player's deletion. Every failure is
+    bounded per subject so one bad entry never aborts the remaining sync.
     """
     for archetype in SCENE_ARCHETYPE_REGISTRY:
         try:
@@ -581,9 +562,8 @@ def art_sync_all() -> None:
     scene-specific ensure (change ``scene-asset-migration``). Every record
     write flows through the queue under the shared lock; a failure is bounded
     and never aborts startup. Runs as a startup step AFTER
-    ``art_scene_migration``, ``art_gallery_prune`` and ``art_seed_sync`` so
-    classic records are converted, the prune has swept, and a seed card
-    occupies a subject's gallery before the automatic guard reads it.
+    ``art_gallery_prune`` and ``art_seed_sync`` so the prune has swept and a
+    seed card occupies a subject's gallery before the automatic guard reads it.
     """
     try:
         _sync_registry_subjects()
@@ -727,166 +707,6 @@ def request_gallery_image(entity_or_subject, *, fields=(), custom_prompt="", bin
     return image_id
 
 
-# --- Classic scene conversion (change ``scene-asset-migration``) -------------
-
-
-def _classic_scene_output_identities(record) -> tuple[str, ...]:
-    """The record's distinct stored identities, current output first."""
-    identities: list[str] = []
-    for identity in (record.db.output_identity, record.db.prior_output_identity):
-        if isinstance(identity, str) and identity and identity not in identities:
-            identities.append(identity)
-    return tuple(identities)
-
-
-def _delete_classic_scene_files(
-    record_key: str, identities: tuple[str, ...], referenced: set[str]
-) -> None:
-    """Unlink every existing confined classic file no gallery card references.
-
-    A failed unlink is one bounded diagnostic per identity and never stops the
-    remaining files: the record is already gone, so this pass cannot retry,
-    and the event is the only trace that names the file left behind.
-    """
-    for identity in identities:
-        if identity in referenced:
-            continue
-        resolved = resolved_under_store_root(identity)
-        if resolved is None or not resolved.is_file():
-            continue
-        try:
-            resolved.unlink()
-        except OSError as error:
-            log_warn(
-                "art_scene_migration_failed",
-                context={"record": record_key, "identity": identity},
-                exc=error,
-            )
-
-
-def _scene_created_at(record, resolved: Path) -> float:
-    """The record's completion timestamp, or the classic file's mtime."""
-    completed_at = record.db.completed_at
-    if (
-        isinstance(completed_at, (int, float))
-        and not isinstance(completed_at, bool)
-        and math.isfinite(completed_at)
-    ):
-        return float(completed_at)
-    return resolved.stat().st_mtime
-
-
-def _scene_image_size(payload: bytes) -> dict[str, int]:
-    """The pixel size of the copied bytes, decoded exactly as the seed sync does."""
-    with Image.open(io.BytesIO(payload)) as image:
-        width, height = image.size
-    if width <= 0 or height <= 0:
-        raise ValueError("the classic scene output declares no positive pixel size")
-    return {"width": width, "height": height}
-
-
-def _convert_classic_scene_output(record, subject: ArtSubject, identity: str) -> None:
-    """Copy one presentable classic output into the scene gallery as one card.
-
-    The copy goes through the seed sync's own never-overwrite primitive under a
-    fresh uuid4 name, and the size is decoded from the copied bytes, so the
-    appended card is contract-valid without a second read of the classic file.
-    """
-    resolved = resolved_under_store_root(identity)
-    if resolved is None or not resolved.is_file():
-        raise ValueError(f"classic scene identity {identity!r} is not presentable")
-    payload = resolved.read_bytes()
-    if len(payload) > _MAX_FILE_BYTES:
-        raise ValueError(f"classic scene identity {identity!r} is past the store size cap")
-    image_size = _scene_image_size(payload)
-    image_id = str(uuid.uuid4())
-    stored_identity = (
-        f"gallery/{gallery_kinds.store_directory_for(subject.kind.value)}/"
-        f"{subject.key}/{image_id}{Path(identity).suffix.lower()}"
-    )
-    _publish_under_store(stored_identity, payload)
-    gallery_api.append_card(
-        subject,
-        image_id=image_id,
-        stored_identity=stored_identity,
-        prompt=None,
-        seed=None,
-        checkpoint=None,
-        requested_fields=[],
-        binding=None,
-        image_size=image_size,
-        source="generated",
-        created_at=_scene_created_at(record, resolved),
-    )
-
-
-def _migrate_classic_scene_record(record) -> str:
-    """Convert or drop one classic scene record; return its counted outcome.
-
-    A ``pending``/``in_progress`` record is untouched. A ``done`` record whose
-    output is presentable and whose gallery holds no card appends one card,
-    then the record and its own files go. Every other settled state — a card
-    already present, ``failed``, ``missing``, an unregistered archetype, or a
-    ``done`` record without a presentable output — drops the record and its
-    unreferenced files without creating a card. The record is deleted only
-    after the card append committed; the classic files are unlinked only after
-    the record is gone, so an interruption leaves work the next pass completes
-    (a copy is an orphan file the prune reclaims in the same startup).
-    """
-    status = str(record.db.status or "")
-    if status in ArtAssetStatus.ACTIVE:
-        return "skipped"
-    try:
-        subject = scene_subject_for(str(record.db.subject_key or ""))
-    except ArtSubjectError:  # observability: ignore R2: an unregistered archetype is the documented drop case
-        subject = None
-    converted = False
-    if subject is not None and status == ArtAssetStatus.DONE:
-        identity = classic_output_identity(
-            subject, record.db.output_identity, directory="scene"
-        )
-        if identity is not None and not gallery_api.cards_for(subject):
-            _convert_classic_scene_output(record, subject, identity)
-            converted = True
-    identities = _classic_scene_output_identities(record)
-    referenced = gallery_api.referenced_stored_identities()
-    record_name = str(record.db_key)
-    record.delete()
-    _delete_classic_scene_files(record_name, identities, referenced)
-    return "converted" if converted else "dropped"
-
-
-def migrate_classic_scene_records() -> dict:
-    """Startup conversion of settled classic scene records into scene gallery cards.
-
-    Runs at every startup immediately BEFORE ``prune_gallery_orphans`` (design
-    D2), so a copy whose card append failed is an unreferenced ``gallery/``
-    file the prune deletes in the same startup, while a record whose deletion
-    failed is retried at the next one. Idempotent: a second pass finds no
-    classic scene records and changes nothing. Every record is converted or
-    dropped independently — one failure is a bounded diagnostic carrying the
-    record key and never aborts startup or the remaining records. Returns and
-    emits ``{"converted", "dropped", "skipped"}``.
-    """
-    counts = {"converted": 0, "dropped": 0, "skipped": 0}
-    records = [
-        record
-        for record in ArtAssetRecord.objects.all()
-        if not is_gallery_job(record)
-        and str(record.db.kind or "") == ArtSubjectKind.SCENE.value
-    ]
-    records.sort(key=lambda record: str(record.db_key))
-    for record in records:
-        try:
-            counts[_migrate_classic_scene_record(record)] += 1
-        except Exception as error:  # noqa: BLE001 - one bad record never aborts startup
-            log_warn(
-                "art_scene_migration_failed",
-                context={"record": str(record.db_key)},
-                exc=error,
-            )
-    log_info("art_scene_migration", context=counts)
-    return counts
 
 
 def _gallery_job_is_unclaimable(record, registered_monster_keys=None) -> bool:
@@ -940,61 +760,6 @@ def _registered_monster_keys() -> frozenset[str] | None:
     return keys
 
 
-def _delete_unregistered_classic_records(
-    registered_monster_keys: frozenset[str], referenced: set[str]
-) -> tuple[int, int]:
-    """Delete classic monster records of unregistered keys and their own files.
-
-    Classic outputs live outside ``gallery/``, so the file phase cannot reach
-    them: each record's ``output_identity`` and ``prior_output_identity`` are
-    unlinked here, through store-root confinement, unless a gallery card
-    references the same identity. Files go first and the record only after
-    every one of them is gone: a failed unlink keeps the record, so the next
-    pass retries instead of leaving a file no record can ever reach again. A
-    record whose files are already missing is simply deleted. Returns
-    ``(records, files)`` deleted.
-    """
-    records_deleted = 0
-    files_deleted = 0
-    for record in list(ArtAssetRecord.objects.all()):
-        try:
-            if is_gallery_job(record):
-                continue
-            if str(record.db.kind or "") != ArtSubjectKind.MONSTER.value:
-                continue
-            if record.db.subject_key in registered_monster_keys:
-                continue
-            record_name = str(record.db_key)
-            unlink_failed = False
-            for identity in (record.db.output_identity, record.db.prior_output_identity):
-                if not isinstance(identity, str) or not identity or identity in referenced:
-                    continue
-                resolved = resolved_under_store_root(identity)
-                if resolved is None:
-                    continue
-                try:
-                    if not resolved.is_file():
-                        continue
-                    resolved.unlink()
-                    files_deleted += 1
-                except OSError as error:
-                    unlink_failed = True
-                    log_warn(
-                        "gallery_prune_failed",
-                        context={"phase": "classic-file", "record": record_name, "path": identity},
-                        exc=error,
-                    )
-            if unlink_failed:
-                continue
-            record.delete()
-            records_deleted += 1
-        except Exception as error:  # noqa: BLE001 - one bad record never stops the sweep
-            log_warn(
-                "gallery_prune_failed",
-                context={"phase": "classic-record", "record": str(record.db_key)},
-                exc=error,
-            )
-    return records_deleted, files_deleted
 
 
 def prune_gallery_orphans() -> dict:
@@ -1007,20 +772,18 @@ def prune_gallery_orphans() -> dict:
     2. The gallery reference set is read (read-only through the gallery API).
     3. Every gallery job record that can never be claimed or published again
        (unresolvable subject, unregistered monster key, or a status outside
-       ``pending``/``in_progress``) is deleted, and every classic monster
-       record of an unregistered key is deleted together with its own
-       unreferenced output files.
+       ``pending``/``in_progress``) is deleted.
     4. Every file under the store root's ``gallery/`` tree that no card of
        any remaining gallery record references is deleted — including the
        cards of the records phase 1 removed.
 
     The unregistered-key rules run only when the visual registry builds
-    non-empty; the classic phase also needs the reference set. Every path is
-    resolved through the single store-root confinement helper, so nothing
-    outside ``ART_STORE_ROOT`` is ever unlinked, and a referenced file is
-    NEVER deleted. Every failure phase is bounded: an unreadable tree or a
-    failing deletion is a named diagnostic and the prune continues; the
-    function itself never raises, so startup never aborts because of it.
+    non-empty. Every path is resolved through the single store-root
+    confinement helper, so nothing outside ``ART_STORE_ROOT`` is ever
+    unlinked, and a referenced file is NEVER deleted. Every failure phase is
+    bounded: an unreadable tree or a failing deletion is a named diagnostic
+    and the prune continues; the function itself never raises, so startup
+    never aborts because of it.
 
     Reads happen on the reactor thread during ``at_server_start``, before the
     scheduler can claim or publish anything — the queue lock is deliberately
@@ -1042,10 +805,8 @@ def prune_gallery_orphans() -> dict:
     except Exception as error:  # noqa: BLE001 - bounded: skip the file phases, still prune job records
         log_error("gallery_prune_failed", context={"phase": "references"}, exc=error)
     try:
-        for record in list(ArtAssetRecord.objects.all()):
+        for record in list(GalleryJobRecord.objects.all()):
             try:
-                if not is_gallery_job(record):
-                    continue
                 if _gallery_job_is_unclaimable(record, registered):
                     record.delete()
                     records_deleted += 1
@@ -1057,18 +818,6 @@ def prune_gallery_orphans() -> dict:
                 )
     except Exception as error:  # noqa: BLE001 - bounded scan failure
         log_error("gallery_prune_failed", context={"phase": "record-scan"}, exc=error)
-    if registered is not None and referenced is not None:
-        # Without the reference set a classic file cannot be proven
-        # unreferenced, so its record is kept for the next pass instead of
-        # being deleted with its files left behind.
-        try:
-            classic_records, classic_files = _delete_unregistered_classic_records(
-                registered, referenced
-            )
-            records_unregistered += classic_records
-            files_deleted += classic_files
-        except Exception as error:  # noqa: BLE001 - bounded scan failure
-            log_error("gallery_prune_failed", context={"phase": "classic-records"}, exc=error)
     if referenced is not None:
         # Without the reference set NOTHING may be deleted: a prune must
         # never remove a file a card references, and an unreadable set cannot

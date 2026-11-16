@@ -6,9 +6,11 @@ from django.test import override_settings
 
 from evennia.utils.test_resources import EvenniaTestCase
 
-from world.art.queue import ensure
+import uuid
+
+from world.art.queue import enqueue_gallery_job
 from world.art.scheduler import ArtDrainScript
-from world.art.store import ArtAssetRecord, ArtAssetStatus
+from world.art.store import ArtAssetStatus, GalleryJobRecord
 from world.art.subjects import ArtSubject, ArtSubjectKind
 
 from tools.spec_traceability import covers_requirement
@@ -21,7 +23,14 @@ def _scene(key):
 class ArtSchedulerTests(EvenniaTestCase):
     def _seed(self, *keys):
         for key in keys:
-            ensure(_scene(key), f"desc-{key}")
+            enqueue_gallery_job(
+                _scene(key),
+                f"desc-{key}",
+                image_id=str(uuid.uuid5(uuid.NAMESPACE_DNS, key)),
+                binding=None,
+                face_rect=None,
+                requested_fields=[],
+            )
 
     @covers_requirement("art-queue-worker::the-scheduler-is-settings-configurable-and-disableable")
     def test_disabled_scheduler_never_drains(self):
@@ -35,9 +44,9 @@ class ArtSchedulerTests(EvenniaTestCase):
             script.at_repeat()
         drain.assert_not_called()
         pending = [
-            record
-            for record in ArtAssetRecord.objects.all()
-            if record.db.status == ArtAssetStatus.PENDING
+            job
+            for job in GalleryJobRecord.objects.all()
+            if job.db.status == ArtAssetStatus.PENDING
         ]
         self.assertEqual(len(pending), 2)
 
