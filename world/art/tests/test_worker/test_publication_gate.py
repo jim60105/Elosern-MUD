@@ -8,6 +8,7 @@ from django.test import override_settings
 
 from world.art import publication
 from world.art import queue as art_queue
+from world.art import gallery as gallery_api
 from world.art.fake_sd_client import FakeSDWebUIClient
 from world.art.scheduler import ArtDrainScript
 from world.art.store import ArtAssetStatus
@@ -37,7 +38,7 @@ class PublicationGateTests(WorkerStoreIsolation):
     @covers_requirement("gm-save-management::consistent-snapshots-without-damaged-art-history")
     def test_drains_and_scheduler_ticks_are_no_ops_while_paused(self):
         subject = self._subject()
-        self._record(subject)
+        job = self._record(subject)
         with override_settings(ART_SCHEDULER_ENABLED=True), patch("world.art.worker.drain") as patched:
             script, errors = ArtDrainScript.create("art_drain_gate_test")
             self.assertEqual(errors, [])
@@ -49,15 +50,14 @@ class PublicationGateTests(WorkerStoreIsolation):
         with publication.paused():
             self.assertEqual(drain(4), 0)
             self.assertEqual(drain_synchronous(4), 0)
-        self.assertEqual(self._record_for(subject).db.status, ArtAssetStatus.PENDING)
+        self.assertEqual(self._job_for(job).db.status, ArtAssetStatus.PENDING)
         self.assertFalse(publication.is_paused())
 
     @covers_requirement("gm-save-management::consistent-snapshots-without-damaged-art-history")
     def test_the_settle_and_its_file_replace_run_inside_the_gate(self):
         subject = self._subject()
-        self._record(subject)
+        job = self._record(subject)
         observed = []
-        real_classic = art_queue.settle_generated
         real_gallery = art_queue.settle_gallery_generated
 
         def watch(real):
@@ -67,14 +67,14 @@ class PublicationGateTests(WorkerStoreIsolation):
 
             return watching
 
-        with (
-            self._client(FakeSDWebUIClient()),
-            patch("world.art.worker.settle_generated", side_effect=watch(real_classic)),
-            patch("world.art.worker.settle_gallery_generated", side_effect=watch(real_gallery)),
+        with self._client(FakeSDWebUIClient()), patch(
+            "world.art.worker.settle_gallery_generated",
+            side_effect=watch(real_gallery),
         ):
             self.assertEqual(drain_synchronous(1), 1)
         self.assertEqual(observed, [False])
-        self.assertEqual(self._record_for(subject).db.status, ArtAssetStatus.DONE)
+        self.assertIsNone(self._job_for(job))
+        self.assertEqual(len(gallery_api.cards_for(subject)), 1)
 
     @covers_requirement("gm-save-management::consistent-snapshots-without-damaged-art-history")
     def test_a_store_write_waits_for_a_running_snapshot(self):
