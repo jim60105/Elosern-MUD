@@ -3310,7 +3310,7 @@ performs one drain run while `POPULATION_DRAIN_ENABLED` is true.
 | --- | --- | --- |
 | `POPULATION_DRAIN_ENABLED` | `True` | Whether the periodic caller drains |
 | `POPULATION_DRAIN_INTERVAL_SECONDS` | `2` | Real seconds between repeats |
-| `POPULATION_DRAIN_SLICE_SECONDS` | `600` | Game seconds one run advances |
+| `POPULATION_DRAIN_SLICE_SECONDS` | `600` | Maximum game seconds one settlement step advances |
 | `POPULATION_DRAIN_IDLE_SECONDS` | `20` | Real seconds without player input before a repeat drains |
 | `POPULATION_DRAIN_STEPS_PER_RUN` | `4` | Settlement steps one repeat may perform |
 
