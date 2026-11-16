@@ -2,9 +2,10 @@
 
 Authored declarations (city gates, anchor placements, wilderness entry gates,
 place room joins, district landmarks and grid art associations) hold a
-qualified identity, never a coordinate. This module is the one game-side
-boundary that turns those identities into the coordinate, room or wire form a
-consumer needs.
+qualified identity, never a coordinate; a subrace start location names an
+anchor whose placement holds one. This module is the one game-side boundary
+that turns those identities into the coordinate, room or wire form a consumer
+needs.
 
 Two shapes live here:
 
@@ -223,6 +224,7 @@ class StaticWorld:
     district_landmarks: Mapping[str, QualifiedRef]
     grid_art: Mapping[QualifiedRef, str]
     place_rooms: Mapping[str, QualifiedRef]
+    start_locations: Mapping[str, str]
     interior_rooms: Mapping[str, str]
     interior_scenes: Mapping[str, str | None]
     scene_archetypes: frozenset[str]
@@ -263,6 +265,7 @@ class StaticWorld:
             tuple(
                 (key, _ref(room)) for key, room in sorted(self.place_rooms.items())
             ),
+            tuple(sorted(self.start_locations.items())),
             tuple(sorted(self.interior_rooms.items())),
             tuple(
                 (room_id, scene)
@@ -337,6 +340,15 @@ class StaticWorld:
                     f"place {key}: room is authored by interior {authored!r}, not "
                     f"{reference.map_id!r}"
                 )
+        for subrace_key, anchor_key in self.start_locations.items():
+            placement = self.anchor_placements.get(anchor_key)
+            if placement is None:
+                problems.append(
+                    f"start location {subrace_key}: anchor {anchor_key!r} has no "
+                    "settlement placement"
+                )
+                continue
+            check_node(f"start location {subrace_key}", placement.node)
         for room_id, scene in self.interior_scenes.items():
             if scene is None:
                 continue
@@ -350,6 +362,16 @@ class StaticWorld:
 
 def _ref(value: QualifiedRef) -> tuple[Any, ...]:
     return (value.domain, value.map_id, value.object_id, value.cell)
+
+
+def _start_locations() -> Mapping[str, str]:
+    """Every subrace's start anchor key, read from the live start registry."""
+
+    from world.lore.start_locations import SUBRACE_START_LOCATION_REGISTRY
+
+    return MappingProxyType(
+        {key: row.anchor_key for key, row in SUBRACE_START_LOCATION_REGISTRY.items()}
+    )
 
 
 def published_static_world() -> StaticWorld:
@@ -380,6 +402,7 @@ def published_static_world() -> StaticWorld:
         place_rooms=MappingProxyType(
             {key: place.room for key, place in PLACE_REGISTRY.items()}
         ),
+        start_locations=_start_locations(),
         interior_rooms=MappingProxyType(
             {room.room_id: room.interior_id for room in interiors.rooms.values()}
         ),
@@ -424,6 +447,7 @@ def static_world_for_candidate(
         place_rooms=MappingProxyType(
             {key: place.room for key, place in PLACE_REGISTRY.items()}
         ),
+        start_locations=_start_locations(),
         interior_rooms=MappingProxyType(
             {room.room_id: room.interior_id for room in interiors.rooms.values()}
         ),

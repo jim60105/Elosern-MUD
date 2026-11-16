@@ -26,11 +26,11 @@ Requirement IDs: take the exact strings from
 
 ## 2. Adoption-time closure (design D2)
 
-- [ ] 2.1 In `world/maps/static_references.py`, add the `start_locations` field to
+- [x] 2.1 In `world/maps/static_references.py`, add the `start_locations` field to
   `StaticWorld` after `place_rooms`. Add the problems loop and the fingerprint part
   exactly as in D2. Pass the field from `published_static_world()` and from
   `static_world_for_candidate()`.
-- [ ] 2.2 In `world/maps/tests/test_static_map_references.py`, add tests that build a
+- [x] 2.2 In `world/maps/tests/test_static_map_references.py`, add tests that build a
   `StaticWorld` with `dataclasses.replace(published_static_world(), ...)` on the
   published shipped world:
   (a) a start row pointing at an anchor key absent from `anchor_placements` gives a

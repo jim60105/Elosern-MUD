@@ -7,8 +7,10 @@ a synthetic settlement graph, never shipped geography or copy.
 
 from __future__ import annotations
 
+import dataclasses
 import unittest
 from contextlib import ExitStack
+from types import MappingProxyType
 from unittest import mock
 
 from evennia.utils.create import create_object
@@ -33,6 +35,7 @@ from typeclasses.exits import Exit
 from typeclasses.rooms import GridRoom, Room
 
 from elosern_map_core.documents import DistrictDeclaration
+from world.lore.anchor_placement import AnchorPlacement
 from world.lore.map_districts import landmark_node_id, landmark_node_ids
 from world.lore.settlements.places import PlaceDefinition, PlaceKind
 from world.maps import map_data
@@ -47,8 +50,10 @@ from world.maps.static_references import (
     StaticReferenceError,
     binding_signature,
     place_exterior_xyz,
+    published_static_world,
     settlement_node_xyz,
     validate_static_references,
+    validate_static_world,
 )
 from world.rules.map_district_lighting import lit_district_keys
 from world.rules.map_knowledge import KNOWLEDGE_ATTR, encode_grid, parse_knowledge
@@ -422,7 +427,7 @@ class IntegratedMovedNodeTests(EvenniaTest):
         import world.lore.map_districts as districts_module
         import world.maps.city_gates as gates_module
         import world.maps.room_art as room_art
-        from world.lore import anchor_placement, wilderness_entry
+        from world.lore import anchor_placement, start_locations, wilderness_entry
 
         gates = {
             "t_gate": CityGateDef(
@@ -439,6 +444,9 @@ class IntegratedMovedNodeTests(EvenniaTest):
             (gates_module, "CITY_GATE_REGISTRY", gates),
             (bootstrap_module, "CITY_GATE_REGISTRY", gates),
             (anchor_placement, "ANCHOR_PLACEMENT_REGISTRY", {}),
+            # No placement exists in this synthetic world, so no start row may
+            # name one either.
+            (start_locations, "SUBRACE_START_LOCATION_REGISTRY", {}),
             (wilderness_entry, "WILDERNESS_ENTRY_REGISTRY", {}),
             (
                 "world.lore.settlements.places.PLACE" + "_REGISTRY",
@@ -554,3 +562,65 @@ class IntegratedMovedNodeTests(EvenniaTest):
                     lit_district_keys(traveller, {district.district_id: district}),
                     frozenset({district.district_id}),
                 )
+
+
+class StartLocationFamilyTests(unittest.TestCase):
+    """The start-location registry is one more checked static family."""
+
+    def _world(self, *, start_locations=None, anchor_placements=None):
+        published = published_static_world()
+        changes = {}
+        if start_locations is not None:
+            changes["start_locations"] = MappingProxyType(
+                {**published.start_locations, **start_locations}
+            )
+        if anchor_placements is not None:
+            changes["anchor_placements"] = MappingProxyType(
+                {**published.anchor_placements, **anchor_placements}
+            )
+        return dataclasses.replace(published, **changes)
+
+    @staticmethod
+    def _start_problems(world):
+        return [
+            problem for problem in world.problems() if problem.startswith("start location")
+        ]
+
+    def test_a_start_anchor_without_a_placement_rejects_the_world(self):
+        world = self._world(start_locations={"t_wayfarer": "t_nowhere"})
+
+        problems = self._start_problems(world)
+        self.assertEqual(len(problems), 1, problems)
+        self.assertIn("t_wayfarer", problems[0])
+        self.assertIn("t_nowhere", problems[0])
+        with self.assertRaises(StaticReferenceError) as captured:
+            validate_static_world(world)
+        self.assertIn("start location t_wayfarer", str(captured.exception))
+
+    def test_a_start_anchor_whose_node_does_not_resolve_rejects_the_world(self):
+        world = self._world(
+            start_locations={"t_wayfarer": "t_driftmark"},
+            anchor_placements={
+                "t_driftmark": AnchorPlacement(
+                    "t_driftmark", settlement_node_ref(MAP, "t_absent_node")
+                )
+            },
+        )
+
+        problems = self._start_problems(world)
+        self.assertEqual(len(problems), 1, problems)
+        self.assertIn("start location t_wayfarer", problems[0])
+        with self.assertRaises(StaticReferenceError):
+            validate_static_world(world)
+
+    def test_the_published_world_has_no_start_location_problem(self):
+        self.assertEqual(self._start_problems(published_static_world()), [])
+
+    def test_a_changed_start_anchor_changes_the_fingerprint(self):
+        published = published_static_world()
+        self.assertTrue(published.start_locations, "no start row is published")
+        subrace_key = sorted(published.start_locations)[0]
+        moved = self._world(start_locations={subrace_key: "t_elsewhere"})
+
+        self.assertNotEqual(moved.fingerprint, published.fingerprint)
+        self.assertEqual(self._world().fingerprint, published.fingerprint)
