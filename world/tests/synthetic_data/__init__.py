@@ -32,6 +32,15 @@ Local fixtures (design D3): ``make_*`` factories build one synthetic entry
 from keyword overrides; tests register them for their own scope through the
 ``extra=`` argument instead of growing the shared catalogs.
 
+Coupled swaps (subrace-start-locations): the ``start_locations`` and
+``anchor_placements`` swaps belong together. A start row names an anchor, and
+the static-reference closure rejects a start anchor with no placement, so a
+scope that swaps one of the two without the other and then validates the
+static references (through ``sync_grid``, ``sync_all``, ``sync_interiors`` or
+``runtime.adopt``) fails the start-location family. The same holds for a plain
+``install_synthetic_catalogs()``, which installs the kit's start rows but
+publishes the kit's anchor placements only when it borrows the authored world.
+
 The single-module history is split into modules of a shared surface (the
 ``world.lore.items`` package precedent applies here): ``vocab`` holds the
 runtime-resolved shipped seams and the shared element rows; the ``data_*``
@@ -93,6 +102,7 @@ from world.lore.races import (
 from world.lore.scene_archetypes import SceneArchetype
 from world.lore.sexual_vocab import BODY_PARTS
 from world.lore.settlements.shops import ShopDefinition
+from world.lore.start_locations import SubraceStartLocation
 from world.lore.starting_kits import SubraceStartingKit
 from world.lore.titles import (
     FixedTitleDef,
@@ -157,6 +167,7 @@ from world.tests.synthetic_data.data_characters import (
     SYNTH_STATIC_TIERS,
     SYNTH_SUBRACES,
     SYNTH_STARTING_KITS,
+    SYNTH_START_LOCATIONS,
     SYNTH_NPC_TIERS,
     SYNTH_MONSTER_TIERS,
 )

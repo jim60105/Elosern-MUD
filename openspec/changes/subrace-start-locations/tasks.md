@@ -68,11 +68,11 @@ Requirement IDs: take the exact strings from
 
 ## 4. Synthetic kit (design D4)
 
-- [ ] 4.1 Add `SYNTH_START_LOCATIONS` to `world/tests/synthetic_data/data_characters.py`.
+- [x] 4.1 Add `SYNTH_START_LOCATIONS` to `world/tests/synthetic_data/data_characters.py`.
   Register it in `targets.py` (in the content table and in `REGISTRY_TARGETS`), export
   it from `world/tests/synthetic_data/__init__.py`, and add the coupling note from D4 to
   that module's docstring. Acceptance: `EV world.tests.test_synthetic_data` passes.
-- [ ] 4.2 Run
+- [x] 4.2 Run
   `rg -n "synthetic_registries\([^)]*anchor_placements" --glob '*.py' commands server typeclasses web world tests`.
   For each scope that swaps `anchor_placements`, check whether the same test calls
   `sync_grid`, `sync_all`, `sync_interiors` or `runtime.adopt` inside the scope. If one

@@ -196,6 +196,7 @@ class SyntheticCatalogShapeTests(unittest.TestCase):
             "SYNTH_RACES": "world.lore.races",
             "SYNTH_SUBRACES": "world.lore.races",
             "SYNTH_STARTING_KITS": "world.lore.starting_kits",
+            "SYNTH_START_LOCATIONS": "world.lore.start_locations",
             "SYNTH_PRESETS": "world.lore.player_presets",
             "SYNTH_NPC_TIERS": "world.lore.npc_tiers",
             "SYNTH_MONSTER_TIERS": "world.lore.monsters",
