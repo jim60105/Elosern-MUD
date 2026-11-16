@@ -902,11 +902,17 @@ _DECODED_STATE: tuple[Any, MonsterActivityState] | None = None
 
 def read_monster_activity(wilderness: Any) -> MonsterActivityState:
     """Read the complete owner record; missing or malformed state refuses."""
-    global _DECODED_STATE
     _require_wilderness(wilderness)
     batch = _ACTIVE_BATCH
     if batch is not None and batch.wilderness is wilderness and batch.state is not None:
         return batch.state
+    return read_stored_monster_activity(wilderness)
+
+
+def read_stored_monster_activity(wilderness: Any) -> MonsterActivityState:
+    """The stored record, ignoring any in-flight batched state."""
+    global _DECODED_STATE
+    _require_wilderness(wilderness)
     stored = wilderness.attributes.get(MONSTER_ACTIVITY_ATTRIBUTE, return_obj=True)
     raw = None if stored is None else stored.db_value
     if raw is None:
@@ -937,6 +943,14 @@ def _write_state(wilderness: Any, state: MonsterActivityState) -> None:
         batch.state = state
         return
     wilderness.db.monster_activity = state_to_dict(state)
+
+
+def write_monster_activity(wilderness: Any, state: MonsterActivityState) -> None:
+    """Store ``state`` as the complete record (parks it in an active batch)."""
+    _require_wilderness(wilderness)
+    if not isinstance(state, MonsterActivityState):
+        raise TypeError(f"expected a MonsterActivityState, got {state!r}")
+    _write_state(wilderness, state)
 
 
 @dataclass(slots=True)
@@ -3666,6 +3680,7 @@ __all__ = [
     "plan_from_dict",
     "plan_to_dict",
     "read_monster_activity",
+    "read_stored_monster_activity",
     "receipt",
     "record_combat_interval",
     "record_room_protection",
@@ -3686,4 +3701,5 @@ __all__ = [
     "state_to_dict",
     "unbatched_state_writes",
     "update_member_time",
+    "write_monster_activity",
 ]
