@@ -32,7 +32,9 @@ compatibility leftovers, so the field is removed.
 ## Batch:
 
 - depends-on: retire-limbo-city-gates (the game must stop reading the block first)
-- Transitively depends on subrace-start-settlements.
+- Batch order: `subrace-start-locations`, `subrace-start-settlements`,
+  `entrance-probe-fixtures`, `retire-limbo-city-gates`, `drop-settlement-city-gate-field` (this change).
+- Transitively depends on subrace-start-locations, subrace-start-settlements and entrance-probe-fixtures.
 - Conflict notes: touches all 338 settlement YAML files with a one-key deletion. Any
   in-flight change that edits settlement documents (for example the elven village
   documents) must be merged or rebased first, and this change's apply must start from

@@ -7,6 +7,13 @@ command on its own. `EV` stands for
 
 ## 1. Map-core (design D1)
 
+Ordering note: the schema rejects unknown fields, so once 1.1 lands every shipped
+settlement document fails to load until 3.1 strips the key. Do sections 1, 2 and 4 with
+their own synthetic or inline fixtures first. Do 3.1 right after the last code edit,
+before any command that loads the shipped map world (contract gate, `EV` map modules,
+generators). Rebase on current master immediately before 3.1, and re-run 3.1 if a
+rebase brings settlement edits.
+
 - [ ] 1.1 Remove `city_gate` from `packages/map-core/elosern_map_core/schema.py`,
   `documents.py` and `authoring.py`, as in D1.
 - [ ] 1.2 Update the map-core tests: delete gate-specific cases and drop `city_gate` keys

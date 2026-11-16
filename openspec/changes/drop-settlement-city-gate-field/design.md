@@ -59,8 +59,9 @@ Check the result:
 - `uv run --locked python -m tools.contract_gate` and the map-core load (task 3.1) pass.
 
 Then regenerate in the order `world/maps/AGENTS.md` gives: district partition, road
-network, reference context. Commit whatever changes. Most likely only
-`content/map-reference-context.json` changes, through its source digests.
+network, reference context. Commit whatever changes. Expect all three to change: the
+partition and road-network artifacts carry source signatures over the settlement
+documents, and the reference context carries their digests.
 
 ### D3. Map editor: delete the kind end to end
 
@@ -87,7 +88,8 @@ protected-node addition (lines 92 and 93) and the carry-over block (around line 
 ## Risks / Trade-offs
 
 - [The 338-file diff collides with an in-flight settlement edit.] Mitigation: apply from
-  current master, and run the script last, after code and tests are green. Re-run it if
+  current master, and run the script right after the last code edit (see the ordering
+  note in tasks.md); fixture-only tests are green before it. Re-run it if
   a rebase brings new documents.
 - [Editor browser tests that click the start-entry radio.] Task 4.4 runs
   `web.tests.browser.test_map_editor_relationships` and removes any step that selects
