@@ -8,15 +8,15 @@ Requirement IDs: take the exact strings from
 
 ## 1. Lore registry (design D1, D5)
 
-- [ ] 1.1 Create `world/lore/start_locations.py`, starting with a module docstring that
+- [x] 1.1 Create `world/lore/start_locations.py`, starting with a module docstring that
   names this change. Add the `SubraceStartLocation` frozen dataclass,
   `SUBRACE_START_LOCATION_REGISTRY` (exactly the 15 rows of the design D5 table, in
   `SUBRACE_REGISTRY` order) and `validate_start_locations(registry, subraces)` with the
   five error messages, in the order D1 gives. Call it at module bottom against
   `SUBRACE_REGISTRY`. Add `__all__`.
-- [ ] 1.2 Add the `start_locations` `_spec(...)` line from D1 to
+- [x] 1.2 Add the `start_locations` `_spec(...)` line from D1 to
   `world/lore/registry_index.py`, right after the `starting_kits` line.
-- [ ] 1.3 Create `world/lore/tests/test_start_locations.py` (`unittest.TestCase`; build
+- [x] 1.3 Create `world/lore/tests/test_start_locations.py` (`unittest.TestCase`; build
   synthetic subraces with `world.tests.synthetic_data.make_subrace`, never shipped
   keys). Add one test for each of the five rejection branches and one acceptance test,
   all annotated with
