@@ -12,7 +12,7 @@ One lazily created gallery record per subject SHALL carry typed subject kind/key
 - **THEN** the record is created with that one card and `default_image_id` equal to that card's `image_id`
 
 #### Scenario: A later append leaves the default alone
-- **WHEN** a second card is appended to a record that already has a default
+- **WHEN** a second card is appended to an uncapped record that already has a default
 - **THEN** the card list has two entries in append order and `default_image_id` still names the first card
 
 #### Scenario: Setting a default to an unknown card is rejected
@@ -20,11 +20,11 @@ One lazily created gallery record per subject SHALL carry typed subject kind/key
 - **THEN** a typed validation error is raised and the record's `default_image_id` is unchanged
 
 #### Scenario: The first official preference creates a card-less record
-- **WHEN** a character writes its first official preference or a monster writes one through a valid entity context
-- **THEN** the character retains its cardless-record behavior; the monster stores only entity-local preference state and creates no species record or card
+- **WHEN** a character or scene subject writes its first official preference or a monster writes one through a valid entity context
+- **THEN** a subject-scoped owner gets a cardless record; a monster stores only entity-local preference state and creates no species record or card
 
 #### Scenario: Clearing an unset preference creates nothing
-- **WHEN** a character or monster clears an unset official preference
+- **WHEN** a character, scene or monster clears an unset official preference
 - **THEN** the clear is a no-op and creates no record or entity preference state
 
 #### Scenario: The record holds no live object reference
@@ -33,14 +33,14 @@ One lazily created gallery record per subject SHALL carry typed subject kind/key
 
 #### Scenario: Record creation follows the documented lazy triggers
 - **WHEN** gallery record creation is exercised
-- **THEN** card append, recorded generation error and explicit card default retain their existing triggers; personal official writes create a character record only, while monster personal writes stay entity-local; startup and presentation never manufacture a record
+- **THEN** card append, recorded generation error and explicit card default retain their triggers; official writes create character or scene subject records according to declared scope, while monster writes stay entity-local; startup and presentation never manufacture a record
 
 #### Scenario: An explicit default set names an existing card
 - **WHEN** an explicit default set is submitted
 - **THEN** it SHALL name an existing card of that record and SHALL be rejected otherwise, and card-default semantics SHALL be unchanged and SHALL stay distinct from the personal official selection, which is not a default-card operation
 
 #### Scenario: The first append sets the default and later appends do not
-- **WHEN** cards are appended to a record
+- **WHEN** cards are appended to an uncapped record
 - **THEN** the first card appended to an empty record SHALL become that record's default, and a later append SHALL NOT change the default
 
 ### Requirement: Face rectangles are normalized, bounded, and default to the shared upper-half constant

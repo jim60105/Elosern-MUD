@@ -20,7 +20,7 @@ repository deterministic-path contract test passes with no edit.
 Startup SHALL recover explicit named portrait policies through the shared automatic gallery guard, including official-default suppression. Invalid canonical ages SHALL reject deterministically with a bounded diagnostic and no persisted rejection marker. Repeated attempts on unchanged invalid data SHALL reject identically.
 
 #### Scenario: A named policy with an empty gallery is recovered at startup
-- **WHEN** a character has an explicit named portrait policy, an empty gallery, and no in-flight job after a restart
+- **WHEN** an eligible character has an explicit named portrait policy, an empty gallery, no in-flight job and no satisfying official default after a restart
 - **THEN** exactly one gallery generation is requested and no gameplay is rolled back
 
 #### Scenario: A subject that already has a card is not regenerated
@@ -39,18 +39,14 @@ Startup SHALL recover explicit named portrait policies through the shared automa
 
 #### Scenario: A recovery request is one unbound auto-generated card
 - **WHEN** recovery proceeds for a subject, which happens only for an empty gallery with no
-  in-flight job
+  in-flight job and no satisfying official default after declared eligibility checks
 - **THEN** the requested image is one unbound auto-generated card, through the per-image gallery seam
 
 ### Requirement: Successful player creation and validated import schedule an eligible unique portrait through transaction.on_commit
-The player-creation activation path (after `world.rules.character_creation.activate_player_character`
-succeeds) and the validated import path (`world/imports/loader.py`, inside the all-or-nothing batch)
-SHALL establish the explicit named `portrait_policy` and SHALL schedule the guarded gallery request through
-`transaction.on_commit`, so the schedule fires only after the owning transaction commits. A rolled-back
-or rejected creation/import SHALL emit no post-commit job.
+Creation and validated import SHALL establish named portrait policy transactionally. Unless creation explicitly skips generation, they SHALL schedule the guarded gallery callback through transaction.on_commit; actual enqueue SHALL require eligibility and unsatisfied gallery/job/official state. Rejected or rolled-back transactions SHALL emit no callback or job.
 
 #### Scenario: A committed creation schedules exactly one guarded gallery request
-- **WHEN** player creation commits successfully
+- **WHEN** player creation commits successfully with generation not explicitly skipped
 - **THEN** the character carries an explicit named policy with a stable key and exactly one
   post-commit guarded gallery request is scheduled
 
@@ -68,15 +64,15 @@ or rejected creation/import SHALL emit no post-commit job.
 - **THEN** no imported character carries a portrait policy and no post-commit job is emitted
 
 ### Requirement: Every player-activation path finalizes the portrait lifecycle
-The system SHALL run identical portrait finalization — assigning the named `portrait_policy` and scheduling a post-commit guarded gallery request — on every successful player activation path, Telnet and Web alike.
+Every successful activation transport SHALL establish the same named portrait policy and apply the same explicit skip flag and guarded post-commit generation behavior. Official-satisfied, carded, in-flight or ineligible subjects SHALL enqueue nothing; skipped creation SHALL schedule nothing.
 
 #### Scenario: Web activation assigns the portrait policy
 - **WHEN** a character is activated through the Web creation flow
-- **THEN** the character has a named `portrait_policy` with stable key `str(pk)` and exactly one guarded gallery request is scheduled
+- **THEN** it has named policy with stable key str(pk); a callback is scheduled only when not explicitly skipped, and enqueue is subject to the shared guard
 
 #### Scenario: Telnet and Web activation produce identical portrait state
-- **WHEN** a character is activated through Telnet and another through the Web flow
-- **THEN** both characters carry the same policy shape and both have portrait jobs queued
+- **WHEN** characters activate through Telnet and Web with equivalent skip, eligibility, gallery, job and official-reference inputs
+- **THEN** both carry the same policy shape and the same guarded scheduling/enqueue outcome, including no request for skipped or satisfied subjects
 
 #### Scenario: Rolled-back activation leaves no portrait state
 - **WHEN** the activation transaction fails after the policy would have been assigned
@@ -242,11 +238,11 @@ Startup SHALL synchronize every registered scene archetype and visual species th
 Every automatic path SHALL use the shared gallery request and official-satisfied guard for every gallery-bearing kind. An eligible unsatisfied subject SHALL request one unbound image from its standard deterministic description, with no free text or face rectangle. Settlement SHALL establish a default only under the declared gallery cap and preserve explicit official preferences.
 
 #### Scenario: A committed creation produces one unbound default card
-- **WHEN** player creation commits and its post-commit job is drained
+- **WHEN** eligible player creation commits without skipping or satisfying official artwork and its requested post-commit job is drained
 - **THEN** the character's gallery holds exactly one unbound card carrying the fitted default square for its image, that card is the default, and no fixed-output record exists
 
 #### Scenario: A registered monster tier produces one unbound default card
-- **WHEN** startup synchronization runs for a registered monster visual species with an empty gallery and its job is drained
+- **WHEN** startup synchronization runs for a registered monster visual species with an empty gallery, no job and no satisfying official default and its requested job is drained
 - **THEN** that species' gallery holds exactly one unbound card carrying the fitted default square for its image, that card is the default, and startup wrote no fixed-output record
 
 #### Scenario: The age gate still rejects before any record or prompt
@@ -254,7 +250,7 @@ Every automatic path SHALL use the shared gallery request and official-satisfied
 - **THEN** nothing is queued, no prompt is rendered, no card is appended, and the named diagnostic is logged
 
 #### Scenario: A kind without the age precondition reads no age attribute
-- **WHEN** an automatic path runs for a registered monster visual species
+- **WHEN** an otherwise unsatisfied automatic path runs for a registered monster visual species
 - **THEN** no canonical-age check runs, no age attribute is read, and the request proceeds
 
 #### Scenario: A rolled-back transaction produces nothing
@@ -296,7 +292,7 @@ Every automatic path SHALL use the shared gallery request and official-satisfied
 
 #### Scenario: Only gallery job records on generation paths
 - **WHEN** any gallery-bearing subject goes through these automatic paths
-- **THEN** only the per-image gallery job is produced
+- **THEN** an accepted request produces only a per-image gallery job; skipped, ineligible or satisfied paths produce no state
 
 #### Scenario: Official selection survives settlement
 - **WHEN** an automatic or manual request settles after an explicit official choice was stored

@@ -45,6 +45,7 @@ None.
 - `webclient-art-panel`: remove classic stage/default examples.
 - `webclient-gallery-management-actions`: deletion falls to official/terminal sources.
 - `webclient-party-panel`: remove classic portrait precedence.
+- `gm-operations-dashboard`: report live gallery jobs and durable gallery errors without a classic carrier.
 
 ## Impact
 

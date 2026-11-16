@@ -14,6 +14,7 @@
 - [ ] 2.3 Delete the seven named conversion/file helpers and `migrate_classic_scene_records` in design D5. Remove `art_scene_migration` from `server/conf/at_server_startstop.py` and its startup observability test catalog. Restrict prune job scans to `GalleryJobRecord`; keep gallery orphan cleanup, current species checks and `gallery_seed.py` active.
 - [ ] 2.4 Remove fixed scene/portrait admission and done-record scans from `web/art_media.py`; keep exact gallery-card, official, bundled and alpha serving with confinement/404 behavior. Remove obsolete identity URL declarations only if their route is separate; keep the shared dispatcher. Convert `web/gm/readers/art.py` to live gallery-job inspection and migrate any actual committed-output field consumer in the same change.
 - [ ] 2.5 Migrate remaining concrete fixture consumers in `commands/tests/test_character_creation/_support.py`, `web/webclient/presentation/tests/test_party_panel.py`, `web/tests/browser/seed/exploration_fixture.py` and `web/browser_support/unified_image_transitions.py` to real gallery enqueue/card state. Migrate direct old-carrier references in official catalog/provenance, species identity, gallery match, scene/presenter/source-fault tests. Remove import-only obsolete record assertions rather than introducing a fake model.
+- [ ] 2.6 Migrate `web/gm/dashboard.py::_art` to live `GalleryJobRecord` counts and `gallery.erroring_subjects()` failure rows per design D4, preserving transport/status keys and section isolation. Replace old-carrier sources/fixtures in `web/gm/tests/test_dashboard.py`, `test_runtime_immutability.py`, `test_state_api.py` and the opaque typeclass fixture in `web/admin-app/tests/json-tree.test.js`. Assert recorded failures survive terminal deletion, clear after success, and dashboard/state reads perform no writes.
 
 ## 3. Complete staff cutover and regression replacement
 
@@ -46,6 +47,10 @@ Run commands individually, never inside wrappers or chained to other shell comma
 - [ ] 5.11 `uv run --locked python -m tools.observability_lint check`
 - [ ] 5.12 `uv run --locked python -m tools.contract_gate --change retire-classic-art-assets`
 - [ ] 5.13 `openspec validate retire-classic-art-assets --strict`
+- [ ] 5.14 `uv run --locked --env-file=.env.evennia-test evennia test --settings test_settings.py --keepdb web.gm.tests.test_dashboard`
+- [ ] 5.15 `uv run --locked --env-file=.env.evennia-test evennia test --settings test_settings.py --keepdb web.gm.tests.test_runtime_immutability`
+- [ ] 5.16 `uv run --locked --env-file=.env.evennia-test evennia test --settings test_settings.py --keepdb web.gm.tests.test_state_api`
+- [ ] 5.17 `pnpm exec vitest run web/admin-app/tests/json-tree.test.js`
 
 Expected state is successful focused tests, no active import/caller of removed classic APIs, no fixed output media serving, no migration startup step, preserved gallery/seed generation, and strict validation without warnings. Development databases are not reset by these tasks.
 
@@ -74,6 +79,7 @@ IDs below were obtained from the canonical list command. Apply `covers_requireme
 | Queue boundary event tests | `art-queue-worker::worker-claim-and-settle-emit-boundary-events` |
 | In-flight wire-state tests | `art-queue-worker::in-flight-generation-exposes-a-wire-stable-status` |
 | Gallery-only declaration contract tests | `art-gallery-kind-capabilities::one-closed-declaration-states-what-every-subject-kind-s-gallery-may-do` |
+| GM live-count, durable-error and read-only tests | `gm-operations-dashboard::independent-read-only-dashboard-sections` |
 
 ## Replacement requirement traceability handoff
 

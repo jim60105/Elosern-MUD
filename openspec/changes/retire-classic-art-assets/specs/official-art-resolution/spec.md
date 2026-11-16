@@ -12,8 +12,8 @@ All gallery-bearing kinds SHALL resolve from stored state and startup snapshots 
 - **THEN** no asset record, queue record, gallery record, stored file, or entity attribute changed
 
 #### Scenario: The selection exemption is the player's own choice
-- **WHEN** (after personalization lands) a subject with a generated gallery default explicitly selects a resolving official image and later clears the selection
-- **THEN** the selected official image presents while set and the gallery default presents again after clearing, with no mutation by either act — the outranking was the player's decision, not a catalog default replacing runtime art
+- **WHEN** a scene subject or monster individual whose generated default remains stored selects a resolving official image and later clears that selection
+- **THEN** official presents while selected and the retained generated default resolves after clearing; character mutual clearing never restores a default that the explicit selection action cleared
 
 #### Scenario: Artwork updates never switch runtime images to official defaults
 - **WHEN** official artwork is replaced or added for a subject whose image was player-selected or generated
@@ -21,7 +21,7 @@ All gallery-bearing kinds SHALL resolve from stored state and startup snapshots 
 
 #### Scenario: The personal selection is exempt by construction
 - **WHEN** the personal official selection added by `official-art-personalization` is set
-- **THEN** it is exempt from the catalog-default protection by construction — it is itself the player's explicit choice, presented at the personal-default slot ahead of the gallery default exactly as design §7 orders it, and clearing it restores the pre-selection resolution unchanged with nothing mutated by either act
+- **THEN** the explicit choice presents at its declared personal slot; clearing resumes the chain from actual remaining stored state without restoring a cleared character default, and presentation itself writes nothing
 
 #### Scenario: Bare registry subject uses its own official reference
 - **WHEN** a registered scene or monster typed subject is resolved without an entity

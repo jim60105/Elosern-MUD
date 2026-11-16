@@ -13,6 +13,7 @@ See proposal.md for motivation. This is a single-repository pre-release deletion
 | `world/art/service.py:707-861` | Classic scene conversion, file cleanup and startup migration are isolated deletion targets. |
 | `server/conf/at_server_startstop.py:653` | `art_scene_migration` invokes that conversion before prune. |
 | `web/art_media.py:64,128`; `web/gm/readers/art.py:57-59` | Media and GM inspection still query classic record class. |
+| `web/gm/dashboard.py:270-297` | Dashboard directly imports the classic carrier and builds failure rows from terminal records, so both its count and error sources must change. |
 | `commands/art.py:27-28,174,192,332` | Staff commands retain unreachable classic requeue/retry and terminal record reporting. |
 | `server/saves/tests/test_lease_reclaim.py:9-22` | Save/lease regression fixtures depend on classic enqueue even though the lease mechanism remains live. |
 
@@ -74,6 +75,8 @@ In `web/art_media.py`, remove fixed scene/portrait `_ALLOWED_IDENTITY` admission
 
 GM art inspection changes its job list query to `GalleryJobRecord`. Preserve the existing GM transport shape unless a field describes classic committed output, in which case remove that field and migrate its concrete consumer together. Gallery holdings remain read through gallery accessors.
 
+`web/gm/dashboard.py::_art` also changes in this cutover. Preserve `{counts, drain, failures}` and the existing status-key vocabulary: counts measure current `GalleryJobRecord` rows, so missing/done/failed counts are zero after ordinary terminal deletion, without claiming historical totals. Build newest bounded failure rows from `gallery.erroring_subjects()` using its subject key/kind, bounded error and recorded error timestamp. A later successful publication clears the error and its dashboard row. Preserve the existing row keys and limit/order, so `web/admin-app/views/overview/ArtPanel.vue` and `lib/dashboard.js::ART_SEGMENTS` need no alternate shape or compatibility path. Update the old typeclass fixture in `web/admin-app/tests/json-tree.test.js` without copy/markup assertions. Dashboard failures remain section-local and all reads remain non-creating.
+
 ### D5. Delete conversion, retain startup and staff behavior
 
 Delete service helpers `_classic_scene_output_identities`, `_delete_classic_scene_files`, `_scene_created_at`, `_scene_image_size`, `_convert_classic_scene_output`, `_migrate_classic_scene_record` and `migrate_classic_scene_records`, plus the `art_scene_migration` startup step and its catalog/test patch target. Prune scans `GalleryJobRecord` and gallery records only. `gallery_seed.py` remains active and unchanged except an import/docstring made obsolete by the carrier rename.
@@ -82,7 +85,7 @@ Delete service helpers `_classic_scene_output_identities`, `_delete_classic_scen
 
 ### D6. Retire obsolete contracts explicitly
 
-All twelve `art-asset-lifecycle` requirements are REMOVED. Eleven active lifecycle guarantees are re-owned under `art-gallery-autogen`; conversion is removed outright. Lifecycle scheduling, canonical ages, post-commit transaction ownership, failure isolation, startup ordering and deletion suppression remain required. No tests of these real guarantees are deleted merely because the old capability is retired.
+All twelve `art-asset-lifecycle` requirements are REMOVED. Eleven active lifecycle guarantees are re-owned under `art-gallery-autogen`; conversion is removed outright. The sole-writer and named-spawn titles are revised for gallery terminology. Lifecycle scheduling, canonical ages, post-commit transaction ownership, explicit skip, official satisfaction, transport parity, failure isolation, startup ordering and deletion suppression remain required. No tests of these real guarantees are deleted merely because the old capability is retired.
 
 OpenSpec strict validation refuses omitted scenarios in a MODIFIED block. Requirements containing deleted classic scenarios therefore use explicit REMOVED plus ADDED gallery replacement contracts, with reasons and no-migration instructions. This is a behavior retirement, not a scenario-loss workaround or validation waiver. The rewrite ledger below records each replacement. Other blocks remain MODIFIED with their full retained scenarios.
 
@@ -103,6 +106,23 @@ The explicit gallery replacements are listed in tasks.md's traceability handoff 
 | unify-artwork-selection | Implemented and main specs synchronized before retirement integration | Shared chain, default generation, fallback terminal, generation seam, model, typed subject, fault attribution and official selection | presenter/gallery_match, service, gallery actions/read models and overlapping tests | unify first, retire second |
 
 Retirement's shared blocks already include predecessor scenarios. Before apply, resolve CLI artifacts against the then-current main specs and preserve all non-classic additions. No parallel cutover of shared files and no reverse archive order. No child repository participates.
+
+The exact shared requirement blocks are listed here without a dependency on a sibling artifact path. Relocation preserves the predecessor's recovery, creation-skip and transport-parity qualifications.
+
+| Capability | Shared requirement |
+| --- | --- |
+| art-gallery-autogen | Automatic character portraits produce exactly one unbound default card |
+| art-gallery-resolution | Display resolution is one deterministic chain from equipment to fallback |
+| art-gallery-resolution | Monster subjects resolve through the chain without the binding steps |
+| art-gallery-kind-capabilities | One closed declaration states what every subject kind's gallery may do |
+| official-art-resolution | The extended chain stays deterministic, offline, and side-effect-free |
+| art-gallery-model | One gallery record per art subject carries an ordered card list and a default |
+| art-gallery-fallback | The fallback seam supplies a URL and a face rectangle and reports its use |
+| art-gallery-generation | One validated service seam requests every gallery image |
+| art-source-fault-facts | Faults are attributed to requested sources |
+| art-asset-lifecycle | Startup recovery rescans explicit unique portrait policies |
+| art-asset-lifecycle | Successful player creation and validated import schedule an eligible unique portrait through transaction.on_commit |
+| art-asset-lifecycle | Every player-activation path finalizes the portrait lifecycle |
 
 ## Risks / Trade-offs
 

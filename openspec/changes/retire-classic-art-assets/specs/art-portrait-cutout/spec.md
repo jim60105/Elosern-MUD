@@ -46,16 +46,16 @@ Enabled portrait background removal SHALL apply to gallery-job PNG bytes for the
 - **WHEN** the stage is enabled with an injected backend, the sd-webui double returns an
   opaque multi-pixel PNG, and a gallery `portrait:character:<key>` job generates
   successfully
-- **THEN** the record settles `done`, the stored file at
-  `portrait/character/<key><extension>` decodes with an alpha channel carrying fully
+- **THEN** the job is removed and its card's stored file at
+  `gallery/character/<key>/<image-id><extension>` decodes with an alpha channel carrying fully
   transparent pixels, its bytes differ from the same job's disabled-stage output, and the
   backend recorded exactly one call
 
 #### Scenario: A monster portrait is stored transparent
 - **WHEN** the stage is enabled, the sd-webui double returns an opaque multi-pixel PNG,
   and a gallery `portrait:monster:<visual-key>` job for a registered visual species generates successfully
-- **THEN** the record settles `done`, the stored file at
-  `portrait/monster/<visual-key><extension>` decodes with an alpha channel carrying fully
+- **THEN** the job is removed and its card's stored file at
+  `gallery/monster/<visual-key>/<image-id><extension>` decodes with an alpha channel carrying fully
   transparent pixels, and its bytes differ from the same job's disabled-stage output
 
 #### Scenario: A gallery portrait job is cut out on the same terms
@@ -64,8 +64,7 @@ Enabled portrait background removal SHALL apply to gallery-job PNG bytes for the
   generate successfully
 - **THEN** each appends exactly one card whose stored
   `gallery/<kind-directory>/<subject-key>/<image-id><extension>` file decodes with a
-  transparent alpha channel differing from its disabled-stage output, and no fixed-output
-  record's committed output was touched
+  transparent alpha channel differing from its disabled-stage output, and each terminal job is removed
 
 #### Scenario: Scene art never reaches the backend
 - **WHEN** the stage is enabled and a `scene:<archetype>` job generates successfully
@@ -128,36 +127,30 @@ Cutout failures SHALL retain the bounded art_cutout_unavailable/art_cutout_error
 #### Scenario: An unavailable backend settles a bounded failure
 - **WHEN** the stage is enabled, `ART_REMBG_BACKEND` names an unimportable dotted path,
   and a character portrait job runs
-- **THEN** the record settles `failed` with `art_cutout_unavailable`, its prior valid
-  output file is unchanged on disk, and no new file was written
+- **THEN** the job is removed, gallery state records `art_cutout_unavailable`, existing cards/files are unchanged, and no new file is written
 
 #### Scenario: A removal failure settles a bounded failure
 - **WHEN** the injected backend raises `CutoutError("art_cutout_error", …)` for a claimed
   portrait job
-- **THEN** the record settles `failed` with `art_cutout_error` and the prior valid output
-  is retained
+- **THEN** the job is removed, gallery state records `art_cutout_error`, and every prior card/default/file remains intact
 
 #### Scenario: An unexpected backend exception is still bounded
 - **WHEN** the injected backend raises an arbitrary non-`CutoutError` exception
-- **THEN** the record settles `failed` with a bounded cutout code — never an unbounded
-  exception and never `in_progress`
+- **THEN** gallery state records a bounded cutout code and the job is removed without an escaping exception or stuck in-progress job
 
 #### Scenario: A failing gallery cutout appends no card
 - **WHEN** a claimed gallery portrait job's cutout fails with either bounded code
-- **THEN** the subject's gallery holds the same cards it held before, the bounded code is
-  recorded on the gallery record, and no file is referenced by any card
+- **THEN** existing cards and references stay unchanged, the bounded code is recorded on the gallery record, the job is removed, and no new card/file reference is added
 
 #### Scenario: One failing portrait does not fail its batch
 - **WHEN** a claimed batch holds a scene job, a portrait job whose cutout fails, and a
   second portrait job whose cutout succeeds
-- **THEN** the scene settles `done` unchanged, the failing portrait settles `failed` with
-  its bounded code, the second portrait settles `done` with a transparent artifact, and no
-  job is left `in_progress`
+- **THEN** the scene and successful portrait append their respective unchanged/transparent cards, the failed subject records its bounded error with existing cards preserved, and all terminal jobs are removed
 
 #### Scenario: A failed cutout never stores the un-cut image
 - **WHEN** a portrait job's cutout fails after a successful generation
 - **THEN** no artifact is written for that job, the sd-webui client was called exactly
-  once, and the record's status carries the cutout code rather than `done`
+  once, gallery state carries the bounded cutout code, and the terminal job is removed
 
 #### Scenario: art_cutout_unavailable names backend-readiness failures
 - **WHEN** the backend or its model could not be made ready: an unresolvable or
