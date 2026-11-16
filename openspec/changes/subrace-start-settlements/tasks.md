@@ -68,7 +68,7 @@ Precondition: `subrace-start-locations` is archived on master.
 ## 2. Test seams (design D6)
 
 - [x] 2.1 Create `world/tests/start_room_fixture.py` exactly as in D6.
-- [ ] 2.2 Apply `stub_start_room()` (class decorator, or `self.enterContext(...)` in
+- [x] 2.2 Apply `stub_start_room()` (class decorator, or `self.enterContext(...)` in
   `setUp`) to every test class that activates a character and is not covered by section
   1. To find them, run
   `rg -l "activate_player_character|activate_draft|_creation_activate_adapter|creation\.activate|character preset|_activate_creation" commands server typeclasses web/webclient world tests --glob '*/tests/*'`.
@@ -87,27 +87,27 @@ Precondition: `subrace-start-locations` is archived on master.
   that only names the command and never activates (for example `tests/test_command_docs.py`).
   When an existing assertion pins the pre-change location after a successful activation,
   change it to the stub room. Change nothing else.
-- [ ] 2.3 In `web/tests/browser/seed/runner.py` (both `activate_player_character`
+- [x] 2.3 In `web/tests/browser/seed/runner.py` (both `activate_player_character`
   calls) and `web/tests/browser/seed/npc_persona_fixture.py`, wrap the activation in the
   seed patch from D6, returning the room the seed just placed the character in.
-- [ ] 2.4 Extend `web/tests/browser/fixtures.py::journey_settlement_scope` with the
+- [x] 2.4 Extend `web/tests/browser/fixtures.py::journey_settlement_scope` with the
   creation-only union from D6, and add one sentence to its docstring.
 
 ## 3. Verification
 
-- [ ] 3.1 Run each module touched in sections 1 and 2 with `EV <dotted.module>`, one at
+- [x] 3.1 Run each module touched in sections 1 and 2 with `EV <dotted.module>`, one at
   a time. Each must pass.
-- [ ] 3.2 `uv run --locked python -m tools.shard_register fix` then `uv run --locked python -m tools.contract_gate --change subrace-start-settlements`.
+- [x] 3.2 `uv run --locked python -m tools.shard_register fix` then `uv run --locked python -m tools.contract_gate --change subrace-start-settlements`.
   It must exit 0.
-- [ ] 3.3 `uv run --locked python -m tools.observability_lint check` is clean, including
+- [x] 3.3 `uv run --locked python -m tools.observability_lint check` is clean, including
   the new `log_warn` and `log_info` calls.
 - [ ] 3.4 Run `pnpm run build`, then
   `uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_browser_creation_preset`
   and `... web.tests.browser.test_browser_creation_custom`. Then run
   `EV web.webclient.actions.tests.test_party_management_acceptance_fixture` (the
   synthetic boot path). All must pass.
-- [ ] 3.5 Add a short "Start location" paragraph to
+- [x] 3.5 Add a short "Start location" paragraph to
   `docs/development/adding-player-presets.md`: a preset starts in its subrace's row of
   `world/lore/start_locations.py`, a new subrace must add a row, and the row names the
   settlement's anchor key only.
-- [ ] 3.6 `openspec validate subrace-start-settlements --strict` passes.
+- [x] 3.6 `openspec validate subrace-start-settlements --strict` passes.
