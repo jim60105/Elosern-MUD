@@ -28,7 +28,7 @@ nodes:
     y_m: 352
     prototype_parent: anchor_room
     key: 林間光庭
-    desc: 巨樹的樹冠在這裡讓開一個缺口，整片陽光直落地面。村人在這塊光裡聚攏，分派活計、交換消息，孩子追著光斑跑。
+    desc: 巨樹的樹冠在這裡讓開一道缺口，整片陽光筆直落到地面。村人在這片光裡聚攏，分派活計、交換消息，孩子追著光斑跑。
     anchor_key: elven_village_fionnen
     typeclass:
     scene_archetype: city_street
@@ -46,7 +46,7 @@ nodes:
     y_m: 196
     prototype_parent: grid_room
     key: 花蕊蜜園
-    desc: 花圃一畦接一畦，蜂箱擱在畦邊的樹蔭下，蜂在花間進出。採下來的蜜與花瓣一起熬煮，做成蜜漬的花瓣，是村裡常備的甜食。
+    desc: 花圃一畦接一畦，蜂箱擱在畦邊的樹蔭下，蜂在花間進出。採下來的蜜與花瓣一起熬煮，做成蜜漬花瓣，是村裡常備的甜食。
     anchor_key:
     typeclass:
     scene_archetype: forest_path
@@ -64,7 +64,7 @@ nodes:
     y_m: 118
     prototype_parent: grid_room
     key: 林泉浴場
-    desc: 溪水在下游聚成一汪池子，四周圍著被日頭曬暖的石頭。村人在這裡洗身、泡水，順便把一天的事說完。
+    desc: 溪水在下游聚成一池清水，四周圍著被日頭曬暖的石頭。村人在這裡洗身、泡水，順便把一天的事說完。
     anchor_key:
     typeclass:
     scene_archetype: forest_path
@@ -82,7 +82,7 @@ nodes:
     y_m: 22
     prototype_parent: grid_room
     key: 木作空地
-    desc: 空地中央擺著幾張矮凳，木料堆在樹下，刨花落了一地。弓、箭與修橋的板材都在這裡做，織補的活也在同一塊地上。
+    desc: 空地中央擺著幾張矮凳，木料堆在樹下，刨花落了一地。弓、箭在這裡做，修橋的木板也在這裡備好，織補的活也在同一塊地上。
     anchor_key:
     typeclass:
     scene_archetype: forest_path

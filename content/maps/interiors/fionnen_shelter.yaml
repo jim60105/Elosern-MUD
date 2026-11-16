@@ -8,7 +8,7 @@ id: fionnen_shelter
 rooms:
   fionnen_shelter:
     name_zh: 共食棚
-    desc_zh: 樹蔭下一片編枝的棚頂，底下擺著長桌，桌腳埋進土裡。村人各自帶一份過來，坐下就吃，棚裡整天有人在。
+    desc_zh: 樹蔭下搭著編枝的棚頂，底下擺著長桌，桌腳埋進土裡。村人各自帶一份過來，坐下就吃，棚裡整天有人在。
     scene_archetype: tavern_interior
 connections: []
 exterior:

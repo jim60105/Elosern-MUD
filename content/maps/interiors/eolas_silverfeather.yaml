@@ -8,7 +8,7 @@ id: eolas_silverfeather
 rooms:
   eolas_silverfeather:
     name_zh: 銀羽驛站・幽月谷分站
-    desc_zh: 架上的信按收件的地方分堆，封蠟與公用信紙擺在門邊的矮櫃上。寄信的人把信放下，取信的人自己翻找，沒有人守著。
+    desc_zh: 架上的信按寄往的地方分堆，封蠟與公用信紙擺在門邊的矮櫃上。寄信的人把信放下，取信的人自己翻找，沒有人守著。
     scene_archetype: tavern_interior
 connections: []
 exterior:

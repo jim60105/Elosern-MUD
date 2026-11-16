@@ -8,7 +8,7 @@ id: eolas_shelter
 rooms:
   eolas_shelter:
     name_zh: 共食棚
-    desc_zh: 棚下擺著長桌與矮凳，屋簷外垂著幾串曬乾的香草。村人端著自己的一份過來，坐下就吃，吃完了把碗擱回原處。
+    desc_zh: 棚下擺著長桌與矮凳，屋簷外垂著幾束曬乾的香草。村人端著自己的一份過來，坐下就吃，吃完了把碗擱回原處。
     scene_archetype: tavern_interior
 connections: []
 exterior:

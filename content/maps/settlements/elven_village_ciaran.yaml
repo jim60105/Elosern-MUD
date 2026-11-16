@@ -110,7 +110,7 @@ nodes:
     y_m: 14
     prototype_parent: grid_room
     key: 溪池浴場
-    desc: 溪流出村之後匯成一汪淺池，岸邊的石頭被水磨得圓滑。村人在這裡洗身、洗衣，孩子在水淺處玩；傍晚水面映著谷上的燈火。
+    desc: 溪流出村之後匯成一池淺水，岸邊的石頭被水磨得圓滑。村人在這裡洗身、洗衣，孩子在水淺處玩；傍晚水面映著谷上的燈火。
     anchor_key:
     typeclass:
     scene_archetype: wilderness_path

@@ -8,7 +8,7 @@ id: fionnen_honey_house
 rooms:
   fionnen_honey_house:
     name_zh: 蜜漬房
-    desc_zh: 屋裡擱著一排陶罐，罐口封著蠟，裝的是蜜漬的花瓣與果實。熬煮的鍋還留在灶上，甜味留在木頭上，很久不散。
+    desc_zh: 屋裡擱著一排陶罐，罐口封著蠟，裝的是蜜漬的花瓣與果實。熬煮的鍋還留在灶上，甜味滲進木頭裡，很久不散。
     scene_archetype: tavern_interior
 connections: []
 exterior:

@@ -19,7 +19,7 @@ nodes:
     y_m: 655
     prototype_parent: grid_room
     key: 深林獸徑
-    desc: 谷口之外就是北邊的深林，來去村子只有這一條獸徑。徑旁的老枝上掛著村民從林裡帶回的獸角與爪，一端繫著褪色的布條，風起時互相碰撞出聲。
+    desc: 谷口之外就是北邊的深林，進出村子只有這一條獸徑。徑旁的老枝上掛著村民從林裡帶回的獸角與爪，一端繫著褪色的布條，風起時互相碰撞出聲。
     anchor_key:
     typeclass:
     scene_archetype: forest_path
@@ -37,7 +37,7 @@ nodes:
     y_m: 548
     prototype_parent: grid_room
     key: 試法坪
-    desc: 離住屋最遠、靠著獸徑的一塊空地，村裡的試法都在這裡。地面被燒過、凍過、裂開過，草長不齊，石上留著深淺不一的痕跡。
+    desc: 離住屋最遠、靠著獸徑的一塊空地，村裡的試法都在這裡進行。地面被燒過、凍過、裂開過，草長不齊，石上留著深淺不一的痕跡。
     anchor_key:
     typeclass:
     scene_archetype: mountain_path
@@ -46,7 +46,7 @@ nodes:
     y_m: 468
     prototype_parent: grid_room
     key: 溫泉浴場
-    desc: 谷壁底下湧出溫泉，石頭圍成幾窪池子，水面上浮著一層白氣。村人在這裡洗身、洗衣，順便把一天的事說完才回家。
+    desc: 谷壁底下湧出溫泉，石頭圍成幾座池子，水面上浮著一層白氣。村人在這裡洗身、洗衣，順便把一天的事說完才回家。
     anchor_key:
     typeclass:
     scene_archetype: mountain_path

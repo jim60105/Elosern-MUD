@@ -8,7 +8,7 @@ id: fionnen_silverfeather
 rooms:
   fionnen_silverfeather:
     name_zh: 銀羽驛站・翠綠森林分站
-    desc_zh: 信架靠著樹幹立起，分格放著遠近各地的來信，公用信紙與封蠟擱在最下層。寄信取信都自己動手，架上從不鎖。
+    desc_zh: 信架靠著樹幹立起，分格放著遠近各地的來信，公用信紙與封蠟擱在最下層。寄信取信都自己動手，架上從不上鎖。
     scene_archetype: tavern_interior
 connections: []
 exterior:
