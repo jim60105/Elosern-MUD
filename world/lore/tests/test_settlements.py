@@ -264,15 +264,13 @@ class PlaceRegistryTests(unittest.TestCase):
             with self.subTest(place=key):
                 self.assertIsInstance(place.kind, PlaceKind)
         # The worked example for the kind rule: a dwelling whose occupant
-        # trades is still a home. Reclassifying such a row to its host's
-        # capability leaves no trading home and fails here.
-        trading_homes = [
-            place
-            for place in PLACE_REGISTRY.values()
-            if place.kind is PlaceKind.HOME and place.assortment_keys
-        ]
-        self.assertTrue(trading_homes)
-        for place in trading_homes:
+        # trades is still a home, so its kind and its declarations never
+        # contradict each other. Whether any such dwelling ships is game
+        # data; the rule itself is established by the synthetic record in
+        # test_a_dwelling_that_trades_is_authored_a_home.
+        for place in PLACE_REGISTRY.values():
+            if place.kind is not PlaceKind.HOME or not place.assortment_keys:
+                continue
             with self.subTest(place=place.key):
                 self.assertIsNotNone(place_shop_identity(place))
                 self.assertTrue(place_capabilities(place, "merchant"))
