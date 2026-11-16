@@ -2,7 +2,7 @@
 
 ## Context
 
-See `proposal.md` for the motivation. This document is self-contained: it repeats every table, coordinate and code block the work needs. Its source is the approved design `docs/superpowers/specs/2026-11-16-elven-villages-eolas-fionnen-design.md` at commit `58abb913` on branch `chore/elven-villages`. That file is not on `master`, and the worker does not need it.
+See `proposal.md` for the motivation. This document is self-contained: it repeats every table, coordinate and code block the work needs. Its source is the approved design `docs/superpowers/specs/2026-11-16-elven-villages-eolas-fionnen-design.md` on `master`. That file's Status section lists where this document supersedes it; where the two differ, this document is right, and the worker does not need the source.
 
 Facts established while planning, by reading the code and by a throwaway run of the whole change with placeholder prose in a scratch clone:
 
@@ -203,7 +203,7 @@ The source design says 幽月谷村's entrance faces north and 翠綠森林村's
 
 This also keeps the exit names clear: `forest_trail` has one road, direction `s`, so the outward alias `n` is free; `leaf_veiled_path` has one road, direction `w`, so the outward alias `e` is free. The alternative values `n` and `e` would give the gate rooms an outward alias equal to their only road direction.
 
-The `city_gate` blocks come from the source design and have a player-visible effect, the same one 暗影谷村 has today. `world/maps/bootstrap.py` creates a one-way exit from the starting room 虛境 for every city gate row, so 虛境 gains the exits 深林獸徑 and 葉隱小徑. The first time a character takes one, that gate room becomes the character's `home` (`world/rules/city_gates.py`). No character-creation code reads the registry. This change keeps the city gates, following the 暗影谷村 precedent, and the review document states the effect so the human reviewer can confirm it is wanted.
+The `city_gate` blocks come from the source design and have a player-visible effect, the same one 暗影谷村 has today. `world/maps/bootstrap.py` creates a one-way exit from the starting room 虛境 for every city gate row, so 虛境 gains the exits 深林獸徑 and 葉隱小徑. The first time a character takes one, that gate room becomes the character's `home` (`world/rules/city_gates.py`). No character-creation code reads the registry. The user has confirmed this effect is wanted: both new villages keep their city gate, so all three elven villages behave the same way.
 
 ### Decision 6: Eight host-less interiors, one room each
 
@@ -469,13 +469,12 @@ The road network is not in the source design; the scratch run showed it goes sta
 
 Node and room descriptions in both new villages, and the new 暗影谷村 node, follow the register of the existing 暗影谷村 nodes and interiors (`content/maps/settlements/elven_village_ciaran.yaml`, `content/maps/interiors/ciaran_*.yaml`): landscape, livelihood and daily life, with each place written as a lived-in scene, not a service building. No signboards, no shopkeeper wording, no building of worship. Each description is one to three sentences of Traditional Chinese, written with the `chinese-content-writing-guideline` and `writing-style-guideline` skills. Magic is practised in one spot per village (試法坪, 靶道); no description invents a site per element.
 
-Whether the prose reads well and whether the maps look irregular are human judgements. They are recorded in `docs/lore/elven-villages-map-review.md`, written in English, with these five sections:
+Whether the prose reads well and whether the maps look irregular are human judgements. They are recorded in `docs/lore/elven-villages-map-review.md`, written in English, with these four sections:
 
 1. **Scope**: the files this change authored.
 2. **Map images**: for each of the three village maps, the capture command used, and what the image shows when read: which nodes connect, where the bends are, and whether any part reads as a grid.
 3. **Prose review**: for each new node and room, one line confirming it follows the guideline above, or the correction made.
 4. **Lore checks**: no temple, no signboard, one magic practice spot per village, entrances that do not read as gates.
-5. **For the reviewer's decision**: one paragraph stating that the two new city gates add the exits 深林獸徑 and 葉隱小徑 to the starting room 虛境 and that the first traversal sets the character's `home` (Decision 5).
 
 No test reads this document.
 

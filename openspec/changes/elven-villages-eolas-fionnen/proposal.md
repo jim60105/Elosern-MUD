@@ -38,7 +38,7 @@ None. The existing requirements of `village-ciaran-map` (the village stays a tre
 - Edited tests (data pins removed, no test added): `world/lore/tests/test_settlements.py`, `world/rules/tests/test_guild_config/test_service_host_roster.py`, `world/quests/tests/test_definitions.py`, `world/maps/tests/test_bootstrap/test_bootstrap_selection.py`. One stale comment is corrected in `world/maps/tests/test_settlement_sources.py`.
 - Regenerated: the district partition, the road network signature and the map reference context.
 - Edited documents: `docs/lore/settlement-locations.md`, and one sentence each in `docs/development/evennia-testing-guide.md` and `docs/development/narrative-memory-and-recall.md`.
-- Player-visible side effect, kept from the approved design and matching 暗影谷村: each new city gate adds a one-way exit from the starting room 虛境 into its village (design Decision 5).
+- Player-visible effect, confirmed by the user and matching 暗影谷村: each new city gate adds a one-way exit from the starting room 虛境 into its village, so a new character can start there (design Decision 5).
 - Not touched: `content/maps/locations.yaml`, personal homes, residents' names, service hosts, assortments, commerce, dialogue, room artwork, and every requirement under `openspec/specs/`.
 - No child Git repository is needed.
 

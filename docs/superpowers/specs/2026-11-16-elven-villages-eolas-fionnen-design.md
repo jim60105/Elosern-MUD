@@ -36,8 +36,8 @@ right:
   that village to be straight.
 - **City gates.** Each new `city_gate` adds a one-way exit from the starting
   room 虛境, and a character's first traversal sets `home` to that village.
-  暗影谷村 already works this way. Whether new characters should be able to
-  start in the two hidden villages is an open decision.
+  暗影谷村 already works this way, and the user confirmed both new villages
+  keep it.
 - **Other documents.** One sentence each in
   `docs/development/evennia-testing-guide.md` and
   `docs/development/narrative-memory-and-recall.md` counts gate maps or
