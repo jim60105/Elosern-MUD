@@ -106,6 +106,7 @@ class MapSourceOwnershipContract(unittest.TestCase):
             "world/lore/settlements/places_altoria_middle.py",
             "world/lore/settlements/places_altoria_upper.py",
             "world/lore/settlements/places_ciaran.py",
+            "world/lore/settlements/places_eolas.py",
         )
         for path, tree in trees.items():
             with self.subTest(module=path):

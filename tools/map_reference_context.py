@@ -83,6 +83,7 @@ def _find_place_source_file(place_key: str, repo_root: Path) -> str:
         places_altoria_middle,
         places_altoria_upper,
         places_ciaran,
+        places_eolas,
     )
 
     module_map = (
@@ -90,6 +91,7 @@ def _find_place_source_file(place_key: str, repo_root: Path) -> str:
         (places_altoria_middle, "world/lore/settlements/places_altoria_middle.py"),
         (places_altoria_upper, "world/lore/settlements/places_altoria_upper.py"),
         (places_ciaran, "world/lore/settlements/places_ciaran.py"),
+        (places_eolas, "world/lore/settlements/places_eolas.py"),
     )
     for mod, rel_path in module_map:
         if any(row.key == place_key for row in getattr(mod, "ROWS", ())):

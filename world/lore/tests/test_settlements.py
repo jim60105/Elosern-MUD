@@ -101,8 +101,9 @@ class PlaceRegistryTests(unittest.TestCase):
         from world.lore.settlements.places_altoria_middle import ROWS as middle
         from world.lore.settlements.places_altoria_upper import ROWS as upper
         from world.lore.settlements.places_ciaran import ROWS as village
+        from world.lore.settlements.places_eolas import ROWS as eolas_rows
 
-        slice_keys = [row.key for row in (*lower, *middle, *upper, *village)]
+        slice_keys = [row.key for row in (*lower, *middle, *upper, *village, *eolas_rows)]
         keys = list(PLACE_REGISTRY)
         self.assertEqual(keys[: len(slice_keys)], slice_keys)
         trailing = keys[len(slice_keys):]
@@ -717,17 +718,17 @@ class DerivedShopRegistryTests(unittest.TestCase):
         "settlement-place-registry::shop-identities-and-the-service-host-roster-are-derived-from-places"
     )
     def test_shops_are_derived_from_the_places_that_author_a_shop_identity(self):
+        # Keyed off the registry, not off a hand-kept roster: every place that
+        # authors a shop identity contributes exactly one shop, and no other
+        # place does. Which rows exist is game data.
+        authored = {
+            place_shop_identity(place)
+            for place in PLACE_REGISTRY.values()
+            if place_shop_identity(place) is not None
+        }
         self.assertEqual(
             set(SHOP_REGISTRY),
-            {
-                "altoria_general_store", "altoria_forge",
-                "altoria_eatery", "altoria_tailor",
-                "altoria_jeweller", "altoria_alchemist",
-                "altoria_sanctum_shop",
-                "ciaran_gwenaera_home", "ciaran_hailiel_home",
-                "ciaran_lareneth_home", "ciaran_nireth_home",
-                "ciaran_valwyn_home", "ciaran_vethiel_home",
-            },
+            authored,
         )
         shop = SHOP_REGISTRY["altoria_general_store"]
         store = PLACE_REGISTRY["altoria_general_store"]
