@@ -63,13 +63,18 @@ leaves behind, so the bundled image stays in effect instead of being
 regenerated on the next entry.
 """
 
+import contextvars
 import uuid
+from contextlib import contextmanager
 from pathlib import Path
+from threading import get_ident
+from typing import Iterator
 
 from django.conf import settings
 from django.db import transaction
 
 from world.observability import log_error, log_info, log_warn
+from world.rules.presentation_events import on_publication_commit
 
 from world.art import gallery as gallery_api
 from world.art import gallery_kinds
@@ -80,23 +85,132 @@ from world.art.gallery_prompt import (
 )
 from world.art.paths import resolved_under_store_root
 from world.art.queue import (
+    _enqueue_gallery_job_locked,
+    _gallery_job_in_flight_locked,
     enqueue_gallery_job,
     gallery_job_in_flight,
+    queue_lock,
 )
 from world.art.store import ArtAssetStatus, GalleryJobRecord
 from world.art.subjects import (
     ArtSubjectError,
     ArtSubject,
     ArtSubjectKind,
+    DraftPortraitValues,
     character_ages,
     character_subject_for,
+    draft_character_description,
     description_for,
+    named_character_subject,
     parse_subject,
     monster_subject_for,
     scene_subject_for,
 )
 from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY
 from world.lore.monster_visuals import get_monster_visual_registry
+
+
+#: How long a serialized gallery mutation waits for the shared queue lock before
+#: it reports a bounded internal error instead of blocking the caller forever.
+#: It is a deadlock guard, not a throughput control: every legitimate holder
+#: releases on its own fast database/finalization path.
+_MUTATION_LOCK_TIMEOUT_SECONDS = 30.0
+
+
+class GalleryMutationError(RuntimeError):
+    """Raised when a serialized gallery mutation is entered or used illegally."""
+
+
+class _MutationOwner:
+    """The unforgeable sentinel proving a token came from this module."""
+
+
+_MUTATION_OWNER = _MutationOwner()
+
+
+class GalleryMutationToken:
+    """The subject-bound proof that one serialized mutation scope is active.
+
+    Minted only by :func:`serialized_gallery_mutation`; ``world/art/queue.py``'s
+    private already-locked primitives and the common request seam accept it in
+    place of reacquiring the non-reentrant queue lock. Identity, thread and
+    lifetime are all checked, so a foreign subject, a token used from another
+    thread, or one retained past its scope is rejected rather than silently
+    reusing someone else's serialization.
+    """
+
+    __slots__ = ("subject_full", "thread_id", "owner", "closed")
+
+    def __init__(self, subject_full: str, thread_id: int, owner: object) -> None:
+        self.subject_full = subject_full
+        self.thread_id = thread_id
+        self.owner = owner
+        self.closed = False
+
+
+_active_mutation: contextvars.ContextVar[GalleryMutationToken | None] = (
+    contextvars.ContextVar("elosern_gallery_mutation", default=None)
+)
+
+
+def _require_active_mutation_token(
+    token: object, subject: ArtSubject
+) -> GalleryMutationToken:
+    """Validate one caller-supplied mutation token against the live scope."""
+    if not isinstance(token, GalleryMutationToken) or token.owner is not _MUTATION_OWNER:
+        raise GalleryMutationError("a foreign gallery mutation token was rejected")
+    if token.closed:
+        raise GalleryMutationError("a gallery mutation token was used outside its scope")
+    if token.thread_id != get_ident():
+        raise GalleryMutationError("a gallery mutation token was used from another thread")
+    if token.subject_full != subject.full():
+        raise GalleryMutationError(
+            "a gallery mutation token covers a different subject"
+        )
+    if _active_mutation.get() is not token:
+        raise GalleryMutationError("a gallery mutation token is not the active scope")
+    return token
+
+
+@contextmanager
+def serialized_gallery_mutation(subject: ArtSubject) -> Iterator[GalleryMutationToken]:
+    """Hold the shared queue serialization around one subject-bound mutation.
+
+    Acquires the ONE non-reentrant ``queue_lock`` BEFORE the caller opens its
+    database transaction and yields a subject-bound token the common request
+    seam and the queue's private already-locked primitives accept instead of
+    reacquiring the lock. This is service-owned: it writes no character
+    attribute, and the caller owns the transaction. The order is
+    ``deferred callbacks -> queue lock -> database transaction -> gallery
+    lock``; the callback deferral scope must therefore wrap this one.
+
+    The same character may nest: an inner entry for the same subject on the
+    same thread reuses the active unit (the lock is not reentrant). A foreign
+    subject or another thread is rejected before any wait. The lock is released
+    on every exit path; a token used afterwards is rejected.
+    """
+    active = _active_mutation.get()
+    if active is not None:
+        if active.thread_id != get_ident():
+            raise GalleryMutationError(
+                "a gallery mutation cannot nest on another thread"
+            )
+        if active.subject_full != subject.full():
+            raise GalleryMutationError(
+                "a gallery mutation for another subject cannot nest here"
+            )
+        yield active
+        return
+    if not queue_lock.acquire(timeout=_MUTATION_LOCK_TIMEOUT_SECONDS):
+        raise GalleryMutationError("the gallery queue stayed serialized")
+    token = GalleryMutationToken(subject.full(), get_ident(), _MUTATION_OWNER)
+    context_token = _active_mutation.set(token)
+    try:
+        yield token
+    finally:
+        token.closed = True
+        _active_mutation.reset(context_token)
+        queue_lock.release()
 
 
 def _gallery_auto_generation_pending(subject) -> bool:
@@ -289,9 +403,12 @@ def schedule_portrait_ensure(entity) -> None:
     """Register an exception-safe post-commit portrait ensure for an entity.
 
     The canonical-age check runs at schedule time; if it rejects, nothing is
-    scheduled and no record is produced. Otherwise ``transaction.on_commit``
-    registers the ensure, which re-checks the ages immediately before the queue
-    write.
+    scheduled and no record is produced. Otherwise the shared publication
+    commit registration (``world.rules.presentation_events``) registers the
+    ensure, which re-checks the ages immediately before the queue write. That
+    registration is the same commit contract as a raw ``on_commit`` for the
+    ordinary path, while letting a mutation that holds queue serialization
+    defer the ensure until it has released its locks.
     Django runs on_commit callbacks synchronously on the committing thread
     after commit, so the callback catches every art error and never
     propagates: a committed creation or import is always reported as success
@@ -308,7 +425,7 @@ def schedule_portrait_ensure(entity) -> None:
         except Exception as error:  # noqa: BLE001 - bounded, never propagates
             log_warn("art_portrait_ensure_failed", context={"entity": entity.key}, exc=error)
 
-    transaction.on_commit(_safe)
+    on_publication_commit(_safe)
 
 
 def schedule_occupant_portrait(occupant) -> None:
@@ -529,6 +646,12 @@ def _recover_named_portraits() -> None:
     job: a subject whose gallery already holds a card, or whose generation is
     already pending/in-progress, is left alone (change
     ``gallery-autogen-retrofit``).
+
+    A creation-pending character is never recovered: its early named policy is
+    established by the draft portrait request, and the pending shell carries no
+    canonical ages. Any existing draft job/card stays with the normal
+    settlement/reconnect path, and startup must not manufacture an automatic
+    replacement for it (change ``creation-draft-portrait-request``).
     """
     from evennia.objects.models import ObjectDB
 
@@ -536,6 +659,8 @@ def _recover_named_portraits() -> None:
 
     for entity in ObjectDB.objects.all():
         if not isinstance(entity, LivingEntity):
+            continue
+        if bool(getattr(entity, "creation_pending", False)):
             continue
         try:
             subject = character_subject_for(entity)
@@ -575,7 +700,31 @@ def art_sync_all() -> None:
         log_error("art_startup_recovery_failed", context={"scope": "portrait-recovery"}, exc=error)
 
 
-def request_gallery_image(entity_or_subject, *, fields=(), custom_prompt="", binding=None, face_rect=None) -> str:
+def _pending_player_character(entity) -> bool:
+    """True for a ``PlayerCharacter`` still inside character creation.
+
+    Imported here rather than at module scope: the typeclasses layer depends on
+    world state, and this module must stay importable by the queue, the worker
+    and the art tests without pulling it in.
+    """
+    from typeclasses.characters import PlayerCharacter
+
+    return isinstance(entity, PlayerCharacter) and bool(
+        getattr(entity, "creation_pending", False)
+    )
+
+
+def request_gallery_image(
+    entity_or_subject,
+    *,
+    fields=(),
+    custom_prompt="",
+    binding=None,
+    face_rect=None,
+    draft_values=None,
+    mutation_token=None,
+    replacement_image_id=None,
+) -> str:
     """Validate, mint, and enqueue exactly one gallery image request.
 
     The ONLY gameplay-reachable entry point for gallery generation
@@ -606,7 +755,38 @@ def request_gallery_image(entity_or_subject, *, fields=(), custom_prompt="", bin
     pattern the auto-generation retrofit wires: because every rejection
     raises before any write, a wrapped call can never roll back committed
     gameplay. Returns the minted ``image_id``.
+
+    The ONE typed exception to the canonical-age precondition is the pending
+    character's draft request (change ``creation-draft-portrait-request``):
+    ``draft_values`` carries the validated race/subrace/sex/apparent-age
+    snapshot and the description is composed exclusively from it. That branch
+    is accepted only with the serialized mutation token its rules owner holds,
+    only for an owned pending player character, and only with an empty field
+    selection, no binding and no face rectangle; every ordinary or activated
+    request still reads the canonical age pair and refuses a pending character
+    without validated draft values. ``replacement_image_id`` is the
+    server-authorized previous creation image the draft settlement may replace;
+    it is rejected on every ordinary request. There is no generic
+    ``skip_age_check`` flag and no alternate public queue bypass.
     """
+    if draft_values is not None and not isinstance(draft_values, DraftPortraitValues):
+        raise ArtSubjectError(
+            "draft_values must be the validated draft-portrait snapshot"
+        )
+    if draft_values is None and (mutation_token is not None or replacement_image_id is not None):
+        raise GalleryMutationError(
+            "a mutation token or replacement metadata requires validated draft values"
+        )
+    if draft_values is not None:
+        if mutation_token is None:
+            raise GalleryMutationError(
+                "a draft portrait request requires the serialized mutation scope"
+            )
+        if fields or binding is not None or face_rect is not None:
+            raise ArtSubjectError(
+                "a pending draft portrait request carries no field selection, "
+                "binding or face rectangle"
+            )
     # 1. Derive the subject through the kind's typed producer. A raw subject
     # for a registry-backed kind is re-validated through its kind's producer
     # right here — the caller's key alone is never trusted, and no later
@@ -621,7 +801,12 @@ def request_gallery_image(entity_or_subject, *, fields=(), custom_prompt="", bin
             subject = registry_producer(subject.key)
     else:
         entity = entity_or_subject
-        subject = character_subject_for(entity)
+        if draft_values is not None:
+            # The pending shell's policy may not be committed yet, so the named
+            # subject is derived from its primary key instead of its attribute.
+            subject = named_character_subject(entity)
+        else:
+            subject = character_subject_for(entity)
     if subject is None:
         raise ArtSubjectError(
             f"subject source {getattr(entity, 'key', entity_or_subject)!r} yields no portrait subject"
@@ -631,6 +816,12 @@ def request_gallery_image(entity_or_subject, *, fields=(), custom_prompt="", bin
         raise ArtSubjectError(
             f"subject kind {subject.kind.value!r} declares no gallery"
         )
+    if draft_values is not None:
+        if not _pending_player_character(entity):
+            raise ArtSubjectError(
+                "a draft portrait request requires an owned pending player character"
+            )
+        _require_active_mutation_token(mutation_token, subject)
     # 2. Capability-gated argument validation, each error naming the
     # undeclared capability when the declaration rejects the argument.
     # The catalog validator is itself kind-aware: an empty selection stays
@@ -676,30 +867,52 @@ def request_gallery_image(entity_or_subject, *, fields=(), custom_prompt="", bin
     # A kind without the declaration never reads the age attribute at all.
     apparent_age = None
     if capability.requires_age_precondition:
-        if entity is None:
-            raise ArtSubjectError(
-                f"a gallery request for {subject.full()!r} requires the entity carrying the portrait subject"
-            )
-        _age, apparent_age = character_ages(entity)
+        if draft_values is not None:
+            apparent_age = draft_values.apparent_age
+        else:
+            if entity is None:
+                raise ArtSubjectError(
+                    f"a gallery request for {subject.full()!r} requires the entity carrying the portrait subject"
+                )
+            if _pending_player_character(entity):
+                raise ArtSubjectError(
+                    f"a gallery request for pending character {subject.full()!r} "
+                    "requires validated draft portrait values"
+                )
+            _age, apparent_age = character_ages(entity)
     # 4. Description: the selection and free text exist only where declared;
     # a kind without them gets its registry-driven description (monster kind)
     # or base identity text — never an empty character description.
-    description = description_for(
-        subject,
-        entity=entity,
-        apparent_age=apparent_age,
-        fields=selected if capability.supports_field_selection else None,
-        custom_prompt=custom if capability.supports_free_text else "",
-    )
+    if draft_values is not None:
+        description = draft_character_description(draft_values, custom)
+    else:
+        description = description_for(
+            subject,
+            entity=entity,
+            apparent_age=apparent_age,
+            fields=selected if capability.supports_field_selection else None,
+            custom_prompt=custom if capability.supports_free_text else "",
+        )
     image_id = str(uuid.uuid4())
-    enqueue_gallery_job(
-        subject,
-        description,
-        image_id=image_id,
-        binding=binding,
-        face_rect=face_rect,
-        requested_fields=list(selected),
-    )
+    if mutation_token is not None:
+        _enqueue_gallery_job_locked(
+            subject,
+            description,
+            image_id=image_id,
+            binding=binding,
+            face_rect=face_rect,
+            requested_fields=list(selected),
+            replacement_image_id=replacement_image_id,
+        )
+    else:
+        enqueue_gallery_job(
+            subject,
+            description,
+            image_id=image_id,
+            binding=binding,
+            face_rect=face_rect,
+            requested_fields=list(selected),
+        )
     log_info(
         "gallery_generate",
         context={"subject": subject.full(), "image_id": image_id, "kind": subject.kind.value},

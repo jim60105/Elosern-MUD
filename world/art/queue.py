@@ -24,6 +24,7 @@ import uuid
 from pathlib import Path
 
 from django.conf import settings
+from django.db import transaction
 from evennia.utils.create import create_script
 
 from world.art import gallery as gallery_api
@@ -107,6 +108,22 @@ def is_gallery_job(record: object) -> bool:
     )
 
 
+def _gallery_job_in_flight_locked(subject: ArtSubject) -> bool:
+    """The in-flight read without lock acquisition (an already-serialized caller).
+
+    Only ``world.art.service``'s serialized mutation seam may use this: every
+    public caller goes through :func:`gallery_job_in_flight`, which owns the
+    lock. The question it answers is identical.
+    """
+    return any(
+        record.db.kind == subject.kind.value
+        and record.db.subject_key == subject.key
+        and record.db.status in (ArtAssetStatus.PENDING, ArtAssetStatus.IN_PROGRESS)
+        for record in _all_records()
+        if is_gallery_job(record)
+    )
+
+
 def gallery_job_in_flight(subject: ArtSubject) -> bool:
     """True when a pending or in-progress gallery job exists for the subject.
 
@@ -117,13 +134,7 @@ def gallery_job_in_flight(subject: ArtSubject) -> bool:
     blocks a later automatic request.
     """
     with queue_lock:
-        return any(
-            record.db.kind == subject.kind.value
-            and record.db.subject_key == subject.key
-            and record.db.status in (ArtAssetStatus.PENDING, ArtAssetStatus.IN_PROGRESS)
-            for record in _all_records()
-            if is_gallery_job(record)
-        )
+        return _gallery_job_in_flight_locked(subject)
 
 
 def source_hash(description: str) -> str:
@@ -186,6 +197,62 @@ def _membership_is_current(record: GalleryJobRecord) -> bool:
     return True
 
 
+def _validate_enqueue_subject(subject: ArtSubject) -> None:
+    """The one refusal every enqueue entry applies before its write."""
+    if not gallery_kinds.has_gallery(subject.kind.value):
+        raise gallery_api.GalleryRecordError(
+            f"subject kind {subject.kind.value!r} declares no gallery"
+        )
+    if subject.kind is ArtSubjectKind.MONSTER and not is_registered_monster_visual_key(
+        subject.key
+    ):
+        raise gallery_api.GalleryRecordError(
+            f"monster subject {subject.key!r} is not a registered visual species"
+        )
+
+
+def _enqueue_gallery_job_locked(
+    subject: ArtSubject,
+    description: str,
+    *,
+    image_id: str,
+    binding: dict | None,
+    face_rect: dict | None,
+    requested_fields: list,
+    replacement_image_id: str | None = None,
+) -> GalleryJobRecord:
+    """Create one per-image job without lock acquisition (already-serialized caller).
+
+    Only ``world.art.service``'s serialized mutation seam uses this; every
+    public caller goes through :func:`enqueue_gallery_job`, which owns the lock.
+    The enqueue rules are exactly the public wrapper's, plus the optional
+    server-authorized ``replacement_image_id`` metadata a draft portrait request
+    records so settlement can replace exactly its own previous creation image.
+    """
+    _validate_enqueue_subject(subject)
+    digest = source_hash(description)
+    record = create_script(
+        GalleryJobRecord,
+        key=gallery_record_key(subject, image_id),
+        persistent=True,
+        interval=0,
+    )
+    record.db.kind = subject.kind.value
+    record.db.subject_key = subject.key
+    record.db.gallery_image_id = image_id
+    record.db.gallery_binding = binding
+    record.db.gallery_face_rect = face_rect
+    record.db.gallery_requested_fields = list(requested_fields)
+    record.db.gallery_replacement_image_id = replacement_image_id
+    record.db.source_description = description
+    record.db.source_hash = digest
+    record.db.prompt_digest = _prompt_digest_or_empty(subject, description)
+    record.db.aspect_ratio = _aspect_ratio_for(subject)
+    record.db.status = ArtAssetStatus.PENDING
+    record.db.enqueued_at = time.time()
+    return record
+
+
 def enqueue_gallery_job(
     subject: ArtSubject,
     description: str,
@@ -206,37 +273,15 @@ def enqueue_gallery_job(
     whose declaration grants no gallery, or an unregistered monster key, is
     refused before any write.
     """
-    if not gallery_kinds.has_gallery(subject.kind.value):
-        raise gallery_api.GalleryRecordError(
-            f"subject kind {subject.kind.value!r} declares no gallery"
-        )
-    if subject.kind is ArtSubjectKind.MONSTER and not is_registered_monster_visual_key(
-        subject.key
-    ):
-        raise gallery_api.GalleryRecordError(
-            f"monster subject {subject.key!r} is not a registered visual species"
-        )
-    digest = source_hash(description)
     with queue_lock:
-        record = create_script(
-            GalleryJobRecord,
-            key=gallery_record_key(subject, image_id),
-            persistent=True,
-            interval=0,
+        return _enqueue_gallery_job_locked(
+            subject,
+            description,
+            image_id=image_id,
+            binding=binding,
+            face_rect=face_rect,
+            requested_fields=requested_fields,
         )
-        record.db.kind = subject.kind.value
-        record.db.subject_key = subject.key
-        record.db.gallery_image_id = image_id
-        record.db.gallery_binding = binding
-        record.db.gallery_face_rect = face_rect
-        record.db.gallery_requested_fields = list(requested_fields)
-        record.db.source_description = description
-        record.db.source_hash = digest
-        record.db.prompt_digest = _prompt_digest_or_empty(subject, description)
-        record.db.aspect_ratio = _aspect_ratio_for(subject)
-        record.db.status = ArtAssetStatus.PENDING
-        record.db.enqueued_at = time.time()
-        return record
 
 
 def claim(limit: int) -> list[GalleryJobRecord]:
@@ -328,11 +373,21 @@ def settle_gallery_generated(
     a card pointing at a missing file), and delete the spent job record. The
     card carries the verbatim prompt pair and server-reported seed from the
     returned generation, the configured checkpoint when one is set, and the
-    job record's pending binding, face rectangle, and requested field ids. A
-    gallery job deletes NO prior file: a capped gallery's own append handles
-    its displaced unreferenced file. Lock order is ``queue_lock ->
-    gallery_lock`` (the only allowed order; ``gallery.py`` never acquires
-    ``queue_lock``).
+    job record's pending binding, face rectangle, and requested field ids.
+
+    A job carrying server-authorized replacement metadata (the pending
+    character's draft portrait) publishes through the gallery's one replacement
+    helper inside the same database transaction: the new card becomes the
+    default and exactly the named previous creation card is dropped, while
+    unrelated cards and official preferences stay untouched. Removed card
+    files are unlinked only after the transaction committed, the queue lock
+    was released, and the gallery lock was released. A failed generation never
+    reaches this path, so its previous card and default survive.
+
+    A gallery job with no replacement metadata deletes NO prior file: a capped
+    gallery's own append handles its displaced unreferenced file. Lock order is
+    ``queue_lock -> gallery_lock -> database transaction`` (the only allowed
+    order; ``gallery.py`` never acquires ``queue_lock``).
 
     Returns the stored card dict, or ``None`` for a stale claim (the
     temporary file is removed first). A wrong, escaping, or malformed
@@ -343,6 +398,8 @@ def settle_gallery_generated(
     prune, the record is deleted, and the settle reports ``None`` rather than
     raising inside the queue lock.
     """
+    removed_identities: list = []
+    stored: dict | None = None
     with queue_lock:
         record = _record_by_db_key(job_key)
         if record is None or not is_gallery_job(record):
@@ -396,20 +453,49 @@ def settle_gallery_generated(
             if image_size is not None:
                 gallery_api.validate_face_rect(face_rect, image_size=image_size)
             card_fields["face_rect"] = face_rect
-        stored = gallery_api.append_card(subject, **card_fields)
-        # The recorded error describes the LAST generation attempt, so a
-        # successful append clears it. Non-authoritative like the terminal
-        # marking below: the appended card is the publish, and a failed clear
-        # must never rewrite this settle's outcome.
+        replacement_image_id = record.db.gallery_replacement_image_id
+        card_snapshot = gallery_api.card_state_snapshot(subject)
+        job_status_before = record.db.status
         try:
-            gallery_api.clear_error(subject)
-        except Exception:  # noqa: BLE001 - the appended card is authoritative
-            pass
-        # The card append is the authoritative publish: a failure deleting
-        # the spent record afterwards must never rewrite this settle's
-        # outcome; the terminal marking below keeps it unclaimable.
-        _finish_gallery_job(record, ArtAssetStatus.DONE)
-        return stored
+            with transaction.atomic():
+                if replacement_image_id:
+                    stored, removed_identities = gallery_api.append_replacement_card(
+                        subject,
+                        replaced_image_id=replacement_image_id,
+                        **card_fields,
+                    )
+                else:
+                    stored = gallery_api.append_card(subject, **card_fields)
+                # The recorded error describes the LAST generation attempt, so a
+                # successful append clears it. Non-authoritative like the
+                # terminal marking below: the appended card is the publish, and
+                # a failed clear must never rewrite this settle's outcome.
+                try:
+                    gallery_api.clear_error(subject)
+                except Exception:  # noqa: BLE001 - the appended card is authoritative
+                    pass
+                # The card append is the authoritative publish: a failure
+                # deleting the spent record afterwards must never rewrite this
+                # settle's outcome; the terminal marking below keeps it
+                # unclaimable.
+                _finish_gallery_job(record, ArtAssetStatus.DONE)
+        except BaseException:
+            # Nothing from this settlement committed: no card was appended and
+            # no previous card was dropped, so no file may be unlinked. The
+            # idmapped attribute values the rolled-back writes replaced stay
+            # readable in process, so they are written back to the snapshot.
+            removed_identities = []
+            gallery_api.restore_card_state(card_snapshot)
+            try:
+                record.db.status = job_status_before
+            except Exception:  # noqa: BLE001 - diagnostic state only
+                pass
+            raise
+    # Committed removals are unlinked only now: the database transaction
+    # committed, and both the queue and gallery serialization were released.
+    for identity in removed_identities:
+        gallery_api.unlink_stored_file(subject, identity)
+    return stored
 
 
 def settle_gallery_failed(
