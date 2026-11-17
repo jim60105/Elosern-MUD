@@ -435,15 +435,21 @@ binding 綁上這個宣告，seed 行程則在整個生命週期套用同一份�
 hook wrapper，shipped 與 synthetic 兩種 catalog 模式因此都走同一條宣告路徑；
 synthetic install 本身仍只由 `ELOSERN_BROWSER_SYNTH_CATALOGS=1` 決定。
 
-宣告推導自 registry，不是複製 roster：今天的 gate map 涵蓋起始城市與精靈三村
-（`elven_village_ciaran`、`elven_village_eolas`、`elven_village_fionnen`），裝上
-synthetic kit 而多出一列 gate 時會自動變寬。瀏覽器
-journey 只透過 registry 的城門進入持久世界（其餘面板讀的是完整 bundle，
-不需要房間），因此這個宣告就是目前檢查過的 journey 真正需要的地圖集合。
+宣告推導自 registry，不是複製 roster：基礎集合是 `entrance_refs(2)` 指名的
+兩張 entrance 地圖，registry 改寫那兩筆時宣告跟著換。shipped 模式的行程另外要跑
+production 的 guild-economy sync，它把每個 service host 解析到位於永久 interior
+的 anchor 房間；interior 只有在它的 exterior 所屬 settlement 被物化時才會存在，
+因此 shipped 模式併入所有擁有永久 interior 的 settlement（目前是首都與精靈三村
+`elven_village_ciaran`、`elven_village_eolas`、`elven_village_fionnen`），這是
+保守的 startup 依賴閉包，不是剛好被佔用的 host 房間集合。synthetic kit 的啟動
+略過這個 step，因此不需要它們。瀏覽器 journey 只透過
+wilderness entrance 進入持久世界（其餘面板讀的是完整 bundle，不需要房間），
+因此這個宣告就是目前檢查過的 journey 與 startup 真正需要的地圖集合。
 這不是「任何遺漏都會立刻失敗」的保證：fixture 對可選層本來就有早期返回，
 新增必經地點時必須把它加進宣告，並在 fixture 內明確斷言取得該房間。
 
-修訂前後在同一個 checkout 量到：`sync_map_world` 由 43.6 s + 13.4 s（首啟與
+（以下為引入範圍宣告當時的歷史量測，早於後續的 interior 併入。）修訂前後在同一個
+checkout 量到：`sync_map_world` 由 43.6 s + 13.4 s（首啟與
 initial-setup 重啟）降到 2.96 s + 1.03 s，單一行程的開機由 99.7 s 降到 45.0 s。
 這段成本原本是每個分片行程都要付一次，兩個行程同機時會把另一半的 journey 擠出
 它自己的等待上限。

@@ -239,14 +239,35 @@ def journey_settlement_scope() -> tuple[str, ...]:
     and booting cannot disagree, and ``sync_grid``/``sync_wilderness`` still
     converge these maps through the real planner, transaction and rollback.
 
+    A shipped-catalog runtime (``ELOSERN_BROWSER_SYNTH_CATALOGS`` not ``1``) also
+    runs the production guild-economy sync, which resolves every service host
+    into the permanent interior room it anchors at. An interior only
+    materializes beside the settlement its exterior opens onto, so every
+    settlement owning a published interior joins the scope even when no
+    journey walks it -- a conservative startup dependency closure, not the
+    exact set of occupied host rooms. The synthetic install skips that startup
+    step (``browser_startstop``) and needs no such settlement.
+
     A creation runtime (``ELOSERN_BROWSER_CREATION=1``) also materializes every
     subrace's start settlement, because activation there places the new
     character in its start room.
     """
 
-    from world.tests.geography_fixture import entrance_refs
+    from world.tests.geography_fixture import (
+        entrance_refs,
+        publish_shipped_map_world,
+    )
 
     scope = {ref.map_id for ref in entrance_refs(2)}
+    if os.environ.get("ELOSERN_BROWSER_SYNTH_CATALOGS") != "1":
+        from world.maps import interiors
+
+        publish_shipped_map_world()
+        scope |= {
+            document.exterior.settlement
+            for document in interiors.current().documents.values()
+            if document.exterior is not None
+        }
     if os.environ.get("ELOSERN_BROWSER_CREATION") == "1":
         from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY
         from world.maps.static_references import published_static_world
