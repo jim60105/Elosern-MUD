@@ -1,7 +1,7 @@
 ## Purpose
 
-Define the starting room's localized zh-tw identity — where characters first exist — its
-idempotent startup convergence, and the zh-tw bridge exit surface to the capital.
+Define the starting room's localized zh-tw identity — where characters first exist — and its
+idempotent startup convergence.
 
 ## Requirements
 

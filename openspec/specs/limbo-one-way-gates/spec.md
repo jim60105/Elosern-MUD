@@ -1,9 +1,6 @@
 ## Purpose
 
-Define the one-way 虛境 threshold: the authored city-gate registry, the
-forward-only gate exits synced from it, the pruning of every exit pointing
-back into the starting room, and the hard gate that admits no character into
-虛境 by any path (including the first-gate-traversal home re-anchor).
+Define 虛境 as a backstage holding room that admits no character and owns no exit.
 
 ## Requirements
 

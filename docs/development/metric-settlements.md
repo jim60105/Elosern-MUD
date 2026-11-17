@@ -18,11 +18,11 @@ authoritative map.
 | Source discovery and publication | `world/maps/map_data.py` (sorted discovery, validated candidate, immutable snapshot) |
 | Room/exit lifecycle | `world/maps/bootstrap.py::sync_grid` / `sync_settlement_graph` |
 | Map knowledge | `world/rules/map_knowledge.py` (sole writer) |
-| Gate placement (identity) | `world/maps/city_gates.py::CITY_GATE_REGISTRY`, `world/lore/wilderness_entry.py` |
+| Gate placement (identity) | `world/lore/wilderness_entry.py` |
 | Ghost anchor (identity) | `world/lore/anchor_placement.py` |
 | Place exteriors (identity) | `world/lore/settlements/places*.py` |
 | Scene art key (identity) | `world/maps/room_art.py::GRID_NODE_SCENE_ARCHETYPES` |
-| Current coordinate/wire derivation | `world/maps/static_references.py` (gates, placements, exteriors, art, district landmarks and wilderness gates) |
+| Current coordinate/wire derivation | `world/maps/static_references.py` (placements, exteriors, art, district landmarks and wilderness gates) |
 | Local-map and `地圖` projection | `web/webclient/presentation/local_map/`, `commands/localized/xyzgrid.py` |
 
 `z` stays the logical map/layer key; it is never physical elevation. Interiors

@@ -2,7 +2,7 @@
 
 Define the sample city（聖潔王都 / `capital_altoria`）as real, walkable rooms and exits
 from its authored sparse graph, with a single `AnchorRoom` at the central plaza
-and one forward bridge from Limbo per city-gate registry row.
+and its wilderness gates as the only way out.
 
 ## Requirements
 

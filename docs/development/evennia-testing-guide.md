@@ -372,7 +372,7 @@ Django 的 `TestCase` 使用 class-level 與 method-level transaction，並會�
 1. **發佈（publication）** 永遠是完整的不可變 map world。`world.maps.runtime`
    一次採納完整 bundle，完成 static-reference 驗證；測試不得只發佈部分世界。
 2. **物化（materialization）** 由測試宣告決定。只有宣告的地圖會經過 planner
-   與 writer，產生房間、道路、art、display 清理與 forward bridge。
+   與 writer，產生房間、道路、art 與 display 清理。
 
 ### 宣告 API
 
@@ -404,10 +404,9 @@ selected_startup_settlements(settlement_ids)  # context manager
 
 ### Whole-roster 斷言是明文例外
 
-有些測試的主體就是「整個 registry 都收斂」：AnchorRoom placement、Limbo 對每個
-`CITY_GATE_REGISTRY` row 的 forward exit，以及 wilderness gate 總數。這些測試
-保留完整迴圈，並以 registry 推導完整宣告，例如
-`tuple(sorted({row.gate.map_id for row in CITY_GATE_REGISTRY.values()}))`。
+有些測試的主體就是「整個 registry 都收斂」：AnchorRoom placement 與 wilderness
+gate 總數。這些測試保留完整迴圈，並以 registry 推導完整宣告，例如
+`tuple(sorted({placement.zcoord for placement in ANCHOR_PLACEMENT_REGISTRY.values()}))`。
 它們必須在模組內標記為 documented exception。
 
 不要為了縮小 fixture 而降低任何 assertion、迴圈上界或計數；那會把
@@ -428,7 +427,7 @@ selected_startup_settlements(settlement_ids)  # context manager
 
 受管瀏覽器行程啟動的是一台真實伺服器，因此它也適用同一條邊界：發佈完整，
 物化由宣告決定。`web/tests/browser/fixtures.py` 的
-`journey_settlement_scope()` 由 live 的 `CITY_GATE_REGISTRY` 推導出宣告，
+`journey_settlement_scope()` 由共用的 entrance probe（`entrance_refs(2)`）推導出宣告，
 `web/tests/browser/browser_startstop.py` 的 `apply_settlement_scope()` 只在
 啟動 hook 期間把 `bootstrap.sync_grid`／`bootstrap.sync_wilderness` 兩個
 binding 綁上這個宣告，seed 行程則在整個生命週期套用同一份宣告，兩邊因此不會
@@ -1286,7 +1285,7 @@ NPC 的人物設定、角色卡、語音與劇本台詞是作者文字，行為�
 
 `world/tests/synthetic_data/`（import 路徑 `world.tests.synthetic_data`）是全庫共用的替身世界：每個 catalog 都是**真實
 definition dataclass** 組成的 `t_` 前綴字典（items、skills、races/subraces、presets、
-npc/monster tiers、anchors、regions、city gates、archetypes、shops/economy、quests、
+npc/monster tiers、anchors、regions、archetypes、shops/economy、quests、
 titles、dialogue、buffs、acts 等），display prose 全為自製正體中文，與 shipped token
 universe 經自我測試證明不碰撞。
 

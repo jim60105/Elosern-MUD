@@ -1,8 +1,8 @@
 ## Purpose
 
 Define the idempotent grid bootstrap that instantiates real, walkable xyzgrid rooms and exits at
-server start, distinct from the `LoreRecord` data-mirror `sync_all()`, plus the Limbo-bridging exit
-pair and the `evennia xyzgrid` CLI registration.
+server start, distinct from the `LoreRecord` data-mirror `sync_all()`, and the `evennia xyzgrid` CLI
+registration.
 
 ## Requirements
 

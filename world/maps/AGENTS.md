@@ -48,7 +48,7 @@ validates village and hamlet placement; it writes nothing.
 | Authored monster sites (camps, nests, bosses) | `monster_sites.py` |
 | When a population boundary happens | `population_lifecycle.py` (the one coordinator; the two owners above never decide timing) |
 | Monster groups and journeys | `monster_activity.py` (sole writer of `wilderness.db.monster_activity`) |
-| City gates, Limbo, room art | `city_gates.py`, `limbo.py`, `room_art.py` |
+| Limbo, room art | `limbo.py`, `room_art.py` |
 | Operator repairs | `gm.py` |
 
 Placement *data* (which monsters, where, how many) is not here. It is the
