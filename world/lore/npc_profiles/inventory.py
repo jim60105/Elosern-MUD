@@ -123,6 +123,16 @@ NPC_SOURCE_INVENTORY: tuple[NpcSource, ...] = (
     NpcSource("dialogue_table", "fionnen_gwynnel_home", "fionnen_homes_a"),
     NpcSource("dialogue_table", "fionnen_ithrlin_home", "fionnen_homes_a"),
 
+    # fionnen_homes_b: the four 翠綠森林村 fare homes and their tables.
+    NpcSource("place_host", "fionnen_elunwen", "fionnen_homes_b"),
+    NpcSource("place_host", "fionnen_firwen", "fionnen_homes_b"),
+    NpcSource("place_host", "fionnen_lumeth", "fionnen_homes_b"),
+    NpcSource("place_host", "fionnen_sylara", "fionnen_homes_b"),
+    NpcSource("dialogue_table", "fionnen_elunwen_home", "fionnen_homes_b"),
+    NpcSource("dialogue_table", "fionnen_firwen_home", "fionnen_homes_b"),
+    NpcSource("dialogue_table", "fionnen_lumeth_home", "fionnen_homes_b"),
+    NpcSource("dialogue_table", "fionnen_sylara_home", "fionnen_homes_b"),
+
     # companions: the four starting-companion declarations.
     NpcSource("starting_companion", "violet_altoria:lidzia_rosenthal", "companions"),
     NpcSource("starting_companion", "lidzia_rosenthal:violet_altoria", "companions"),

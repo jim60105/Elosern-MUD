@@ -3,7 +3,8 @@
 The slice order below is fixed and load-bearing (the
 ``world/lore/settlements/places.py`` assembly precedent): ``altoria_lower``,
 ``altoria_trade``, ``altoria_guild``, ``altoria_upper``, ``ciaran_homes_a``,
-``ciaran_homes_b``, ``eolas_homes_a``, ``eolas_homes_b``, ``fionnen_homes_a``.
+``ciaran_homes_b``, ``eolas_homes_a``, ``eolas_homes_b``, ``fionnen_homes_a``,
+``fionnen_homes_b``.
 Each slice is owned by exactly one later content change and exports one
 ``ROWS: tuple[NpcProfile, ...]`` tuple; this module is the single place that
 concatenates them into ``NPC_PROFILE_REGISTRY``.
@@ -33,6 +34,7 @@ from world.lore.npc_profiles.ciaran_homes_b import ROWS as CIARAN_HOMES_B_ROWS  
 from world.lore.npc_profiles.eolas_homes_a import ROWS as EOLAS_HOMES_A_ROWS  # noqa: E402
 from world.lore.npc_profiles.eolas_homes_b import ROWS as EOLAS_HOMES_B_ROWS  # noqa: E402
 from world.lore.npc_profiles.fionnen_homes_a import ROWS as FIONNEN_HOMES_A_ROWS  # noqa: E402
+from world.lore.npc_profiles.fionnen_homes_b import ROWS as FIONNEN_HOMES_B_ROWS  # noqa: E402
 
 
 def assemble_profile_registry(
@@ -91,6 +93,7 @@ PROFILE_SLICES: tuple[tuple[str, tuple[NpcProfile, ...]], ...] = (
     ("eolas_homes_a", EOLAS_HOMES_A_ROWS),
     ("eolas_homes_b", EOLAS_HOMES_B_ROWS),
     ("fionnen_homes_a", FIONNEN_HOMES_A_ROWS),
+    ("fionnen_homes_b", FIONNEN_HOMES_B_ROWS),
 )
 
 #: The slice labels the assembly declares, in order.
@@ -119,6 +122,7 @@ __all__ = [
     "EOLAS_HOMES_A_ROWS",
     "EOLAS_HOMES_B_ROWS",
     "FIONNEN_HOMES_A_ROWS",
+    "FIONNEN_HOMES_B_ROWS",
     "NPC_PROFILE_REGISTRY",
     "PROFILE_KEY_SLICES",
     "PROFILE_SLICES",
