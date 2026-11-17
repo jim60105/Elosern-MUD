@@ -1,5 +1,5 @@
-"""Idempotent grid and wilderness bootstrap: converge the sparse settlements,
-bridge them to Limbo with one-way registry gates, and provision the wilderness
+"""Idempotent grid and wilderness bootstrap: converge the starting room (Limbo,
+which owns no exits) and the sparse settlements, and provision the wilderness
 layer and one grid-side gate exit per registered gate (map-wilderness,
 wilderness-anchor-footprint, limbo-one-way-gates).
 

@@ -45,7 +45,7 @@ _SYNTH_MAP_KEY = sorted(KNOWN_GRID_MAP_KEYS)[0]
 def _shipped_first_gate_ref():
     """The first shipped wilderness entrance's node, borrowed at kit assembly.
 
-    The kit's city-gate, placement and wilderness-gate rows must land on a
+    The kit's placement and wilderness-gate rows must land on a
     node ``sync_grid()`` really materializes — the fixtures' registry probes
     then resolve a real room. The shipped grid is still live when the kit
     module imports (install patches registries afterwards), so the borrowed

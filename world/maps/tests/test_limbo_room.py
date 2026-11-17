@@ -262,6 +262,18 @@ class LimboExitPruneTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaT
         self.assertEqual(context["exit_dbref"], reverse_dbref)
         self.assertEqual(context["side"], "destination")
 
+    def test_self_loop_exit_is_removed_once(self):
+        loop = create_object(Exit, key="t_迴圈小徑", location=self.limbo, destination=self.limbo)
+        loop_id = loop.id
+
+        with patch("world.maps.bootstrap.log_info") as log_info:
+            sync_limbo()
+
+        self.assertFalse(ObjectDB.objects.filter(id=loop_id).exists())
+        events = self._pruned_events(log_info)
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0].kwargs["context"]["side"], "location")
+
     def test_converged_room_is_left_alone_on_a_second_run(self):
         create_object(Exit, key="t_離境小徑", location=self.limbo, destination=self.room1)
         create_object(Exit, key="t_回境小徑", location=self.room1, destination=self.limbo)

@@ -13,7 +13,6 @@ from typeclasses.exits import CostedXYZExit, Exit
 from typeclasses.rooms import GridRoom, Room
 from world.lore.sync import sync_all
 from world.maps.map_data import SETTLEMENT_GRAPHS
-from world.maps.limbo import LIMBO_KEY
 from world.maps.static_references import settlement_node_xyz
 from world.rules.clock import CLOCK_YAML, get_world_clock
 
@@ -231,27 +230,16 @@ class SampleCityCostedExitTests(_ChargeAssertions, EvenniaTest):
         )
 
     @covers_requirement("sample-city-altoria::the-sample-city-s-declared-intra-city-exits-spawn-as-costedxyzexit", "world-clock::move-and-converse-command-default-time-costs-are-declared-as-rulebook-data-only")
-    def test_limbo_bridge_exit_advances_clock_on_successful_traversal(self):
-        sync_test_settlements(
-            (WILDERNESS_ENTRY_REGISTRY["capital_altoria"].gate_for("n").destination.map_id,)
-        )
-        limbo = self.room2
-        limbo.key = LIMBO_KEY
-        limbo.save()
+    def test_plain_exit_into_the_city_advances_clock_on_successful_traversal(self):
         sync_test_settlements(
             (WILDERNESS_ENTRY_REGISTRY["capital_altoria"].gate_for("n").destination.map_id,)
         )
         south_gate = GridRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
-        from_each = [
-            exit_obj
-            for exit_obj in Exit.objects.all()
-            if exit_obj.location == limbo and exit_obj.destination == south_gate
-        ]
-        self.assertEqual(len(from_each), 1)
-        exit_obj = from_each[0]
-        self.assertIsInstance(exit_obj, Exit)
+        exit_obj = create_object(
+            Exit, key="t_連通門", location=self.room2, destination=south_gate
+        )
         before = get_world_clock().tick
-        self.char1.location = limbo
+        self.char1.location = self.room2
         exit_obj.at_traverse(self.char1, south_gate)
         self.assertIs(self.char1.location, south_gate)
         self.assertEqual(get_world_clock().tick, before + MOVE)

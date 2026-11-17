@@ -119,3 +119,6 @@ AGENTS.md: run each command on its own. `EV` stands for
   also establish preflight or rejection behavior were retargeted to the anchor-placement family.
 - `test_limbo_room.py::test_at_server_start_renames_legacy_room_and_bridges_it` was retargeted to
   assert the renamed room has no exits; the sync_limbo-before-sync_grid ordering test was deleted.
+- Final review: `test_movement_roundtrip.py` and `test_city_movement_cost.py` traversed the
+  deleted Limbo bridge; both now traverse an ordinary non-distance Exit from a plain room into
+  the south gate, so the `move` command-default lineage keeps its coverage.

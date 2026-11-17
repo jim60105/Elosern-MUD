@@ -6,8 +6,8 @@ traversal charges the physical duration the exit resolved at preflight
 (``world.rules.travel_cost``: authored edge geometry integrated against the
 slowest eligible source-present traveller's terrain speed, recomputed at every
 member threshold and terrain boundary, rounded upward once);
-explicit non-distance connectors — the Limbo bridge, instance-room doorways, a
-plain room pair — charge their authored ``CLOCK_YAML["command_defaults"]``
+explicit non-distance connectors — instance-room doorways, a plain room pair —
+charge their authored ``CLOCK_YAML["command_defaults"]``
 duration. Grid steps, wilderness steps and gate approaches still share one cost
 mechanism instead of bespoke inline ``get_world_clock().advance(...)`` calls
 (design.md D-1/D-5).
