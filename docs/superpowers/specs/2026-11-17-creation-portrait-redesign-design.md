@@ -1,7 +1,7 @@
 # 角色創建介面重設計與建角肖像設計（Creation Portrait Redesign Design）
 
 日期：2026-11-17
-狀態：已核准（待提案；兩個 OpenSpec change 見 §9）
+狀態：已核准（提案完成；七個 OpenSpec change 與平行實作批次見 §9）
 
 版面參考：`docs/design/creation-portraits/`（Storybook `Design/CreationPortraits`，合成資料，立繪為內建預設圖）。
 
@@ -170,16 +170,77 @@ drawer 的文案有兩處依賴「已存在的角色」（「透過目前的角�
 
 | 欄位 | 內容 | 所屬 change |
 | --- | --- | --- |
-| `presets[].artwork` | canonical artwork descriptor | 1 |
-| `custom.silhouettes` | 性別與外觀年齡區間對應的 artwork descriptor 清單 | 1 |
-| `portrait` | `status`（`empty`／`pending`／`ready`／`failed`／`unavailable`）、選用的 `artwork`、選用的 `reason` | 2 |
+| `presets[].artwork` | canonical artwork descriptor | `creation-panel-artwork` |
+| `custom.silhouettes` | 性別與外觀年齡區間對應的 artwork descriptor 清單 | `creation-panel-artwork` |
+| `portrait` | `status`（`empty`／`pending`／`ready`／`failed`／`unavailable`）、選用的 `artwork`、選用的 `reason` | `creation-draft-portrait-panel` |
 
 每個 change 各升一次 schema 版本，舊版本一律拒絕。專案沒有已發布的使用者，不做相容層。
 
-拆成兩個 change，依序進行：
+### 9.1 提案清單
 
-1. **creation-portrait-layout**：外框、卡牌牆、分步表單、概念頁、`presets[].artwork` 與 `custom.silhouettes`。肖像欄只有空白狀態，不顯示生成按鈕。
-2. **creation-draft-portrait**：`creation.portrait.generate`、面板的 `portrait`、肖像欄的其餘狀態、drawer 整合、與啟用及重設的互動。
+本設計原先規劃兩個交付（`creation-portrait-layout` 與 `creation-draft-portrait`）；實際提案依「一個工作天可完成」切成七個 change。協議變更、兩個 UI 介面，以及請求／狀態／生命週期的整合各自有獨立的測試擁有者，因此分開交付；肖像欄的空白狀態留在 UI 切片，其餘狀態與生成流程一起交付。
+
+| 序 | change | 範圍 | schema | commit |
+| --- | --- | --- | --- | --- |
+| 1 | `creation-panel-artwork` | `presets[].artwork` 與 `custom.silhouettes` 的 canonical descriptor、presenter 與瀏覽器鏡像驗證器 | 7 | `b10d6d91`、`9083d9d8` |
+| 2 | `creation-preset-card-wall` | 卡牌牆的本地展開與明確選取 | 7 | `f49cd972` |
+| 3 | `creation-stepped-form` | 三步表單、概念引導、空白肖像欄 | 7 | `21682318` |
+| 4 | `creation-draft-portrait-request` | `creation.portrait.generate` 的准入與序列化、connectivity 的唯一例外 | 7 | `a483442a`、`5b7c45d7`、`12f61043` |
+| 5 | `creation-draft-portrait-panel` | 面板 `portrait` 區塊、schema 8、完成發佈 | 8 | `3126d1e9`、`f3b02b74`、`4d506462` |
+| 6 | `creation-draft-portrait-cleanup` | 重設與啟用的所有權、rollback 保證 | 8 | `ef4f72d8`、`7ebd5d07` |
+| 7 | `creation-draft-portrait` | 真實 `GalleryGenerateDrawer` 整合與顯式狀態刷新 | 8 | `c17480e7`、`3edcd79d`、`b3aebb81` |
+
+兩個 schema 切換點：change 1 升到 7（descriptor 與 silhouettes），change 5 升到 8（`portrait` 區塊）。其餘 change 沿用當前版本。
+
+### 9.2 依賴、衝突與平行實作批次
+
+縮寫：A artwork、W wall、S steps、R request、P panel、C cleanup、I integration。
+
+依賴 DAG：A → W → S；A → R；R 與 S → P → C；S 與 C → I。P 依賴 S，因為它的 mounted-form 保留回歸必須跑真實步驟。單一工程師的安全順序是 A、W、S、R、P、C、I。不需要子 Git repo。
+
+| 批次 | 可同時進行的 change | 前置 |
+| --- | --- | --- |
+| 1 | A `creation-panel-artwork` | 無 |
+| 2 | W `creation-preset-card-wall`、R `creation-draft-portrait-request` | A |
+| 3 | S `creation-stepped-form` | A、W |
+| 4 | P `creation-draft-portrait-panel` | S、R |
+| 5 | C `creation-draft-portrait-cleanup` | R、P |
+| 6 | I `creation-draft-portrait` | S、C |
+
+衝突判定：`共享` 表示必須序列化共用檔案或同一條 spec requirement；`平行` 表示實質程式碼互斥，只需一般文件與 manifest 整合。
+
+| 組合 | 衝突與必要順序 |
+| --- | --- |
+| A/W | artwork props 與 fixtures 由卡牌牆消費；A 先於 W |
+| A/S | silhouette 表與 fixtures 由肖像欄消費；A 先於 S |
+| A/R | presenter／fallback API 與 art 測試；A 先於 R |
+| A/P | 同一面板／鏡像／fixtures 與版本 requirement；A 先於 P |
+| A/C | 在 R 之後可平行；沒有共同 requirement 替換 |
+| A/I | descriptor 與 fixture 消費；A 先於 I |
+| W/S | 同一 overlay／CSS／stories 與 workspace requirement；W 先於 S |
+| W/R | A 之後程式碼可平行；registry 對 UI，只共用文件與 manifest |
+| W/P | A、R 之後程式碼可平行；共用 fixtures 與文件需整合 |
+| W/C | R 之後程式碼可平行；共用 overlay 測試 |
+| W/I | 同一 overlay／stories／focus；W 先於 I |
+| S/R | 前置完成後實質程式碼可平行 |
+| S/P | 同一 overlay／form／stories 與 mounted-step 回歸；S 先於 P |
+| S/C | 程式碼可平行；共用 overlay 測試 |
+| S/I | 同一 slot／overlay／composable／stories；S 先於 I |
+| R/P | receipt／read model 與 publication 結果；R 先於 P |
+| R/C | 同一 rules／service／queue／測試，autogen spec 檔但不同 requirement 區塊；R 先於 C |
+| R/I | request 與 echo 由 drawer host 消費；R 先於 I |
+| P/C | receipt／錯誤／重設的 publication 語意；P 先於 C |
+| P/I | union／result／state 由 slot 消費；P 先於 I |
+| C/I | 生命週期瀏覽器旅程；C 先於 I |
+
+| 目前開啟中的其他 change | 對 A/W/S/R/P/C/I 的衝突 |
+| --- | --- |
+| `ciaran-village-local-goods` | 無；產品檔案與 spec 無交集，不觸發 creation／art／資料重生 |
+| `fionnen-village-fare-homes` | 無；僅在新測試登記時共用 CI manifest |
+
+`fionnen-village-craft-homes` 已封存，不計入開啟中的衝突。connectivity capability 的 delta 只由 R 擁有；P 與 I 消費 R 的 API 與狀態，不另寫 connectivity delta。目前沒有其他開啟中的 change 觸及 `art-service-connectivity-surface` 或 `world/art/connectivity.py`，因此這個修訂沒有外部衝突；日後開啟的 change 若觸及這兩者，必須與 R 序列化。
+
+### 9.3 既有 requirement 的改寫
 
 `openspec/specs/webclient-character-creation-ui/spec.md` 需要改寫的既有要求：
 
@@ -187,7 +248,7 @@ drawer 的文案有兩處依賴「已存在的角色」（「透過目前的角�
 - 「預設卡不得宣稱未提供的肖像」改為：預設卡顯示伺服器提供的 artwork descriptor，瀏覽器不得自行組出圖片位置。
 - 面板的欄位清單與 schema 版本。
 
-`art-gallery-generation` 與 `player-character-creation` 由第二個 change 增補建角期間生成與重設清除的要求。
+`art-gallery-generation`、`art-gallery-autogen`、`art-subject-model`、`webclient-action-dispatch` 與 `webclient-input-narrative` 由 `creation-draft-portrait-request` 增補建角期間生成的要求；`player-character-creation` 由 `creation-draft-portrait-cleanup` 增補重設與 rollback 的要求。
 
 ## 10. 元件與檔案
 
@@ -235,6 +296,6 @@ drawer 的文案有兩處依賴「已存在的角色」（「透過目前的角�
 
 ## 14. 風險
 
-- **待啟用角色提前取得 `portrait_policy`。** 現況是啟用時才建立。提前建立後，「回滾的建角不留下肖像狀態」這條既有保證的適用範圍要在第二個 change 的規格中重新界定為「回滾的啟用不新增肖像狀態」。
+- **待啟用角色提前取得 `portrait_policy`。** 現況是啟用時才建立。提前建立後，「回滾的建角不留下肖像狀態」這條既有保證的適用範圍要在 `creation-draft-portrait-cleanup` 的規格中重新界定為「回滾的啟用不新增肖像狀態」。
 - **八張卡的寬度。** 預設角色上限是 8。卡牌牆在 1451 寬、七倍展開比例下，收合卡約 96px 寬。上限若提高，卡牌牆要改成可橫向捲動的一列，屆時另行設計。
 - **立繪構圖差異。** 收合卡以置頂裁切取臉，構圖偏離中央的立繪會切到。官方圖的臉部框選資料已存在於 descriptor，實作時以它定位裁切，沒有框選資料時才用置頂。

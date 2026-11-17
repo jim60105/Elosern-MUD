@@ -44,40 +44,11 @@ The gallery drawer is a nested modal; it must be above creation, retain its own 
 
 ## Dependency and code-conflict matrix
 
-Abbreviations: A artwork, W wall, S steps, R request, P panel, C cleanup, I integration. `shared` means sequence shared files or the same spec requirement; `parallel` means disjoint substantive code, with ordinary documentation/manifest integration.
-
-| Pair | Conflict and required order |
-| --- | --- |
-| A/W | artwork props/fixtures consumed by wall; A before W |
-| A/S | silhouette table/fixtures consumed by slot; A before S |
-| A/R | presenter/fallback APIs and art tests; A before R |
-| A/P | same panel/mirror/fixtures and version requirement; A before P |
-| A/C | parallel after R; no common requirement replacement |
-| A/I | descriptor/fixture consumer; A before I |
-| W/S | same overlay/CSS/stories and workspace requirement; W before S |
-| W/R | parallel code after A; registry vs UI, shared docs/manifests only |
-| W/P | parallel code after A/R; shared fixtures/docs require integration |
-| W/C | parallel code after R; overlay tests shared |
-| W/I | same overlay/stories/focus; W before I |
-| S/R | parallel substantive code after prerequisites |
-| S/P | same overlay/form/stories and mounted-step regression; S before P |
-| S/C | parallel code; shared overlay tests |
-| S/I | same slot/overlay/composable/stories; S before I |
-| R/P | receipt/read model and publication result; R before P |
-| R/C | same rules/service/queue/tests, autogen spec file but different requirement blocks; R before C |
-| R/I | request/echo consumed by drawer host; R before I |
-| P/C | receipt/error/reset publication semantics; P before C |
-| P/I | union/result/state consumed by slot; P before I |
-| C/I | lifecycle browser journey; C before I |
-
-| Other currently open change | Conflict against A/W/S/R/P/C/I |
-| --- | --- |
-| ciaran-village-local-goods | none in product files/specs; no creation/art/data regeneration overlap |
-| fionnen-village-fare-homes | none in product files/specs; only CI manifests if new tests are registered |
-
-Connectivity-capability ownership is R only; P/I consume R's APIs/state rather than authoring another connectivity delta. Neither currently open village change touches `art-service-connectivity-surface` or `world/art/connectivity.py`, so the amendment adds no external conflict. A newly opened change touching either must serialize with R. `fionnen-village-craft-homes` is now archived and is not counted as an open-change conflict.
-
-Dependency DAG: A → W → S; A → R; R and S → P → C; S and C → I. A safe single-engineer delivery order is A, W, S, R, P, C, I. P explicitly depends on S because its mounted-form preservation regression must exercise real steps. No child Git repo is needed.
+The proposal list, dependency DAG, code-conflict matrix and parallel implementation batches live in
+the approved design at
+`docs/superpowers/specs/2026-11-17-creation-portrait-redesign-design.md` §9. This change is delivery
+batch 6 (I) and starts only after `creation-stepped-form` (S) and
+`creation-draft-portrait-cleanup` (C).
 
 ## Design resolutions and preserved predecessor decisions
 
