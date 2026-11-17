@@ -112,7 +112,6 @@ def _settlements(entries: dict[str, WildernessEntryPoint]) -> SettlementSnapshot
         graphs=MappingProxyType({Z_MAP_KEY: _synthetic_graph()}),
         anchor_placements=MappingProxyType({}),
         local_frame_anchors=MappingProxyType({}),
-        city_gates=MappingProxyType({}),
         wilderness_entries=MappingProxyType(entries),
         grid_node_scene_archetypes=MappingProxyType({}),
     )

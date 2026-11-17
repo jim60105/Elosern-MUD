@@ -16,7 +16,6 @@ from typeclasses.rooms import AnchorRoom, GridRoom, Room
 from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY
 from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
 from world.quests.tests._fixtures import RegistryIsolationMixin
-from world.maps.city_gates import CITY_GATE_REGISTRY, CityGateDef
 from world.maps.bootstrap import SyncReport, sync_grid, sync_limbo, sync_wilderness
 from world.maps.limbo import LIMBO_ALIAS, LIMBO_DESC, LIMBO_KEY, LIMBO_LEGACY_KEY
 from world.maps.map_data import SETTLEMENT_GRAPHS
@@ -39,9 +38,7 @@ from world.maps.tests._bootstrap_fixtures import (
     ANCHOR_PLACEMENT_MAP_IDS,
     CAPITAL_MAP_IDS,
     CAPITAL_VILLAGE_MAP_IDS,
-    CITY_GATE_MAP_IDS,
     EAST_GATE_XYZ,
-    SELECTED_GATE_ROW_COUNT,
     SOUTH_GATE_XYZ,
     VILLAGE_MAP_IDS,
     WILDERNESS_GATE_MAP_IDS,
@@ -69,12 +66,8 @@ class GridBootstrapTests(_GridBootstrapCase):
         self.assertEqual(
             self._count_city_exits(), _declared_road_count(CAPITAL_VILLAGE_MAP_IDS)
         )
-        # One forward Limbo bridge per CITY_GATE_REGISTRY row.
-        self.assertEqual(len(self._bridging_exits()), 2)
-        self.assertEqual(
-            len(self._bridging_exits()) + self._count_city_exits(),
-            _declared_road_count(CAPITAL_VILLAGE_MAP_IDS) + SELECTED_GATE_ROW_COUNT,
-        )
+        # 虛境 owns no exits: the grid joins nothing to the starting room.
+        self.assertEqual(self._bridging_exits(), [])
 
     def test_sync_grid_is_idempotent_and_preserves_dbid(self):
         create_object(Room, key=LIMBO_KEY, location=None)
@@ -96,7 +89,7 @@ class GridBootstrapTests(_GridBootstrapCase):
         self.assertEqual(
             self._count_city_exits(), _declared_road_count(CAPITAL_VILLAGE_MAP_IDS)
         )
-        self.assertEqual(len(self._bridging_exits()), 2)
+        self.assertEqual(self._bridging_exits(), [])
         self.assertEqual(first_ids, second_ids)
 
     def test_single_call_on_fresh_grid_spawns_every_declared_room(self):
@@ -177,7 +170,7 @@ class GridBootstrapStartupTests(_GridBootstrapCase):
     def test_at_server_start_without_limbo_syncs_lore_and_grid(self):
         with selected_startup_settlements(
             CAPITAL_VILLAGE_MAP_IDS,
-            # These contracts cover the grid, the bridges and the lore mirror;
+            # These contracts cover the grid and the lore mirror;
             # the ambient monster population is not part of them.
             zone_keys=(),
         ):
@@ -189,16 +182,16 @@ class GridBootstrapStartupTests(_GridBootstrapCase):
         self.assertEqual(
             self._count_city_exits(), _declared_road_count(CAPITAL_VILLAGE_MAP_IDS)
         )
-        self.assertEqual(len(self._bridging_exits()), 0)
+        self.assertEqual(self._bridging_exits(), [])
         from evennia.utils.search import search_script
 
         self.assertEqual(len(search_script("lore:anchor_placements:capital_altoria")), 1)
 
-    def test_at_server_start_with_limbo_creates_bridging_exits(self):
+    def test_at_server_start_with_limbo_creates_no_exit_touching_it(self):
         create_object(Room, key=LIMBO_KEY, location=None)
         with selected_startup_settlements(
             CAPITAL_VILLAGE_MAP_IDS,
-            # These contracts cover the grid, the bridges and the lore mirror;
+            # These contracts cover the grid, 虛境's empty exit set and the lore mirror;
             # the ambient monster population is not part of them.
             zone_keys=(),
         ):
@@ -210,7 +203,7 @@ class GridBootstrapStartupTests(_GridBootstrapCase):
         self.assertEqual(
             self._count_city_exits(), _declared_road_count(CAPITAL_VILLAGE_MAP_IDS)
         )
-        self.assertEqual(len(self._bridging_exits()), SELECTED_GATE_ROW_COUNT)
+        self.assertEqual(self._bridging_exits(), [])
 
 
 class WildernessBootstrapTests(_WildernessBootstrapCase):

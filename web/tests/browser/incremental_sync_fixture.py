@@ -23,7 +23,6 @@ runtime outside this test module.
 from __future__ import annotations
 
 import hashlib
-import importlib
 from dataclasses import replace
 from typing import Any
 
@@ -56,47 +55,42 @@ SNAPSHOT_MARKER = chr(0x7532)
 DELTA_MARKER = chr(0x4E59)
 
 
-def _gate_registry() -> dict[str, Any]:
-    """Return the shipped city-gate registry module's mapping.
+def entrance_positions() -> list[tuple[str, int, int, str]]:
+    """Return ``(name, x, y, map_key)`` for the two sorted-first entrances.
 
-    The module path and attribute are assembled at call time (the same
-    harness idiom the exploration seed uses) so this test module carries no
-    catalog symbol reference of its own.
+    Each position is the gate room of one wilderness entrance, resolved
+    through the shared entrance probe, so this test module names no shipped
+    catalog symbol or map key. Every entrance lies on a distinct settlement
+    map.
     """
-    module = importlib.import_module(".".join(("world", "maps", "city_gates")))
-    return getattr(module, "CITY" + "_GATE_REGISTRY")
+    from world.maps.static_references import settlement_node_xyz
+    from world.tests.geography_fixture import entrance_refs
 
-
-def gate_positions() -> list[tuple[str, int, int, str]]:
-    """Return ``(name, x, y, map_key)`` for every registered gate, sorted."""
-    registry = _gate_registry()
     positions = []
-    for name in sorted(registry):
-        from world.maps.static_references import settlement_node_xyz
-
-        x, y, z_map = settlement_node_xyz(registry[name].gate)
-        positions.append((name, int(x), int(y), str(z_map)))
+    for index, ref in enumerate(entrance_refs(2)):
+        x, y, z_map = settlement_node_xyz(ref)
+        positions.append((f"entrance{index}", int(x), int(y), str(z_map)))
     return positions
 
 
 def first_gate_xyz() -> tuple[int, int, str]:
-    """The ``(x, y, map_key)`` of the first registered gate room."""
-    _name, x, y, z_map = gate_positions()[0]
+    """The ``(x, y, map_key)`` of the first entrance's gate room."""
+    _name, x, y, z_map = entrance_positions()[0]
     return x, y, z_map
 
 
 def second_map_xyz() -> tuple[int, int, str]:
-    """The ``(x, y, map_key)`` of one gate on a *different* grid map.
+    """The ``(x, y, map_key)`` of an entrance gate room on a *different* map.
 
     A relocation there crosses an authoritative map boundary, which is what
     the text traversal scenario needs.
     """
-    positions = gate_positions()
+    positions = entrance_positions()
     origin = positions[0][3]
     for _name, x, y, z_map in positions[1:]:
         if z_map != origin:
             return x, y, z_map
-    raise RuntimeError("no second grid-map gate room is registered")
+    raise RuntimeError("no second grid-map entrance room is available")
 
 
 def xyz_arg(position: tuple[int, int, str]) -> str:

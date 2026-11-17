@@ -143,7 +143,6 @@ class ThirdSettlementTests(unittest.TestCase):
         # the location id are different, and no Python row names either.
         self.assertEqual(sorted(snapshot.anchor_placements), ["elven_village_eolas"])
         self.assertEqual(sorted(snapshot.local_frame_anchors), ["elven_village_eolas"])
-        self.assertEqual(sorted(snapshot.city_gates), ["t_third"])
         # Entry rows are keyed by the anchor identity the gate exits persist,
         # which is the document's location_ref (never its own id).
         self.assertEqual(sorted(snapshot.wilderness_entries), ["elven_village_eolas"])

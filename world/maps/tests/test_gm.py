@@ -29,9 +29,10 @@ class MapConsoleTests(ConsoleOwnerTest):
         self.assertEqual(list(destination.pin_reasons),['t_manual_pin'])
         self.assertEqual(read_world_clock().tick,tick)
         before={key:attribute_snapshot(self.player,key) for key in ('party','map_knowledge','quest_log','home')}
-        with mock.patch('world.rules.city_gates.reanchor_home_on_gate_arrival',side_effect=RuntimeError('after companion arrival')):
+        with mock.patch('world.rules.movement_settlement.invalidate_previous_edge',side_effect=RuntimeError('after companion arrival')) as late:
             with self.assertRaises(RuntimeError):
                 gm.teleport(self.target,f'#{self.room2.pk}')
+        late.assert_called_once_with(self.player)
         self.assertIs(self.player.location,destination)
         self.assertIs(self.npc.location,destination)
         for key,value in before.items():
@@ -54,9 +55,10 @@ class MapConsoleTests(ConsoleOwnerTest):
         self.assertIs(self.player.location,self.room2)
         self.assertIsNone(self.player.db.dialogue_session)
         self.assertEqual(read_world_clock().tick,tick)
-        with mock.patch('world.rules.city_gates.reanchor_home_on_gate_arrival',side_effect=RuntimeError('late')):
+        with mock.patch('world.rules.movement_settlement.invalidate_previous_edge',side_effect=RuntimeError('late')) as late:
             with self.assertRaises(RuntimeError):
                 gm.teleport(self.target,f'#{self.room1.pk}')
+        late.assert_called_once_with(self.player)
         self.assertIs(self.player.location,self.room2)
         self.assertIn(self.player,self.room2.contents)
         self.assertNotIn(self.player,self.room1.contents)

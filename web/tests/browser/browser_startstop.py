@@ -210,7 +210,7 @@ def apply_settlement_scope():
     static-reference validation, the planner, the writer, the transaction and
     the rollback path all stay production code, and the declaration itself
     (``fixtures.journey_settlement_scope``) is resolved at call time because the
-    gate registry it derives from needs the world the boot publishes. The
+    entrance probe it derives from needs the world the boot publishes. The
     returned callable restores both bindings; the one-shot seed process, which
     exits after seeding, may simply ignore it.
     """

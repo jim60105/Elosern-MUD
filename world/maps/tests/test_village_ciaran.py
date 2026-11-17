@@ -15,7 +15,6 @@ from tools.spec_traceability import covers_requirement
 from evennia.utils.test_resources import EvenniaTestCase
 
 from world.maps.map_data import settlement_graph
-from world.maps.static_references import settlement_node_xyz
 from world.tests.geography_fixture import publish_shipped_geography
 
 publish_shipped_geography()
@@ -205,23 +204,6 @@ class VillageCiaranMapTests(EvenniaTestCase):
         text = f"{entrance.key} {entrance.desc}".lower()
         for forbidden in ("wall", "gate", "guard", "城牆", "城門", "衛兵"):
             self.assertNotIn(forbidden, text)
-
-    @covers_requirement(
-        "village-ciaran-map::the-village-has-a-wilderness-footprint-disjoint-from-every-other-settlement"
-    )
-    def test_the_declared_entrance_is_the_city_gate_registry_slot(self):
-        from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
-        from world.maps.city_gates import CITY_GATE_REGISTRY
-
-        row = CITY_GATE_REGISTRY[MAP_ID]
-        self.assertEqual(settlement_node_xyz(row.gate)[2], MAP_ID)
-        self.assertEqual(
-            row.gate,
-            WILDERNESS_ENTRY_REGISTRY[self.document.location_ref]
-            .gate_for("n")
-            .destination,
-        )
-        self.assertEqual(row.exit_key, self.document.city_gate.exit_key)
 
     def test_no_wall_gate_guard_or_marketplace_in_village_text(self):
         for node in self.document.nodes.values():

@@ -9,7 +9,7 @@ from world.maps import wilderness_provider
 from world.maps.wilderness_provider import WILDERNESS_NAME
 from world.maps.static_references import settlement_node_xyz
 from world.rules.map_knowledge import KnowledgeError, parse_knowledge
-from .._knowledge_probes import live_city_gate_registry, live_map_key, live_wilderness_entry_registry
+from .._knowledge_probes import live_map_key, live_wilderness_entry_registry
 
 
 def _entry_with_west_gate_on(map_key: str):
@@ -52,7 +52,6 @@ class _MapKnowledgeFixture(EvenniaTest):
         self.map = live_map_key()
         sync_test_settlements((self.map,))
         sync_test_wilderness((self.map,))
-        self.gate_row = live_city_gate_registry()[self.map]
         entry, west_row = _entry_with_west_gate_on(self.map)
         # The south gate room is the same entry's north-returning gate
         # destination — read from the live registry, not a shipped constant.

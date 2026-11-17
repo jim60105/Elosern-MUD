@@ -1,5 +1,6 @@
-"""Tests for the localized starting room (Limbo) identity and its bridge
-(localize-limbo-zhtw: limbo-room capability)."""
+"""Tests for the localized starting room (Limbo): its identity, its hard
+entry gate and the rule that it owns no exits (limbo-room and
+limbo-one-way-gates capabilities)."""
 
 from tools.spec_traceability import covers_requirement
 
@@ -8,16 +9,12 @@ from unittest.mock import patch
 from evennia.objects.models import ObjectDB
 from evennia.utils.create import create_object
 from evennia.utils.search import search_object
-from evennia.utils.test_resources import EvenniaCommandTestMixin, EvenniaTest
+from evennia.utils.test_resources import EvenniaTest
 
-from commands.localized.general import CmdHome
 from server.conf.at_server_startstop import at_server_start
-from typeclasses.characters import Character, PlayerCharacter
 from typeclasses.exits import Exit
-from typeclasses.npcs import NPC
-from typeclasses.rooms import GridRoom, LimboRoom, Room
+from typeclasses.rooms import LimboRoom, Room
 from world.maps.bootstrap import sync_limbo
-from world.maps.static_references import settlement_node_xyz
 from world.maps.limbo import (
     LIMBO_ALIAS,
     LIMBO_DESC,
@@ -29,29 +26,10 @@ from world.rules.tests.combat_fixtures import BattlefieldIsolation
 from world.tests.geography_fixture import (
     publish_shipped_geography,
     selected_startup_settlements,
-    sync_test_settlements,
 )
 
 
-#: The city-gate row the starting-room bridge is built from, read through the
-#: live registry via an assembled attribute string so this file never names a
-#: shipped catalog symbol or map key literally.
-def _gate_row():
-    import importlib
-
-    registry = getattr(
-        importlib.import_module("world.maps." + "city_gates"),
-        "CITY_GATE" + "_REGISTRY",
-    )
-    keys = sorted(registry)
-    if not keys:
-        raise AssertionError("no city gate row exists for the limbo bridge")
-    return registry[keys[0]]
-
-
 publish_shipped_geography()
-
-SOUTH_GATE_XYZ = settlement_node_xyz(_gate_row().gate)
 
 
 class LimboRoomTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTest):
@@ -65,9 +43,6 @@ class LimboRoomTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTest):
     def _limbo(self):
         found = search_object(LIMBO_KEY, exact=True)
         return found[0] if found else None
-
-    def _south_gate(self):
-        return GridRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
 
     @covers_requirement("limbo-room::the-starting-room-presents-a-localized-zh-tw-identity")
     def test_sync_limbo_authors_zh_tw_identity(self):
@@ -131,50 +106,15 @@ class LimboRoomTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTest):
         self.assertTrue(any(LIMBO_KEY in str(call) for call in warn.call_args_list))
 
     @covers_requirement("limbo-room::sync-limbo-converges-the-starting-room-idempotently-at-server-start")
-    def test_at_server_start_converges_limbo_before_the_settlement_grid(self):
-        from server.conf.at_server_startstop import STARTUP_STEP_ORDER
-        from world.maps import bootstrap, runtime
-
-        # The starting room, every settlement graph and every permanent
-        # interior converge in ONE boot step, so the ordering this guards is
-        # the step body's own: the starting room converges (its legacy key is
-        # renamed to the canonical one) before the settlement grid bridges into
-        # it. A grid-first synchronization would bridge from the legacy key.
-        self.assertIn("sync_map_world", STARTUP_STEP_ORDER)
-        create_object(Room, key=LIMBO_LEGACY_KEY, location=None)
-        seen = {}
-
-        with selected_startup_settlements((_gate_row().gate.map_id,)):
-            # Observe the adapted binding, so the selection and the ordering
-            # observation hold at the same time.
-            adapted_sync_grid = bootstrap.sync_grid
-
-            def recording_sync_grid():
-                room = self._limbo()
-                seen["key"] = None if room is None else room.key
-                return adapted_sync_grid()
-
-            with patch.object(bootstrap, "sync_grid", recording_sync_grid):
-                runtime.synchronize()
-
-        self.assertEqual(seen.get("key"), LIMBO_KEY)
-        bridge = [
-            exit_obj
-            for exit_obj in self._limbo().exits
-            if exit_obj.destination == self._south_gate()
-        ]
-        self.assertEqual([exit_obj.key for exit_obj in bridge], [_gate_row().exit_key])
-
-    @covers_requirement("limbo-room::sync-limbo-converges-the-starting-room-idempotently-at-server-start")
-    def test_at_server_start_renames_legacy_room_and_bridges_it(self):
+    def test_at_server_start_renames_legacy_room_and_leaves_it_without_exits(self):
         from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
 
         legacy = create_object(Room, key=LIMBO_LEGACY_KEY, location=None)
         # Full startup also synchronizes service hosts in every settlement, so
-        # the declaration must cover every spawned host room, not only the
-        # bridge's own gate settlement.
+        # the declaration must cover every spawned host room.
         # The ambient monster population is not part of this declaration: the
-        # contract under test is the legacy room's rename and its bridge.
+        # contract under test is the legacy room's rename and that the
+        # settlement grid joins no exit to it.
         with selected_startup_settlements(
             tuple(
                 sorted(
@@ -192,68 +132,8 @@ class LimboRoomTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTest):
         room = self._limbo()
         self.assertEqual(room.id, legacy.id)
         self.assertEqual(room.key, LIMBO_KEY)
-        bridge = [exit_obj for exit_obj in room.exits if exit_obj.destination.xyz == SOUTH_GATE_XYZ]
-        self.assertEqual([exit_obj.key for exit_obj in bridge], ["南門"])
-
-    @covers_requirement("limbo-room::the-bridge-to-the-capital-presents-zh-tw-exit-names-and-aliases-reconciled-in-place")
-    def test_bridge_exits_carry_zh_tw_keys_and_aliases_only(self):
-        create_object(Room, key=LIMBO_KEY, location=None)
-        sync_test_settlements((_gate_row().gate.map_id,))
-
-        limbo = self._limbo()
-        south_gate = self._south_gate()
-        to_city = [e for e in limbo.exits if e.destination == south_gate]
-        self.assertEqual([e.key for e in to_city], ["南門"])
-        # One-way: no exit leads back into the starting room.
-        self.assertEqual([e for e in south_gate.exits if e.destination == limbo], [])
-        for exit_obj in to_city:
-            aliases = set(exit_obj.aliases.all())
-            self.assertEqual(aliases, set(_gate_row().exit_aliases))
-            self.assertTrue(all(not alias.isascii() for alias in aliases))
-
-    @covers_requirement("limbo-room::the-bridge-to-the-capital-presents-zh-tw-exit-names-and-aliases-reconciled-in-place")
-    def test_pre_existing_english_bridge_aliases_are_reconciled_in_place(self):
-        create_object(Room, key=LIMBO_KEY, location=None)
-        sync_test_settlements((_gate_row().gate.map_id,))
-
-        limbo = self._limbo()
-        south_gate = self._south_gate()
-        to_city = [e for e in limbo.exits if e.destination == south_gate][0]
-        to_city.aliases.clear()
-        to_city.aliases.add("south gate", "old capital gate")
-        to_city_id = to_city.id
-        # A legacy reverse exit seeded as an existing database has it.
-        reverse = create_object(
-            Exit, key="離開王都", aliases=["回虛境"], location=south_gate, destination=limbo
-        )
-
-        sync_test_settlements((_gate_row().gate.map_id,))
-
-        to_city = [e for e in limbo.exits if e.destination == south_gate]
-        self.assertEqual(len(to_city), 1)
-        self.assertEqual(to_city[0].id, to_city_id)
-        self.assertEqual(to_city[0].key, "南門")
-        self.assertNotIn("south gate", to_city[0].aliases.all())
-        self.assertNotIn("old capital gate", to_city[0].aliases.all())
-        self.assertEqual(
-            set(to_city[0].aliases.all()), set(_gate_row().exit_aliases)
-        )
-        # The reverse exit converges away (deleted object, gone from db).
-        self.assertEqual(
-            ObjectDB.objects.filter(id=reverse.id).exists(),
-            False,
-        )
-
-    @covers_requirement("limbo-room::the-bridge-to-the-capital-presents-zh-tw-exit-names-and-aliases-reconciled-in-place")
-    def test_resync_keeps_bridge_zh_tw_without_duplicates(self):
-        create_object(Room, key=LIMBO_KEY, location=None)
-        sync_test_settlements((_gate_row().gate.map_id,))
-        sync_test_settlements((_gate_row().gate.map_id,))
-
-        limbo = self._limbo()
-        south_gate = self._south_gate()
-        self.assertEqual(len([e for e in limbo.exits if e.destination == south_gate]), 1)
-        self.assertEqual(len([e for e in south_gate.exits if e.destination == limbo]), 0)
+        self.assertEqual(room.exits, [])
+        self.assertFalse(ObjectDB.objects.filter(db_destination=room.id).exists())
 
 
 class LimboHardGateTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTest):
@@ -332,101 +212,82 @@ class LimboHardGateTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
         self.assertEqual(room.db.desc, LIMBO_DESC)
 
 
-class GateHomePolicyTests(
-    BattlefieldIsolation, RegistryIsolationMixin, EvenniaCommandTestMixin, EvenniaTest
-):
-    """First-gate-traversal home re-anchor (D7) and the full one-way flow."""
+class LimboExitPruneTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTest):
+    """``sync_limbo()`` deletes every exit that touches 虛境 (retire-limbo-city-gates D1)."""
 
     def setUp(self):
         super().setUp()
-        self.room1.key = "Room1"
-        self.room2.key = "Room2"
-        self.room1.save()
-        self.room2.save()
-        create_object(Room, key=LIMBO_KEY, location=None)
+        self.limbo = create_object(Room, key=LIMBO_KEY, location=None)
+
+    @staticmethod
+    def _pruned_events(log_info):
+        return [
+            call
+            for call in log_info.call_args_list
+            if call.args and call.args[0] == "bootstrap_limbo_exit_pruned"
+        ]
+
+    def test_leftover_forward_exit_is_removed_and_logged(self):
+        forward = create_object(
+            Exit, key="t_離境小徑", location=self.limbo, destination=self.room1
+        )
+        forward_id = forward.id
+        forward_dbref = forward.dbref
+
+        with patch("world.maps.bootstrap.log_info") as log_info:
+            sync_limbo()
+
+        self.assertFalse(ObjectDB.objects.filter(id=forward_id).exists())
+        events = self._pruned_events(log_info)
+        self.assertEqual(len(events), 1)
+        context = events[0].kwargs["context"]
+        self.assertEqual(context["exit_dbref"], forward_dbref)
+        self.assertEqual(context["exit_key"], "t_離境小徑")
+        self.assertEqual(context["side"], "location")
+
+    def test_reverse_exit_is_removed_and_logged(self):
+        reverse = create_object(
+            Exit, key="t_回境小徑", location=self.room1, destination=self.limbo
+        )
+        reverse_id = reverse.id
+        reverse_dbref = reverse.dbref
+
+        with patch("world.maps.bootstrap.log_info") as log_info:
+            sync_limbo()
+
+        self.assertFalse(ObjectDB.objects.filter(id=reverse_id).exists())
+        events = self._pruned_events(log_info)
+        self.assertEqual(len(events), 1)
+        context = events[0].kwargs["context"]
+        self.assertEqual(context["exit_dbref"], reverse_dbref)
+        self.assertEqual(context["side"], "destination")
+
+    def test_converged_room_is_left_alone_on_a_second_run(self):
+        create_object(Exit, key="t_離境小徑", location=self.limbo, destination=self.room1)
+        create_object(Exit, key="t_回境小徑", location=self.room1, destination=self.limbo)
         sync_limbo()
-        sync_test_settlements((_gate_row().gate.map_id,))
-        self.limbo = search_object(LIMBO_KEY, exact=True)[0]
-        self.south_gate = GridRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
-        self.gate_exit = [e for e in self.limbo.exits if e.destination == self.south_gate][0]
-        # Birth state: the character was created in 虛境 with a 虛境 home
-        # (no DEFAULT_HOME override), via direct placement as the creation
-        # pipeline performs it.
-        self.char1.location = self.limbo
-        self.char1.home = self.limbo
+        object_ids = set(ObjectDB.objects.values_list("id", flat=True))
 
-    @covers_requirement("limbo-one-way-gates::the-first-city-gate-traversal-re-anchors-a-虛境-home-to-the-arrival-gate-room")
-    def test_first_gate_traversal_reanchors_home(self):
-        self.gate_exit.at_traverse(self.char1, self.south_gate)
+        with patch("world.maps.bootstrap.log_info") as log_info:
+            sync_limbo()
 
-        self.assertIs(self.char1.location, self.south_gate)
-        self.assertIs(self.char1.home, self.south_gate)
+        self.assertEqual(self._pruned_events(log_info), [])
+        self.assertEqual(set(ObjectDB.objects.values_list("id", flat=True)), object_ids)
 
-    @covers_requirement("limbo-one-way-gates::the-first-city-gate-traversal-re-anchors-a-虛境-home-to-the-arrival-gate-room")
-    def test_second_gate_traversal_never_overwrites_home(self):
-        self.gate_exit.at_traverse(self.char1, self.south_gate)
-        home_id = self.char1.home.id
-        self.assertIsNotNone(home_id)
+    def test_non_exit_objects_touching_the_room_survive(self):
+        # An item that merely carries a destination, and a non-exit object
+        # held in the room (as a creation-pending shell is), are not exits.
+        marker = create_object(
+            "typeclasses.objects.Object",
+            key="t_指路石",
+            location=self.room1,
+            destination=self.limbo,
+        )
+        held = create_object("typeclasses.objects.Object", key="t_寄存物", location=self.limbo)
 
-        # Re-crossing the same gate later (e.g. placed back for a resync test)
-        # must not touch the now-city home.
-        self.char1.location = self.limbo
-        self.gate_exit.at_traverse(self.char1, self.south_gate)
+        with patch("world.maps.bootstrap.log_info") as log_info:
+            sync_limbo()
 
-        self.assertEqual(self.char1.home.id, home_id)
-        self.assertIs(self.char1.home, self.south_gate)
-
-    @covers_requirement("limbo-one-way-gates::the-first-city-gate-traversal-re-anchors-a-虛境-home-to-the-arrival-gate-room")
-    def test_preexisting_non_limbo_home_survives_first_traversal(self):
-        self.char1.home = self.room2
-
-        self.gate_exit.at_traverse(self.char1, self.south_gate)
-
-        self.assertIs(self.char1.location, self.south_gate)
-        self.assertIs(self.char1.home, self.room2)
-
-    @covers_requirement("limbo-one-way-gates::the-first-city-gate-traversal-re-anchors-a-虛境-home-to-the-arrival-gate-room")
-    def test_failed_settlement_leaves_home_at_limbo(self):
-        with patch(
-            "world.rules.movement.charge_movement", side_effect=RuntimeError("clock boom")
-        ):
-            with self.assertRaises(RuntimeError):
-                self.gate_exit.at_traverse(self.char1, self.south_gate)
-
-        self.assertIs(self.char1.location, self.limbo)
-        self.assertIs(self.char1.home, self.limbo)
-
-    @covers_requirement("limbo-one-way-gates::the-first-city-gate-traversal-re-anchors-a-虛境-home-to-the-arrival-gate-room")
-    def test_settlement_failure_after_the_home_write_restores_live_home(self):
-        # The writer logs AFTER the durable write; failing that log raises
-        # inside the settlement transaction with home already written, so the
-        # outer rollback plus compensation must reconcile the LIVE object back
-        # to the rolled-back row — not just the database.
-        with patch("world.rules.city_gates.log_info", side_effect=RuntimeError("log boom")):
-            with self.assertRaises(RuntimeError):
-                self.gate_exit.at_traverse(self.char1, self.south_gate)
-
-        self.assertIs(self.char1.location, self.limbo)
-        self.assertIs(self.char1.home, self.limbo)
-
-    @covers_requirement("limbo-one-way-gates::the-first-city-gate-traversal-re-anchors-a-虛境-home-to-the-arrival-gate-room")
-    def test_non_player_traversal_changes_no_home(self):
-        traveler = create_object(NPC, key="旅人", location=self.limbo, home=self.limbo)
-
-        self.gate_exit.at_traverse(traveler, self.south_gate)
-
-        self.assertIs(traveler.location, self.south_gate)
-        self.assertIs(traveler.home, self.limbo)
-
-    @covers_requirement("limbo-one-way-gates::the-first-city-gate-traversal-re-anchors-a-虛境-home-to-the-arrival-gate-room")
-    @covers_requirement("limbo-one-way-gates::虛境-admits-no-character-by-any-path")
-    def test_home_command_after_reanchor_delivers_to_gate_never_limbo(self):
-        # Full one-way flow: birth in 虛境 → cross 「南門」 → wander → home.
-        self.gate_exit.at_traverse(self.char1, self.south_gate)
-        self.char1.location = self.room1  # wander away through any later path
-
-        output = self.call(CmdHome(), "", caller=self.char1, cmdstring="回家")
-
-        self.assertIn("還是家最溫暖", output)
-        self.assertIs(self.char1.location, self.south_gate)
-        self.assertIsNot(self.char1.location, self.limbo)
+        self.assertTrue(ObjectDB.objects.filter(id=marker.id).exists())
+        self.assertTrue(ObjectDB.objects.filter(id=held.id).exists())
+        self.assertEqual(self._pruned_events(log_info), [])

@@ -1,6 +1,6 @@
 """Current bindings every authored static map reference resolves against.
 
-Authored declarations (city gates, anchor placements, wilderness entry gates,
+Authored declarations (anchor placements, wilderness entry gates,
 place room joins, district landmarks and grid art associations) hold a
 qualified identity, never a coordinate; a subrace start location names an
 anchor whose placement holds one. This module is the one game-side boundary
@@ -218,7 +218,6 @@ class StaticWorld:
     """
 
     index: ReferenceIndex
-    city_gates: Mapping[str, Any]
     anchor_placements: Mapping[str, Any]
     wilderness_entries: Mapping[str, Any]
     district_landmarks: Mapping[str, QualifiedRef]
@@ -235,9 +234,6 @@ class StaticWorld:
 
         digest = hashlib.sha256()
         parts: list[Any] = [
-            tuple(
-                (key, _ref(row.gate)) for key, row in sorted(self.city_gates.items())
-            ),
             tuple(
                 (key, _ref(placement.node))
                 for key, placement in sorted(self.anchor_placements.items())
@@ -301,8 +297,6 @@ class StaticWorld:
             except ReferenceError as error:
                 problems.append(str(error))
 
-        for key, row in self.city_gates.items():
-            check_node(f"city gate {key}", row.gate)
         for key, placement in self.anchor_placements.items():
             check_node(f"anchor placement {key}", placement.node)
         for key, entry in self.wilderness_entries.items():
@@ -382,14 +376,12 @@ def published_static_world() -> StaticWorld:
     from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY
     from world.lore.settlements.places import PLACE_REGISTRY
     from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
-    from world.maps.city_gates import CITY_GATE_REGISTRY
     from world.maps.interiors import current as current_interiors
     from world.maps.room_art import GRID_NODE_SCENE_ARCHETYPES
 
     interiors = current_interiors()
     return StaticWorld(
         index=reference_index(),
-        city_gates=MappingProxyType(dict(CITY_GATE_REGISTRY)),
         anchor_placements=MappingProxyType(dict(ANCHOR_PLACEMENT_REGISTRY)),
         wilderness_entries=MappingProxyType(dict(WILDERNESS_ENTRY_REGISTRY)),
         district_landmarks=MappingProxyType(
@@ -434,7 +426,6 @@ def static_world_for_candidate(
 
     return StaticWorld(
         index=world.reference_index,
-        city_gates=MappingProxyType(dict(settlements.city_gates)),
         anchor_placements=MappingProxyType(dict(settlements.anchor_placements)),
         wilderness_entries=MappingProxyType(dict(settlements.wilderness_entries)),
         district_landmarks=MappingProxyType(
@@ -490,8 +481,8 @@ def binding_signature() -> str:
 
     The digest covers the settlement graphs (a moved node changes it), the
     placements, the interior identities and their exteriors, the district
-    landmarks, the grid art associations, the city gates and the wilderness
-    gate destinations, so a presenter cache keyed by it can never serve
+    landmarks, the grid art associations and the wilderness gate
+    destinations, so a presenter cache keyed by it can never serve
     geometry or visit ids from a previous binding.
     """
 
@@ -500,7 +491,6 @@ def binding_signature() -> str:
     from world.lore.map_districts import current as current_districts
     from world.lore.settlements.places import PLACE_REGISTRY
     from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
-    from world.maps.city_gates import CITY_GATE_REGISTRY
     from world.maps.geography import current as current_geography
     from world.maps.interiors import current as current_interiors
     from world.maps.map_data import SETTLEMENT_GRAPHS
@@ -578,9 +568,6 @@ def binding_signature() -> str:
                 key=lambda item: (_ref(item[0]), item[1]),
             )
         )
-    )
-    parts.append(
-        tuple((key, _ref(row.gate)) for key, row in sorted(CITY_GATE_REGISTRY.items()))
     )
     parts.append(
         tuple(

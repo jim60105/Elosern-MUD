@@ -55,8 +55,6 @@ def _node_dependents() -> dict[tuple[str, str], set[str]]:
             dependents.setdefault((reference.map_id, reference.object_id), set()).add(family)
 
     static = published_static_world()
-    for row in static.city_gates.values():
-        add(row.gate, "city_gate")
     for placement in static.anchor_placements.values():
         add(placement.node, "anchor")
     for entry in static.wilderness_entries.values():
