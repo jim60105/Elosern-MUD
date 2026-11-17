@@ -197,28 +197,33 @@ class ItemEffectsLoaderRemovalShapeTests(unittest.TestCase):
     def _document_with(self, entry):
         """The canonical document with its negative-removal entry replaced.
 
-        The removal entry is located by content probe, so this fixture
-        never names the shipped item whose entry it mutates.
+        The removal entry is located by content probe, so this fixture never
+        names the shipped item whose entry it mutates. It returns the temp path
+        and the key of the mutated item, so the caller asserts that item's own
+        profile rather than how many removal profiles shipped content declares.
         """
         source = Path(__file__).parents[1] / "rulebook" / "item_effects.yaml"
         document = yaml.safe_load(source.read_text(encoding="utf-8"))
+        mutated = None
         replaced = 0
-        for item_entry in document["items"].values():
+        for item_key, item_entry in document["items"].items():
             for effect in item_entry["effects"]:
                 if effect.get("remove_status") == "negative":
                     effect.clear()
                     effect.update(entry)
+                    mutated = item_key
                     replaced += 1
         self.assertEqual(replaced, 1)
         handle = tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False)
         yaml.safe_dump(document, handle, allow_unicode=True)
         handle.close()
-        return Path(handle.name)
+        return Path(handle.name), mutated
 
     def _load(self, entry):
         from world.rules.item_effects import load_item_effect_rules
 
-        return load_item_effect_rules(self._document_with(entry))
+        document_path, item_key = self._document_with(entry)
+        return load_item_effect_rules(document_path), item_key
 
     def test_removal_entry_with_amount_is_rejected(self):
         with self.assertRaises(ItemEffectsRulebookError):
@@ -235,16 +240,13 @@ class ItemEffectsLoaderRemovalShapeTests(unittest.TestCase):
             self._load({})
 
     def test_removal_entry_shape_loads(self):
-        loaded = self._load({"remove_status": "negative"})
-        removal_profiles = [
-            profile
-            for profile in loaded["profiles"].values()
-            if any(
-                isinstance(effect, StatusRemoveEffect)
-                for effect in profile.effects
-            )
+        loaded, item_key = self._load({"remove_status": "negative"})
+        selectors = [
+            effect.selector
+            for effect in loaded["profiles"][item_key].effects
+            if isinstance(effect, StatusRemoveEffect)
         ]
-        self.assertEqual(len(removal_profiles), 1)
+        self.assertEqual(selectors, ["negative"])
 
 
 if __name__ == "__main__":
