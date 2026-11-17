@@ -67,7 +67,7 @@ No line of dialogue delivers a free remedy, a custom commission, a discount or a
 
 ## 4. Per-Host Review
 
-Every scene declares `revision: r1`, opens with a complete actor utterance, holds five to seven lines and carries at least one host line. Three of the twelve topics are open merchant topics with no conditions; the elder's 往事 is a `pure_chain` successor of 山谷 and declares no `requires`. No topic declares a variant, a refusal or an `unavailable` status.
+Every scene declares `revision: r1`, opens with a complete actor utterance, holds five to eight lines and carries at least one host line. Every topic is open; the elder's 往事 is a `pure_chain` successor of 山谷 and declares no `requires`. No topic declares a variant, a refusal or an `unavailable` status.
 
 ### A. `eolas_nirnel_home` (妮爾內爾‧德米多)
 
@@ -76,17 +76,17 @@ Every scene declares `revision: r1`, opens with a complete actor utterance, hold
 1. **Opening greeting**: Nirnel sets down a basket of cut herbs, looks the guest over for tiredness and names what is bottled today. Her collar is loose over the warm stove and she does not gather it. Source: 生活方式 › 性文化 (no shame about the body); 種族設定 › 精靈族 (no shop, a maker's own home).
 2. `eolas_nirnel_home.topic_01` (`keyword`: 香草, `label`: 香草): the herb rows of 石階菜畦, the hour that decides when a leaf is picked, the stones she carried out of the beds, and the drying bunches above the stove. Source: `docs/lore/settlement-locations.md` 幽月谷村 (族人種塊根、豆子與香草) and the `terrace_gardens` node.
 3. `eolas_nirnel_home.topic_02` (`keyword`: 藥露, `label`: 藥露): 幽月香草藥露 is valley herbs and 溪源 water steeped slowly; it restores stamina for the trail, and she warns against treating medicine as water. Source: the `eolas_herb_tonic` registry row (potion band) and the `eolas_remedies` shelf.
-4. `eolas_nirnel_home.topic_03` (`keyword`: 魔力, `label`: 魔力): 魔力藥水 restores spent magic and 強效治療藥水 is for deep wounds; elves take no illness, but burns from 試法坪 and broken bones are real, and spent mana is felt in the body. Source: 種族設定 › 精靈族 (免疫所有疾病); 特殊體質; the two item registry rows.
+4. `eolas_nirnel_home.topic_03` (`keyword`: 魔力, `label`: 魔力): 魔力藥水 restores spent magic and 強效治療藥水 is for deep wounds; elves take no illness, but burns from 試法坪 and broken bones are real, and spent mana is felt in the body. Her last line turns to what a spent body wants in the night, and says the body must hold up first. Source: 種族設定 › 精靈族 (免疫所有疾病); 特殊體質; 生活方式 › 性文化; the two item registry rows.
 5. `eolas_nirnel_home.topic_04` (`keyword`: 收回, `label`: 收回): she takes back her own sealed jars and empty bottles for copper and declines herbs picked elsewhere. Source: the home's `eolas_remedies` service.
 
 ### B. `eolas_raellin_home` (雷林‧莉特弗特)
 
 **Card and voice review.** The public leaf reads her as the villager who loves cooking on 岩屋坡, bakes bean flatbread in the shared 窯場 and packs food for anyone heading up the trail, and it says plainly that she feeds people first and has no shyness about the body or the night; the appearance leaf keeps the brief (honey-brown hair in two short braids, flour to the elbows, a wooden paddle in her belt) and the speech leaf keeps the everyday, lively register with 喔 and 嘛. `identity.hidden` is empty, `voice.greeting` stays empty, and `voice.misunderstood` offers bread first and asks for the question again. Canon: 種族設定 › 精靈族; 生活方式 › 性文化. The card and the dialogue agree on the kiln, the bread and the herbs.
 
-1. **Opening greeting**: Raellin comes back from the kiln with warm flatbread, tears the top one in half and offers half before asking where the guest is headed. Her sleeves are at the shoulder and the kiln's red is still on her face. Source: `docs/lore/settlement-locations.md` 幽月谷村 (共用窯燒陶與玻璃); 生活方式 › 性文化.
+1. **Opening greeting**: Raellin comes back from the kiln with warm flatbread, tears the top one in half and offers half before asking where the guest is headed. She says food comes before strength, the night included, and her sleeves are at the shoulder with the kiln's red still on her face. Source: `docs/lore/settlement-locations.md` 幽月谷村 (共用窯燒陶與玻璃); 生活方式 › 性文化.
 2. `eolas_raellin_home.topic_01` (`keyword`: 豆餅, `label`: 豆餅): 幽月窯烤豆餅 is terrace beans ground into a paste, kneaded with last season's wheat flour and stuck to the kiln wall while the heat is still in it; she judges the bake by the sound of the crust. Source: the `eolas_kiln_flatbread` registry row and the `eolas_fare` shelf; the `kiln_yard` node.
 3. `eolas_raellin_home.topic_02` (`keyword`: 菜畦, `label`: 菜畦): beans, roots and herbs come from 石階菜畦; the terraces are built and watered by the village together, and neighbours trade bread for herbs rather than copper. Source: 幽月谷村 (石階菜畦) and the `terrace_gardens` node; 社會與文化 › 倫理觀.
-4. `eolas_raellin_home.topic_03` (`keyword`: 共食, `label`: 共食): the village eats at 共食棚 and nobody pays; a visitor may sit and eat, and copper is for what a guest carries away. Source: the 共食棚 interior and the village's self-sufficient economy in `docs/lore/settlement-locations.md`.
+4. `eolas_raellin_home.topic_03` (`keyword`: 共食, `label`: 共食): the village eats at 共食棚 and nobody pays; a visitor may sit and eat, copper is for what a guest carries away, and she says plainly that a guest who stays on after eating is not sent away and that the night waits until the meal is done. Source: the 共食棚 interior, the village's self-sufficient economy in `docs/lore/settlement-locations.md`, and 生活方式 › 性文化.
 5. `eolas_raellin_home.topic_04` (`keyword`: 收回, `label`: 收回): she takes back unopened food she packed and declines provisions from outside. Source: the home's `eolas_fare` service.
 
 ### C. `eolas_saelnel_home` (賽爾內爾‧妮格汀加勒)
@@ -116,7 +116,7 @@ None of the three names contains 店 or 舖, none of the descriptions contains �
 - **Traditional Chinese**: full-width punctuation throughout, no 您, no sentence-final 的 before a comma or a full stop, no half-width punctuation beside Chinese characters.
 - **No wuxia vocabulary**: no 江湖, 客官, 過招, 劍招, 招式, 祕技, 拜師, 功夫 or 掌門.
 - **No proprietor vocabulary**: none of 老闆, 店主, 本店, 營業時間, 營業, 庫存, 存貨, 存量, 售價, 光臨, 開店, 開門 or 打烊 appears in a village table.
-- **Scene shapes**: all twelve scenes open with an actor speech line, hold five to seven lines, carry at least one host line and declare `revision: r1`.
+- **Scene shapes**: all twelve scenes open with an actor speech line, hold five to eight lines, carry at least one host line and declare `revision: r1`.
 - **No age**: no 歲 figure, no apparent age and no count of years appears in any card, room description, greeting or scene. The ages live only in the profile records the game reads.
 - **No mechanics**: no line promises a skill, a stat, a status or a command. The scenes describe the world-side act only.
 - **Consent is structural**: no actor line grants consent, initiates an act or promises one; every explicit line belongs to the host.

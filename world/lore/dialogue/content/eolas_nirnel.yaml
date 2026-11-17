@@ -76,6 +76,9 @@ topics:
     - kind: speech
       speaker: host
       text: 「也為了走獸徑的客人。谷裡的人不太受傷，可山外的人會。你帶著一瓶，路上心裡踏實些。」
+    - kind: speech
+      speaker: host
+      text: 「也有人來問夜裡的事。身子撐得住，才談得上盡興；耗到腿發軟才想起我，就晚了。」
 - topic_id: eolas_nirnel_home.topic_04
   keyword: 收回
   label: 收回
