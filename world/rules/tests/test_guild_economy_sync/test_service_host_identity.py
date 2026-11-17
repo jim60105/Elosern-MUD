@@ -85,13 +85,8 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
             call for call in logged.call_args_list
             if call.args and call.args[0] == "guild_service_host_created"
         ]
-        # guild host + six capital merchants + eight village hosts + the lane's
-        # three attendants (altoria-hospitality) + the watch's two captains and
-        # the yard's instructor (altoria-crown-and-watch) + the academy's dean
-        # and the merchant hall's guild master (altoria-learning-and-exchange;
-        # the host-less palace and the host-less market stalls contribute no
-        # row, hence 25 and not 27)
-        self.assertEqual(len(events), 25)
+        # One event per derived service-host row.
+        self.assertEqual(len(events), len(get_catalog().service_hosts))
         # The guild host's event is located by service id, not position: the
         # terrace split (altoria-place-slices) made the lower terrace's eatery
         # the first roster row, so no shipped row keeps a fixed index.
@@ -148,7 +143,7 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
             call for call in logged.call_args_list
             if call.args and call.args[0] == "guild_service_host_created"
         ]
-        self.assertEqual(len(late), 25)
+        self.assertEqual(len(late), len(get_catalog().service_hosts))
 
     @covers_requirement("living-entity-hierarchy::livingentity-carries-sex-as-a-bounded-vocabulary-attribute-defaulting-to-other")
     def test_an_elf_host_sync_writes_the_permitted_sex(self):

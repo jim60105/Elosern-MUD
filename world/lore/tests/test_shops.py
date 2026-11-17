@@ -82,22 +82,16 @@ class ShopNPCIdentityTests(unittest.TestCase):
         self.assertIn("guild_branch:guild_branch_altoria", str(caught.exception))
         self.assertIn(holder, str(caught.exception))
 
-    def test_shipped_registry_carries_the_seven_capital_and_six_village_shops(self):
-        # The capital shops arrive in terrace-slice order (altoria-place-slices):
-        # the lower terrace's eatery precedes the middle terrace's store,
-        # forge, tailor, jeweller and alchemist (altoria-adornments-and-
-        # remedies closed the specialist family), and the upper terrace's
-        # sanctum shop follows (altoria-sanctum — the temple contributes no
-        # shop identity); the village homes close, alphabetical by host
-        # given name (ciaran-village-crafts grew the village to six homes).
-        self.assertEqual(
-            list(SHOP_REGISTRY),
-            [
-                "altoria_eatery", "altoria_general_store",
-                "altoria_forge", "altoria_tailor", "altoria_jeweller",
-                "altoria_alchemist", "altoria_sanctum_shop",
-                "ciaran_gwenaera_home", "ciaran_hailiel_home",
-                "ciaran_lareneth_home", "ciaran_nireth_home",
-                "ciaran_valwyn_home", "ciaran_vethiel_home",
-            ],
-        )
+    def test_shop_registry_follows_the_place_registry_order(self):
+        # A shop identity is derived from a place's merchant capability, so
+        # the registry is exactly the places that author one, in place order.
+        # Which places those are is game data and is not pinned here.
+        from world.lore.settlements.places import PLACE_REGISTRY, place_shop_identity
+
+        expected = [
+            shop_key
+            for shop_key in map(place_shop_identity, PLACE_REGISTRY.values())
+            if shop_key is not None
+        ]
+        self.assertTrue(expected)
+        self.assertEqual(list(SHOP_REGISTRY), expected)

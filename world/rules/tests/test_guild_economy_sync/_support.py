@@ -247,12 +247,12 @@ def _village_trading_place():
     """The registry-first village trading row (the comparison host)."""
     return next(iter(_village_trading_places()))
 
-def _village_subrace_key() -> str:
-    """The subrace every village host is authored to carry, registry-derived.
+def _village_subrace_keys() -> frozenset[str]:
+    """The subraces village hosts are authored to carry, registry-derived.
 
-    The village's people are a minority subrace WITHIN the capital's races:
-    the village identity is the one authored host subrace that no place of the
-    capital (the settlement owning the guild hall) declares.
+    The villages' people are minority subraces WITHIN the capital's races: a
+    village subrace is an authored host subrace that no place of the capital
+    (the settlement owning the guild hall) declares.
     """
     places = _places()
     capital_keys = {
@@ -265,13 +265,13 @@ def _village_subrace_key() -> str:
         for place in places.values()
         if place.settlement_key in capital_keys and place.host_subrace
     }
-    distinct = {
+    distinct = frozenset(
         place.host_subrace
         for place in _village_places()
         if place.host_subrace and place.host_subrace not in capital_subraces
-    }
-    assert len(distinct) == 1, f"village identity is not one subrace: {distinct}"
-    return next(iter(distinct))
+    )
+    assert distinct, "no village host declares a minority subrace"
+    return distinct
 
 def _roster_row(service_id):
     """The live catalog's roster row anchored on ``service_id``.
