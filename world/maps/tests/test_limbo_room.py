@@ -227,6 +227,9 @@ class LimboExitPruneTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaT
             if call.args and call.args[0] == "bootstrap_limbo_exit_pruned"
         ]
 
+    @covers_requirement(
+        "limbo-one-way-gates::sync-limbo-removes-every-exit-that-touches-虛境"
+    )
     def test_leftover_forward_exit_is_removed_and_logged(self):
         forward = create_object(
             Exit, key="t_離境小徑", location=self.limbo, destination=self.room1
@@ -245,6 +248,9 @@ class LimboExitPruneTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaT
         self.assertEqual(context["exit_key"], "t_離境小徑")
         self.assertEqual(context["side"], "location")
 
+    @covers_requirement(
+        "limbo-one-way-gates::sync-limbo-removes-every-exit-that-touches-虛境"
+    )
     def test_reverse_exit_is_removed_and_logged(self):
         reverse = create_object(
             Exit, key="t_回境小徑", location=self.room1, destination=self.limbo
@@ -262,6 +268,9 @@ class LimboExitPruneTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaT
         self.assertEqual(context["exit_dbref"], reverse_dbref)
         self.assertEqual(context["side"], "destination")
 
+    @covers_requirement(
+        "limbo-one-way-gates::sync-limbo-removes-every-exit-that-touches-虛境"
+    )
     def test_self_loop_exit_is_removed_once(self):
         loop = create_object(Exit, key="t_迴圈小徑", location=self.limbo, destination=self.limbo)
         loop_id = loop.id
@@ -274,6 +283,9 @@ class LimboExitPruneTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaT
         self.assertEqual(len(events), 1)
         self.assertEqual(events[0].kwargs["context"]["side"], "location")
 
+    @covers_requirement(
+        "limbo-one-way-gates::sync-limbo-removes-every-exit-that-touches-虛境"
+    )
     def test_converged_room_is_left_alone_on_a_second_run(self):
         create_object(Exit, key="t_離境小徑", location=self.limbo, destination=self.room1)
         create_object(Exit, key="t_回境小徑", location=self.room1, destination=self.limbo)
@@ -286,6 +298,9 @@ class LimboExitPruneTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaT
         self.assertEqual(self._pruned_events(log_info), [])
         self.assertEqual(set(ObjectDB.objects.values_list("id", flat=True)), object_ids)
 
+    @covers_requirement(
+        "limbo-one-way-gates::sync-limbo-removes-every-exit-that-touches-虛境"
+    )
     def test_non_exit_objects_touching_the_room_survive(self):
         # An item that merely carries a destination, and a non-exit object
         # held in the room (as a creation-pending shell is), are not exits.

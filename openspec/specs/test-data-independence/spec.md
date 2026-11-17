@@ -6,7 +6,9 @@ content in test sources, a provably shrink-only exemption ledger seeded with
 the pre-existing debt corpus, the `Data-contract test:` classification tag,
 and the CI + documentation wiring that keeps behavior tests resolvable without
 a database or shipped-content coupling.
+
 ## Requirements
+
 ### Requirement: Data-contract tests are explicitly classified
 A test file intentionally exercising shipped content SHALL retain the exact `Data-contract test:` first-docstring-line tag (or leading JS/TS comment) and its matching ledger reason. The classification SHALL permit generic schema/reference/content-quality checks and minimal real consumer smoke, and SHALL NOT authorize duplicated balance tables, literal magnitude pins, mock echoes or expected values from the same production calculation. Fixed synthetic fixtures MAY use known literal results.
 
@@ -189,7 +191,7 @@ and its mirrors SHALL be clean under the test-data lint gate.
 #### Scenario: Kit catalogs cover the shipped definition domains
 - **WHEN** the shared kit's catalogs are inventoried
 - **THEN** they cover at least items, skills, races/subraces, player presets, NPC and
-  monster tiers, anchors, wilderness regions, city gates, scene archetypes,
+  monster tiers, anchors, wilderness regions, scene archetypes,
   shops/economy, quests, titles, dialogue, buffs, and sexual acts
 
 #### Scenario: The kit carries no unused entries

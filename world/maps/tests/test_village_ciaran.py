@@ -195,7 +195,7 @@ class VillageCiaranMapTests(EvenniaTestCase):
         self.assertGreater(len({round(edge.length, 6) for edge in self.graph.edges}), 1)
 
     @covers_requirement(
-        "village-ciaran-map::the-village-has-exactly-one-concealed-entrance"
+        "village-ciaran-map::the-village-s-only-outside-connection-is-its-concealed-wilderness-entrance"
     )
     def test_the_entrance_does_not_read_as_a_gate(self):
         entrance = self.document.nodes[

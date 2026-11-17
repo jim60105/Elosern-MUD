@@ -67,6 +67,9 @@ class GridBootstrapAnchorTests(_GridBootstrapCase):
 class GridBootstrapBridgingTests(_GridBootstrapCase):
     """Starting-room isolation, gate exits and startup cases."""
 
+    @covers_requirement(
+        "limbo-one-way-gates::sync-limbo-removes-every-exit-that-touches-虛境"
+    )
     def test_sync_grid_creates_no_exit_touching_the_starting_room(self):
         from evennia.objects.models import ObjectDB
 
@@ -120,9 +123,8 @@ class GridBootstrapBridgingTests(_GridBootstrapCase):
         self.assertEqual(self._bridging_exits(), [])
 
     @covers_requirement(
-        "village-ciaran-map::the-village-has-exactly-one-concealed-entrance"
+        "village-ciaran-map::the-village-s-only-outside-connection-is-its-concealed-wilderness-entrance"
     )
-    @covers_requirement("limbo-one-way-gates::every-sync-prunes-every-exit-whose-destination-is-the-starting-room")
     def test_no_exit_joins_the_starting_room_and_the_village(self):
         limbo = create_object(Room, key=LIMBO_KEY, location=None)
         sync_test_settlements(CAPITAL_VILLAGE_MAP_IDS)

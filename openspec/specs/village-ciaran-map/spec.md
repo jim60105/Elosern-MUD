@@ -47,39 +47,6 @@ The village settlement document SHALL define a connected branching graph in its 
   underground settlement with skylit basins and ravines: no walls, no city gates, no
   marketplace and no signed premises
 
-### Requirement: The village has exactly one concealed entrance
-The village SHALL have exactly one connection to anything outside it, at its
-entrance node, serving both as the arrival point from the starting room and
-as the return point from the wilderness.
-
-#### Scenario: The village is reachable from the starting room
-- **WHEN** the starting room's exits are inspected after grid
-  synchronization
-- **THEN** one of them leads into the village's entrance node
-
-#### Scenario: No village room leads back to the starting room
-- **WHEN** every exit of every spawned village room is inspected after grid
-  synchronization
-- **THEN** none has the starting room as its destination
-
-#### Scenario: The entrance does not read as a gate
-- **WHEN** the entrance node's key and description are read
-- **THEN** they describe a concealed path through the forest, and name no
-  wall, gate or guard
-
-#### Scenario: A concealed path occupies the city-gate registry slot
-- **WHEN** the entrance is registered in the slot a city gate would occupy
-- **THEN** its naming and description SHALL still present a concealed path,
-  not a city gate: the world's elven villages have no walls and no gates,
-  their concealment being the forest and the villagers themselves
-
-#### Scenario: Synchronization prunes any exit back to the starting room
-- **WHEN** grid synchronization runs and any village room holds an exit whose
-  destination is the starting room
-- **THEN** synchronization SHALL prune that exit on every run, keeping the
-  connection one-way from the starting room on the same terms the capital's
-  is
-
 ### Requirement: The village has a wilderness footprint disjoint from every other settlement
 The village SHALL declare a wilderness footprint and at least one gate
 returning to its entrance node, so a traveller crossing the wilderness can
@@ -119,3 +86,18 @@ Village geometry SHALL use integer metres from its settlement document while ret
 #### Scenario: Underground setting and route
 - **WHEN** the village source is converted and a source-defined route is measured
 - **THEN** existing prose and concealed-entry semantics remain unchanged and route length uses its metre edges; underground setting fidelity is human-reviewed without a copied prose/duration approval table
+
+### Requirement: The village's only outside connection is its concealed wilderness entrance
+The village SHALL connect to anything outside it only at its entrance node, which is the return point from the wilderness. No village room SHALL hold an exit into the starting room or receive one from it, and the entrance node SHALL read as a concealed path, not a gate.
+
+#### Scenario: The starting room does not reach the village
+- **WHEN** every exit located in the starting room or in a spawned village room is inspected after grid synchronization
+- **THEN** none of them joins the starting room and the village
+
+#### Scenario: The entrance does not read as a gate
+- **WHEN** the entrance node's key and description are read
+- **THEN** they describe a concealed path through the forest, and name no wall, gate or guard
+
+#### Scenario: The wilderness returns to the entrance node
+- **WHEN** the village's wilderness entry gates are read
+- **THEN** every gate destination is the entrance node

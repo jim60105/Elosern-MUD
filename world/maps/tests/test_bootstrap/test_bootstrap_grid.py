@@ -54,7 +54,6 @@ class GridBootstrapTests(_GridBootstrapCase):
     """Spawn, update and first-pass convergence cases."""
 
     @covers_requirement("sample-city-altoria::the-sample-city-has-the-declared-rooms-in-a-connected-sparse-topology")
-    @covers_requirement("grid-room-sync::a-single-authored-idempotent-exit-bridges-limbo-and-the-sample-city")
     def test_sync_grid_spawns_both_settlements_rooms_and_exits(self):
         create_object(Room, key=LIMBO_KEY, location=None)
         sync_test_settlements(CAPITAL_VILLAGE_MAP_IDS)

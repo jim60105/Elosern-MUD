@@ -97,7 +97,7 @@ record_arrival SHALL remain at existing successful movement-completion seams and
 
 #### Scenario: Grid traversal records the destination after success
 - **WHEN** a `PlayerCharacter` successfully traverses a `CostedXYZExit` or an ordinary `Exit`
-  (including the Limbo bridge and an instance doorway pair)
+  (including an instance doorway pair)
 - **THEN** the knowledge record contains the destination's canonical `grid:` or `room:` node ID with a
   `last_seen_tick` equal to the current world tick
 

@@ -53,7 +53,6 @@ class SampleCityWalkthroughTests(EvenniaTest):
 
         self.assertTrue(plaza.return_appearance(self.char1))
 
-    @covers_requirement("sample-city-altoria::the-sample-city-connects-to-the-rest-of-the-world-through-exactly-one-bridging-exit")
     def test_every_room_is_reachable_from_south_gate(self):
         from world.maps.map_data import current
 
@@ -71,6 +70,9 @@ class SampleCityWalkthroughTests(EvenniaTest):
         self.assertEqual(len(seen), len(current().settlements["capital_altoria"].nodes))
         self.assertEqual(len([room for room in seen if isinstance(room, AnchorRoom)]), 1)
 
+    @covers_requirement(
+        "sample-city-altoria::the-sample-city-connects-to-the-world-only-through-its-wilderness-gates"
+    )
     def test_wilderness_gates_are_the_only_way_out_and_no_room_joins_limbo(self):
         from typeclasses.exits import WildernessGateExit
         from world.maps.map_data import current
