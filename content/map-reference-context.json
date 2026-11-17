@@ -238,7 +238,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "7b6331be29eb807141ef72314fdcf7b9e2db64f031ab1bba25d1529ac2a47d1b",
+  "fingerprint": "5b726e17ef6349d742113b1fe036f461528d2e73ac72fd5854a655bc22ea1f3a",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -16304,14 +16304,14 @@
     "world/lore/npc_card.py": "dfcfdd19ccbe3e92f7a3a7a8a561e423ba8710b14b7172cefb5f1c4fb9713dbd",
     "world/lore/npc_editorial_review.py": "9344e2b199fb4c2d83e2d18742aaa124b6eeb9a5585fa5afcc60fc0e8ecc3fdb",
     "world/lore/npc_profiles/__init__.py": "5819d59f3c448c34d33d263dc14b3e0efd4f790401addffacdc50cb95a73f76d",
-    "world/lore/npc_profiles/altoria_guild.py": "4e1aeaa10c8a87788b94842fff83727511febc727e933c021c2fa1b7975cdf04",
-    "world/lore/npc_profiles/altoria_lower.py": "485d327f3885fc8b48a1ca31ad4e45085471a727a6234e255dde33aa470708f3",
-    "world/lore/npc_profiles/altoria_trade.py": "13e835f3954920902b8a60afdb25b03c263b73bc0855ee6aa8c48ef4072b8f36",
-    "world/lore/npc_profiles/altoria_upper.py": "99fbbfbc2a340b493df93755386ee6c09fa8f98448484c5894154ae3377f290f",
-    "world/lore/npc_profiles/ciaran_homes_a.py": "c82e5c6a858a8df432a33fe3763283b608be82589adc75a5ae84c4326a42fb1a",
-    "world/lore/npc_profiles/ciaran_homes_b.py": "b0de829a2d3b36bf3a3d59b3c3610189746117b8d9129dcf4afa0ced9085a461",
-    "world/lore/npc_profiles/eolas_homes_a.py": "2cacc4ed57ac915014bd3cde2ea1356affa0a37a5c164d1648cbb9951e4dc334",
-    "world/lore/npc_profiles/eolas_homes_b.py": "7075b5758d3fb5fd083257d398fcb41a036d391e08e5c61f046362b5898224d4",
+    "world/lore/npc_profiles/altoria_guild.py": "cf14a2a86fe4614fe68dffa1ecfcebb0de66fa4c9f0a0175421f155bd8bcd14e",
+    "world/lore/npc_profiles/altoria_lower.py": "744b069ab74a9380f882a8db319132548dbd7517e6b85555e3cf2a54a74829de",
+    "world/lore/npc_profiles/altoria_trade.py": "0f877088fb1ba44264dff809e172ac87b1828d465da830133e8da489fe36c888",
+    "world/lore/npc_profiles/altoria_upper.py": "2b63b521a2d7d25de671c51610a19fd2f88f4ed8b750df5d274222af44b8af28",
+    "world/lore/npc_profiles/ciaran_homes_a.py": "806794677fcdf587803ef3ce6d329b9d82ca8de295d4c510bc5ee7fc84d1be63",
+    "world/lore/npc_profiles/ciaran_homes_b.py": "ac7b7533eb9a6840902a24fbd7822bdc1faa3c172ab1c64fd7e38003c592c7ae",
+    "world/lore/npc_profiles/eolas_homes_a.py": "21fde12d4a8556b1a1d3cd91a11f43d5d327dbc1359969b9e793060c7838721d",
+    "world/lore/npc_profiles/eolas_homes_b.py": "00c72527e56b125bc26c7fd3a66fddc0499bc4eae4d5b181a34439aaa0efe04e",
     "world/lore/npc_profiles/inventory.py": "5c6e881998c928eab7902462d27ffc88902a983806e0cf1edb24e71916452ac1",
     "world/lore/npc_profiles/shape.py": "988fc9dea7ad2f706bef99f8d6df265e423802af79a76880b6099cd2ba2be4fa",
     "world/lore/npc_tiers.py": "ef6a82a681f9212ab71295771986769e6f7285538367f72297bad6dddb66fd48",
