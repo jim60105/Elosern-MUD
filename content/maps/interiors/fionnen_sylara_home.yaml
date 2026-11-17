@@ -1,0 +1,21 @@
+# Permanent interior authored source (schema version 1).
+# The sole authority for the room's identity, name, prose, scene metadata and
+# its one exterior entrance relationship. The room id is the stable place key
+# a service record joins to, so a service record declares no geometry.
+version: 1
+kind: interior
+id: fionnen_sylara_home
+rooms:
+  fionnen_sylara_home:
+    name_zh: 希拉拉的家
+    desc_zh: 屋子挨著林間菜圃的畦邊，門口踩出一條通往藥圃的小路。樑上倒掛著止血藥草，風從板縫進來時，葉尖會碰在一起。角落的小爐上煨著一鍋蜂蠟，旁邊的架子上，封好的藥膏罐與藥水瓶排成一列。
+    scene_archetype: tavern_interior
+connections: []
+exterior:
+  settlement: elven_village_fionnen
+  node: forest_plots
+  room: fionnen_sylara_home
+  doorway_key: 希拉拉的家
+  doorway_aliases:
+  - sylara
+  - sylara's home
