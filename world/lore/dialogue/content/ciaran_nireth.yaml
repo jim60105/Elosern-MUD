@@ -6,7 +6,7 @@ topics:
   label: 調藥
   fallback:
     scene_id: ciaran_nireth_home.topic_01_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
@@ -15,7 +15,7 @@ topics:
       text: 妮瑞斯‧米斯特瓦勒拿布巾按了按額角滲出的細汗，目光掃過爐台上排列整齊的藥瓶。
     - kind: speech
       speaker: host
-      text: 「藥草全是我每天清晨在門前園子裡採摘，火候依著族裡長輩傳下來的法子，用慢火細煨一整天。精靈雖然天生不受瘟病侵害，但筋骨創傷和魔力枯竭，不管哪一族遇上都一樣凶險喔。」
+      text: 「藥草全是我每天清晨在門前園子裡採摘，火候依著族裡長輩傳下來的法子，用慢火細煨一整天。精靈天生不受瘟病侵害，筋骨也結實，可魔力枯竭不分族裔，誰遇上都凶險喔。」
     - kind: speech
       speaker: actor
       text: 你在這裡常備的藥，主要能應對哪些凶險情況？

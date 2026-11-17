@@ -6,7 +6,7 @@ topics:
   label: 藥草
   fallback:
     scene_id: fionnen_sylara_home.topic_01_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
@@ -24,7 +24,7 @@ topics:
       text: 「村子裡常有人受傷嗎？」
     - kind: speech
       speaker: host
-      text: 「進深林的獵人回來，身上總帶著幾道傷口。孩子跑得太急也會摔。備著，總比臨時去找好。」
+      text: 「進深林的獵人回來，衣裳總是給枝椏扯破，人倒不礙事。孩子跑得太急，撞斷的反而是樹幹。備著，山外來的客人和林子裡的動物都用得上。」
 - topic_id: fionnen_sylara_home.topic_02
   keyword: 蜂蠟膏
   label: 蜂蠟膏
@@ -54,7 +54,7 @@ topics:
   label: 光魔法
   fallback:
     scene_id: fionnen_sylara_home.topic_03_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
@@ -72,7 +72,7 @@ topics:
       text: 「那你自己受過傷，也會用光治嗎？」
     - kind: speech
       speaker: host
-      text: 「會。不過精靈受了傷，本來就會自己好。我學著處理傷口，是為了來訪的客人和林裡的動物。」
+      text: 「用不上。族裡的人就算給樹枝擦破皮，過一夜也就長好了。我學著處理傷口，是為了來訪的客人和林裡的動物。」
 - topic_id: fionnen_sylara_home.topic_04
   keyword: 收回
   label: 收回

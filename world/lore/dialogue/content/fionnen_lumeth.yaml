@@ -6,7 +6,7 @@ topics:
   label: 養蜂
   fallback:
     scene_id: fionnen_lumeth_home.topic_01_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
@@ -24,7 +24,7 @@ topics:
       text: 「收蜜的時候，蜂不會螫你嗎？」
     - kind: speech
       speaker: host
-      text: 「會呀。被螫幾次就曉得哪一種動作會惹牠們，動作慢一點，牠們也就懶得理你。」
+      text: 「會呀，蜂會繞著人轉。動作慢一點，牠們曉得你無意搶蜜，也就不理你了。」
 - topic_id: fionnen_lumeth_home.topic_02
   keyword: 蜜漬
   label: 蜜漬

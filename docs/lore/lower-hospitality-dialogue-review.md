@@ -13,9 +13,9 @@
   - Retained services: No quests, rumors, recruitments, or stat buffs granted by prose alone. Eatery sells assortment goods and buys ingredients. Tavern provides social setting and companion talks without free perks. Innkeeper provides lodging and practice environment without free heals or fee modifications.
 
 ## 2. Topic Inventory and Intent
-- `altoria_eatery_owner.yaml` (`revision: r2`):
+- `altoria_eatery_owner.yaml` (`revision: r2`, with `topic_02` later raised to `r3`):
   - `altoria_eatery.topic_01` (餐點): Daily basic hot meat soup, fresh thick-cut rye bread, travel rations.
-  - `altoria_eatery.topic_02` (招牌): Southeastern harbor lobster bisque recipe from an old boatman; genuine rare mention of elven candied blossoms as expensive luxury confections.
+  - `altoria_eatery.topic_02` (招牌): Southeastern harbor lobster bisque recipe from an old boatman; elven candied blossoms bought out on 南大道 as expensive luxury confections.
   - `altoria_eatery.topic_03` (乾糧): Wilderness travel advice, beastfolk smoked jerky and rye hardtack.
   - `altoria_eatery.topic_04` (收購): Buying game and wild harvest with strict freshness standards.
 - `altoria_tavern_keeper.yaml` (`revision: r2`):

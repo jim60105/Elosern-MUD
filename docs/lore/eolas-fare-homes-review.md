@@ -67,7 +67,7 @@ No line of dialogue delivers a free remedy, a custom commission, a discount or a
 
 ## 4. Per-Host Review
 
-Every scene declares `revision: r1`, opens with a complete actor utterance, holds five to eight lines and carries at least one host line. Every topic is open; the elder's 往事 is a `pure_chain` successor of 山谷 and declares no `requires`. No topic declares a variant, a refusal or an `unavailable` status.
+Every scene opens with a complete actor utterance, holds five to eight lines and carries at least one host line. `eolas_nirnel_home.topic_03` was revised after the first delivery and declares `revision: r2`; the other eleven stay at `r1`. Every topic is open; the elder's 往事 is a `pure_chain` successor of 山谷 and declares no `requires`. No topic declares a variant, a refusal or an `unavailable` status.
 
 ### A. `eolas_nirnel_home` (妮爾內爾‧德米多)
 
@@ -76,7 +76,7 @@ Every scene declares `revision: r1`, opens with a complete actor utterance, hold
 1. **Opening greeting**: Nirnel sets down a basket of cut herbs, looks the guest over for tiredness and names what is bottled today. Her collar is loose over the warm stove and she does not gather it. Source: 生活方式 › 性文化 (no shame about the body); 種族設定 › 精靈族 (no shop, a maker's own home).
 2. `eolas_nirnel_home.topic_01` (`keyword`: 香草, `label`: 香草): the herb rows of 石階菜畦, the hour that decides when a leaf is picked, the stones she carried out of the beds, and the drying bunches above the stove. Source: `docs/lore/settlement-locations.md` 幽月谷村 (族人種塊根、豆子與香草) and the `terrace_gardens` node.
 3. `eolas_nirnel_home.topic_02` (`keyword`: 藥露, `label`: 藥露): 幽月香草藥露 is valley herbs and 溪源 water steeped slowly; it restores stamina for the trail, and she warns against treating medicine as water. Source: the `eolas_herb_tonic` registry row (potion band) and the `eolas_remedies` shelf.
-4. `eolas_nirnel_home.topic_03` (`keyword`: 魔力, `label`: 魔力): 魔力藥水 restores spent magic and 強效治療藥水 is for deep wounds; elves take no illness, but burns from 試煉場 and broken bones are real, and spent mana is felt in the body. Her last line turns outright to sex, gives what a spent body wants as the reason, and says the body must hold up first. Source: 種族設定 › 精靈族 (免疫所有疾病); 特殊體質; 生活方式 › 性文化; the two item registry rows.
+4. `eolas_nirnel_home.topic_03` (`keyword`: 魔力, `label`: 魔力): 魔力藥水 restores spent magic and 強效治療藥水 is for deep wounds; elves take no illness and their bodies hold, but a burn she gave herself on 試煉場 is real, and spent mana is felt in the body. Her last line turns outright to sex, gives what a spent body wants as the reason, and says the body must hold up first. Source: 種族設定 › 精靈族 (免疫所有疾病); 特殊體質; 生活方式 › 性文化; the two item registry rows.
 5. `eolas_nirnel_home.topic_04` (`keyword`: 收回, `label`: 收回): she takes back her own sealed jars for copper, keeps empty bottles to wash and refill, and declines herbs picked elsewhere. Source: the home's `eolas_remedies` service.
 
 ### B. `eolas_raellin_home` (雷林‧莉特弗特)
@@ -116,7 +116,7 @@ None of the three names contains 店 or 舖, none of the descriptions contains �
 - **Traditional Chinese**: full-width punctuation throughout, no 您, no sentence-final 的 before a comma or a full stop, no half-width punctuation beside Chinese characters.
 - **No wuxia vocabulary**: no 江湖, 客官, 過招, 劍招, 招式, 祕技, 拜師, 功夫 or 掌門.
 - **No proprietor vocabulary**: none of 老闆, 店主, 本店, 營業時間, 營業, 庫存, 存貨, 存量, 售價, 光臨, 開店, 開門 or 打烊 appears in a village table.
-- **Scene shapes**: all twelve scenes open with an actor speech line, hold five to eight lines, carry at least one host line and declare `revision: r1`.
+- **Scene shapes**: all twelve scenes open with an actor speech line, hold five to eight lines and carry at least one host line; the one revised scene declares `revision: r2` and the other eleven `r1`.
 - **No age**: no 歲 figure, no apparent age and no count of years appears in any card, room description, greeting or scene. The ages live only in the profile records the game reads.
 - **No mechanics**: no line promises a skill, a stat, a status or a command. The scenes describe the world-side act only.
 - **Consent is structural**: no actor line grants consent, initiates an act or promises one; every explicit line belongs to the host.

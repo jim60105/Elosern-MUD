@@ -72,7 +72,7 @@ Every offer in `world/rules/rulebook/commerce/fionnen.yaml` sits inside its item
 
 ## 4. Per-Host Review
 
-Every scene declares `revision: r1`, opens with a complete actor utterance, holds six lines and carries at least one host line. Every topic is open except 菲爾溫's 往事, which is a `pure_chain` successor of 森林 and declares no `requires`. No topic declares a variant, a refusal or an unavailable status.
+Every scene opens with a complete actor utterance, holds six lines and carries at least one host line. Three scenes were revised after the first delivery and declare `revision: r2`, namely `fionnen_lumeth_home.topic_01`, `fionnen_sylara_home.topic_01` and `fionnen_sylara_home.topic_03`; the other thirteen stay at `r1`. Every topic is open except 菲爾溫's 往事, which is a `pure_chain` successor of 森林 and declares no `requires`. No topic declares a variant, a refusal or an unavailable status.
 
 ### A. `fionnen_elunwen_home` (埃倫溫‧斯威夫塔羅)
 
@@ -133,7 +133,7 @@ None of the four names contains 店 or 舖, none of the descriptions contains �
 - **Traditional Chinese**: full-width punctuation throughout, no 您, no sentence-final 的 before a comma or a full stop, no half-width punctuation beside Chinese characters.
 - **No wuxia vocabulary**: no 江湖, 客官, 過招, 劍招, 招式, 祕技, 拜師, 功夫 or 掌門.
 - **No proprietor vocabulary**: none of 老闆, 店主, 本店, 營業時間, 營業, 庫存, 存貨, 存量, 售價, 光臨, 開店, 開門 or 打烊 appears in a village table.
-- **Scene shapes**: all sixteen scenes open with an actor speech line, hold six lines, carry at least one host line and declare `revision: r1`.
+- **Scene shapes**: all sixteen scenes open with an actor speech line, hold six lines and carry at least one host line; the three revised scenes declare `revision: r2` and the other thirteen `r1`.
 - **No age**: no 歲 figure, no apparent age and no count of years appears in any card, room description, greeting or scene. The longbow's age is written as older than the kingdom, and the elder's memory as what she recalls.
 - **No mechanics**: no line promises a skill, a stat, a status or a command. The scenes describe the world-side act only.
 - **Consent is structural**: no actor line grants consent, initiates an act or promises one; every frank line belongs to the host, and no fare home stages a sexual scene.

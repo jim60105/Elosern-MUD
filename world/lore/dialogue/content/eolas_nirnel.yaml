@@ -54,7 +54,7 @@ topics:
   label: 魔力
   fallback:
     scene_id: eolas_nirnel_home.topic_03_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
@@ -69,7 +69,7 @@ topics:
       text: 「精靈不是不會生病嗎？那還需要這些？」
     - kind: speech
       speaker: host
-      text: 「病是不會生，可傷會。試煉場上燒穿的皮肉、林子裡摔斷的骨頭，都要養；魔力用空了也一樣，身子自己記得。」
+      text: 「病是不會生，可傷會。試煉場上自己點起的火燒穿了皮肉，也得養；魔力用空了也一樣，身子自己記得。」
     - kind: speech
       speaker: actor
       text: 「所以你們準備這些，是為了自己練法術受的傷？」

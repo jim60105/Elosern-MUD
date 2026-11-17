@@ -27,7 +27,7 @@ topics:
   label: 招牌
   fallback:
     scene_id: altoria_eatery.topic_02_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
@@ -45,7 +45,7 @@ topics:
       text: 「精靈做的花蕊蜜餞，在王都也能買得到？」
     - kind: speech
       speaker: host
-      text: 「精靈貴客難得拿出一些稀罕物，過路商隊一帶進南大道，轉眼就給搶個精光，進價高昂，自然也賣得貴得多啦。」
+      text: 「精靈貴客難得拿出一些稀罕物，過路商隊一帶進南大道，轉眼就被搶購一空，進價高昂，自然也賣得貴得多啦。」
 - topic_id: altoria_eatery.topic_03
   keyword: 乾糧
   label: 乾糧
