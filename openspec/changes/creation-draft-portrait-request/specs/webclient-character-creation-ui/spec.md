@@ -147,15 +147,23 @@ The production action registry SHALL register exactly `creation.preset`, `creati
 ## ADDED Requirements
 
 ### Requirement: Pending characters request portraits from exact draft values
-`creation.portrait.generate` SHALL accept exactly `race`, `subrace`, `sex`, `apparent_age` and `custom_prompt` for the authenticated account’s pending character. Invalid identity, prompt or in-flight state SHALL reject before policy or queue writes. An admitted request SHALL preserve canonical identity, draft, proposal and activation confirmation while requesting one image on that character’s named subject.
+`creation.portrait.generate` SHALL accept exactly `race`, `subrace`, `sex`, `apparent_age` and `custom_prompt` for the authenticated account's pending character. Invalid input, in-flight work or known service unavailability SHALL reject before policy, receipt or queue writes. Admission SHALL preserve canonical identity, draft, proposal and activation confirmation while requesting one image on that character's named subject.
 
 #### Scenario: A valid draft request needs no saved form
-- **WHEN** an owned pending character submits registered compatible race/subrace, a race-permitted sex, integer apparent age in 0..10000 excluding booleans and an accepted prompt
+- **WHEN** an owned pending character submits registered compatible race/subrace, a race-permitted sex, integer apparent age in 0..10000 excluding booleans and an accepted prompt with a successful server connectivity verdict
 - **THEN** one fresh image job is enqueued on `portrait:character:<character pk>`, with no canonical identity, trait, wizard-draft or concept-proposal write and no activation
 
 #### Scenario: Admission serializes receipt discovery through commit
 - **WHEN** a draft request contends with settlement of its preceding image
 - **THEN** queue serialization precedes database writes and covers receipt/card discovery through policy/job/receipt commit; admission either rejects the in-flight request or retains the committed preceding card, and callbacks that reacquire locks run only after release
+
+#### Scenario: Known-unavailable service refuses retryably before mutation
+- **WHEN** an otherwise valid creation portrait request receives a failed server connectivity verdict, even if the browser's displayed state was stale or bypassed
+- **THEN** it returns `portrait_service_unavailable` and publishes the safe unavailable reason without a policy, portrait receipt/state, draft, confirmation or queue write; existing art survives, and a later valid successful verdict permits explicit retry
+
+#### Scenario: Offline portrait does not block creation or play
+- **WHEN** art and LLM services are unavailable
+- **THEN** preset and custom creation, activation and deterministic gameplay remain available; no connectivity gate is added to gallery, ensure/autogen, queue or worker paths
 
 #### Scenario: Exact payload rejects before mutation
 - **WHEN** any required key is missing, an extra field names a subject, actor, age, binding, fields or calculated stat, a key is blank/overlong/unknown, subrace is incompatible, sex is forbidden, or apparent age is malformed/out of range

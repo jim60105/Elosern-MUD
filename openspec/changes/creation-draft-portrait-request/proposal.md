@@ -11,7 +11,7 @@ The existing gallery request requires canonical ages and identity already writte
 - Serialize per-subject admission, track draft-owned image ids and replace only the previous draft image on success.
 - Keep receipt discovery through commit under queue-before-database serialization and defer lock-taking commit callbacks until release.
 - Extend registry/catalog coverage without inventing a typed command or echoing prompt text.
-- Preserve the handoff's diagnostic-only connectivity decision: offline generation fails through the existing worker, not a new preflight probe. This documented deviation from approved §7.3 avoids changing the existing non-gating contract.
+- Explicitly amend diagnostic-only connectivity for this admission alone, as approved §§7.3/12 require: known-unavailable service rejects retryably before writes; gallery, ensure, queue and worker paths remain ungated.
 
 ## Capabilities
 
@@ -27,6 +27,7 @@ None.
 - `art-gallery-generation`: the validated draft-value request path.
 - `art-gallery-autogen`: draft-age exception and activation/rollback ownership.
 - `art-subject-model`: draft-value physical description.
+- `art-service-connectivity-surface`: the sole creation-admission exception and read-only cached availability for server presentation.
 
 ## Impact
 
@@ -38,4 +39,5 @@ Approved source: `docs/superpowers/specs/2026-11-17-creation-portrait-redesign-d
 
 - depends-on: creation-panel-artwork
 - Code-conflict notes: serialize shared `creation.py`/browser validator/fixture schema edits in 1 → 4 → 5; shared overlay/stories in 2 → 3 → 7; rules/service/queue/receipt edits in 4 → 6. Detailed matrix is in `creation-draft-portrait/design.md`.
+- Connectivity delta ownership: this change alone modifies `art-service-connectivity-surface`; panel/integration changes consume it. Any concurrent change to that capability or `world/art/connectivity.py` must be serialized with this change.
 - No code/spec conflict with `ciaran-village-local-goods`, `fionnen-village-craft-homes` or `fionnen-village-fare-homes`: those change lore/commerce/maps and editorial documents; this batch changes creation/art mechanisms and frontend synchronization documentation. Shared CI shard manifests are integration-only conflicts if both deliveries register tests; regenerate registrations after earlier changes instead of replacing their entries.
