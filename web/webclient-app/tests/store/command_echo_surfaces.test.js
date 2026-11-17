@@ -678,9 +678,10 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
         openExploration();
         enterCreation();
         expect(store.focusItemByKey("presets")).toBe(true);
-        store.focusConfirm("pointer"); // opens the preset card frame
-        expect(store.focusItemByKey("preset-0")).toBe(true);
-        store.focusConfirm("pointer");
+        store.focusConfirm("pointer"); // opens the (row-less) preset frame
+        // The card wall's deliberate choose is the single preset dispatch
+        // (creation-preset-card-wall); it carries no display descriptor.
+        store.dispatchAction("creation.preset", { preset_key: CREATION_PANEL_SAMPLE.presets[0].key });
       },
       expected: "character preset preset_wandering_blade",
     },
@@ -692,8 +693,8 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
         enterCreation();
         expect(store.focusItemByKey("presets")).toBe(true);
         store.focusConfirm("pointer");
-        expect(store.focusItemByKey("preset-0")).toBe(true);
-        store.focusConfirm("pointer"); // saves the draft (pending save)
+        // The card wall's choose saves the draft (pending save).
+        store.dispatchAction("creation.preset", { preset_key: CREATION_PANEL_SAMPLE.presets[0].key });
         store.receive(1, "ui_action_result", [fx.actionResult()], {});
         // The successful save opens the confirmation frame automatically.
         expect(store.focusItemByKey("confirm-creation.activate")).toBe(true);

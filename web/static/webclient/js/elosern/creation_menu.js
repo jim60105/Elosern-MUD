@@ -1,8 +1,8 @@
 /*
  * Elosern DOM-independent character-creation menu model.
  *
- * Reduces a validated `creation` panel into the logical preset cards, the
- * custom-form geometry (selected race/subrace, the seven allocation axes, and
+ * Reduces a validated `creation` panel into the root and preset-list frames,
+ * the custom-form geometry (selected race/subrace, the seven allocation axes, and
  * the name plus two age fields), the saved-draft restoration, and the
  * exact wire payloads consumed by KeyboardRouter and the creation dock. The
  * server is authoritative for every bound and the age gate; this model only
@@ -73,33 +73,6 @@
         openSubmenu: "concept",
       },
     ];
-  }
-
-  function presetItems(panel) {
-    var items = [];
-    (panel.presets || []).forEach(function (card, index) {
-      items.push({
-        key: "preset-" + index,
-        label: card.display_name + "（" + card.race_description + "）",
-        enabled: true,
-        actionId: PRESET_ACTION,
-        payload: { preset_key: card.key },
-        presetKey: card.key,
-        description:
-          (card.emphasis || "") + " " + (card.background || ""),
-      });
-    });
-    if (items.length === 0) {
-      items.push({
-        key: "presets-empty",
-        label: "目前沒有可選擇的預設角色。",
-        enabled: false,
-        actionId: null,
-        payload: null,
-        description: "請使用自訂角色。",
-      });
-    }
-    return items;
   }
 
   function presetCard(panel, presetKey) {
@@ -601,7 +574,11 @@
         // Menu titles (H3 webclient-hud-03-action-dock): the breadcrumb
         // names every stacked frame; fixed, testable labels.
         root: { items: rootItems(panel), focusKey: null, title: "建角" },
-        presets: { items: presetItems(panel), focusKey: null, grid: true, gridCols: 2, title: "預設角色" },
+        // The preset list is a navigation marker only (creation-preset-card-
+        // wall): browsing and the deliberate selection live on the overlay's
+        // card wall, so this frame carries no rows a digit or Enter could
+        // submit. It keeps its breadcrumb title and gives Escape a level.
+        presets: { items: [], focusKey: null, title: "預設角色" },
       },
     };
   }
@@ -616,7 +593,6 @@
     RESET_ACTION: RESET_ACTION,
     RESET_DISPLAY: RESET_DISPLAY,
     rootItems: rootItems,
-    presetItems: presetItems,
     presetCard: presetCard,
     buildMenus: buildMenus,
     profileFor: profileFor,

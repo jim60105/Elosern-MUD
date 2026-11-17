@@ -537,13 +537,20 @@ export function applyTransport(ctx) {
     // keeps its frozen two-field shape.
     ctx.mutationSubmitted = true;
     ctx.lastSubmittedRequestId = requestId;
-    // A custom save tracks its request so the result resolution opens the
-    // confirmation for the just-saved draft (fix-creation-finalization-safety
-    // D1); the preset path records the same markers on router submit.
+    // A custom or preset save tracks its request so the result resolution
+    // opens the confirmation for the just-saved draft only after its matching
+    // successful result (fix-creation-finalization-safety D1). The preset save
+    // comes from the card wall's deliberate choose (creation-preset-card-wall),
+    // so re-choosing the already-saved card still reaches the confirmation.
     if (actionId === CreationMenu.CUSTOM_ACTION && ctx.creation) {
       ctx.creation.pendingSaveRequestId = requestId;
       ctx.creation.pendingActivate = "custom";
       ctx.creation.pendingActivateKey = null;
+    } else if (actionId === CreationMenu.PRESET_ACTION && ctx.creation) {
+      const presetKey = envelope.payload.preset_key;
+      ctx.creation.pendingSaveRequestId = requestId;
+      ctx.creation.pendingActivate = "preset";
+      ctx.creation.pendingActivateKey = typeof presetKey === "string" ? presetKey : null;
     }
     ctx.router.setMutationInFlight(true);
     try {

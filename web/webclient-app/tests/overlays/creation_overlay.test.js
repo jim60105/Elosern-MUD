@@ -86,15 +86,6 @@ describe("CreationOverlay (B5 overlays family)", () => {
     wrapper.unmount();
   });
 
-  it("activating a preset card emits creation.preset with the exact payload", () => {
-    const wrapper = mount(CreationOverlay, { props: { creation: CREATION_PANEL_SAMPLE } });
-    wrapper.findAll('[data-testid="creation-preset-card"]')[1].trigger("click");
-    expect(lastAction(wrapper, "creation.preset")).toEqual({
-      action_id: "creation.preset",
-      payload: { preset_key: "preset_lantern_scholar" },
-    });
-  });
-
   // -- Custom state + age bounds gate ---------------------------------------
   it("custom confirm emits creation.custom with the exact payload fields", async () => {
     const wrapper = mount(CreationOverlay, { props: { creation: CREATION_PANEL_SAMPLE } });
@@ -439,13 +430,14 @@ describe("CreationOverlay (B5 overlays family)", () => {
   });
 
   // -- Draft resume ----------------------------------------------------------
-  it("resumes a preset draft with the saved preset highlighted", () => {
+  it("resumes a preset draft with the saved preset marked and expanded", () => {
     const wrapper = mount(CreationOverlay, { props: { creation: CREATION_PANEL_PRESET_DRAFT_SAMPLE } });
     expect(wrapper.get('[data-testid="creation-overlay"]').attributes("data-mode")).toBe("preset");
     const cards = wrapper.findAll('[data-testid="creation-preset-card"]');
     const selected = cards.filter((card) => card.attributes("data-selected") === "true");
     expect(selected.length).toBe(1);
-    expect(selected[0].get('[data-testid="creation-preset-name"]').text()).toBe("燈下學士");
+    expect(selected[0].attributes("data-preset-key")).toBe(CREATION_PANEL_PRESET_DRAFT_SAMPLE.draft.preset_key);
+    expect(selected[0].attributes("data-expanded")).toBe("true");
   });
 
   it("resumes a custom draft with the form pre-filled", () => {
@@ -811,5 +803,336 @@ describe("name roll tab pinning real-store integration (fix-creation-roll-tab-pi
       store.view.creationView = { stage: "presets", confirmItems: [], confirmLabel: null, confirmAction: null, pendingPresetKey: null };
     await appWrapper.vm.$nextTick();
       expect(overlayEl.getAttribute("data-mode")).toBe("preset");
+  });
+});
+
+// -- Preset card wall (creation-preset-card-wall) ---------------------------
+// Synthetic cards only: the wall renders whatever the panel supplies, so the
+// keys, names and count below are invented and never a shipped roster.
+const WALL_CARDS = ["t_wall_ash", "t_wall_birch", "t_wall_cedar", "t_wall_dune"].map((key, index) => ({
+  key,
+  display_name: `測試卡${index + 1}`,
+  race: CREATION_PANEL_SAMPLE.custom.races[0].key,
+  race_description: "測試種族描述。",
+  subrace: null,
+  emphasis: "測試專長",
+  background: "測試來歷。",
+  artwork: { ...structuredClone(CREATION_PANEL_SAMPLE.presets[0].artwork), subject_id: `creation:preset:${key}` },
+}));
+const wallPanel = (overrides = {}) => ({ ...CREATION_PANEL_SAMPLE, presets: WALL_CARDS, draft: null, ...overrides });
+
+function keydown(target, key, init = {}) {
+  const event = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true, ...init });
+  target.dispatchEvent(event);
+  return event;
+}
+
+function expandedKeyOf(root) {
+  const open = root.querySelectorAll('[data-testid="creation-preset-card"][data-expanded="true"]');
+  expect(open.length).toBe(1);
+  return open[0].getAttribute("data-preset-key");
+}
+
+describe("CreationPresetWall: local browsing until deliberate selection", () => {
+  let wrapper;
+  let bubbled;
+  const onBubble = (event) => bubbled.push(event.key);
+
+  function mountWall(props = {}) {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    wrapper = mount(CreationOverlay, { props: { creation: wallPanel(), ...props }, attachTo: host });
+    return wrapper;
+  }
+  const wall = () => wrapper.get('[data-testid="creation-preset-wall"]').element;
+  const expanded = () => wall().querySelector('[data-expanded="true"]');
+  const actions = () => (wrapper.emitted("action") ?? []).map(([intent]) => intent);
+
+  beforeEach(() => {
+    bubbled = [];
+    // Stands in for the bubble-phase keyboard bridge: a consumed wall key
+    // must never reach it.
+    document.addEventListener("keydown", onBubble);
+  });
+  afterEach(() => {
+    document.removeEventListener("keydown", onBubble);
+    wrapper?.unmount();
+    wrapper = null;
+    document.body.innerHTML = "";
+  });
+
+  it("renders every supplied card, opens the first on entry and focuses it", async () => {
+    mountWall();
+    await nextTick();
+    const cards = wall().querySelectorAll('[data-testid="creation-preset-card"]');
+    expect([...cards].map((card) => card.getAttribute("data-preset-key"))).toEqual(WALL_CARDS.map((c) => c.key));
+    expect(expandedKeyOf(wall())).toBe(WALL_CARDS[0].key);
+    expect(expanded().getAttribute("aria-current")).toBe("true");
+    expect(document.activeElement).toBe(expanded());
+    // Collapsed cards are named native opening buttons; the expanded card's
+    // primary button is never nested inside an opening button.
+    const openers = wall().querySelectorAll('[data-testid="creation-preset-open"]');
+    expect(openers.length).toBe(WALL_CARDS.length - 1);
+    openers.forEach((button) => {
+      expect(button.tagName).toBe("BUTTON");
+      expect(button.getAttribute("aria-label")).toBeTruthy();
+    });
+    expect(wall().querySelector('[data-testid="creation-preset-choose"]').closest('[data-testid="creation-preset-open"]')).toBeNull();
+  });
+
+  it("restores a surviving draft card on entry, and falls back to the first card", () => {
+    mountWall({ creation: wallPanel({ draft: { mode: "preset", stage: "preset_selected", preset_key: WALL_CARDS[2].key } }) });
+    expect(expandedKeyOf(wall())).toBe(WALL_CARDS[2].key);
+    wrapper.unmount();
+    mountWall({ creation: wallPanel({ draft: { mode: "preset", stage: "preset_selected", preset_key: "t_wall_gone" } }) });
+    expect(expandedKeyOf(wall())).toBe(WALL_CARDS[0].key);
+  });
+
+  it("keeps a surviving local browse on republication and replaces a vanished one", async () => {
+    mountWall();
+    keydown(expanded(), "3");
+    await nextTick();
+    expect(expandedKeyOf(wall())).toBe(WALL_CARDS[2].key);
+    await wrapper.setProps({ creation: wallPanel({ presets: WALL_CARDS.map((card) => ({ ...card })) }) });
+    expect(expandedKeyOf(wall())).toBe(WALL_CARDS[2].key);
+    await wrapper.setProps({ creation: wallPanel({ presets: WALL_CARDS.filter((card) => card.key !== WALL_CARDS[2].key) }) });
+    expect(expandedKeyOf(wall())).toBe(WALL_CARDS[0].key);
+    expect(actions()).toEqual([]);
+  });
+
+  it("pointer opening only moves the expansion and sends nothing", async () => {
+    mountWall();
+    const opener = wall().querySelector(`[data-preset-key="${WALL_CARDS[1].key}"] [data-testid="creation-preset-open"]`);
+    opener.focus();
+    opener.click();
+    await nextTick();
+    await nextTick();
+    expect(expandedKeyOf(wall())).toBe(WALL_CARDS[1].key);
+    // Focus follows the card that had it, instead of dropping to the body.
+    expect(document.activeElement).toBe(expanded());
+    expect(actions()).toEqual([]);
+  });
+
+  it("horizontal arrows move the expansion, clamp at the ends and never reach the bridge", async () => {
+    mountWall();
+    const left = keydown(expanded(), "ArrowLeft");
+    expect(left.defaultPrevented).toBe(true);
+    expect(expandedKeyOf(wall())).toBe(WALL_CARDS[0].key);
+    for (let i = 0; i < WALL_CARDS.length + 2; i++) {
+      keydown(document.activeElement, "ArrowRight");
+      await nextTick();
+    }
+    expect(expandedKeyOf(wall())).toBe(WALL_CARDS[WALL_CARDS.length - 1].key);
+    expect(document.activeElement).toBe(expanded());
+    expect(bubbled).toEqual([]);
+    expect(actions()).toEqual([]);
+  });
+
+  it("a digit opens the supplied ordinal; a missing ordinal is inert", async () => {
+    mountWall();
+    keydown(expanded(), "2");
+    await nextTick();
+    expect(expandedKeyOf(wall())).toBe(WALL_CARDS[1].key);
+    const missing = keydown(document.activeElement, String(WALL_CARDS.length + 1));
+    await nextTick();
+    expect(missing.defaultPrevented).toBe(true);
+    expect(expandedKeyOf(wall())).toBe(WALL_CARDS[1].key);
+    expect(bubbled).toEqual([]);
+    expect(actions()).toEqual([]);
+  });
+
+  it("ignores repeated, modified and composing keys and leaves them unclaimed", () => {
+    mountWall();
+    const ignored = [
+      ["2", { repeat: true }],
+      ["2", { ctrlKey: true }],
+      ["2", { shiftKey: true }],
+      ["2", { altKey: true }],
+      ["ArrowRight", { metaKey: true }],
+      ["2", { isComposing: true }],
+      ["Enter", { isComposing: true }],
+    ];
+    for (const [key, init] of ignored) {
+      expect(keydown(expanded(), key, init).defaultPrevented).toBe(false);
+    }
+    expect(expandedKeyOf(wall())).toBe(WALL_CARDS[0].key);
+    expect(actions()).toEqual([]);
+  });
+
+  it("leaves text entry and Escape to their owners", () => {
+    mountWall();
+    const field = document.createElement("input");
+    wall().appendChild(field);
+    expect(keydown(field, "3").defaultPrevented).toBe(false);
+    expect(keydown(field, "ArrowRight").defaultPrevented).toBe(false);
+    expect(keydown(field, "Enter").defaultPrevented).toBe(false);
+    expect(keydown(expanded(), "Escape").defaultPrevented).toBe(false);
+    expect(bubbled).toContain("Escape");
+    expect(expandedKeyOf(wall())).toBe(WALL_CARDS[0].key);
+    expect(actions()).toEqual([]);
+  });
+
+  it("Enter on the expanded card chooses it exactly once through the preset save", async () => {
+    mountWall();
+    keydown(expanded(), "3");
+    await nextTick();
+    const enter = keydown(document.activeElement, "Enter");
+    expect(enter.defaultPrevented).toBe(true);
+    expect(actions()).toEqual([{ action_id: "creation.preset", payload: { preset_key: WALL_CARDS[2].key } }]);
+    expect(bubbled).toEqual([]);
+  });
+
+  it("the primary button chooses once; Enter on wall buttons stays native and a held Enter is swallowed", async () => {
+    mountWall();
+    const choose = wall().querySelector('[data-testid="creation-preset-choose"]');
+    // The wall leaves Enter on its own buttons to the native click.
+    expect(keydown(choose, "Enter").defaultPrevented).toBe(false);
+    const opener = wall().querySelector('[data-testid="creation-preset-open"]');
+    expect(keydown(opener, "Enter").defaultPrevented).toBe(false);
+    expect(keydown(choose, "Enter", { repeat: true }).defaultPrevented).toBe(true);
+    expect(actions()).toEqual([]);
+    choose.click();
+    expect(actions()).toEqual([{ action_id: "creation.preset", payload: { preset_key: WALL_CARDS[0].key } }]);
+  });
+
+  it("holds the choose while a mutation is in flight, browsing stays live", async () => {
+    mountWall({ dispatchState: { inFlight: { requestId: "session:9" }, submittedRequestId: "session:9" } });
+    expect(wall().querySelector('[data-testid="creation-preset-choose"]').disabled).toBe(true);
+    keydown(expanded(), "2");
+    await nextTick();
+    expect(expandedKeyOf(wall())).toBe(WALL_CARDS[1].key);
+    keydown(document.activeElement, "Enter");
+    expect(actions()).toEqual([]);
+  });
+
+  it("routes dock-focused keys only while the dock stands on the preset frame", async () => {
+    const dock = document.createElement("div");
+    dock.id = "action-dock";
+    dock.tabIndex = 0;
+    document.body.appendChild(dock);
+    mountWall({ stage: { stage: "root" } });
+    dock.focus();
+    // At the root frame the dock keeps its own digits and Enter: the keys
+    // travel on to the bridge and the wall does not move.
+    keydown(dock, "2");
+    keydown(dock, "Enter");
+    expect(bubbled).toEqual(["2", "Enter"]);
+    expect(expandedKeyOf(wall())).toBe(WALL_CARDS[0].key);
+    await wrapper.setProps({ stage: { stage: "presets" } });
+    bubbled = [];
+    expect(keydown(dock, "ArrowRight").defaultPrevented).toBe(true);
+    await nextTick();
+    expect(keydown(dock, "4").defaultPrevented).toBe(true);
+    await nextTick();
+    expect(expandedKeyOf(wall())).toBe(WALL_CARDS[3].key);
+    // A dock-driven change never takes the dock's focus.
+    expect(document.activeElement).toBe(dock);
+    expect(actions()).toEqual([]);
+    keydown(dock, "Enter");
+    expect(actions()).toEqual([{ action_id: "creation.preset", payload: { preset_key: WALL_CARDS[3].key } }]);
+    expect(bubbled).toEqual([]);
+  });
+
+  it("removes its document listener when the wall unmounts", async () => {
+    mountWall();
+    const removed = vi.spyOn(document, "removeEventListener");
+    await wrapper.get('[data-testid="creation-mode-custom"]').trigger("click");
+    expect(removed.mock.calls.some(([type, , capture]) => type === "keydown" && capture === true)).toBe(true);
+    removed.mockRestore();
+  });
+});
+
+describe("CreationPresetWall real-store integration (creation-preset-card-wall)", () => {
+  let store;
+  let sender;
+  let appWrapper;
+
+  function openCreation(panel) {
+    store.beginTransport(1);
+    store.setConnected(true);
+    expect(
+      store.receive(1, "ui_snapshot", [fx.snapshot({ mode: "creation", revision: 2, panels: { creation: panel } })], {}).accepted,
+    ).toBe(true);
+  }
+
+  async function mountApp() {
+    const host = document.createElement("div");
+    host.id = "elosern-app";
+    document.body.appendChild(host);
+    appWrapper = mount(AppClient, { attachTo: host });
+    await nextTick();
+    return host;
+  }
+
+  const echoes = () => store.narrative.filter((line) => line.kind === "in").length;
+
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    store = useElosernStore();
+    sender = fx.createFakeSender();
+    store.setSender(sender);
+  });
+  afterEach(() => {
+    appWrapper?.unmount();
+    appWrapper = null;
+    document.body.innerHTML = "";
+    store.$dispose();
+  });
+
+  it("wall- and dock-focused browsing sends nothing; Enter saves once and confirmation follows its success", async () => {
+    openCreation(wallPanel());
+    const host = await mountApp();
+    const wallEl = host.querySelector('[data-testid="creation-preset-wall"]');
+    const echoBefore = echoes();
+    // Wall-focused browsing.
+    keydown(document.activeElement, "ArrowRight");
+    await nextTick();
+    keydown(document.activeElement, "3");
+    await nextTick();
+    expect(expandedKeyOf(wallEl)).toBe(WALL_CARDS[2].key);
+    // Dock-focused browsing on the preset frame.
+    expect(store.focusItemByKey("presets")).toBe(true);
+    store.focusConfirm("pointer");
+    await nextTick();
+    expect(store.view.creationView.stage).toBe("presets");
+    const dock = host.querySelector("#action-dock");
+    dock.focus();
+    keydown(dock, "2");
+    keydown(dock, "ArrowRight");
+    keydown(dock, "ArrowLeft");
+    await nextTick();
+    expect(expandedKeyOf(wallEl)).toBe(WALL_CARDS[1].key);
+    expect(sender.sent.actions).toEqual([]);
+    expect(echoes()).toBe(echoBefore);
+
+    keydown(dock, "Enter");
+    await nextTick();
+    expect(sender.sent.actions.map((a) => [a.action_id, a.payload])).toEqual([
+      ["creation.preset", { preset_key: WALL_CARDS[1].key }],
+    ]);
+    expect(store.view.creationView.stage).toBe("presets");
+    store.receive(1, "ui_action_result", [fx.actionResult({ request_id: sender.sent.actions[0].request_id })], {});
+    await nextTick();
+    expect(store.view.creationView.stage).toBe("confirm");
+    expect(store.view.creationView.pendingPresetKey).toBe(WALL_CARDS[1].key);
+    expect(host.querySelector('[data-testid="creation-confirm"]')).not.toBeNull();
+  });
+
+  it("a rejected preset save opens no confirmation", async () => {
+    openCreation(wallPanel());
+    const host = await mountApp();
+    keydown(document.activeElement, "Enter");
+    await nextTick();
+    expect(sender.sent.actions).toHaveLength(1);
+    store.receive(
+      1,
+      "ui_action_result",
+      [fx.actionResult({ request_id: sender.sent.actions[0].request_id, outcome: "rejected", code: "unknown_preset", message: "找不到。" })],
+      {},
+    );
+    await nextTick();
+    expect(store.view.creationView.stage).not.toBe("confirm");
+    expect(host.querySelector('[data-testid="creation-confirm"]')).toBeNull();
+    expect(host.querySelector('[data-testid="creation-preset-wall"]')).not.toBeNull();
   });
 });

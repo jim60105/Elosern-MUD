@@ -57,6 +57,7 @@
     "Overlays/PartyLineageTab",
     "Overlays/OverlayHost",
     "Overlays/CreationOverlay",
+    "Overlays/CreationPresetWall",
     "Core/CompanionLineup",
     "Overlays/PartyWindow",
     "Overlays/PartyBagTab",
