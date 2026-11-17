@@ -92,14 +92,14 @@ The production action registry SHALL register exactly `creation.preset`, `creati
   (integers in 0..10000 excluding booleans; the deterministic creation service independently
   enforces the 0..10000 age range on every submission), `race` (a 1..64-character registry key),
   `subrace` (a 1..64-character registry key belonging to the race; the deterministic service
-  rejects a missing or incompatible subrace), and `allocations` (an object containing exactly
-  `hp`, `mp`, `sp`, `atk_phys`, `agility`, and `defense`, each an integer in 0..10000 excluding
-  booleans)
+  rejects a missing or incompatible subrace), `allocations` (an object whose exact keys match
+  `ALLOCATABLE_AXES`, each an integer in 0..10000 excluding booleans), and the required nullable
+  `background`, `affinity_elements`, and `persona` keys; only `sex` is optional
 
 #### Scenario: The custom optional fields carry their exact bounds and defaults
-- **WHEN** `creation.custom` validates its optional fields
-- **THEN** `affinity_elements` is an array of at most the schema-bound number of lowercase element keys, each a registered element (the deterministic creation service enforces each race’s declared maximum), `background` is a string of at most the declared persona-field
-  bound (a missing value is treated as an empty background), and `sex` is null or a `SEX_VALUES`
+- **WHEN** `creation.custom` validates its required nullable fields and optional sex
+- **THEN** `affinity_elements` is null or an array of at most the schema-bound number of lowercase element keys, each a registered element (the deterministic creation service enforces each race's declared maximum), `background` is null or a string of at most the declared persona-field
+  bound (blank normalizes to null), and `sex` is null or a `SEX_VALUES`
   member (a missing value is treated as `DEFAULT_SEX` by the deterministic service)
 - **AND** the required `persona` is null or an object containing exactly `personality`,
   `life_story`, and `habit`, each a non-empty string of at most the declared persona-field bound
@@ -140,8 +140,9 @@ The production action registry SHALL register exactly `creation.preset`, `creati
 #### Scenario: Adapters validate through the deterministic service
 - **WHEN** any creation adapter processes an admitted payload
 - **THEN** it validates through the existing deterministic creation service
-  (`preflight_character_creation`, `activate_player_character`, and the creation-wizard draft
-  service) except the read-only `creation.roll_name` roller call
+  (`preflight_character_creation`, `activate_player_character`, the creation-wizard draft
+  service, or `request_draft_portrait`); `creation.roll_name` uses its read-only roller and
+  `creation.concept` uses the guarded transient generative layer followed by proposal validation
 
 ## ADDED Requirements
 
@@ -151,6 +152,10 @@ The production action registry SHALL register exactly `creation.preset`, `creati
 #### Scenario: A valid draft request needs no saved form
 - **WHEN** an owned pending character submits registered compatible race/subrace, a race-permitted sex, integer apparent age in 0..10000 excluding booleans and an accepted prompt
 - **THEN** one fresh image job is enqueued on `portrait:character:<character pk>`, with no canonical identity, trait, wizard-draft or concept-proposal write and no activation
+
+#### Scenario: Admission serializes receipt discovery through commit
+- **WHEN** a draft request contends with settlement of its preceding image
+- **THEN** queue serialization precedes database writes and covers receipt/card discovery through policy/job/receipt commit; admission either rejects the in-flight request or retains the committed preceding card, and callbacks that reacquire locks run only after release
 
 #### Scenario: Exact payload rejects before mutation
 - **WHEN** any required key is missing, an extra field names a subject, actor, age, binding, fields or calculated stat, a key is blank/overlong/unknown, subrace is incompatible, sex is forbidden, or apparent age is malformed/out of range

@@ -9,6 +9,7 @@ The existing gallery request requires canonical ages and identity already writte
 - Register exact `creation.portrait.generate` and route it through a rules-owned request service.
 - Share named-policy establishment with activation, compose from validated draft values and enqueue on the same character subject.
 - Serialize per-subject admission, track draft-owned image ids and replace only the previous draft image on success.
+- Keep receipt discovery through commit under queue-before-database serialization and defer lock-taking commit callbacks until release.
 - Extend registry/catalog coverage without inventing a typed command or echoing prompt text.
 - Preserve the handoff's diagnostic-only connectivity decision: offline generation fails through the existing worker, not a new preflight probe. This documented deviation from approved §7.3 avoids changing the existing non-gating contract.
 
@@ -29,7 +30,7 @@ None.
 
 ## Impact
 
-Pending-character portrait requests. File/symbol boundaries and runnable acceptance commands are in `design.md` and `tasks.md`. One action plus its request/description seam and isolated queue provenance. No panel rendering, reset or drawer work; existing validators/worker are reused. This bounded backend slice is one engineer-day.
+Pending-character portrait requests. File/symbol boundaries and runnable acceptance commands are in `design.md` and `tasks.md`. One action plus its request/description seam, isolated queue provenance and minimal shared commit-callback deferral. No panel rendering, completion-signal cutover, reset or drawer work; existing validators/worker are reused. This bounded admission unit is one engineer-day; the shared deferral is required by its atomicity, not a separate transaction framework.
 
 Approved source: `docs/superpowers/specs/2026-11-17-creation-portrait-redesign-design.md` (§§4–13); architecture: `docs/superpowers/specs/2026-07-29-ai-mud-engine-design.md`. Planning baseline is primary `master` at `e5108ba23b15de1be410e5df3bc297e2202c17cc`. Single repository; no child repository is needed. No compatibility layer or migration.
 
