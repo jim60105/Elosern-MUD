@@ -40,6 +40,40 @@ assortments:
         max_stock: 10
         initial_stock: 5
         restock_quantity: 2
+  - key: eolas_remedies
+    offers:
+      - item_key: eolas_herb_tonic
+        buy_copper: 60
+        sell_copper: 30
+        max_stock: 10
+        initial_stock: 5
+        restock_quantity: 5
+      - item_key: mana_potion
+        buy_copper: 80
+        sell_copper: 40
+        max_stock: 10
+        initial_stock: 5
+        restock_quantity: 5
+      - item_key: greater_healing_potion
+        buy_copper: 150
+        sell_copper: 75
+        max_stock: 5
+        initial_stock: 2
+        restock_quantity: 2
+  - key: eolas_fare
+    offers:
+      - item_key: eolas_kiln_flatbread
+        buy_copper: 12
+        sell_copper: 6
+        max_stock: 20
+        initial_stock: 10
+        restock_quantity: 5
+      - item_key: meal
+        buy_copper: 6
+        sell_copper: 3
+        max_stock: 20
+        initial_stock: 10
+        restock_quantity: 5
 
 # Per-shop opening/closing/restock hours. Hours are in CLOCK_YAML["seconds_per_hour"]
 # units relative to the world-day boundary.
@@ -53,6 +87,14 @@ shops:
     close_hour: 19
     restock_hour: 6
   - shop_key: eolas_taelith_home
+    open_hour: 7
+    close_hour: 19
+    restock_hour: 6
+  - shop_key: eolas_nirnel_home
+    open_hour: 7
+    close_hour: 19
+    restock_hour: 6
+  - shop_key: eolas_raellin_home
     open_hour: 7
     close_hour: 19
     restock_hour: 6
