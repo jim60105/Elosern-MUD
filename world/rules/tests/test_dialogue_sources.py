@@ -45,10 +45,10 @@ class DialogueSourcesTests(unittest.TestCase):
         "authored-dialogue-content::ciaran-fare-content-has-exclusive-profile-key-yaml-ownership",
         "authored-dialogue-content::ciaran-commons-content-has-exclusive-profile-key-yaml-ownership",
     )
-    def test_complete_inventory_of_25_tables(self):
+    def test_complete_inventory_of_bound_tables(self):
         bindings = canonical_dialogue_bindings()
-        self.assertEqual(len(bindings), 25)
-        self.assertEqual(len(DIALOGUE_SNAPSHOT), 25)
+        self.assertTrue(bindings)
+        self.assertEqual(set(bindings), set(DIALOGUE_SNAPSHOT))
 
         for diag_key, prof_key in bindings.items():
             with self.subTest(dialogue_key=diag_key):

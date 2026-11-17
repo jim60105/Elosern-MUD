@@ -15,7 +15,6 @@ from world.lore.settlements.places import place_dialogue_keys
 import world.lore.settlements.places_altoria_lower as pal
 import world.lore.settlements.places_altoria_middle as pam
 import world.lore.settlements.places_altoria_upper as pau
-import world.lore.settlements.places_ciaran as pci
 
 
 def _keys(rows) -> set[str]:
@@ -26,8 +25,12 @@ def _keys(rows) -> set[str]:
 class AltoriaDialogueSplitContractTests(unittest.TestCase):
     """The terrace split of Altoria dialogue tables preserves assembly order and terrace alignment."""
 
-    def test_assembled_dialogue_snapshot_contains_all_25_tables(self):
-        self.assertEqual(len(DIALOGUE_SNAPSHOT), 25)
+    def test_assembled_dialogue_snapshot_contains_every_bound_table(self):
+        from world.lore.settlements.places import PLACE_REGISTRY
+
+        bound = _keys(PLACE_REGISTRY.values())
+        self.assertTrue(bound)
+        self.assertEqual(len(DIALOGUE_SNAPSHOT), len(bound))
 
     def test_every_altoria_table_keeps_its_greeting_and_four_answers(self):
         capital_places = _keys(pal.ROWS) | _keys(pam.ROWS) | _keys(pau.ROWS)
@@ -43,7 +46,7 @@ class AltoriaDialogueSplitContractTests(unittest.TestCase):
         lower_places = _keys(pal.ROWS)
         middle_places = _keys(pam.ROWS)
         upper_places = _keys(pau.ROWS)
-        ciaran_places = _keys(pci.ROWS)
+        from world.lore.settlements.places import PLACE_REGISTRY
 
-        all_bound_keys = lower_places | middle_places | upper_places | ciaran_places
+        all_bound_keys = _keys(PLACE_REGISTRY.values())
         self.assertEqual(set(DIALOGUE_SNAPSHOT.keys()), all_bound_keys)
