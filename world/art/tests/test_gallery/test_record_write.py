@@ -38,6 +38,7 @@ from world.art.paths import resolved_under_store_root
 from world.art.subjects import ArtSubject, ArtSubjectKind
 from tools.spec_traceability import covers_requirement
 from ._support import (
+    _PreferenceEntity,
     _character,
     _monster,
     _scene,
@@ -589,12 +590,19 @@ class OfficialPreferenceWriteTests(EvenniaTestCase):
         clear_official_selection(subject)
         self.assertEqual(self._store_tree(), before_files)
         self.assertEqual(cards_for(subject), before_cards)
-        # The preference fields never become cards, and the monster one-card
-        # cap is unaffected by them.
+        # The preference fields never become cards or files: a monster's
+        # preferences live on its owning entity, never on a species record,
+        # and the one-card cap stays unaffected by them.
         monster = _monster("prefmonster")
-        set_official_selection(monster, _OFFICIAL)
-        set_official_geometry(monster, _OFFICIAL, stage=dict(_STAGE))
+        owner = _PreferenceEntity()
+        set_official_selection(monster, _OFFICIAL, entity=owner)
+        set_official_geometry(monster, _OFFICIAL, stage=dict(_STAGE), entity=owner)
+        self.assertEqual(
+            official_preferences_for(monster, entity=owner).selection, _OFFICIAL
+        )
+        self.assertIsNone(record_for(monster))
         self.assertEqual(cards_for(monster), [])
+        self.assertEqual(self._store_tree(), before_files)
         monster_id = _new_id()
         self._make_file(_identity(monster, monster_id))
         append_card(monster, **_card_fields(monster, image_id=monster_id))

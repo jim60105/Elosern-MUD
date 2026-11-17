@@ -103,3 +103,17 @@ class _FakeEntity:
     def __init__(self, equipment=...):
         values = {} if equipment is ... else {"equipment": equipment}
         self.db = _FakeDb(values)
+
+
+class _AttributeStore(dict):
+    """The minimal entity attribute surface the preference writers use."""
+
+    def add(self, key, value):
+        self[key] = value
+
+
+class _PreferenceEntity:
+    """One entity-shaped stand-in carrying only its own preference attributes."""
+
+    def __init__(self):
+        self.attributes = _AttributeStore()

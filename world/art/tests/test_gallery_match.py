@@ -63,6 +63,7 @@ from world.art.official_refs import (
 )
 from world.art.store import GalleryJobRecord
 from world.art.subjects import ArtSubject, ArtSubjectKind
+from world.art.tests.test_gallery._support import _PreferenceEntity
 from world.lore import monster_visuals
 
 from tools.spec_traceability import covers_requirement
@@ -658,20 +659,6 @@ class OfficialDefaultStepTests(EvenniaTestCase):
         self.assertTrue(all(fact is not None for fact in facts))
         self.assertTrue(all(fact == facts[0] for fact in facts))
         self.assertEqual(before, after)
-
-
-class _AttributeStore(dict):
-    """The minimal entity attribute surface the preference writers use."""
-
-    def add(self, key, value):
-        self[key] = value
-
-
-class _PreferenceEntity:
-    """One entity-shaped stand-in carrying only its own preference attributes."""
-
-    def __init__(self):
-        self.attributes = _AttributeStore()
 
 
 def _catalog_for(kind: str, key: str, identity: str) -> OfficialCatalog:
