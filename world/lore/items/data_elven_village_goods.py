@@ -1,0 +1,122 @@
+"""Village-made local goods of the Eolas and Fionnen elven villages."""
+
+from world.lore.items.vocab import (
+    EquipmentModifierKey,
+    ItemDefinition,
+    ItemIconKey,
+    ItemKind,
+    ItemPresentation,
+    ItemRarity,
+    ItemUseMechanics,
+)
+
+from world.skills.equipment import EquipmentSlot
+
+ROWS: tuple[ItemDefinition, ...] = (
+    ItemDefinition(
+        key="eolas_kiln_flatbread",
+        display_name_zh="幽月窯烤豆餅",
+        price_table_key="specialty_food",
+        sellable=True,
+        presentation=ItemPresentation(
+            kind=ItemKind.FOOD,
+            icon_key=ItemIconKey.FOOD,
+            rarity=ItemRarity.COMMON,
+            summary_zh="幽月谷村共用窯烤出的豆餅，配著谷裡自種的香草一起吃。",
+        ),
+    ),
+    ItemDefinition(
+        key="eolas_herb_tonic",
+        display_name_zh="幽月香草藥露",
+        price_table_key="potion",
+        sellable=True,
+        presentation=ItemPresentation(
+            kind=ItemKind.POTION,
+            icon_key=ItemIconKey.POTION,
+            rarity=ItemRarity.UNCOMMON,
+            summary_zh="以幽月谷村梯田香草浸漬的藥露，飲下能恢復體力。",
+        ),
+        use_mechanics=ItemUseMechanics(consumable=True, combat_allowed=True),
+    ),
+    ItemDefinition(
+        key="eolas_glass_pendant",
+        display_name_zh="幽月琉璃墜",
+        price_table_key="jewelry",
+        sellable=True,
+        presentation=ItemPresentation(
+            kind=ItemKind.ACCESSORY,
+            icon_key=ItemIconKey.ACCESSORY,
+            rarity=ItemRarity.UNCOMMON,
+            summary_zh="幽月谷村共用窯燒成的琉璃墜，配戴時讓施法更沉穩。",
+        ),
+        equipment_slot=EquipmentSlot.ACCESSORY,
+        modifier_key=EquipmentModifierKey.EOLAS_GLASS_PENDANT,
+    ),
+    ItemDefinition(
+        key="eolas_proving_wand",
+        display_name_zh="幽月試法短杖",
+        price_table_key="masterwork_gear",
+        sellable=True,
+        presentation=ItemPresentation(
+            kind=ItemKind.WEAPON,
+            icon_key=ItemIconKey.WEAPON,
+            rarity=ItemRarity.EPIC,
+            summary_zh="伊歐拉斯族削來在試法坪練習的短杖，導引魔力格外順手。",
+        ),
+        equipment_slot=EquipmentSlot.WEAPON_MAIN,
+        modifier_key=EquipmentModifierKey.EOLAS_PROVING_WAND,
+    ),
+    ItemDefinition(
+        key="fionnen_wildflower_honey",
+        display_name_zh="森林百花蜜",
+        price_table_key="specialty_food",
+        sellable=True,
+        presentation=ItemPresentation(
+            kind=ItemKind.FOOD,
+            icon_key=ItemIconKey.FOOD,
+            rarity=ItemRarity.UNCOMMON,
+            summary_zh="翠綠森林村花蕊蜜園的蜂群釀成的百花蜜。",
+        ),
+    ),
+    ItemDefinition(
+        key="fionnen_beeswax_salve",
+        display_name_zh="森林蜂蠟膏",
+        price_table_key="potion",
+        sellable=True,
+        presentation=ItemPresentation(
+            kind=ItemKind.POTION,
+            icon_key=ItemIconKey.POTION,
+            rarity=ItemRarity.UNCOMMON,
+            summary_zh="以蜂蠟與林間藥草熬成的敷膏，塗上能讓傷口收斂。",
+        ),
+        use_mechanics=ItemUseMechanics(consumable=True, combat_allowed=True),
+    ),
+    ItemDefinition(
+        key="fionnen_archer_bracer",
+        display_name_zh="森林射手護腕",
+        price_table_key="jewelry",
+        sellable=True,
+        presentation=ItemPresentation(
+            kind=ItemKind.ACCESSORY,
+            icon_key=ItemIconKey.ACCESSORY,
+            rarity=ItemRarity.UNCOMMON,
+            summary_zh="斐歐恩族弓手綁在持弓手臂上的木雕護腕，拉弓時更穩。",
+        ),
+        equipment_slot=EquipmentSlot.ACCESSORY,
+        modifier_key=EquipmentModifierKey.FIONNEN_ARCHER_BRACER,
+    ),
+    ItemDefinition(
+        key="fionnen_leafweave_garb",
+        display_name_zh="森林葉織獵衣",
+        price_table_key="masterwork_gear",
+        sellable=True,
+        presentation=ItemPresentation(
+            kind=ItemKind.ARMOR,
+            icon_key=ItemIconKey.ARMOR,
+            rarity=ItemRarity.EPIC,
+            summary_zh="為在巨木之間穿行而織的輕獵衣，身手幾乎不受牽絆。",
+        ),
+        equipment_slot=EquipmentSlot.ARMOR,
+        modifier_key=EquipmentModifierKey.FIONNEN_LEAFWEAVE_GARB,
+    ),
+)

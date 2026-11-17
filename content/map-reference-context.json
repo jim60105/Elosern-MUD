@@ -222,7 +222,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "ee6f51504af5acd58cb394b3e596451874b562b8490462640f020946ae3f30f2",
+  "fingerprint": "de193b799dadb381107c5deb721c65a1ac5ad8e7eb13cc8e9c1f7bbcbf66106c",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -16121,16 +16121,17 @@
     "world/lore/guild.py": "d2148ef7554aee171203ceaee18e6506202788a0e9ce715ed7885b20e9544f34",
     "world/lore/guild_adventurers.py": "424b60250ec79a70ffacc2b492f27c3a1d7ba385c4f7806f20ea40c9153ad5d7",
     "world/lore/items/__init__.py": "ae10633e209acfdaa76f74055e1af70c32e5f12c173691f2015155b0c96410f8",
-    "world/lore/items/assembly.py": "aacb06e8b10def8b001e1c0deffd9deccfbe675eb7d983d56a80ef5c775b04e2",
+    "world/lore/items/assembly.py": "798c120726b223e39e6282734f61f1e569b605ee19dc2eb839187d4d9601faa6",
     "world/lore/items/data_armor_accessories_materials.py": "a6c7418f8d25ea1db8633a3db2b8f53127ec67184710df67c3a24bb1ef608c90",
     "world/lore/items/data_core_items.py": "2867da3ace7e9a4181622e043e2055cc818edfb68217db27d98ca1441dc7b70e",
+    "world/lore/items/data_elven_village_goods.py": "b6b6091874e03d1d8e7761b4fa7877a918d64242f489482302f6ecc59d5e6be8",
     "world/lore/items/data_guild_accessories.py": "b7413f65c4ad8659d919a929cc6e5ecc97316940f05a588e2bb8965697c82101",
     "world/lore/items/data_inspect_only_codex.py": "b8fbed1622fa840b2573722e6f048ae16c7721d2887e309f32a1d2cfcd1410cb",
     "world/lore/items/data_intimacy_items.py": "e9d5363bab120577130942aec267087b3505ee88a05054376631acbdedf67d9a",
     "world/lore/items/data_military_equipment.py": "32fe972de87bb1b815de620f73af15398fc040b941f980982ffdb4b98908407d",
     "world/lore/items/data_named_equipment.py": "bf1940df92f74508e7ca734b48af519eea956e141947c22c08fd3244d9ef8710",
     "world/lore/items/data_regional_equipment.py": "bb577e204091f562ff9704ba304bb67851398e64ab5ae53ce22ea09b5fea65d1",
-    "world/lore/items/vocab.py": "0c13bb1dc25c8df3f641884e7be47045ccb0e3e3301da7133058e0ac7340860e",
+    "world/lore/items/vocab.py": "3460a5fa9ce02c46f0c4baed791c35f94db5f87d8d84cc7ff3ae06a9265626a5",
     "world/lore/magic.py": "f1ae1ffe5f9c9ffba58ac9ea78f80618c80d1ef2d763c7e3b545e7bf8af27dc8",
     "world/lore/map_districts.py": "5a3e96fa284cf4ecaa3bb1590f4080405a13c98164b402c4a275336a88c71039",
     "world/lore/monster_activity.py": "36767fd6cf5d1a4fa88549a81e756fe79ad0ddba88dad9baa10b2a192e2d1272",
@@ -16420,12 +16421,12 @@
     "world/rules/rulebook/commerce/scales.yaml": "d4dc7f6b12e2b77225a8f90715e3beb3e193f331ed567fe78c0ce5f0857c99f4",
     "world/rules/rulebook/cross_lineage_unlock.yaml": "ba8592ff747c2497e4bc5ae6f0caafc592c843043fa25ca9cdd19e319eee6ba3",
     "world/rules/rulebook/defeat_aftermath.yaml": "10d969d9ca9320effade9978df535bcc7867be5445331ff156e5631592ee853a",
-    "world/rules/rulebook/equipment_effects.yaml": "802dd0d04ace492c96398f9e956a1e809fcb426f0a2edb59b8734c366c45303c",
+    "world/rules/rulebook/equipment_effects.yaml": "be06d5ed865e38e9cde901bfdd7cd0e5d0ddfc546bca70284f4d3644c1350d04",
     "world/rules/rulebook/fatigue.yaml": "c8005c3f936fcfe36b6dea4329aece18e61e662e479fb623c13888f50d8640e5",
     "world/rules/rulebook/guild_economy.yaml": "8cd93986ac6aed5024b63803dbe381570d596742b87048c289c0f1a7a35c673a",
     "world/rules/rulebook/guild_exam_restrictions.yaml": "60a7df45d0db574d08b0974b75f75512a5e44c74024918a8e27114414a255c8a",
     "world/rules/rulebook/instance.yaml": "aa73bc6238b00771288efd3f6dabc179cf827e547df7f0327c83062cb0b486e4",
-    "world/rules/rulebook/item_effects.yaml": "0bf7b086d8c6f0d48b37b74811f04c19c4aeeda725a6d3f9ba94649694137c31",
+    "world/rules/rulebook/item_effects.yaml": "58b7c71fe1694e06f23e1e2938cb5e58eb4407cbfd02c9a908d6bad2728004b6",
     "world/rules/rulebook/monster_behaviour.yaml": "f185526a851d7a1ed83d7671546bcb93c17df3e9dcac5bd9158dfe08eef5cb67",
     "world/rules/rulebook/movement.yaml": "072a1054db3806316e0ce384d326e5c60e14611a039dd1c22cedde5fb26eab37",
     "world/rules/rulebook/npc_schedules.yaml": "4807e4f54107f3e4a8941ee1ce1988088a74ff914d46037e32c8254e5d347b50",

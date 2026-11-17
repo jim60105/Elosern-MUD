@@ -225,3 +225,13 @@ effects:
   wooden_club:
     adjustments: {atk_phys: 3, agility: -2}
     weapon_damage_multiplier: 1.05
+  eolas_glass_pendant:
+    adjustments: {mp_cost: "-6%"}
+  eolas_proving_wand:
+    adjustments: {magic_power: 9, mp_cost: "-10%"}
+    # Casting tool: no physical attack bonus, so the neutral declaration stands.
+    weapon_damage_multiplier: 1.0
+  fionnen_archer_bracer:
+    adjustments: {agility: "+5%"}
+  fionnen_leafweave_garb:
+    adjustments: {defense: 6, agility: 4}
