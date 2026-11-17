@@ -12,10 +12,10 @@ topics:
       speaker: actor
       text: 「衣箱上那件摺好的衣裳，料子看起來很輕，那是獵衣嗎？」
     - kind: narration
-      text: 她把獵衣從箱上取下來，抖開，讓布面在窗光裡透光。
+      text: 她把獵衣從箱上取下來，抖開，讓布面在窗光裡透亮。
     - kind: speech
       speaker: host
-      text: 「森林葉織獵衣。線裡絞了林子的韌草，織得疏，跑起來不綁身子。」
+      text: 「森林葉織獵衣。線裡絞了林子裡耐扯的草，織得疏，跑起來不綁身子。」
     - kind: speech
       speaker: host
       text: 「巨木之間的枝椏低，衣服太厚會勾住。這件貼著身體走，手一抬就過去了。」
@@ -94,7 +94,7 @@ topics:
       text: 「衣裳穿舊了，或是不合身了，能帶回樹冠上給你嗎？」
     - kind: speech
       speaker: host
-      text: 「我織的衣裳，帶回來。線我挑開，洗淨了再紡，還能用。」
+      text: 「我織的衣裳，帶回來。線我挑開，洗淨了還能再用。」
     - kind: speech
       speaker: host
       text: 「成色好的我算銅幣給你，破得厲害的我也收，線拆下來當經線。」

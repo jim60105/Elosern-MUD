@@ -24,7 +24,7 @@ topics:
       text: 「晾著的時候，你就這麼放著不管？」
     - kind: speech
       speaker: host
-      text: 「隔幾天翻一次面，讓風走勻。太乾會脆，太濕彎了又彈回去，得看著。」
+      text: 「隔幾天翻一次面，讓風吹得均勻。太乾會脆，太濕彎了又彈回去，得看著。」
     - kind: speech
       speaker: host
       text: 「削到最後，弓身要照著人的手臂走。別人的尺寸，我用不上。」
@@ -45,7 +45,7 @@ topics:
       text: 「弓身長，拉滿了箭走得更遠，也更容易穩住。代價是力氣，臂力不夠的人拉不到底。」
     - kind: speech
       speaker: host
-      text: 「它不替你瞄準。你手抖，它就把抖傳出去；你靜，它就一路直到底。」
+      text: 「它不替你瞄準。你手抖，箭就跟著抖；你靜，它就一路直到底。」
     - kind: speech
       speaker: actor
       text: 「新手拿得動嗎？」

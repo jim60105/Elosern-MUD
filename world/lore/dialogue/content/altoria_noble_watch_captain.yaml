@@ -51,7 +51,7 @@ topics:
       speaker: actor
       text: 「若是想覲見王室或是向宮廷遞交陳情，是在貴族區衛所這裡呈遞公文嗎？」
     - kind: narration
-      text: 古利安‧鷹守推了推眼鏡，嘴角帶著幾分早料到會有此一問的自嘲苦笑。
+      text: 古利安‧鷹守推了推眼鏡，嘴角帶著苦笑，像是早就料到會有此一問。
     - kind: speech
       speaker: host
       text: 「本衛所可沒有替王宮收送信函的權限，目前也未接獲任何謁見的安排。」
@@ -60,7 +60,7 @@ topics:
       text: 「順著這條大道一直走到盡頭便是王宮前庭，王宮大門敞開著，訪客若想參觀自可前去。」
     - kind: speech
       speaker: host
-      text: 「裡頭寬敞得緊，安靜得連巡邏衛兵的腳步聲都聽得一清二楚，冷清到甚至不需要衛隊攔人。」
+      text: 「裡頭寬敞得很，安靜得連巡邏衛兵的腳步聲都聽得一清二楚，平日也沒什麼人走動。」
 - topic_id: altoria_noble_watch.topic_03
   keyword: 衛所
   label: 衛所
@@ -81,7 +81,7 @@ topics:
       text: 「下城門戶與主幹道的防務全由南門衛兵隊長托瓦德‧鄧堡統籌，換班時會核對兩區的治安動態。」
     - kind: speech
       speaker: host
-      text: 「至於這片高地上的風吹草動，訪客儘管問，我自當如實相告。」
+      text: 「至於這片高地上的大小事，訪客儘管問，我自當如實相告。」
 - topic_id: altoria_noble_watch.topic_04
   keyword: 委託
   label: 委託
@@ -102,4 +102,4 @@ topics:
       text: 「若打算承接冒險差事，冒險者公會設於中央廣場東側，大廳告示板每日更新委託。」
     - kind: speech
       speaker: host
-      text: 「倘若有哪間府邸管事私下延請訪客幫忙，那是府第私交，本衛所概不介入。」
+      text: 「倘若有哪間府邸管事私下延請訪客幫忙，那是府邸自己的私事，本衛所概不介入。」

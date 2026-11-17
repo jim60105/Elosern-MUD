@@ -12,13 +12,13 @@ topics:
       speaker: actor
       text: 「聽說你雕的護腕讓弓手綁在持弓的那隻手，它對拉弓有幫助嗎？」
     - kind: narration
-      text: 科瑞斯‧蒙希斯佩爾從木凳邊揀起一個雕到一半的護腕，套上自己的手臂，抬手做了個拉弦的姿勢。
+      text: 科瑞斯‧蒙希斯佩爾從木凳邊拿起一個雕到一半的護腕，套上自己的手臂，抬手做了個拉弦的姿勢。
     - kind: speech
       speaker: host
       text: 「森林射手護腕照手臂的形狀削出來，缺口那一面貼著腕骨，拉滿弓的時候手腕不吃力。」
     - kind: speech
       speaker: host
-      text: 「臂上穩了，箭自然也跟著穩。村裡的弓手用舊了，就來找我削新的弓。」
+      text: 「臂上穩了，箭自然也跟著穩。村裡的弓手用舊了，就來找我削新的護腕。」
     - kind: speech
       speaker: actor
       text: 「木頭綁在手腕上，磨久了不會刮手嗎？」
@@ -39,7 +39,7 @@ topics:
       text: 她把晶石從頸繩上取下，放在掌心，指尖按著石面上讀不出來的細紋。
     - kind: speech
       speaker: host
-      text: 「這叫恆振晶。裡頭刻著極細的振術，我調整它的節奏；太快會刺，太慢就散。」
+      text: 「這叫恆振晶。裡頭刻著極細的振動術式，我調整它的節奏；太快會刺，太慢就散。」
     - kind: speech
       speaker: host
       text: 「調好了貼身藏著，它一整日震著最敏感的那一處，走路、說話、做什麼都在裡頭響。」
@@ -54,7 +54,7 @@ topics:
       text: 「他們拿放大鏡看了又看，只看出一圈刻痕。這套法子我自己摸出來，別人抄不走。」
     - kind: speech
       speaker: host
-      text: 「想要就開口，我從布上揀給你嘛。貼著皮膚戴，別擱在衣服外頭，那就浪費了。」
+      text: 「想要就開口，我從布上挑給你嘛。貼著皮膚戴，別擱在衣服外頭，那就浪費了。」
 - topic_id: fionnen_corith_home.topic_03
   keyword: 魔藤
   label: 魔藤

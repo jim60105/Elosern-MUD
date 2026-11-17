@@ -12,7 +12,7 @@ topics:
       speaker: actor
       text: 「剛開始學弓的時候，第一件要學的是什麼？」
     - kind: narration
-      text: 她把自己的弓靠到靶架邊，走到你側面，低頭看你的腳。
+      text: 她把自己的弓靠到靶架邊，走到來人側面，低頭看他的腳。
     - kind: speech
       speaker: host
       text: 「先學會站。腳踩穩了，氣息才沉得下去；氣息沉不住，手再穩也沒有用。」
@@ -72,7 +72,7 @@ topics:
       text: 「兩種一起練，不會互相妨礙嗎？」
     - kind: speech
       speaker: host
-      text: 「不會。眼睛看靶的時候，呼吸和手裡的光就跟著一起顧到了。」
+      text: 「不會。眼睛看靶的時候，呼吸和手裡的光自然就一起穩住了。」
 - topic_id: fionnen_elunwen_home.topic_04
   keyword: 比試
   label: 比試

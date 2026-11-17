@@ -42,7 +42,7 @@ topics:
       speaker: host
       text: 「我把絲抽成線，線再上機。織衣剩下的線頭我留著補網，一點也不浪費。」
     - kind: narration
-      text: 她把一綑絲放到你面前，絲在光裡泛著很淡的銀色。
+      text: 她把一綑絲放到客人面前，絲在光裡泛著很淡的銀色。
     - kind: speech
       speaker: actor
       text: 「帶出山谷，這一綑能換到多少？」
@@ -72,7 +72,7 @@ topics:
       text: 「外頭來的人若覺得太透，那是他把自己的規矩帶進谷裡。你在這裡穿不穿，都隨你。」
     - kind: speech
       speaker: actor
-      text: 「所以你們不是故意穿得少，是根本不覺得需要多穿？」
+      text: 「這麼說，你們穿得少，是因為根本不覺得需要多穿？」
     - kind: speech
       speaker: host
       text: 「就是這樣。你穿上它，皮膚碰得到風，才曉得這件布好在哪裡。」
