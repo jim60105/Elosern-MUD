@@ -16,6 +16,7 @@ from world.lore.items.data_regional_equipment import ROWS as REGIONAL_EQUIPMENT_
 from world.lore.items.data_intimacy_items import ROWS as INTIMACY_ITEMS_ROWS
 from world.lore.items.data_military_equipment import ROWS as MILITARY_EQUIPMENT_ROWS
 from world.lore.items.data_guild_accessories import ROWS as GUILD_ACCESSORY_ROWS
+from world.lore.items.data_elven_village_goods import ROWS as ELVEN_VILLAGE_GOODS_ROWS
 
 ITEM_REGISTRY: dict[str, ItemDefinition] = {
     definition.key: definition
@@ -28,5 +29,6 @@ ITEM_REGISTRY: dict[str, ItemDefinition] = {
         *INTIMACY_ITEMS_ROWS,
         *MILITARY_EQUIPMENT_ROWS,
         *GUILD_ACCESSORY_ROWS,
+        *ELVEN_VILLAGE_GOODS_ROWS,
     )
 }

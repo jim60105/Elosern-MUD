@@ -59,3 +59,11 @@ items:
     effects:
       - stat: pleasure
         amount: 11
+  eolas_herb_tonic:
+    effects:
+      - stat: sp
+        amount: 40
+  fionnen_beeswax_salve:
+    effects:
+      - stat: hp
+        amount: 60
