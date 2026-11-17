@@ -2,14 +2,12 @@
 cost, and one deliberate failure charges nothing (map-movement-clock task 8)."""
 
 from evennia.utils.create import create_object
-from evennia.utils.search import search_object
 from evennia.utils.test_resources import EvenniaTest
 
 from typeclasses.exits import Exit, WildernessGateExit
-from typeclasses.rooms import GridRoom, Room, TerrainRoom
+from typeclasses.rooms import GridRoom, TerrainRoom
 from world.lore.sync import sync_all
 from world.tests.geography_fixture import sync_test_settlements, sync_test_wilderness
-from world.maps.limbo import LIMBO_KEY
 from world.maps.static_references import settlement_node_xyz
 from world.maps.wilderness_provider import WILDERNESS_NAME
 from world.rules.clock import CLOCK_YAML, get_world_clock
@@ -95,12 +93,10 @@ class MovementLineageRoundTripTests(_ChargeAssertions, EvenniaTest):
         self.room2.key = "Room2"
         self.room1.save()
         self.room2.save()
-        create_object(Room, key=LIMBO_KEY, location=None)
         sync_all()
         declared = (_EAST_GATE.destination.map_id,)
         sync_test_settlements(declared)
         sync_test_wilderness(declared)
-        self.limbo = search_object(LIMBO_KEY, exact=True)[0]
         self.south_gate = GridRoom.objects.filter_xyz(xyz=SOUTH_GATE_XYZ).first()
         self.east_gate = GridRoom.objects.filter_xyz(xyz=EAST_GATE_XYZ).first()
         self.gate = [
@@ -113,14 +109,13 @@ class MovementLineageRoundTripTests(_ChargeAssertions, EvenniaTest):
         from typeclasses.exits import CostedXYZExit
         from world.maps.map_data import current
 
-        # 1. Limbo -> South Gate via the bridging Exit (move).
-        limbo_to_city = [
-            e for e in self.limbo.exits if e.destination == self.south_gate
-        ][0]
-        self.assertIsInstance(limbo_to_city, Exit)
-        self.char1.location = self.limbo
+        # 1. A plain room -> South Gate via an ordinary non-distance Exit (move).
+        plain_to_city = create_object(
+            Exit, key="t_連通門", location=self.room1, destination=self.south_gate
+        )
+        self.char1.location = self.room1
         previous = get_world_clock().tick
-        limbo_to_city.at_traverse(self.char1, self.south_gate)
+        plain_to_city.at_traverse(self.char1, self.south_gate)
         self.assertEqual(get_world_clock().tick - previous, MOVE)
         self.assertIs(self.char1.location, self.south_gate)
 

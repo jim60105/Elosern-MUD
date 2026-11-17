@@ -43,8 +43,6 @@ from world.maps.bootstrap import (
     sync_interiors,
     sync_settlement_graph,
 )
-from world.maps.city_gates import CityGateDef
-from world.maps.limbo import LIMBO_KEY
 from world.maps.room_art import grid_scene_identity
 from world.maps.static_references import (
     StaticReferenceError,
@@ -205,16 +203,18 @@ class StaticFamilyMovementTests(EvenniaTest):
             import world.lore.settlements.places as places
             import world.lore.start_locations as start_locations
             import world.lore.wilderness_entry as wilderness_entry
-            import world.maps.city_gates as city_gates
             import world.maps.room_art as room_art
 
             with (
                 mock.patch.object(
-                    city_gates,
-                    "CITY_GATE_REGISTRY",
-                    {"t_broken": mock.Mock(gate=settlement_node_ref(MAP, "nowhere"))},
+                    anchor_placement,
+                    "ANCHOR_PLACEMENT_REGISTRY",
+                    {
+                        "t_broken": AnchorPlacement(
+                            "t_broken", settlement_node_ref(MAP, "nowhere")
+                        )
+                    },
                 ),
-                mock.patch.object(anchor_placement, "ANCHOR_PLACEMENT_REGISTRY", {}),
                 mock.patch.object(
                     start_locations, "SUBRACE_START_LOCATION_REGISTRY", {}
                 ),
@@ -229,7 +229,7 @@ class StaticFamilyMovementTests(EvenniaTest):
             ):
                 with self.assertRaises(StaticReferenceError) as captured:
                     validate_static_references()
-        self.assertIn("city gate t_broken", str(captured.exception))
+        self.assertIn("anchor placement t_broken", str(captured.exception))
         self.assertIn("no authored node", str(captured.exception))
 
     def test_binding_signature_tracks_geography_and_road_geometry(self):
@@ -330,41 +330,32 @@ class SyncPreservationTests(EvenniaTest):
 class PreflightPolicyTests(EvenniaTest):
     @covers_requirement("map-object-references::static-references-resolve-by-authored-identity")
     def test_a_wrong_domain_target_is_rejected_before_any_write(self):
+        from world.lore import anchor_placement
         from world.lore.settlements import places
-        from world.maps import city_gates
         from world.maps import room_art
 
         broken = {
-            "t_wrong_domain": CityGateDef(
-                gate=wilderness_cell_ref((1, 2)),
-                exit_key="測試門",
-                exit_aliases=(),
-            )
+            "t_wrong_domain": AnchorPlacement("t_wrong_domain", wilderness_cell_ref((1, 2)))
         }
         with (
-            mock.patch.object(city_gates, "CITY_GATE_REGISTRY", broken),
+            mock.patch.object(anchor_placement, "ANCHOR_PLACEMENT_REGISTRY", broken),
             mock.patch.object(places, "PLACE_REGISTRY", {}),
             mock.patch.object(room_art, "GRID_NODE_SCENE_ARCHETYPES", {}),
         ):
             with self.assertRaises(StaticReferenceError) as captured:
                 validate_static_references()
-        self.assertIn("city gate t_wrong_domain", str(captured.exception))
+        self.assertIn("anchor placement t_wrong_domain", str(captured.exception))
         self.assertIn("not a settlement_node", str(captured.exception))
 
     def test_sync_all_rejects_before_mirroring_any_registry(self):
         from evennia.objects.models import ObjectDB
         from evennia.utils.search import search_script
-        from world.lore import sync
-        from world.maps import city_gates
+        from world.lore import anchor_placement, sync
 
-        broken = {
-            "t_broken": CityGateDef(
-                gate=settlement_node_ref(MAP, "nowhere"), exit_key="x", exit_aliases=()
-            )
-        }
+        broken = {"t_broken": AnchorPlacement("t_broken", settlement_node_ref(MAP, "nowhere"))}
         before = (ObjectDB.objects.count(), len(search_script("lore:anchor_placements:capital_altoria")))
         with (
-            mock.patch.object(city_gates, "CITY_GATE_REGISTRY", broken),
+            mock.patch.object(anchor_placement, "ANCHOR_PLACEMENT_REGISTRY", broken),
             mock.patch.object(sync, "sync_one") as sync_one,
         ):
             with self.assertRaises(StaticReferenceError):
@@ -378,16 +369,12 @@ class PreflightPolicyTests(EvenniaTest):
     def test_startup_rejects_before_creating_the_world_clock(self):
         from evennia.objects.models import ObjectDB
         from server.conf.at_server_startstop import at_server_start
-        from world.maps import city_gates
+        from world.lore import anchor_placement
 
-        broken = {
-            "t_broken": CityGateDef(
-                gate=settlement_node_ref(MAP, "nowhere"), exit_key="x", exit_aliases=()
-            )
-        }
+        broken = {"t_broken": AnchorPlacement("t_broken", settlement_node_ref(MAP, "nowhere"))}
         before = ObjectDB.objects.count()
         with (
-            mock.patch.object(city_gates, "CITY_GATE_REGISTRY", broken),
+            mock.patch.object(anchor_placement, "ANCHOR_PLACEMENT_REGISTRY", broken),
             mock.patch("world.rules.clock.get_world_clock") as clock,
         ):
             with self.assertRaises(StaticReferenceError):
@@ -429,24 +416,14 @@ class IntegratedMovedNodeTests(EvenniaTest):
     def _apply(self, graph, place, district):
         import world.maps.bootstrap as bootstrap_module
         import world.lore.map_districts as districts_module
-        import world.maps.city_gates as gates_module
         import world.maps.room_art as room_art
         from world.lore import anchor_placement, start_locations, wilderness_entry
 
-        gates = {
-            "t_gate": CityGateDef(
-                gate=settlement_node_ref(MAP, "anchor"),
-                exit_key="測試門",
-                exit_aliases=(),
-            )
-        }
         art = {settlement_node_ref(MAP, "anchor"): "t_synthetic_scene"}
         stack = ExitStack()
         for entry in (
             (map_data, "SETTLEMENT_GRAPHS", {MAP: graph}),
             (bootstrap_module, "SETTLEMENT_GRAPHS", {MAP: graph}),
-            (gates_module, "CITY_GATE_REGISTRY", gates),
-            (bootstrap_module, "CITY_GATE_REGISTRY", gates),
             (anchor_placement, "ANCHOR_PLACEMENT_REGISTRY", {}),
             # No placement exists in this synthetic world, so no start row may
             # name one either.
@@ -486,9 +463,8 @@ class IntegratedMovedNodeTests(EvenniaTest):
         return stack
 
     @covers_requirement("map-object-references::static-references-resolve-by-authored-identity")
-    def test_moved_node_follows_gate_art_service_and_lighting(self):
+    def test_moved_node_follows_art_service_and_lighting(self):
         place, district = self._place(), self._district()
-        create_object(Room, key=LIMBO_KEY)
         traveller = create_object(PlayerCharacter, key="traveller")
         traveller.attributes.add(
             KNOWLEDGE_ATTR,
@@ -506,11 +482,6 @@ class IntegratedMovedNodeTests(EvenniaTest):
             shop = GridRoom.objects.filter_xyz(xyz=(20, 10, MAP)).first()
             self.assertEqual(anchor.scene_archetype, "t_synthetic_scene")
             self.assertEqual(anchor.scene_identity, grid_scene_identity(MAP, 10, 10))
-            limbo = Room.objects.filter(db_key=LIMBO_KEY).first()
-            self.assertEqual(
-                [exit_obj.destination.pk for exit_obj in limbo.exits],
-                [anchor.pk],
-            )
             from evennia.utils.search import search_object_by_tag
 
             interiors = search_object_by_tag(place.key)
@@ -547,10 +518,6 @@ class IntegratedMovedNodeTests(EvenniaTest):
                 self.assertEqual(moved_shop.xyz, (50, 40, MAP))
                 self.assertEqual(
                     moved_anchor.scene_identity, grid_scene_identity(MAP, 40, 40)
-                )
-                self.assertEqual(
-                    [exit_obj.destination.pk for exit_obj in limbo.exits],
-                    [moved_anchor.pk],
                 )
                 self.assertTrue(
                     any(

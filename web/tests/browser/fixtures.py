@@ -225,30 +225,28 @@ def journey_settlement_scope() -> tuple[str, ...]:
     Publication stays complete: a runtime adopts the whole authored map world,
     so every panel a journey reads (world map, local map, travel, legibility)
     still resolves against the full bundle. Materialization -- the persistent
-    rooms, roads, display cleanup and forward bridge that
-    ``world.maps.bootstrap`` writes -- is declared here instead of covering the
-    whole roster. A browser journey only ever enters that persistent world
-    through a registered city gate: the seeded starting city and the second
-    gate the map-knowledge fixtures record. Those are the maps that must exist
-    as rooms, and materializing the rest costs every shard process more boot
-    time than the journeys it serves.
+    rooms, roads and display cleanup that ``world.maps.bootstrap`` writes -- is
+    declared here instead of covering the whole roster. A browser journey only
+    ever stands in the settlements of the two sorted-first wilderness
+    entrances: the seeded home settlement and the second map the relocation
+    journeys cross into. Those are the maps that must exist as rooms, and
+    materializing the rest costs every shard process more boot time than the
+    journeys it serves.
 
-    The declaration is derived from the live gate registry, never copied from
-    the roster: it is the shipped gate maps today, and it widens by itself
-    when the installed catalogs (the synthetic kit) register another gate. The
-    seed process and the server process both read it, so seeding and booting
-    cannot disagree, and ``sync_grid``/``sync_wilderness`` still converge these
-    maps through the real planner, transaction and rollback.
+    The declaration is derived from the shared entrance probe
+    (``world.tests.geography_fixture.entrance_refs``), never copied from the
+    roster. The seed process and the server process both read it, so seeding
+    and booting cannot disagree, and ``sync_grid``/``sync_wilderness`` still
+    converge these maps through the real planner, transaction and rollback.
 
     A creation runtime (``ELOSERN_BROWSER_CREATION=1``) also materializes every
     subrace's start settlement, because activation there places the new
     character in its start room.
     """
 
-    from world.maps.city_gates import CITY_GATE_REGISTRY
-    from world.maps.static_references import settlement_node_xyz
+    from world.tests.geography_fixture import entrance_refs
 
-    scope = {settlement_node_xyz(row.gate)[2] for row in CITY_GATE_REGISTRY.values()}
+    scope = {ref.map_id for ref in entrance_refs(2)}
     if os.environ.get("ELOSERN_BROWSER_CREATION") == "1":
         from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY
         from world.maps.static_references import published_static_world

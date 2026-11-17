@@ -222,7 +222,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "1d51a78f293823ac2c947a1f799a952420cbc15441b64cff3242093224682852",
+  "fingerprint": "f6fde66b6729d367ea474834a8683a76733fc5480f9e323005ef59e0a813e741",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -16266,7 +16266,6 @@
     "world/rules/character_creation.py": "ff484f55c3559b92b464ab081457df6dcff81348d428f32532e2f2e9c169b920",
     "world/rules/church.py": "d0d197ca2b70aa2623edeecf065f4d702789bfcfde32dc59d1e8b028397e7b52",
     "world/rules/church_rulebook.py": "7373da0ee3b9311dc8dbb1c768ff54437ad180a86307ef7fc2c6d3480f679f7e",
-    "world/rules/city_gates.py": "769431ba2710458d3f6f560ef8eb5b9f0c0d704ebf29230246b59b9fec67232b",
     "world/rules/clock.py": "7068284d0c3d688965208e61a6604368d7fc7d5f715a3917322962f8eaaa49a2",
     "world/rules/combat/__init__.py": "e6f030fbd5174ae8e7e32a0cd9e69ba46858d09cebbe1b523c72dcc5e24fa813",
     "world/rules/combat/battlefield.py": "d76c5fca0046579e19362ba04ecde17a10d006ed831cec836ec6f0e7d6fbeab0",
@@ -16373,9 +16372,9 @@
     "world/rules/monster_ai/utility.py": "fdb8f7522770db8fab4ec5e95f72d64cd181836fc049ff68b49888c4c60cd24e",
     "world/rules/monster_behaviour.py": "aa986b77b41c2569130ad4799da4d4346fa38aaefff0467d1955e79dc2399546",
     "world/rules/monster_individual.py": "aacf9a52419bfff9677495d5305e8b7380bb375905c10268e4287c0f5e8773fd",
-    "world/rules/movement.py": "cd3d72c72bd4c9cf89b210413b8871056b38caa4969554f4ad5770bb19fe436a",
+    "world/rules/movement.py": "c23dfbd07a2cfb52d6b4f98617037a848be67ddf0526495f90be4968cd646603",
     "world/rules/movement_edges.py": "ea91cd45cea73df108322dca9949522c02dd0818e7d891afc130ff35293624b6",
-    "world/rules/movement_settlement.py": "ac718e055cb16c4de4a4f29e84f955db2a9cf6080f7bf3a433193a952775bfec",
+    "world/rules/movement_settlement.py": "41f9e9ab1de3d204cbd15ff72d0dac8a954ce40b1c9ac7a992f93d6774019b2b",
     "world/rules/mp_flow.py": "cf7f26056b7845b1df943068fe21fc5cfb2b5ab5d837c20a660418d6804179a4",
     "world/rules/namegen.py": "93b04048e6593599605183f7dc3d8d92330ff136759c314893c7d43c14563993",
     "world/rules/npc_capabilities.py": "46b02af1f99742ee7ed081dbc720f676d9b5f23ee41671f38aa9e5bcfc7022e8",
@@ -16497,7 +16496,7 @@
     "world/rules/titles/state.py": "7efdc1e5a9a745f0ba980106f133f031856f21f7bfacb83beaef54f7a3097247",
     "world/rules/traits.py": "fb483c81ecbdfaf57f973fb984867c119bf2615451415980ef82e4de61ae7237",
     "world/rules/travel_capacity.py": "13f544331f38dd691e826325ef668edfb082bed1104b8c2c0b97599acd4e45af",
-    "world/rules/travel_cost.py": "d16917c8cf84f89ad056af6aef9f6544c623706ab36f3e32ffd3dfebb515dd88",
+    "world/rules/travel_cost.py": "9abd8ef000d1cc4d73a888df7710ff36794a2e02ec59cbb7dccc809bc95cffd8",
     "world/rules/travel_events.py": "3ce2284fbfc3810afeed8e3128ce161eabb4ee6be20754467a41177db05d6acd",
     "world/rules/travel_interrupts.py": "7277dea89d7c3064c96e7f3a2160e47505ae81ad0675c5e421952a3e109a65cb",
     "world/rules/travel_plan.py": "10ce62a44c4bbc7c6add81e14c9fe3f023610214b12078441dc4e0fb94f23737",

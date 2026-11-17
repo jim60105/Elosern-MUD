@@ -19,7 +19,6 @@ from typeclasses.rooms import AnchorRoom, GridRoom, Room
 from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY
 from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
 from world.quests.tests._fixtures import RegistryIsolationMixin
-from world.maps.city_gates import CITY_GATE_REGISTRY, CityGateDef
 from world.maps.bootstrap import SyncReport, sync_grid, sync_limbo, sync_wilderness
 from world.maps.limbo import LIMBO_ALIAS, LIMBO_DESC, LIMBO_KEY, LIMBO_LEGACY_KEY
 from world.maps.map_data import SETTLEMENT_GRAPHS
@@ -42,9 +41,7 @@ from world.maps.tests._bootstrap_fixtures import (
     ANCHOR_PLACEMENT_MAP_IDS,
     CAPITAL_MAP_IDS,
     CAPITAL_VILLAGE_MAP_IDS,
-    CITY_GATE_MAP_IDS,
     EAST_GATE_XYZ,
-    SELECTED_GATE_ROW_COUNT,
     SOUTH_GATE_XYZ,
     VILLAGE_MAP_IDS,
     WILDERNESS_GATE_MAP_IDS,

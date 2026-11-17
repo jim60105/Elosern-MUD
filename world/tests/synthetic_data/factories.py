@@ -48,7 +48,6 @@ from world.lore.titles import (
 )
 from world.lore.wilderness_entry import WildernessEntryPoint, WildernessGate
 from world.lore.wilderness_regions import WildernessRegion
-from world.maps.city_gates import CityGateDef
 from world.quests.definitions import (
     KNOWN_GRID_MAP_KEYS,
     DestinationKind,
@@ -98,7 +97,6 @@ from world.tests.synthetic_data.data_world import (
     SYNTH_ANCHORS,
     SYNTH_ARCHETYPES,
     SYNTH_BUFFS,
-    SYNTH_CITY_GATES,
     SYNTH_DIALOGUE,
     SYNTH_GUILD_RANKS,
     SYNTH_NAME_PACKS,
@@ -184,21 +182,6 @@ def make_anchor(key: str = "t_made_anchor", **overrides: object) -> Anchor:
 def make_region(key: str = "t_made_region", **overrides: object) -> WildernessRegion:
     """One synthetic wilderness region."""
     return _make(key, SYNTH_REGIONS["t_glassmere"], overrides)
-
-
-def make_city_gate(key: str = "t_made_gate", **overrides: object) -> CityGateDef:
-    """One synthetic city-gate row (the registry key IS the map id)."""
-    if not key.startswith(SYNTH_PREFIX):
-        raise ValueError(f"synthetic keys must start with {SYNTH_PREFIX!r}, got {key!r}")
-    # Same borrowed shipped node identity as the kit row (one resolvable-node
-    # invariant); callers override with their own resolvable identity.
-    overrides.setdefault(
-        "gate", settlement_node_ref(key, _SYNTH_GATE_REF.object_id)
-    )
-    base = SYNTH_CITY_GATES[_SYNTH_MAP_KEY]
-    merged = {field.name: getattr(base, field.name) for field in _dataclass_fields(base)}
-    merged.update(overrides)
-    return CityGateDef(**merged)
 
 
 def make_archetype(key: str = "t_made_archetype", **overrides: object) -> SceneArchetype:

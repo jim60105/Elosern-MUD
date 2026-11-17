@@ -12,7 +12,6 @@ from typeclasses.exits import Exit, WildernessGateExit
 from typeclasses.rooms import GridRoom
 from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY
 from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
-from world.maps.city_gates import CITY_GATE_REGISTRY
 from world.maps.limbo import LIMBO_KEY
 from world.maps.map_data import SETTLEMENT_GRAPHS
 from world.maps.static_references import settlement_node_xyz
@@ -34,15 +33,6 @@ EAST_GATE_XYZ = settlement_node_xyz(_CAPITAL_ENTRY.gate_for("w").destination)
 CAPITAL_MAP_IDS = (_CAPITAL_ENTRY.gate_for("w").destination.map_id,)
 VILLAGE_MAP_IDS = (_VILLAGE_ENTRY.gate_for("n").destination.map_id,)
 CAPITAL_VILLAGE_MAP_IDS = tuple(sorted({*CAPITAL_MAP_IDS, *VILLAGE_MAP_IDS}))
-SELECTED_GATE_ROW_COUNT = sum(
-    1
-    for row in CITY_GATE_REGISTRY.values()
-    if row.gate.map_id in CAPITAL_VILLAGE_MAP_IDS
-)
-#: The map ids the starting-room bridge rows would materialize.
-CITY_GATE_MAP_IDS = tuple(
-    sorted({row.gate.map_id for row in CITY_GATE_REGISTRY.values()})
-)
 #: The destination maps of every registered wilderness gate.
 WILDERNESS_GATE_MAP_IDS = tuple(
     sorted(
@@ -108,11 +98,8 @@ class _GridBootstrapCase(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTe
         return XYZExit.objects.all_family().count()
 
     def _bridging_exits(self):
-        # A bridging exit is one that touches the starting room itself. The
-        # south gate room may legitimately carry other exits once the boot
-        # runs sync_wilderness() (the per-gate 荒野 gate provisioning); the
-        # south gate is only resolved here as the bridge's far end, never as
-        # a counting target in its own right.
+        # Every exit that touches the starting room itself. 虛境 owns no
+        # exits (retire-limbo-city-gates), so a converged world has none.
         limbo = search_object(LIMBO_KEY, exact=True)
         targets = [limbo[0]] if limbo else []
         return [

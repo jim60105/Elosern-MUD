@@ -60,14 +60,6 @@ def after_successful_movement(
     traversal from any path. The post-move lifecycle is owned by
     ``PlayerCharacter.at_post_move``, which every successful hooks-enabled
     relocation — ordinary traversal and direct ``move_to()`` alike — reaches.
-
-    The tail additionally runs the one-way-gate home re-anchor
-    (limbo-one-way-gates design D7): a successful arrival at a
-    ``CITY_GATE_REGISTRY`` gate room re-homes a character whose ``home`` is
-    still the 虛境 starting room, exactly once. It sits strictly after the
-    raise-capable ``charge_movement`` so a failing settlement (compensated by
-    ``settle_movement``) never reaches it; the rules-side writer is itself a
-    no-op for anything but a player character at a registry gate coordinate.
     """
     from world.rules.map_knowledge import record_arrival
     from world.rules.movement import charge_movement
@@ -94,12 +86,6 @@ def after_successful_movement(
         traversing_object,
         destination if destination is not None else traversing_object.location,
         wilderness_coordinates=wilderness_coordinates,
-    )
-    from world.rules.city_gates import reanchor_home_on_gate_arrival
-
-    reanchor_home_on_gate_arrival(
-        traversing_object,
-        destination if destination is not None else traversing_object.location,
     )
     from world.rules.movement_settlement import note_traversal_completed
 

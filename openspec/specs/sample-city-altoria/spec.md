@@ -2,7 +2,7 @@
 
 Define the sample city（聖潔王都 / `capital_altoria`）as real, walkable rooms and exits
 from its authored sparse graph, with a single `AnchorRoom` at the central plaza
-and one forward bridge from Limbo per city-gate registry row.
+and its wilderness gates as the only way out.
 
 ## Requirements
 
@@ -145,40 +145,6 @@ Map-owned permanent interiors SHALL attach by qualified relationships without be
 - **THEN** the grid coordinates, grid links, cycle count and sole AnchorRoom SHALL remain unchanged
   by interior attachment
 
-### Requirement: The sample city connects to the rest of the world through exactly one bridging exit
-The room of the capital's authored `city_gate` node SHALL be the sample city's entrance from Limbo,
-reached via the single forward bridging `Exit` from Limbo described by the `grid-room-sync`
-capability, exactly one forward bridging exit per `CITY_GATE_REGISTRY` row, of which
-`capital_altoria` is one. Wilderness gates and service interiors SHALL remain separate
-from that bridge. Every room a capital wilderness gate targets SHALL carry its declared
-wilderness gate and SHALL NOT be a dead end.
-
-#### Scenario: The South Gate is the only room reachable from Limbo
-- **WHEN** Limbo's exits are inspected after `sync_grid()` runs
-- **THEN** they are exactly the registry's forward gate exits, one per `CITY_GATE_REGISTRY` row,
-  and the `capital_altoria` row's exit leads into that map, at the city-gate node's current authored coordinate
-
-#### Scenario: No city room leads back to Limbo
-- **WHEN** every exit of every spawned `capital_altoria` room is inspected after `sync_grid()` runs
-- **THEN** none of them has the Limbo starting room as its destination
-
-#### Scenario: The East Gate connects the city and wilderness
-- **WHEN** the exits of each room a capital wilderness gate targets are inspected
-- **THEN** it holds one city exit per authored road leaving that node and the wilderness gate exit its
-  `WILDERNESS_ENTRY_REGISTRY` row authorises, and no other exit
-
-#### Scenario: The bridge is one-way and pruned on every sync
-- **WHEN** the capital's bridging connection is exercised and `sync_grid()` runs
-- **THEN** the bridge is one-way: no room of the sample city SHALL hold an exit whose destination
-  is the Limbo starting room, and `sync_grid()` prunes any such exit on every run (see the
-  `limbo-one-way-gates` capability)
-
-#### Scenario: Other settlements keep their own rows and entrances
-- **WHEN** the `CITY_GATE_REGISTRY` is read alongside this requirement
-- **THEN** other settlements have their own rows and their own entrances; this requirement bounds
-  the capital's connectivity only, and SHALL NOT be read as a claim about how many settlements the
-  registry describes
-
 ### Requirement: The sample city's declared intra-city exits spawn as CostedXYZExit
 Every declared capital road SHALL spawn as a costed grid exit using its YAML exit prototype without changing topology, including diagonal travel.
 
@@ -267,3 +233,14 @@ Capital node positions SHALL be integer metres from the settlement document, wit
 #### Scenario: Physical city interpretation
 - **WHEN** capital geometry is inspected and routes are measured
 - **THEN** scale and lengths use actual source metres, and geometry does not infer population or claim that all housing is authored; setting fidelity remains human-reviewed
+
+### Requirement: The sample city connects to the world only through its wilderness gates
+Apart from service interiors, the sample city's rooms SHALL connect outward only through the wilderness gate exits its wilderness entry authorizes. Every room a capital wilderness gate targets SHALL hold one city exit per authored road leaving that node plus that wilderness gate exit, and SHALL NOT be a dead end. No sample-city room SHALL hold an exit into the starting room or receive one from it.
+
+#### Scenario: A wilderness gate room connects the city and the wilderness
+- **WHEN** the exits of each room a capital wilderness gate targets are inspected after `sync_grid()` and `sync_wilderness()` run
+- **THEN** it holds one city exit per authored road leaving that node and the wilderness gate exit its entry row authorizes, and no other exit
+
+#### Scenario: No city room is joined to 虛境
+- **WHEN** every exit located in or leading into a spawned sample-city room is inspected after `sync_grid()` runs with a starting room present
+- **THEN** none of them is located in the starting room or leads into it

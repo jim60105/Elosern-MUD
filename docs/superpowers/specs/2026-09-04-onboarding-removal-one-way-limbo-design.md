@@ -1,3 +1,5 @@
+> Superseded in part by subrace-start-settlements and retire-limbo-city-gates: 虛境 has no gates; characters start in their subrace's settlement.
+
 # 移除 onboarding 與虛境單向通道設計（Onboarding Removal & One-Way Limbo Design）
 
 日期：2026-09-04

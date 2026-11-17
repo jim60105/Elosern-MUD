@@ -51,7 +51,6 @@ from world.lore.wilderness_entry import (
 )
 from elosern_map_core.authoring import diagnose_settlement_rules
 from elosern_map_core.diagnostics import blocking
-from world.maps.city_gates import CityGateDef
 from world.maps.published import PublishedKeySet, PublishedView
 
 #: The repository root the shipped documents are read from.
@@ -86,8 +85,8 @@ class SettlementSnapshot:
 
     The typed documents are retained because consumers (and the editor's
     external context) need authored identity and provenance; the composed
-    mappings are the game-facing views. ``graphs`` and ``city_gates`` are keyed
-    by the authored settlement (map) identity; ``anchor_placements``,
+    mappings are the game-facing views. ``graphs`` is keyed by the authored
+    settlement (map) identity; ``anchor_placements``,
     ``local_frame_anchors`` and ``wilderness_entries`` are keyed by the
     ``location_ref`` that binds them, because that is the anchor identity a
     geographic location navigates by and the identity a gate exit persists in
@@ -98,7 +97,6 @@ class SettlementSnapshot:
     graphs: Mapping[str, SparseSettlementGraph]
     anchor_placements: Mapping[str, AnchorPlacement]
     local_frame_anchors: Mapping[str, LocalFrameAnchor]
-    city_gates: Mapping[str, CityGateDef]
     wilderness_entries: Mapping[str, WildernessEntryPoint]
     grid_node_scene_archetypes: Mapping[QualifiedRef, str]
     fingerprints: Mapping[str, str] = field(default_factory=dict)
@@ -195,7 +193,6 @@ def _compose_document(
     SparseSettlementGraph | None,
     AnchorPlacement | None,
     LocalFrameAnchor | None,
-    CityGateDef | None,
     WildernessEntryPoint | None,
     dict[QualifiedRef, str],
 ]:
@@ -242,17 +239,6 @@ def _compose_document(
             node.scene_archetype
         )
 
-    city_gate = None
-    if document.city_gate is not None:
-        if document.city_gate.node not in document.nodes:
-            fail(f"city_gate.node {document.city_gate.node!r} is not an authored node")
-        else:
-            city_gate = CityGateDef(
-                gate=settlement_node_ref(settlement_id, document.city_gate.node),
-                exit_key=document.city_gate.exit_key,
-                exit_aliases=document.city_gate.exit_aliases,
-            )
-
     wilderness_entry = None
     if document.wilderness_entry is not None and location is not None:
         entry = document.wilderness_entry
@@ -281,7 +267,7 @@ def _compose_document(
 
     problems.extend(defects)
     if defects or anchor is None:
-        return None, None, None, None, None, {}
+        return None, None, None, None, {}
 
     assert anchor is not None and location is not None
     placement = AnchorPlacement(
@@ -289,7 +275,7 @@ def _compose_document(
         node=settlement_node_ref(settlement_id, anchor.node_id),
     )
     frame = LocalFrameAnchor(document.location_ref, (anchor.x_m, anchor.y_m))
-    return graph, placement, frame, city_gate, wilderness_entry, scene_archetypes
+    return graph, placement, frame, wilderness_entry, scene_archetypes
 
 
 def build_settlements(
@@ -317,13 +303,12 @@ def build_settlements(
     graphs: dict[str, SparseSettlementGraph] = {}
     placements: dict[str, AnchorPlacement] = {}
     frames: dict[str, LocalFrameAnchor] = {}
-    city_gates: dict[str, CityGateDef] = {}
     entries: dict[str, WildernessEntryPoint] = {}
     scene_archetypes: dict[QualifiedRef, str] = {}
 
     for settlement_id in sorted(settlements):
         document = settlements[settlement_id]
-        graph, placement, frame, city_gate, entry, scenes = _compose_document(
+        graph, placement, frame, entry, scenes = _compose_document(
             document, locations, problems
         )
         if graph is None or placement is None or frame is None:
@@ -333,8 +318,6 @@ def build_settlements(
         graphs[settlement_id] = graph
         placements[document.location_ref] = placement
         frames[document.location_ref] = frame
-        if city_gate is not None:
-            city_gates[settlement_id] = city_gate
         if entry is not None:
             # Keyed by the anchor identity the gate exits persist
             # (``db.anchor_key``), so traversal and the local-map presenter
@@ -360,7 +343,6 @@ def build_settlements(
         graphs=MappingProxyType(graphs),
         anchor_placements=MappingProxyType(placements),
         local_frame_anchors=MappingProxyType(frames),
-        city_gates=MappingProxyType(city_gates),
         wilderness_entries=MappingProxyType(entries),
         grid_node_scene_archetypes=MappingProxyType(scene_archetypes),
         fingerprints=MappingProxyType(dict(fingerprints or {})),

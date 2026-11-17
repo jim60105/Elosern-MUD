@@ -103,10 +103,6 @@ def live_wilderness_entry_registry():
     return live_registry("world.lore.wilderness_entry", "WILDERNESS_ENTRY" + "_REGISTRY")
 
 
-def live_city_gate_registry():
-    return live_registry("world.maps.city_gates", "CITY_GATE" + "_REGISTRY")
-
-
 # -- runtime key probes -------------------------------------------------------
 
 
@@ -153,7 +149,6 @@ def synthetic_title_key_secondary() -> str:
 __all__ = [
     "basic_attack_key",
     "live_anchor_registry",
-    "live_city_gate_registry",
     "live_element_registry",
     "live_fixed_title_registry",
     "live_guild_rank_registry",

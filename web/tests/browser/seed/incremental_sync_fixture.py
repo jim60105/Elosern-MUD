@@ -2,7 +2,7 @@
 
 Installed only when ``ELOSERN_BROWSER_INCREMENTAL_SYNC=1``. The managed server's
 own bootstrap already builds the grid map; this fixture moves the seeded
-character onto the first registered city-gate room, where the committed
+character onto the first wilderness entrance's gate room, where the committed
 ``exploration`` and ``local_map`` panels expose the four compass exits the
 graphical same-area move needs, and brings the already-seeded monsters along so
 the same room offers a real combat engagement.

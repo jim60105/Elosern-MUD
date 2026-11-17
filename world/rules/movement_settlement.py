@@ -1353,8 +1353,8 @@ def settle_relocation(entity: Any, destination: Any) -> None:
     The operator console's map-lifecycle ``teleport`` verb
     (gm-developer-console::map-lifecycle-verbs-with-consequences): the entity
     moves without a movement charge, records its arrival node, brings its
-    party along, observes the destination's arrival lore, re-homes a gate
-    arrival, and drops the dialogue it held in the room it left. Every write
+    party along, observes the destination's arrival lore, and drops the
+    dialogue it held in the room it left. Every write
     lives in this deterministic settlement, so the operator adapter delegates
     instead of importing a map-knowledge write helper (map-knowledge D4).
 
@@ -1374,7 +1374,6 @@ def settle_relocation(entity: Any, destination: Any) -> None:
     from typeclasses.characters import PlayerCharacter
     from world.maps.population_lifecycle import ensure_locations_current
     from world.quests.room_observation import observe_arrival_lore
-    from world.rules.city_gates import reanchor_home_on_gate_arrival
     from world.rules.dialogue import clear_dialogue_session
     from world.rules.map_knowledge import record_arrival
     from world.rules.movement_edges import (
@@ -1462,7 +1461,6 @@ def settle_relocation(entity: Any, destination: Any) -> None:
                     wilderness_source_coordinates=source_coordinates,
                 )
                 observe_arrival_lore(entity, destination)
-                reanchor_home_on_gate_arrival(entity, destination)
                 if source is not destination:
                     clear_dialogue_session(entity)
                 # A teleport is a non-traversal relocation: the retained
@@ -1677,7 +1675,6 @@ def _compensate(snapshot: MovementSnapshot) -> None:
     never masks the original traversal failure.
     """
     _compensate_traverser(snapshot)
-    _compensate_home(snapshot)
     _compensate_companions(snapshot)
     _restore_wilderness_bookkeeping(snapshot)
     _restore_wilderness_rooms(snapshot)
@@ -1731,39 +1728,6 @@ def _compensate_traverser(snapshot: MovementSnapshot) -> None:
             },
         )
         _force_reconcile_location(traverser, snapshot.source_location)
-
-
-def _compensate_home(snapshot: MovementSnapshot) -> None:
-    """Reconcile the live traverser's ``home`` after the outer rollback.
-
-    The one-way-gate re-anchor (limbo-one-way-gates D7) may have written the
-    traverser's durable ``home`` FK before a later settlement step raised; the
-    outer rollback reverted the row but the live object keeps its in-memory
-    relation — the same rollback-stale surface class ``db_location`` is treated
-    as. The authoritative value is re-read from the rolled-back row and applied
-    in-memory only (never a re-assign through the property, which would
-    re-save a row the writer did not end up touching).
-    """
-    from evennia.objects.models import ObjectDB
-    from typeclasses.characters import PlayerCharacter
-
-    traverser = snapshot.traverser
-    if not isinstance(traverser, PlayerCharacter):
-        return
-    try:
-        row_home = ObjectDB.objects.filter(id=traverser.id).values_list(
-            "db_home_id", flat=True
-        ).first()
-        if traverser.db_home_id != row_home:
-            traverser.db_home_id = row_home
-    except Exception as error:
-        # A home that cannot be reconciled is a diagnostic, never a mask of
-        # the original traversal failure (mirrors every other step here).
-        log_warn(
-            "rollback_restore_failed",
-            exc=error,
-            context={"obj": str(traverser), "surface": "home"},
-        )
 
 
 def _compensate_companions(snapshot: MovementSnapshot) -> None:

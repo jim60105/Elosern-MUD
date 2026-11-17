@@ -71,7 +71,7 @@ and leaves the previously published snapshot exactly as it was; reading before
 any publication raises `SettlementNotLoaded`. Nothing loads at import.
 
 `SETTLEMENT_GRAPHS`, `KNOWN_GRID_MAP_KEYS`, `ANCHOR_PLACEMENT_REGISTRY`,
-`LOCAL_FRAME_ANCHOR_REGISTRY`, `CITY_GATE_REGISTRY`,
+`LOCAL_FRAME_ANCHOR_REGISTRY`,
 `WILDERNESS_ENTRY_REGISTRY` and `GRID_NODE_SCENE_ARCHETYPES` are read-only views
 over the published snapshot, so a replacement reaches every consumer that
 already holds them. The composition roots (`world.maps.runtime` at startup, `sync_grid`, `sync_wilderness`,
@@ -126,8 +126,7 @@ or test graph and returns a `SyncReport(created, updated, deleted)`.
 
 ## Static references
 
-Static map targets outside the settlement graph — city gates (虛境 bridges),
-ghost-anchor placements, wilderness entry gates, place room joins and their authored exterior entrances,
+Static map targets outside the settlement graph — ghost-anchor placements, wilderness entry gates, place room joins and their authored exterior entrances,
 district landmarks and grid scene-art associations — declare a qualified
 identity (`QualifiedRef`: tagged domain, map scope, object id, or an explicitly
 typed wilderness cell). They never store coordinates.

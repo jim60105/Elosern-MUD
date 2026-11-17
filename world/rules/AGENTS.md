@@ -15,7 +15,7 @@ you read the body.
 | Combat | `combat/` (d100 resolution), `combat_session/` (persistent sessions, rounds, settlement, exits), `combat_initiation.py`, `combat_modifiers.py`, `combat_beats.py`, `combat_result.py`, `combat_identity.py`, `disengage.py`, `overwhelm.py`, `defeat_aftermath/`, `field_contact.py`, `world_escape.py` |
 | Monster decisions | `monster_behaviour.py`, `monster_ai/`, `monster_individual.py` |
 | World time, rest, fatigue | `clock.py`, `quantum.py`, `time_skip.py`, `skip_safety.py`, `sleep_control.py`, `sleep_receipt.py`, `camping.py`, `upkeep.py`, `fatigue.py`, `mental_time.py`, `settlement_alignment.py` |
-| Movement and travel | `movement.py`, `movement_edges.py`, `movement_settlement.py`, `travel_cost.py`, `travel_plan.py`, `travel_capacity.py`, `travel_events.py`, `travel_interrupts.py`, `sight.py`, `city_gates.py` |
+| Movement and travel | `movement.py`, `movement_edges.py`, `movement_settlement.py`, `travel_cost.py`, `travel_plan.py`, `travel_capacity.py`, `travel_events.py`, `travel_interrupts.py`, `sight.py` |
 | What the player knows of the map | `map_knowledge.py`, `map_discovery.py`, `map_district_lighting.py`, `wilderness_disclosure.py` |
 | Money, items, equipment, shops | `wallet.py`, `economy.py`, `equipment.py`, `equipment_effects.py`, `item_effects.py`, `items/`, `party_inventory.py`, `shop_hours.py`, `caravan_arrivals.py` |
 | Guild, exams, quest offers | `guild.py`, `guild_config/`, `guild_economy.py`, `guild_offers.py`, `guild_exams.py`, `guild_exam_request.py`, `guild_exam_restrictions.py`, `exam_schedule_holds.py`, `human_guild_hosts.py`, `quest_issuance.py`, `quest_delivery.py` |

@@ -5,7 +5,7 @@ from tools.spec_traceability import covers_requirement
 from unittest.mock import patch
 from evennia.utils.create import create_object
 from typeclasses.exits import Exit
-from typeclasses.rooms import GridRoom, Room, TerrainRoom
+from typeclasses.rooms import GridRoom, TerrainRoom
 from world.rules.clock import get_world_clock
 from world.rules.map_knowledge import parse_knowledge
 
@@ -32,22 +32,6 @@ class MapKnowledgeRecordingTests(_MapKnowledgeFixture):
         self.char1.location = self.room1
         exit_obj.at_traverse(self.char1, self.room2)
         self.assertIn(f"room:{self.room2.id}", _node_ids(self.char1))
-
-
-    @covers_requirement("map-knowledge::arrival-recording-happens-only-at-existing-successful-arrival-seams")
-    def test_limbo_bridge_records_grid_node(self):
-        limbo = create_object(Room, key="LimboBridge", location=None)
-        south_gate = GridRoom.objects.filter_xyz(xyz=self.south_gate_xyz).first()
-        bridge = create_object(
-            Exit,
-            key=self.gate_row.exit_key,
-            aliases=list(self.gate_row.exit_aliases),
-            location=limbo,
-            destination=south_gate,
-        )
-        self.char1.location = limbo
-        bridge.at_traverse(self.char1, south_gate)
-        self.assertIn(_grid_node(south_gate), _node_ids(self.char1))
 
 
     def test_instance_doorway_records_room_node(self):

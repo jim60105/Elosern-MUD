@@ -31,8 +31,8 @@ arrival is accepted and the external forced-sleep latch applies there.
 Processing is per authored boundary, never per meter or per second.
 
 Only ``seconds`` is an authority. ``clock.yaml``'s ``command_defaults`` remain
-the explicit durations for non-distance connectors (a Limbo bridge, an
-instance-room doorway, a plain room pair); a distance-bearing outdoor lineage
+the explicit durations for non-distance connectors (an instance-room
+doorway, a plain room pair); a distance-bearing outdoor lineage
 either resolves here or is refused before any write. ``wilderness_move`` is
 retained as the distinct wilderness flight-waiver context key only and is never
 a seconds authority. An explicit connector's authored duration is admission

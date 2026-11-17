@@ -35,7 +35,6 @@ from world.tests.synthetic_data.data_world import (
     SYNTH_ARCHETYPES,
     SYNTH_ASSORTMENTS,
     SYNTH_BUFFS,
-    SYNTH_CITY_GATES,
     SYNTH_DIALOGUE,
     SYNTH_GUILD_BRANCHES,
     SYNTH_GUILD_RANKS,
@@ -84,7 +83,6 @@ def _content_by_logical() -> dict[str, Callable[[], Mapping[str, object]]]:
         "anchor_placements": lambda: SYNTH_ANCHOR_PLACEMENTS,
         "regions": lambda: SYNTH_REGIONS,
         "wilderness_entries": lambda: SYNTH_WILDERNESS_ENTRIES,
-        "city_gates": lambda: SYNTH_CITY_GATES,
         "archetypes": lambda: SYNTH_ARCHETYPES,
         "settlements": lambda: SYNTH_SETTLEMENTS,
         "places": lambda: SYNTH_PLACES,
@@ -209,7 +207,6 @@ GEOGRAPHY_TARGETS: dict[str, str] = {
 SETTLEMENT_TARGETS: dict[str, str] = {
     "anchor_placements": "anchor_placements",
     "wilderness_entries": "wilderness_entries",
-    "city_gates": "city_gates",
 }
 
 _CONTENT: dict[str, Callable[[], Mapping[str, object]]] = _content_by_logical()

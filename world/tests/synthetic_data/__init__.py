@@ -112,7 +112,6 @@ from world.lore.titles import (
 )
 from world.lore.wilderness_entry import WildernessEntryPoint, WildernessGate
 from world.lore.wilderness_regions import WildernessRegion
-from world.maps.city_gates import CityGateDef
 from world.quests.definitions import (
     KNOWN_GRID_MAP_KEYS,
     DestinationKind,
@@ -195,7 +194,6 @@ from world.tests.synthetic_data.data_world import (
     SYNTH_NAME_PACKS,
     SYNTH_ASSORTMENTS,
     SYNTH_SHOPS,
-    SYNTH_CITY_GATES,
     SYNTH_ARCHETYPES,
     SYNTH_DIALOGUE,
     SYNTH_BUFFS,
@@ -260,7 +258,6 @@ from world.tests.synthetic_data.factories import (
     make_monster_site,
     make_anchor,
     make_region,
-    make_city_gate,
     make_archetype,
     make_price_entry,
     make_assortment,

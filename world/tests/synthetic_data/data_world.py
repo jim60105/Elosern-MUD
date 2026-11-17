@@ -30,7 +30,6 @@ from world.lore.titles import (
 )
 from world.lore.wilderness_entry import WildernessEntryPoint, WildernessGate
 from world.lore.wilderness_regions import WildernessRegion
-from world.maps.city_gates import CityGateDef
 from world.rules.buffs import BuffDefinition, PHYSIOLOGICAL_PROTECTION
 from world.rules.fatigue import PROJECTION_BUFF_KEYS
 from world.rules.dialogue import DialogueDefinition, KeywordResponse
@@ -292,20 +291,6 @@ SYNTH_SHOPS: dict[str, ShopDefinition] = {
         assortment_keys=("t_mossgate_goods",),
     ),
 }
-
-SYNTH_CITY_GATES: MappingProxyType = MappingProxyType(
-    {
-        _SYNTH_MAP_KEY: CityGateDef(
-            # The borrowed shipped gate identity (vocab resolver): the kit
-            # row must land on a node the shipped map data actually contains,
-            # or the registry-probing fixtures resolve no room and silently
-            # no-op.
-            gate=_SYNTH_GATE_REF,
-            exit_key="霧門",
-            exit_aliases=("合成門", "苔徑門"),
-        ),
-    }
-)
 
 SYNTH_ARCHETYPES: MappingProxyType[str, SceneArchetype] = MappingProxyType(
     {

@@ -1,7 +1,7 @@
 ## Purpose
 
-Define the starting room's localized zh-tw identity — where characters first exist — its
-idempotent startup convergence, and the zh-tw bridge exit surface to the capital.
+Define the starting room's localized zh-tw identity — where characters first exist — and its
+idempotent startup convergence.
 
 ## Requirements
 
@@ -61,8 +61,7 @@ step.
 
 - **WHEN** `sync_limbo()` runs against a database that contains both a room keyed `LIMBO_KEY` and a
   separate room keyed the legacy `"Limbo"`
-- **THEN** the canonical `LIMBO_KEY` room is re-authored, converged onto `LimboRoom`, and used for
-  the bridge, the legacy room is left in place, and a warning is logged
+- **THEN** the canonical `LIMBO_KEY` room is re-authored and converged onto `LimboRoom`, the legacy room is left in place, and a warning is logged
 
 #### Scenario: A missing room degrades gracefully
 
@@ -84,51 +83,10 @@ step.
 #### Scenario: The canonical pick is never silent or arbitrary
 
 - **WHEN** both a canonical `LIMBO_KEY` room and a legacy `"Limbo"` room exist
-- **THEN** the canonical room SHALL be the one synced and bridged, the legacy room SHALL be left
+- **THEN** the canonical room SHALL be the one synced, the legacy room SHALL be left
   untouched, and a warning SHALL be logged — never a silent arbitrary pick
 
 #### Scenario: A missing qualifying room warns and returns
 
 - **WHEN** no qualifying room exists at all
 - **THEN** the function SHALL log a warning and return without raising
-
-### Requirement: The bridge to the capital presents zh-tw exit names and aliases, reconciled in place
-The directed exit bridging the starting room and the capital's South Gate SHALL present
-player-facing commands in Traditional Chinese: the forward exit from the starting room toward the
-city SHALL keep key 「南門」 with only zh-tw aliases (no English aliases such as `south gate` or
-`altoria`), taken from its `CITY_GATE_REGISTRY` row. The bridge is one-way.
-
-#### Scenario: The exit toward the city carries zh-tw aliases only
-- **WHEN** the starting room's exit to the South Gate is inspected after `sync_grid()` runs
-- **THEN** its key is 「南門」 and its alias set contains no English word (for example, neither
-  `south gate` nor `altoria` appears among the aliases)
-
-#### Scenario: No return exit survives a sync
-- **WHEN** the South Gate's exits are inspected after `sync_grid()` runs on a database that
-  previously held the legacy 「離開王都」 return exit
-- **THEN** no exit from the South Gate (or any other room) leads back to the starting room
-
-#### Scenario: Pre-existing English aliases are reconciled in place
-- **WHEN** `sync_grid()` runs against a database whose forward bridge exit already exists but carries
-  the legacy English aliases (`south gate`, `altoria`)
-- **THEN** that same exit object is rewritten to the zh-tw key and zh-tw alias set, no duplicate
-  exit is created, and a second sync run is a no-op
- 
-#### Scenario: The one-way bridge authors no return exit
-
-- **WHEN** the bridge is authored and synced
-- **THEN** no return exit from the South Gate back to the starting room SHALL be authored, and any
-  pre-existing reverse exit (such as the legacy 「離開王都」 with alias 「回虛境」) SHALL be pruned by
-  `sync_grid()` on every run (see the `limbo-one-way-gates` capability)
-
-#### Scenario: Existing bridge exits reconcile on every sync
-
-- **WHEN** the grid bootstrap runs
-- **THEN** it SHALL reconcile the key and aliases of pre-existing forward bridge exits in place on
-  every sync — not only at creation — so databases that already contain the bridge with English
-  aliases converge without rebuilding the exits
-
-#### Scenario: Re-sync keeps the bridge zh-tw and one-way
-- **WHEN** `sync_grid()` runs twice against the same database
-- **THEN** the bridge still consists of exactly one forward exit with the zh-tw key and zh-tw alias
-  set, no duplicate or English-alias exit appears, and no exit leads back to the starting room

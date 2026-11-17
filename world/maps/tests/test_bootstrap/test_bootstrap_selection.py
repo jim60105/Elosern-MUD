@@ -16,7 +16,6 @@ from typeclasses.rooms import AnchorRoom, GridRoom, Room
 from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY
 from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
 from world.quests.tests._fixtures import RegistryIsolationMixin
-from world.maps.city_gates import CITY_GATE_REGISTRY, CityGateDef
 from world.maps.bootstrap import SyncReport, sync_grid, sync_limbo, sync_wilderness
 from world.maps.limbo import LIMBO_ALIAS, LIMBO_DESC, LIMBO_KEY, LIMBO_LEGACY_KEY
 from world.maps.map_data import SETTLEMENT_GRAPHS
@@ -39,9 +38,7 @@ from world.maps.tests._bootstrap_fixtures import (
     ANCHOR_PLACEMENT_MAP_IDS,
     CAPITAL_MAP_IDS,
     CAPITAL_VILLAGE_MAP_IDS,
-    CITY_GATE_MAP_IDS,
     EAST_GATE_XYZ,
-    SELECTED_GATE_ROW_COUNT,
     SOUTH_GATE_XYZ,
     VILLAGE_MAP_IDS,
     WILDERNESS_GATE_MAP_IDS,
@@ -897,32 +894,13 @@ class SelectedSettlementSyncTests(_SelectionFixture, EvenniaTest):
     @covers_requirement(
         "grid-room-sync::explicit-settlement-selection-bounds-test-synchronization"
     )
-    def test_ancillary_work_respects_the_selection_and_global_prune_stays(self):
+    def test_ancillary_work_respects_the_selection(self):
         from evennia.contrib.grid.xyzgrid.xyzgrid import XYZGrid
-        from world.maps import bootstrap
         from world.maps.room_art import GRID_NODE_SCENE_ARCHETYPES
 
         capital = CAPITAL_MAP_IDS[0]
         village = VILLAGE_MAP_IDS[0]
-        limbo = create_object(Room, key=LIMBO_KEY, location=None)
         sync_test_settlements(CAPITAL_VILLAGE_MAP_IDS)
-
-        capital_row = next(
-            row for row in CITY_GATE_REGISTRY.values() if row.gate.map_id == capital
-        )
-        village_row = next(
-            row for row in CITY_GATE_REGISTRY.values() if row.gate.map_id == village
-        )
-        capital_forward = next(
-            exit_obj for exit_obj in limbo.exits if exit_obj.key == capital_row.exit_key
-        )
-        village_forward = next(
-            exit_obj for exit_obj in limbo.exits if exit_obj.key == village_row.exit_key
-        )
-        capital_forward.key = "drifted capital"
-        capital_forward.save()
-        village_forward.key = "drifted village"
-        village_forward.save()
 
         capital_reference, capital_scene = next(
             (reference, scene)
@@ -966,64 +944,14 @@ class SelectedSettlementSyncTests(_SelectionFixture, EvenniaTest):
         }
         grid.save()
 
-        reverse = create_object(
-            Exit, key="測試村回虛境", location=village_art_room, destination=limbo
-        )
-        reverse_id = reverse.id
-        unmaterialized = CityGateDef(
-            gate=settlement_node_ref(village, "hidden_path"),
-            exit_key="測試未佈建門",
-            exit_aliases=("未佈建",),
-        )
-        rebound = dict(CITY_GATE_REGISTRY)
-        rebound["unmaterialized"] = unmaterialized
-        real_resolve = settlement_node_xyz
+        sync_test_settlements(CAPITAL_MAP_IDS)
 
-        def resolve(reference, **kwargs):
-            if reference == unmaterialized.gate:
-                return (999, 999, village)
-            return real_resolve(reference, **kwargs)
-
-        with (
-            patch("world.maps.bootstrap.CITY_GATE_REGISTRY", rebound),
-            patch("world.maps.bootstrap.settlement_node_xyz", side_effect=resolve),
-            patch("world.maps.bootstrap.log_warn") as warn,
-            patch("world.maps.bootstrap.log_info") as info,
-        ):
-            sync_test_settlements(CAPITAL_MAP_IDS)
-
-        missing = [
-            call
-            for call in warn.call_args_list
-            if call.args and call.args[0] == "bootstrap_grid_gate_missing"
-        ]
-        self.assertEqual(missing, [])
         self.assertNotIn(capital, grid.db.map_data)
         self.assertIn(village, grid.db.map_data)
         self.assertEqual(capital_art_room.scene_archetype, capital_scene)
         self.assertEqual(village_art_room.scene_archetype, "drifted village art")
         self.assertEqual(village_art_room.db.desc, "drifted village prose")
         self.assertEqual(village_exit.key, "drifted village road")
-        self.assertTrue(Exit.objects.filter(id=village_forward.id).exists())
-        self.assertEqual(
-            Exit.objects.get(id=village_forward.id).key, "drifted village"
-        )
-        self.assertEqual(
-            next(
-                exit_obj.key
-                for exit_obj in limbo.exits
-                if exit_obj.destination == capital_forward.destination
-            ),
-            capital_row.exit_key,
-        )
-        self.assertFalse(Exit.objects.filter(id=reverse_id).exists())
-        prunes = [
-            call
-            for call in info.call_args_list
-            if call.args and call.args[0] == "bootstrap_grid_exit_pruned"
-        ]
-        self.assertEqual(len(prunes), 1)
-        self.assertEqual(prunes[0].kwargs["context"]["source_room_key"], village_art_room.key)
 
 class DefaultSelectionOutcomeTests(_SelectionFixture, EvenniaTest):
     """The default selection, its wilderness identity and its adapter."""

@@ -1,5 +1,5 @@
-"""Idempotent grid and wilderness bootstrap: converge the sparse settlements,
-bridge them to Limbo with one-way registry gates, and provision the wilderness
+"""Idempotent grid and wilderness bootstrap: converge the starting room (Limbo,
+which owns no exits) and the sparse settlements, and provision the wilderness
 layer and one grid-side gate exit per registered gate (map-wilderness,
 wilderness-anchor-footprint, limbo-one-way-gates).
 
@@ -47,7 +47,6 @@ from elosern_map_core.sparse import (
     exit_spawn_names,
 )
 from elosern_map_core.references import settlement_node_ref
-from world.maps.city_gates import CITY_GATE_REGISTRY
 from world.maps.instance import register_instance_reclamation
 from world.maps.limbo import (
     LIMBO_ALIAS,
@@ -70,10 +69,9 @@ from world.maps.wilderness_provider import (
     ElosernWildernessMapProvider,
 )
 
-# No gate coordinates live here (limbo-one-way-gates D1: the registries are the
-# sole authored source): every consumer resolves a city gate through
-# CITY_GATE_REGISTRY and a wilderness gate through WILDERNESS_ENTRY_REGISTRY,
-# so bootstrap owns no gate surface of its own.
+# No gate coordinates live here: every consumer resolves a wilderness gate
+# through WILDERNESS_ENTRY_REGISTRY, so bootstrap owns no gate surface of its
+# own.
 
 # The hard-gate starting-room typeclass (limbo-one-way-gates D4). Referenced
 # by module path so bootstrap never imports typeclasses.rooms' subclasses.
@@ -546,13 +544,14 @@ def sync_limbo() -> None:
 
     The canonical lookup is restricted to the ``Room`` typeclass by ``db_key``
     (never the alias-inclusive ``search_object``), so a non-room object that
-    happens to share the key or the ``limbo`` alias can never be rewritten or
-    bridged.
+    happens to share the key or the ``limbo`` alias can never be rewritten.
 
     The call also declaratively converges the room's typeclass onto the
     hard-gate ``LimboRoom`` (limbo-one-way-gates D4): an unconverged room is
     swapped in place without clearing attributes, an already-converged room
     is left as-is, so the convergence is idempotent and never a migration.
+    Finally it deletes every exit located in or leading into the room, because
+    虛境 owns no exits (retire-limbo-city-gates D1).
     """
 
     limbo = find_starting_rooms(LIMBO_KEY)
@@ -597,6 +596,36 @@ def sync_limbo() -> None:
     # makes every run after the first a no-op.
     if room.typeclass_path != LIMBO_ROOM_TYPECLASS:
         room.swap_typeclass(LIMBO_ROOM_TYPECLASS, clean_attributes=False, no_default=True)
+    _prune_limbo_exits(room)
+
+
+def _prune_limbo_exits(limbo) -> None:
+    """Delete every persisted exit located in or leading into ``limbo``.
+
+    虛境 is a backstage holding room for creation-pending shells
+    (retire-limbo-city-gates D1): it owns no exits, and no exit leads into it.
+    The query runs at the unscoped ``ObjectDB`` level so every Exit subclass is
+    caught; the ``isinstance`` gate leaves non-exit objects untouched. On a
+    converged database this deletes and logs nothing.
+    """
+
+    for side, rows in (
+        ("location", ObjectDB.objects.filter(db_location=limbo.id)),
+        ("destination", ObjectDB.objects.filter(db_destination=limbo.id)),
+    ):
+        for exit_obj in rows:
+            if not isinstance(exit_obj, Exit):
+                continue
+            log_info(
+                "bootstrap_limbo_exit_pruned",
+                context={
+                    "exit_key": exit_obj.key,
+                    "exit_dbref": exit_obj.dbref,
+                    "side": side,
+                    "action": "limbo_owns_no_exits",
+                },
+            )
+            exit_obj.delete()
 
 
 def find_starting_rooms(db_key: str) -> list:
@@ -616,52 +645,6 @@ def find_starting_rooms(db_key: str) -> list:
         for obj in ObjectDB.objects.filter(db_key=db_key)
         if isinstance(obj, Room)
     ]
-
-
-def _ensure_exit(location, destination, key, aliases):
-    """Create or reconcile exactly one ``key``/``aliases`` exit toward ``destination``.
-
-    When one exit already exists, its key and aliases are rewritten in place
-    to the authored values on every call, so a pre-existing exit converges on
-    the zh-tw bridge surface without being rebuilt (localize-limbo-zhtw D-3).
-    Duplicate pre-existing exits toward the same destination are declaratively
-    pruned (the lowest dbid is the stable keeper), so "exactly one" forward
-    exit per registry row holds regardless of database history
-    (limbo-one-way-gates D3's convergence discipline).
-    """
-
-    existing = sorted(
-        (exit_obj for exit_obj in location.exits if exit_obj.destination == destination),
-        key=lambda exit_obj: exit_obj.id,
-    )
-    if not existing:
-        create_object(
-            Exit,
-            key=key,
-            aliases=aliases,
-            location=location,
-            destination=destination,
-        )
-        return
-    keep = existing[0]
-    for duplicate in existing[1:]:
-        log_info(
-            "bootstrap_grid_exit_pruned",
-            context={
-                "exit_key": duplicate.key,
-                "exit_dbref": duplicate.dbref,
-                "source_room_key": location.key,
-                "action": "collapse_duplicate_gate_exit",
-            },
-        )
-        duplicate.delete()
-    if keep.key != key or set(keep.aliases.all()) != set(aliases):
-        keep.key = key
-        keep.aliases.clear()
-        # TagHandler.add takes ONE key or an iterable (``add(a, b)`` would
-        # read ``b`` as a category); pass the authored list as one iterable.
-        keep.aliases.add(list(aliases))
-        keep.save()
 
 
 #: Tag categories owned by the sparse synchronizer. They identify the authored
@@ -1222,7 +1205,7 @@ def _clear_grid_display_maps(*, settlement_ids: frozenset[str]) -> None:
 
 
 def sync_grid(*, settlement_ids: Iterable[str] | None = None) -> SyncReport:
-    """Converge the declared sparse settlements and bridge Limbo to their gates.
+    """Converge the declared sparse settlements.
 
     Every graph is planned read-only before the first write, so a conflicting
     binding refuses with no room, tag, reference or cached coordinate changed.
@@ -1231,10 +1214,9 @@ def sync_grid(*, settlement_ids: Iterable[str] | None = None) -> SyncReport:
     coordinate change, and a second run over unchanged authored data performs
     no managed writes.
 
-    The bridge is one-way (limbo-one-way-gates): one forward exit per selected
-    ``CITY_GATE_REGISTRY`` row, then a prune pass deleting every persisted
-    exit that points back into the starting room. A registry row whose gate
-    room is missing warns and is skipped; other rows still converge.
+    No exit touches the starting room (虛境): it is a backstage holding room
+    that owns no exits, and ``sync_limbo()`` converges that on every start
+    (retire-limbo-city-gates D1).
 
     ``settlement_ids`` is an explicit test-facing selection. Omitted, every
     declared graph converges in registry order and production behavior is
@@ -1268,45 +1250,6 @@ def sync_grid(*, settlement_ids: Iterable[str] | None = None) -> SyncReport:
             _sync_grid_room_art(settlement_ids=settlement_id_set)
 
             register_instance_reclamation()
-
-            limbo = find_starting_rooms(LIMBO_KEY)
-            if not limbo:
-                log_warn(
-                    "bootstrap_grid_limbo_room_missing",
-                    context={"room_key": LIMBO_KEY, "action": "skip_bridging_exits"},
-                )
-                return report
-            limbo = limbo[0]
-
-            for row in CITY_GATE_REGISTRY.values():
-                if row.gate.map_id not in settlement_id_set:
-                    continue
-                try:
-                    gate_xyz = settlement_node_xyz(row.gate, source="city gate")
-                except Exception as error:
-                    log_warn(
-                        "bootstrap_grid_gate_missing",
-                        exc=error,
-                        context={
-                            "map_id": row.gate.map_id,
-                            "action": "skip_gate_row",
-                        },
-                    )
-                    continue
-                gate = GridRoom.objects.filter_xyz(xyz=gate_xyz).first()
-                if gate is None:
-                    log_warn(
-                        "bootstrap_grid_gate_missing",
-                        context={
-                            "map_id": row.gate.map_id,
-                            "xyz": gate_xyz,
-                            "action": "skip_gate_row",
-                        },
-                    )
-                    continue
-                _ensure_exit(limbo, gate, key=row.exit_key, aliases=list(row.exit_aliases))
-
-            _prune_exits_into(limbo)
     except Exception:
         _invalidate_plan_caches(plans, knowledge_journal)
         raise
@@ -1371,34 +1314,6 @@ def _sync_grid_room_art(*, settlement_ids: frozenset[str]) -> None:
             room_art_key=None,
             scene_identity=grid_scene_identity(map_key, x, y),
         )
-
-
-def _prune_exits_into(limbo) -> None:
-    """Delete every persisted exit whose destination is ``limbo``.
-
-    The synchronizer's declarative convergence over its own exit surface
-    (limbo-one-way-gates D3): legacy 「離開王都」/「回虛境」 exits and any
-    later reverse object converge away on the next start, no migration. The
-    query runs on the indexed ``db_destination`` FK at the unscoped
-    ``ObjectDB`` level so every Exit subclass is caught, while the
-    ``isinstance`` gate keeps non-exit objects (items with a destination)
-    untouched. On a converged database this deletes and logs nothing.
-    """
-
-    for exit_obj in ObjectDB.objects.filter(db_destination=limbo.id):
-        if not isinstance(exit_obj, Exit):
-            continue
-        source = exit_obj.location
-        log_info(
-            "bootstrap_grid_exit_pruned",
-            context={
-                "exit_key": exit_obj.key,
-                "exit_dbref": exit_obj.dbref,
-                "source_room_key": source.key if source else None,
-                "action": "enforce_one_way_gates",
-            },
-        )
-        exit_obj.delete()
 
 
 # Wilderness-side gate exits all share this key on DIFFERENT rooms; gateway
