@@ -76,7 +76,7 @@ Every scene declares `revision: r1`, opens with a complete actor utterance, hold
 1. **Opening greeting**: Nirnel sets down a basket of cut herbs, looks the guest over for tiredness and names what is bottled today. Her collar is loose over the warm stove and she does not gather it. Source: 生活方式 › 性文化 (no shame about the body); 種族設定 › 精靈族 (no shop, a maker's own home).
 2. `eolas_nirnel_home.topic_01` (`keyword`: 香草, `label`: 香草): the herb rows of 石階菜畦, the hour that decides when a leaf is picked, the stones she carried out of the beds, and the drying bunches above the stove. Source: `docs/lore/settlement-locations.md` 幽月谷村 (族人種塊根、豆子與香草) and the `terrace_gardens` node.
 3. `eolas_nirnel_home.topic_02` (`keyword`: 藥露, `label`: 藥露): 幽月香草藥露 is valley herbs and 溪源 water steeped slowly; it restores stamina for the trail, and she warns against treating medicine as water. Source: the `eolas_herb_tonic` registry row (potion band) and the `eolas_remedies` shelf.
-4. `eolas_nirnel_home.topic_03` (`keyword`: 魔力, `label`: 魔力): 魔力藥水 restores spent magic and 強效治療藥水 is for deep wounds; elves take no illness, but burns from 試法坪 and broken bones are real, and spent mana is felt in the body. Her last line turns outright to sex, gives what a spent body wants as the reason, and says the body must hold up first. Source: 種族設定 › 精靈族 (免疫所有疾病); 特殊體質; 生活方式 › 性文化; the two item registry rows.
+4. `eolas_nirnel_home.topic_03` (`keyword`: 魔力, `label`: 魔力): 魔力藥水 restores spent magic and 強效治療藥水 is for deep wounds; elves take no illness, but burns from 試煉場 and broken bones are real, and spent mana is felt in the body. Her last line turns outright to sex, gives what a spent body wants as the reason, and says the body must hold up first. Source: 種族設定 › 精靈族 (免疫所有疾病); 特殊體質; 生活方式 › 性文化; the two item registry rows.
 5. `eolas_nirnel_home.topic_04` (`keyword`: 收回, `label`: 收回): she takes back her own sealed jars for copper, keeps empty bottles to wash and refill, and declines herbs picked elsewhere. Source: the home's `eolas_remedies` service.
 
 ### B. `eolas_raellin_home` (雷林‧莉特弗特)
@@ -135,7 +135,7 @@ None of the three names contains 店 or 舖, none of the descriptions contains �
 | 深林獸徑 | Settlement node | `content/maps/settlements/elven_village_eolas.yaml` (`forest_trail`) |
 | 共食棚 | Interior | `content/maps/interiors/eolas_shelter.yaml` |
 | 圖書館 | Interior | `content/maps/interiors/eolas_library.yaml` |
-| 試法坪 | Settlement node | `content/maps/settlements/elven_village_eolas.yaml` (`proving_ground`) |
+| 試煉場 | Settlement node | `content/maps/settlements/elven_village_eolas.yaml` (`proving_ground`) |
 | 妮爾內爾‧德米多 | NPC host | `world/lore/npc_profiles/eolas_homes_b.py` (`eolas_nirnel`), `places_eolas.py` |
 | 雷林‧莉特弗特 | NPC host | `world/lore/npc_profiles/eolas_homes_b.py` (`eolas_raellin`), `places_eolas.py` |
 | 賽爾內爾‧妮格汀加勒 | NPC host | `world/lore/npc_profiles/eolas_homes_b.py` (`eolas_saelnel`), `places_eolas.py` |

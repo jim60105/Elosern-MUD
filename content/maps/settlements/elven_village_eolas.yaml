@@ -36,8 +36,8 @@ nodes:
     x_m: 96
     y_m: 548
     prototype_parent: grid_room
-    key: 試法坪
-    desc: 離住屋最遠的一塊空地靠著獸徑，村裡試法都在這裡舉行。地面被燒過、凍過、裂開過，草長不齊，石上留著深淺不一的痕跡。
+    key: 試煉場
+    desc: 離住屋最遠的一塊空地靠著獸徑，村裡要練法術，都在這裡。地面被燒過、凍過、裂開過，草長不齊，石上留著深淺不一的痕跡。
     anchor_key:
     typeclass:
     scene_archetype: mountain_path

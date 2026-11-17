@@ -2,15 +2,15 @@ schema_version: 1
 greeting: 希瑞爾溫‧布瑞特瓦特爾從一塊石板前抬頭，指尖還沾著墨。她把石板往旁一擱，指向木架：「你來得正好。八種元素裡，你比較喜歡哪一種？架上的杖隨你看，要試就試，燒焦了也不用你賠。」說著她把被火燎過的衣襟拉開透氣，胸口一片讓火烤紅的痕跡，她也不急著遮。
 topics:
 - topic_id: eolas_sirelwen_home.topic_01
-  keyword: 試法
-  label: 試法
+  keyword: 法術
+  label: 法術
   fallback:
     scene_id: eolas_sirelwen_home.topic_01_scene
     revision: r1
     lines:
     - kind: speech
       speaker: actor
-      text: 「試法坪那邊的地上到處是燒過、裂過的痕跡，你們平日都在那裡試什麼？」
+      text: 「試煉場那邊的地上到處是燒過、裂過的痕跡，你們平日都在那裡練什麼？」
     - kind: speech
       speaker: host
       text: 「元素法術。火的燒、冰的凍、雷的劈，全往那塊地上招呼。離住屋遠一點，屋子才保得住。」
@@ -32,7 +32,7 @@ topics:
     lines:
     - kind: speech
       speaker: actor
-      text: 「架上那支幽月試法短杖是用什麼削的？拿在手裡有什麼不同？」
+      text: 「架上那支幽月練習短杖是用什麼削的？拿在手裡有什麼不同？」
     - kind: speech
       speaker: host
       text: 「谷裡的老枝，去皮、陰乾，再按元素的性子修長短。木頭認得住魔力，導起來比空手順。」
@@ -68,7 +68,7 @@ topics:
       text: 「法術折騰完，人會累，也會鬆。剩下的力氣我常拿來做別的事，身體被折騰過一遍，夜裡反而更清楚自己要什麼。」
     - kind: speech
       speaker: actor
-      text: 「你這樣講，好像試法和別的事在你看來差不多。」
+      text: 「你這樣講，好像練法術和別的事在你看來差不多。」
     - kind: speech
       speaker: host
       text: 「都是把身體用到極限，再從極限裡回來。差別只在燒不燒得壞。」

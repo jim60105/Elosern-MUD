@@ -29,7 +29,7 @@ The three images were captured after the last settlement edit and after the dist
 
 ### 幽月谷村 (`elven_village_eolas`)
 
-Nine nodes are drawn, each labelled in Traditional Chinese. 溪源 sits between the northern trail and the valley floor and is the only junction besides 谷底空地. The drawn connections are 深林獸徑 to 溪源, 試法坪 to 溪源, 溫泉浴場 to 溪源, 溪源 to 谷底空地, 溫泉浴場 to 岩屋坡, 谷底空地 to 岩屋坡, 谷底空地 to 蛛絲林, 谷底空地 to 石階菜畦, and 谷底空地 to 窯場. Nine connections for nine two-way roads, with no unlisted connection. Three bends are visible. The 溪源 to 谷底空地 road kinks slightly east before running south-west; the 溫泉浴場 to 岩屋坡 road turns east of the wall before dropping to the dwellings; the 谷底空地 to 窯場 road leaves south-east and then steepens. 溪源, 溫泉浴場, 岩屋坡 and 谷底空地 close the one loop the design names. The outline is a lopsided ring with three long spurs, and no part of it reads as a grid of rows and columns.
+Nine nodes are drawn, each labelled in Traditional Chinese. 溪源 sits between the northern trail and the valley floor and is the only junction besides 谷底空地. The drawn connections are 深林獸徑 to 溪源, 試煉場 to 溪源, 溫泉浴場 to 溪源, 溪源 to 谷底空地, 溫泉浴場 to 岩屋坡, 谷底空地 to 岩屋坡, 谷底空地 to 蛛絲林, 谷底空地 to 石階菜畦, and 谷底空地 to 窯場. Nine connections for nine two-way roads, with no unlisted connection. Three bends are visible. The 溪源 to 谷底空地 road kinks slightly east before running south-west; the 溫泉浴場 to 岩屋坡 road turns east of the wall before dropping to the dwellings; the 谷底空地 to 窯場 road leaves south-east and then steepens. 溪源, 溫泉浴場, 岩屋坡 and 谷底空地 close the one loop the design names. The outline is a lopsided ring with three long spurs, and no part of it reads as a grid of rows and columns.
 
 ### 翠綠森林村 (`elven_village_fionnen`)
 
@@ -49,7 +49,7 @@ The guideline is the register of the shipped 暗影谷村 nodes and interiors, n
 | --- | --- | --- |
 | `forest_trail` | 深林獸徑 | A forest trail with the horns and claws of hunted monsters hung beside it; the village's only way in and out, so it reads as a path with a story rather than a gate. |
 | `brook_head` | 溪源 | The spring, its stone trough and the barrels set down beside it; water and the sound of the brook carry the scene. |
-| `proving_ground` | 試法坪 | Scorched, frozen and cracked ground far from the dwellings; magic practice is present as wear on the land, with no signboard and no instructor. |
+| `proving_ground` | 試煉場 | Scorched, frozen and cracked ground far from the dwellings; magic practice is present as wear on the land, with no signboard and no instructor. |
 | `hot_spring` | 溫泉浴場 | Steam, stone-ringed pools, washing and laundry; described as the day's washing place where talk finishes. |
 | `valley_floor` | 谷底空地 | Trodden ground where the village meets, divides the day's work and children run; a lived-in gathering place. |
 | `silk_grove` | 蛛絲林 | Spiders kept for silk and the white cloth woven from it, plus the quiet walk that keeps the webs intact. |
@@ -98,6 +98,6 @@ No temple. No node or room describes worship, an altar, a shrine or a priest. �
 
 No signboard. None of the new descriptions names a shop, a storefront, a counter or a keeper. The two courier rooms say outright that the shelves are unguarded, the storehouse records what the taker takes, and the bow shed lets anyone take what is needed. Trading in these villages stays in private homes, which this change does not author.
 
-One magic practice spot per village. 幽月谷村 practises at 試法坪 and nowhere else; 翠綠森林村 practises at 靶道, where archery and light magic share the lane. No description invents a site per element, and 暗影谷村's existing 練刀場 is untouched.
+One magic practice spot per village. 幽月谷村 practises at 試煉場 and nowhere else; 翠綠森林村 practises at 靶道, where archery and light magic share the lane. No description invents a site per element, and 暗影谷村's existing 練刀場 is untouched.
 
 Entrances that do not read as gates. 深林獸徑 is a monster trail whose branches carry trophies, 葉隱小徑 is an opening hidden by hanging boughs, and 暗影谷村's new 溪池浴場 is a leaf off 溪畔下游 at the water. None of the three contains a wall, a gate room or a guard, and the 暗影谷村 text rule that forbids those words still passes.

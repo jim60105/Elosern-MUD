@@ -93,7 +93,7 @@ northern deep forest to fight monsters.
 ```
           深林獸徑 (entrance, facing north)
                │
-   試法坪 ─── 溪源 ─── 溫泉浴場
+   試煉場 ─── 溪源 ─── 溫泉浴場
                │          │
    蛛絲林 ─ 谷底空地 ─── 岩屋坡
                │   ╲
@@ -106,7 +106,7 @@ northern deep forest to fight monsters.
 | --- | --- | --- | --- |
 | `forest_trail` | 深林獸徑 | 372, 655 | The only way in or out, leading to the northern deep forest. Monster horns and claws the villagers brought back hang beside it. |
 | `brook_head` | 溪源 | 318, 512 | The village's drinking water and its stone trough. The brook runs south across the valley floor. |
-| `proving_ground` | 試法坪 | 96, 548 | All magic practice and experiment happens here. The ground is scorched, frozen and cracked in patches. Far from the dwellings, near the trail. |
+| `proving_ground` | 試煉場 | 96, 548 | All magic practice and experiment happens here. The ground is scorched, frozen and cracked in patches. Far from the dwellings, near the trail. |
 | `hot_spring` | 溫泉浴場 | 497, 468 | An open-air hot spring under the valley wall, with stone-ringed pools. The village bathes, washes clothes and talks here. |
 | `valley_floor` | 谷底空地 | 286, 322 | Anchor room. Where the village gathers. |
 | `silk_grove` | 蛛絲林 | 72, 268 | Spiders kept for silk, the cloth of the white traditional dress. |

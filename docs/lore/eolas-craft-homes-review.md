@@ -36,7 +36,7 @@ The world source states that the Eolas are the 幻童精靈 of 幽月谷村, tha
 - How the change reads it: no card, greeting or scene uses shopkeeper vocabulary. There is no counter, no sign, no stock count. The door is a door, the shelf holds what she finished this season, and the copper is the village's way of looking after a guest.
 - Host handling:
   - `eolas_naelara`: keeps the 蛛絲林, reels the silk and weaves the white cloth the village wears. She receives a guest the way she receives a neighbour and lets the loom speak for her work.
-  - `eolas_sirelwen`: works the 試法坪, writes down every result and carves short wands for her own experiments. She judges a visitor by what that visitor wants to try, never by rank.
+  - `eolas_sirelwen`: works the 試煉場, writes down every result and carves short wands for her own experiments. She judges a visitor by what that visitor wants to try, never by rank.
   - `eolas_taelith`: tends the shared 窯場 and fires the village's bowls, glass and lamp globes. The kiln's heat is the room's own warmth, and she talks about it the way she talks about her work.
 
 ### Body and Sex
@@ -58,7 +58,7 @@ The world source states that the Eolas are the 幻童精靈 of 幽月谷村, tha
 All three homes keep their authored place binding without alteration.
 
 - `eolas_naelara_home` stocks `eolas_silkwork` (精靈蛛絲, 精靈傳統服飾). She reels the silk herself and weaves the cloth on her own loom; buy-back accepts only her own unused silk and dresses, and she declines cloth from outside because she cannot read its thread or dye.
-- `eolas_sirelwen_home` stocks `eolas_wandcraft` (幽月試法短杖). She cuts each wand from valley wood and carves it for the element she is studying; buy-back accepts only her own unbroken wands, and she declines staves from outside.
+- `eolas_sirelwen_home` stocks `eolas_wandcraft` (幽月練習短杖). She cuts each wand from valley wood and carves it for the element she is studying; buy-back accepts only her own unbroken wands, and she declines staves from outside.
 - `eolas_taelith_home` stocks `eolas_kilnware` (幽月琉璃墜, 魔法燈). She blows the glass and fires the globes in the shared kiln; buy-back accepts only her own unbroken glass and lamps, and she declines wares fired elsewhere.
 
 No line of dialogue delivers a free repair, a custom commission, a discount or a price figure. The scenes name goods by their registry display name and state no quantity.
@@ -81,11 +81,11 @@ Every scene declares `revision: r1`, opens with a complete actor utterance, hold
 
 ### B. `eolas_sirelwen_home` (希瑞爾溫‧布瑞特瓦特爾)
 
-**Card and voice review.** The public leaf reads her as the villager most often on the 試法坪, testing all eight elements, writing down what happened and leaving carved wands on the rack; the appearance leaf keeps the brief (hair cut short after one fire too many, ink on the fingers, the scorched hem she has not noticed) and the speech leaf keeps the fast, self-correcting register that answers a question with a better one. `identity.hidden` is empty, `voice.greeting` stays empty, and `voice.misunderstood` asks whether the visitor wants a wand or wants to watch, which matches the greeting's invitation to try one. Canon: 種族設定 › 精靈族 (親和所有屬性魔法); 生活方式 › 性文化. The card agrees with the dialogue: the experiments, the burns and the body's limits are the same story.
+**Card and voice review.** The public leaf reads her as the villager most often on the 試煉場, testing all eight elements, writing down what happened and leaving carved wands on the rack; the appearance leaf keeps the brief (hair cut short after one fire too many, ink on the fingers, the scorched hem she has not noticed) and the speech leaf keeps the fast, self-correcting register that answers a question with a better one. `identity.hidden` is empty, `voice.greeting` stays empty, and `voice.misunderstood` asks whether the visitor wants a wand or wants to watch, which matches the greeting's invitation to try one. Canon: 種族設定 › 精靈族 (親和所有屬性魔法); 生活方式 › 性文化. The card agrees with the dialogue: the experiments, the burns and the body's limits are the same story.
 
-1. **Opening greeting**: Sirelwen looks up from a slate, asks which element the guest favours, points at the wand rack and offers to let the visitor try one at her risk. She opens her scorched hem to the air, the burn across her chest uncovered. Source: 生活方式 › 性文化; 幽月谷村 試法坪.
-2. `eolas_sirelwen_home.topic_01` (`keyword`: 試法, `label`: 試法): the 試法坪 takes fire, ice and lightning because it sits far from the dwellings; she writes the intent before and the result after, and a spell that works once does not count. Source: the 試法坪 node description (離住屋最遠); 種族設定 › 精靈族 (learning by long practice).
-3. `eolas_sirelwen_home.topic_02` (`keyword`: 短杖, `label`: 短杖): 幽月試法短杖 is cut from old valley wood, dried and shaped per element; the wand casts nothing on its own, but magic runs straighter through it, so the same spell leaves the hand with more force and takes less out of the caster, and a burnt wand is cheaper to replace than a burnt hand. Source: the item registry row, the `world/rules/rulebook/equipment_effects.yaml` row and the 幽月杖作 shelf.
+1. **Opening greeting**: Sirelwen looks up from a slate, asks which element the guest favours, points at the wand rack and offers to let the visitor try one at her risk. She opens her scorched hem to the air, the burn across her chest uncovered. Source: 生活方式 › 性文化; 幽月谷村 試煉場.
+2. `eolas_sirelwen_home.topic_01` (`keyword`: 法術, `label`: 法術): the 試煉場 takes fire, ice and lightning because it sits far from the dwellings; she writes the intent before and the result after, and a spell that works once does not count. Source: the 試煉場 node description (離住屋最遠); 種族設定 › 精靈族 (learning by long practice).
+3. `eolas_sirelwen_home.topic_02` (`keyword`: 短杖, `label`: 短杖): 幽月練習短杖 is cut from old valley wood, dried and shaped per element; the wand casts nothing on its own, but magic runs straighter through it, so the same spell leaves the hand with more force and takes less out of the caster, and a burnt wand is cheaper to replace than a burnt hand. Source: the item registry row, the `world/rules/rulebook/equipment_effects.yaml` row and the 幽月杖作 shelf.
 4. `eolas_sirelwen_home.topic_03` (`keyword`: 元素, `label`: 元素): the Eolas touch all eight elements and none of them comes free; her own experiment burnt the room down, and what a body can bear is part of what she learns. The night after is spoken of plainly. Source: 種族設定 › 精靈族 (親和所有屬性魔法); 生活方式 › 性文化.
 5. `eolas_sirelwen_home.topic_04` (`keyword`: 收回, `label`: 收回): she takes back her own unbroken wands and declines staves from outside. Source: the home's `eolas_wandcraft` service.
 
@@ -104,7 +104,7 @@ Every scene declares `revision: r1`, opens with a complete actor utterance, hold
 ## 5. Room Prose Review
 
 - `eolas_naelara_home` (奈拉拉的家): a rock-cut room beside the 蛛絲林, reels of silk on pegs, a loom by the door and white cloth folded on a stone shelf. The prose is a lived-in room: no signboard, no counter, no shopkeeper wording.
-- `eolas_sirelwen_home` (希瑞爾溫的家): a rock-cut room at the edge of the 試法坪, slates of notes on the wall, wand blanks drying on a rack and a scorch mark by the door.
+- `eolas_sirelwen_home` (希瑞爾溫的家): a rock-cut room at the edge of the 試煉場, slates of notes on the wall, wand blanks drying on a rack and a scorch mark by the door.
 - `eolas_taelith_home` (泰莉斯的家): a rock-cut room facing the 窯場, shelves of bowls and glass, a rack of pendants catching the light and the kiln's warmth through the doorway.
 
 None of the three names contains 店 or 舖, none of the descriptions contains 櫃檯 or 招牌, and none carries an ASCII word or a change identifier.
@@ -127,7 +127,7 @@ None of the three names contains 店 or 舖, none of the descriptions contains �
 |---|---|---|
 | 幽月谷村 | Settlement | `world/lore/settlements/settlements.py` (`elven_village_eolas`) |
 | 蛛絲林 | Settlement node | `content/maps/settlements/elven_village_eolas.yaml` (`silk_grove`), `places_eolas.py` (`eolas_naelara_home`) |
-| 試法坪 | Settlement node | `content/maps/settlements/elven_village_eolas.yaml` (`proving_ground`), `places_eolas.py` (`eolas_sirelwen_home`) |
+| 試煉場 | Settlement node | `content/maps/settlements/elven_village_eolas.yaml` (`proving_ground`), `places_eolas.py` (`eolas_sirelwen_home`) |
 | 窯場 | Settlement node | `content/maps/settlements/elven_village_eolas.yaml` (`kiln_yard`), `places_eolas.py` (`eolas_taelith_home`) |
 | 深林獸徑 | Settlement node | `content/maps/settlements/elven_village_eolas.yaml` (`forest_trail`) |
 | 圖書館 | Interior | `content/maps/interiors/eolas_library.yaml` |
@@ -137,7 +137,7 @@ None of the three names contains 店 or 舖, none of the descriptions contains �
 | 幻童精靈 | Race branch (人稱) | `tmp/story_settings/world_info.md` 種族設定 › 精靈族; `docs/lore/overview.md` 精靈族 |
 | 精靈蛛絲 | Item (`elven_spider_silk`) | `world/lore/items/data_armor_accessories_materials.py`, `world/lore/settlements/assortments.py` (`eolas_silkwork`) |
 | 精靈傳統服飾 | Item (`elven_traditional_robe`) | `world/lore/items/data_named_equipment.py`, `world/lore/settlements/assortments.py` (`eolas_silkwork`) |
-| 幽月試法短杖 | Item (`eolas_proving_wand`) | `world/lore/items/data_elven_village_goods.py`, `world/lore/settlements/assortments.py` (`eolas_wandcraft`) |
+| 幽月練習短杖 | Item (`eolas_proving_wand`) | `world/lore/items/data_elven_village_goods.py`, `world/lore/settlements/assortments.py` (`eolas_wandcraft`) |
 | 幽月琉璃墜 | Item (`eolas_glass_pendant`) | `world/lore/items/data_elven_village_goods.py`, `world/lore/settlements/assortments.py` (`eolas_kilnware`) |
 | 魔法燈 | Item (`magic_lamp`) | `world/lore/items/data_armor_accessories_materials.py`, `world/lore/settlements/assortments.py` (`eolas_kilnware`) |
 

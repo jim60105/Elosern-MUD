@@ -8,7 +8,7 @@ id: eolas_sirelwen_home
 rooms:
   eolas_sirelwen_home:
     name_zh: 希瑞爾溫的家
-    desc_zh: 石室開在試法坪邊上，牆上釘著幾塊寫滿字跡的石板，木架上晾著削好的杖坯。門邊的地面留著一道燒焦的痕跡，屋裡仍帶著火燎過的氣味。
+    desc_zh: 石室開在試煉場邊上，牆上釘著幾塊寫滿字跡的石板，木架上晾著削好的杖坯。門邊的地面留著一道燒焦的痕跡，屋裡仍帶著火燎過的氣味。
     scene_archetype: tavern_interior
 connections: []
 exterior:

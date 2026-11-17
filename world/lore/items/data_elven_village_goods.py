@@ -54,14 +54,14 @@ ROWS: tuple[ItemDefinition, ...] = (
     ),
     ItemDefinition(
         key="eolas_proving_wand",
-        display_name_zh="幽月試法短杖",
+        display_name_zh="幽月練習短杖",
         price_table_key="masterwork_gear",
         sellable=True,
         presentation=ItemPresentation(
             kind=ItemKind.WEAPON,
             icon_key=ItemIconKey.WEAPON,
             rarity=ItemRarity.EPIC,
-            summary_zh="伊歐拉斯族為試法坪的練習削成的短杖，導引魔力格外順手。",
+            summary_zh="伊歐拉斯族削來在試煉場練法術的短杖，導引魔力格外順手。",
         ),
         equipment_slot=EquipmentSlot.WEAPON_MAIN,
         modifier_key=EquipmentModifierKey.EOLAS_PROVING_WAND,
