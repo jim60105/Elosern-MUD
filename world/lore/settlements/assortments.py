@@ -287,5 +287,24 @@ ASSORTMENT_REGISTRY: dict[str, AssortmentDefinition] = {
                 "eolas_glass_pendant", "magic_lamp",
             ),
         ),
+        # eolas-village-fare-homes: the 幽月谷村 shelves of daily need. Each
+        # one is one villager's home — the herb keeper's steeped remedies, the
+        # baker's fare for the trail — never a storefront's stock.
+        AssortmentDefinition(
+            key="eolas_remedies",
+            display_name_zh="幽月調藥",
+            allowed_item_kinds=frozenset({ItemKind.POTION}),
+            item_keys=(
+                "eolas_herb_tonic", "mana_potion", "greater_healing_potion",
+            ),
+        ),
+        AssortmentDefinition(
+            key="eolas_fare",
+            display_name_zh="幽月飯食",
+            allowed_item_kinds=frozenset({ItemKind.FOOD}),
+            item_keys=(
+                "eolas_kiln_flatbread", "meal",
+            ),
+        ),
     )
 }

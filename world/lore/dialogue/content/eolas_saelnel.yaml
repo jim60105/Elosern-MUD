@@ -1,0 +1,107 @@
+schema_version: 1
+greeting: 賽爾內爾‧妮格汀加勒坐在窗邊的矮桌前，指尖夾在書頁間把讀到的地方記住，抬起頭來：「來了就坐。書看到一半，正好歇一歇。」她把攤開的書推向桌角，空出一塊桌面。「孩子，你想問山谷，還是想聽點舊事？」
+topics:
+- topic_id: eolas_saelnel_home.topic_01
+  keyword: 山谷
+  label: 山谷
+  fallback:
+    scene_id: eolas_saelnel_home.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「這座山谷是怎麼養活村裡的？吃的東西和穿的東西，都從谷裡來嗎？」
+    - kind: speech
+      speaker: host
+      text: 「谷壁的坡砌成石階菜畦，塊根、豆子與香草都種在那裡。往西是蛛絲林，絲抽成線，織成我們身上這件白衣。」
+    - kind: speech
+      speaker: host
+      text: 「窯場的土取自溪邊，燒出來的碗和玻璃夠全村用；溪源的水一路淌下來，喝、洗、澆菜都靠它。」
+    - kind: speech
+      speaker: actor
+      text: 「那洗身子的地方呢？」
+    - kind: speech
+      speaker: host
+      text: 「溫泉浴場在谷壁底下。石頭圍起幾座池子，洗身、洗衣、說話都在同一個池邊，沒有隔間，也沒有人守著。孩子們在水裡玩到天黑才肯回家。」
+    - kind: speech
+      speaker: actor
+      text: 「所以谷裡的事，幾乎都自己解決了。」
+    - kind: speech
+      speaker: host
+      text: 「外面的人需要什麼，我們不曉得；谷裡需要的東西，我們自己做得出來。這樣的日子過得下去，也就不必去求誰。」
+- topic_id: eolas_saelnel_home.topic_02
+  keyword: 圖書館
+  label: 圖書館
+  fallback:
+    scene_id: eolas_saelnel_home.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「聽說村裡有一座圖書館，是誰在管的？」
+    - kind: speech
+      speaker: host
+      text: 「沒有人管。谷底那一間石室，架上的筆記由族人自己寫下，誰讀完就放回去，誰想抄就抄。」
+    - kind: speech
+      speaker: host
+      text: 「有人試一種法術試了整個季節，就把每一次的結果寫下來。後頭的人不必從頭再試一次。」
+    - kind: narration
+      text: 她用指節敲了敲桌上那本翻開的書，紙頁邊角已經磨軟。
+    - kind: speech
+      speaker: actor
+      text: 「那些筆記裡，有你自己寫的嗎？」
+    - kind: speech
+      speaker: host
+      text: 「有不少。我讀過的架子比大多數人多，寫下的也多。孩子，你要找什麼，我可以告訴你它在哪一排。」
+- topic_id: eolas_saelnel_home.topic_03
+  keyword: 外人
+  label: 外人
+  fallback:
+    scene_id: eolas_saelnel_home.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「村子裡的人，怎麼看待從山外進來的人？」
+    - kind: speech
+      speaker: host
+      text: 「不特別提防，也不特別歡喜。你走進來，就是走進來了；要待多久，看你自己的腳。」
+    - kind: speech
+      speaker: host
+      text: 「谷裡的日子大半由我們自己作主。白日裡做事，夜裡多半在做愛，這是族裡本來的樣子，來了客人也不會改。」
+    - kind: speech
+      speaker: actor
+      text: 「那客人若是不習慣，比如在溫泉浴場不肯脫衣裳呢？」
+    - kind: speech
+      speaker: host
+      text: 「那就穿著。池邊沒有人會多看一眼，也沒有人會問。孩子，這裡沒有人替你定規矩，你自己舒服就好。」
+    - kind: speech
+      speaker: host
+      text: 「我們對外頭的事知道得不多，也不覺得需要知道。你在谷裡，就和谷裡的人一樣過日子。」
+- topic_id: eolas_saelnel_home.topic_04
+  keyword: 往事
+  label: 往事
+  predecessors:
+  - eolas_saelnel_home.topic_01
+  disclosure: pure_chain
+  fallback:
+    scene_id: eolas_saelnel_home.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你剛說谷裡的日子，從前也是這樣過的嗎？」
+    - kind: speech
+      speaker: host
+      text: 「差不多就是這樣。我記得窯場剛砌好的那年，火一點起來，全村的人都圍過去看。有人說燒不出玻璃，泰莉斯‧恩貝爾莉夫那時還沒開始燒窯，伸手就往火門裡探。」
+    - kind: narration
+      text: 她笑了一下，把書往桌角推得更遠些。
+    - kind: speech
+      speaker: host
+      text: 「蛛絲林也是後來才植下。蛛剛到林子裡的時候不肯留，奈拉拉‧弗羅斯特威洛每日去林子邊坐著，坐到蛛自己結了網。」
+    - kind: speech
+      speaker: actor
+      text: 「聽起來，那時候的谷裡也很熱鬧。」
+    - kind: speech
+      speaker: host
+      text: 「熱鬧。谷底空地從前沒有那塊踩實的地方，村人出入都從那裡過，走久了就踩成現在這個樣子。孩子，你現在踩的這片地，比你想的還要舊。」

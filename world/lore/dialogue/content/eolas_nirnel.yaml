@@ -1,0 +1,103 @@
+schema_version: 1
+greeting: 屋裡一只小爐正溫著藥露，妮爾內爾‧德米多把採回來的一籃香草放到桌上，抬眼把來人從頭看到腳，像在估一份疲憊的重量。「坐。今天熬好的是幽月香草藥露，架上封好的都在。你是身上累，還是魔力空了？先說明白，我才好替你挑。」她說著把衣襟往外鬆了鬆，爐火烘得石室發暖，她也沒急著攏回去。
+topics:
+- topic_id: eolas_nirnel_home.topic_01
+  keyword: 香草
+  label: 香草
+  fallback:
+    scene_id: eolas_nirnel_home.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「石階菜畦上的香草都是你在顧的嗎？你怎麼知道哪一畦該採了？」
+    - kind: narration
+      text: 她捻起籃裡的一片葉子，在指間壓碎，湊到鼻前聞了聞。
+    - kind: speech
+      speaker: host
+      text: 「香草認時辰。天剛亮葉子還帶著夜裡的涼，採下來的氣味最乾淨。我走一趟菜畦，只採當天要用的那一點。」
+    - kind: speech
+      speaker: host
+      text: 「畦邊的石頭我一塊一塊揀走，水從上層淌下來，每一層都喝得到。哪一畦今年夠了，我就讓它歇著不採。」
+    - kind: speech
+      speaker: actor
+      text: 「採回來的香草，接下來怎麼處理？」
+    - kind: speech
+      speaker: host
+      text: 「攤在通風的地方陰乾，不晒太陽。石階上那一整排都是今年收下來的香草，綁成一束一束，要熬藥的時候再取喔。」
+- topic_id: eolas_nirnel_home.topic_02
+  keyword: 藥露
+  label: 藥露
+  fallback:
+    scene_id: eolas_nirnel_home.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「幽月香草藥露是拿什麼熬的？喝下去之後，人會覺得哪裡不一樣？」
+    - kind: speech
+      speaker: host
+      text: 「菜畦上的香草，加上溪源打上來的水，小火熬到湯色轉深就封起來。它補的是體力，走獸徑走到腿發軟，喝下就撐得住。」
+    - kind: narration
+      text: 她從架上取下一只陶瓶，在掌心轉了半圈，封口的蠟還完整。
+    - kind: speech
+      speaker: host
+      text: 「城裡也有別種藥水，我這瓶只認山谷裡的草。喝完別急著趕路，讓身子自己把藥性走完喔。」
+    - kind: speech
+      speaker: actor
+      text: 「喝多了會出事嗎？」
+    - kind: speech
+      speaker: host
+      text: 「會。藥是拿來配身子的狀況，不是拿來當水喝。你哪天覺得不對，就先回來找我。」
+- topic_id: eolas_nirnel_home.topic_03
+  keyword: 魔力
+  label: 魔力
+  fallback:
+    scene_id: eolas_nirnel_home.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「架上的魔力藥水和強效治療藥水，分別在什麼時候用？」
+    - kind: speech
+      speaker: host
+      text: 「魔力藥水補的是施法之後空掉的魔力，法術試到頭昏，喝下讓力氣回來。強效治療藥水留給真的破了皮肉的人，滲得深的那種傷，普通藥水壓不住。」
+    - kind: narration
+      text: 她把兩只瓶子並排放在桌上，一只泛藍，一只顏色深些。
+    - kind: speech
+      speaker: actor
+      text: 「精靈不是不會生病嗎？那還需要這些？」
+    - kind: speech
+      speaker: host
+      text: 「病是不會生，可傷會。試法坪上燒穿的皮肉、林子裡摔斷的骨頭，都要養；魔力用空了也一樣，身子自己記得。」
+    - kind: speech
+      speaker: actor
+      text: 「所以你們準備這些，是為了自己試法受的傷？」
+    - kind: speech
+      speaker: host
+      text: 「也為了走獸徑的客人。谷裡的人不太受傷，可山外的人會。你帶著藥，路上心裡踏實些。」
+    - kind: speech
+      speaker: host
+      text: 「也有人來問性愛的事。身子撐得住，才談得上盡興；耗到腿發軟才想起我，就晚了。」
+- topic_id: eolas_nirnel_home.topic_04
+  keyword: 收回
+  label: 收回
+  fallback:
+    scene_id: eolas_nirnel_home.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「用不完的藥露，或是喝空的瓶子，還能拿回來給你嗎？」
+    - kind: speech
+      speaker: host
+      text: 「我封的蠟還在、瓶口沒開的也一樣，拿回來我收，算銅幣給你。空瓶也留著，洗淨了還能再裝。」
+    - kind: speech
+      speaker: host
+      text: 「別人採的香草我不收。哪座坡、什麼時辰採下來，我從葉子的氣味就聞得出來，混進我的鍋裡只會壞了整鍋。」
+    - kind: speech
+      speaker: actor
+      text: 「外頭買來的藥水，也不能拿來換嗎？」
+    - kind: speech
+      speaker: host
+      text: 「不能。你留著自己用，或帶回山外。谷裡的藥只認谷裡採的草喔。」

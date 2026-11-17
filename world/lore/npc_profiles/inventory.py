@@ -107,6 +107,14 @@ NPC_SOURCE_INVENTORY: tuple[NpcSource, ...] = (
     NpcSource("dialogue_table", "eolas_sirelwen_home", "eolas_homes_a"),
     NpcSource("dialogue_table", "eolas_taelith_home", "eolas_homes_a"),
 
+    # eolas_homes_b: the three 幽月谷村 fare homes and their tables.
+    NpcSource("place_host", "eolas_nirnel", "eolas_homes_b"),
+    NpcSource("place_host", "eolas_raellin", "eolas_homes_b"),
+    NpcSource("place_host", "eolas_saelnel", "eolas_homes_b"),
+    NpcSource("dialogue_table", "eolas_nirnel_home", "eolas_homes_b"),
+    NpcSource("dialogue_table", "eolas_raellin_home", "eolas_homes_b"),
+    NpcSource("dialogue_table", "eolas_saelnel_home", "eolas_homes_b"),
+
     # companions: the four starting-companion declarations.
     NpcSource("starting_companion", "violet_altoria:lidzia_rosenthal", "companions"),
     NpcSource("starting_companion", "lidzia_rosenthal:violet_altoria", "companions"),

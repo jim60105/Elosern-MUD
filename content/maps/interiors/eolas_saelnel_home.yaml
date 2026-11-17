@@ -1,0 +1,21 @@
+# Permanent interior authored source (schema version 1).
+# The sole authority for the room's identity, name, prose, scene metadata and
+# its one exterior entrance relationship. The room id is the stable place key
+# a service record joins to, so a service record declares no geometry.
+version: 1
+kind: interior
+id: eolas_saelnel_home
+rooms:
+  eolas_saelnel_home:
+    name_zh: 賽爾內爾的家
+    desc_zh: 岩屋坡上最老的一間石室，牆面鑿出一格一格的書架，矮桌上攤著幾本翻開的書。窗子正對谷底空地，日光一路落到桌面。
+    scene_archetype: tavern_interior
+connections: []
+exterior:
+  settlement: elven_village_eolas
+  node: cliff_dwellings
+  room: eolas_saelnel_home
+  doorway_key: 賽爾內爾的家
+  doorway_aliases:
+  - saelnel
+  - saelnel's home

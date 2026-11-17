@@ -1,0 +1,150 @@
+"""NPC profiles owned by the ``eolas_homes_b`` content slice, the 幽月谷村 fare homes.
+
+This slice holds the village's three fare homes: the herb keeper, the baker and
+the elder.
+
+One profile per host, keyed by the host's ``service_id``. Each card is grounded
+in the elf passages of ``tmp/story_settings/world_info.md``（全族皆為女性、
+無固定職業分工、無婚姻與正式教育、壽命帶來的知識、對身體與性沒有羞恥概念），
+the 幻童精靈 passages of the same source, ``docs/lore/overview.md`` 性愛與身體，
+the 幽月谷村 paragraphs of ``docs/lore/settlement-locations.md`` and the place
+rows of ``world/lore/settlements/places_eolas.py``. Every host's dialogue table
+authors its own greeting, so each profile authors only the ``misunderstood``
+voice line.
+
+The village has no shop: the makers share what they love making and take coin
+because the village looks after the guests who find the valley, so no card
+speaks of a stall, stock or business.
+"""
+
+from world.lore.npc_card import NpcCard, NpcCardIdentity
+from world.lore.npc_profiles.shape import NpcProfile, NpcVoiceLines
+
+ROWS: tuple[NpcProfile, ...] = (
+    NpcProfile(
+        key="eolas_nirnel",
+        card=NpcCard(
+            identity=NpcCardIdentity(
+                public=(
+                    "幽月谷村顧石階菜畦的人。她種香草、按時辰採收，慢火熬成封好"
+                    "的藥露，誰身上疲憊或帶傷來，就在她屋裡取走一瓶。她的身體從"
+                    "不刻意遮掩，熬藥熬到發熱便把衣襟鬆開；性在她們的日子裡和呼"
+                    "吸一樣自然，她說起也照直說。"
+                ),
+            ),
+            appearance=(
+                "苔綠的頭髮壓在一頂草帽下，指甲縫裡留著泥土。腰間掛著一排塞好"
+                "軟木的陶瓶，走動時彼此相碰。身上那件白衣薄得透光，袖口沾著草"
+                "汁，她從不覺得需要多披一層。"
+            ),
+            personality=(
+                "沉靜、善於觀察，一眼就看出人身上哪裡累。熬藥從不趕時間，火候沒"
+                "到就守著不走。對身體的事說得坦然，興致來了也不藏，日子裡大半的"
+                "力氣都留給性愛。"
+            ),
+            speech_style=(
+                "聲音平穩柔和，句子說得完整，交代完一件事會在句尾帶個「喔」。稱"
+                "呼對方「你」，講到身體與性事時語氣和講藥材一樣自然。"
+            ),
+            life_story=(
+                "精靈不生病，她便去研究疲憊，看身子累到哪裡、魔力散到哪裡。架上"
+                "那幾本筆記寫的是哪一種草補哪一種虛，字跡越寫越密。"
+            ),
+            habit=(
+                "採之前先把一片葉子壓在指間揉開，聞過氣味才動手。"
+            ),
+            social_connection=(
+                "雷林‧莉特弗特每天早晨來取廚房用的香草。"
+            ),
+        ),
+        age=660,
+        apparent_age=20,
+        voice=NpcVoiceLines(
+            misunderstood=(
+                "「你是累，還是傷？說明白，我才好替你挑。」"
+            ),
+        ),
+    ),
+    NpcProfile(
+        key="eolas_raellin",
+        card=NpcCard(
+            identity=NpcCardIdentity(
+                public=(
+                    "幽月谷村愛做飯的人，住在岩屋坡。豆餅在共用的窯場烤，誰要上獸"
+                    "徑，她就替誰備一份帶走。做飯做到一身汗，她把袖子挽到肩頭，身"
+                    "子也不避人；吃飽之後的性愛她說得爽快，族裡沒有人覺得需要遮。"
+                ),
+            ),
+            appearance=(
+                "蜜褐的頭髮編成兩條短辮，手肘以下沾著麵粉。腰間插著一支木製的翻"
+                "餅板，白衣上留著窯火的氣味。"
+            ),
+            personality=(
+                "溫暖、話多，先餵飽來人再問來意。對香草特別挑剔，差一點味道都嚐得"
+                "出來。性愛她向來大方，累了就靠著人睡，醒來再吃一頓。"
+            ),
+            speech_style=(
+                "日常而爽朗，句子短，句尾常帶「喔」「嘛」。稱呼對方「你」，一面說"
+                "一面把吃的往人手裡塞。"
+            ),
+            life_story=(
+                "她從前一個烤餅的人手上學會做餅，之後把香草換過許多回。共食棚"
+                "的桌上每日有她烤的餅，獸徑上帶走的食糧也從她這裡包。"
+            ),
+            habit=(
+                "每一爐的第一張餅，她都掰成兩半先聞一聞。"
+            ),
+            social_connection=(
+                "她的香草取自妮爾內爾‧德米多顧的石階菜畦。"
+            ),
+        ),
+        age=380,
+        apparent_age=20,
+        voice=NpcVoiceLines(
+            misunderstood=(
+                "「先吃一口，邊吃邊說。你是餓了，還是有事要問？」"
+            ),
+        ),
+    ),
+    NpcProfile(
+        key="eolas_saelnel",
+        card=NpcCard(
+            identity=NpcCardIdentity(
+                public=(
+                    "幽月谷村的長老，住在岩屋坡最老的一間石室。村裡少有要她裁斷的"
+                    "事，她便讀書、記住從前，陪來的人說話。族裡的日子大半花在性愛"
+                    "上，她也不諱言，講起夜裡的事語氣平和，像講天氣。"
+                ),
+            ),
+            appearance=(
+                "白髮垂到腰間，隨手束著。灰色的眼睛很靜，手邊總有一本磨舊的書。"
+                "身上那件白衣洗得極軟，她坐著的時候書就攤在膝上。"
+            ),
+            personality=(
+                "從容、話帶乾燥的幽默，看人著急只覺得有趣。有人來討一句定奪，她常"
+                "把話繞回一個問題。對身體與性事沒有忌諱，說得慢，也說得直。"
+            ),
+            speech_style=(
+                "說話慢，中間留著停頓。回答之前常先講起一件記得的小事，稱呼誰都是"
+                "「孩子」。"
+            ),
+            life_story=(
+                "她在這座谷裡待得比誰都久。圖書館的筆記她讀遍了，其中不少是她自己"
+                "寫的；窯場砌起來、蛛絲林植下去，她都在場。"
+            ),
+            habit=(
+                "每天傍晚讀一頁書出聲，屋裡沒有別人聽。"
+            ),
+            social_connection=(
+                "希瑞爾溫‧布瑞特瓦特爾每次寫好新的筆記，都拿來問她從前試過沒有。"
+            ),
+        ),
+        age=1040,
+        apparent_age=20,
+        voice=NpcVoiceLines(
+            misunderstood=(
+                "「我沒聽明白。不急，你從頭說一次就好。」"
+            ),
+        ),
+    ),
+)
