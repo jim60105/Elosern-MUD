@@ -150,7 +150,7 @@ def _predicate(
 _FIXED_TITLE_ROWS: dict[str, FixedTitleDef] = {
     "g_f_rank": FixedTitleDef(
         "g_f_rank",
-        "F 級冒險者",
+        "F級冒險者",
         TitleCategory.GUILD,
         "你在公會名冊上留下第一個名字，冒險者的旅程由此開始。",
         "完成公會註冊即可獲得。",
@@ -158,7 +158,7 @@ _FIXED_TITLE_ROWS: dict[str, FixedTitleDef] = {
     ),
     "g_e_rank": FixedTitleDef(
         "g_e_rank",
-        "E 級斥候",
+        "E級斥候",
         TitleCategory.GUILD,
         "你踏足荒野、獵殺低階魔物，成了公會眼中可靠的斥候。",
         "通過 E 級公會考核即可獲得。",
@@ -166,7 +166,7 @@ _FIXED_TITLE_ROWS: dict[str, FixedTitleDef] = {
     ),
     "g_d_rank": FixedTitleDef(
         "g_d_rank",
-        "D 級傭兵",
+        "D級傭兵",
         TitleCategory.GUILD,
         "你已能獨當一面接下委託，傭兵的名號隨之遠播。",
         "通過 D 級公會考核即可獲得。",
@@ -174,7 +174,7 @@ _FIXED_TITLE_ROWS: dict[str, FixedTitleDef] = {
     ),
     "g_c_rank": FixedTitleDef(
         "g_c_rank",
-        "C 級騎士",
+        "C級騎士",
         TitleCategory.GUILD,
         "你以劍與魔法完成委託並守護弱者，被賦予騎士之銜。",
         "通過 C 級公會考核即可獲得。",
@@ -182,7 +182,7 @@ _FIXED_TITLE_ROWS: dict[str, FixedTitleDef] = {
     ),
     "g_b_rank": FixedTitleDef(
         "g_b_rank",
-        "B 級英雄",
+        "B級英雄",
         TitleCategory.GUILD,
         "高難度委託對你已成日常，坊間開始以英雄稱呼你。",
         "通過 B 級公會考核即可獲得。",
@@ -190,7 +190,7 @@ _FIXED_TITLE_ROWS: dict[str, FixedTitleDef] = {
     ),
     "g_a_rank": FixedTitleDef(
         "g_a_rank",
-        "A 級傳奇",
+        "A級傳奇",
         TitleCategory.GUILD,
         "你的事蹟被吟遊詩人寫入歌謠，傳奇之名實至名歸。",
         "通過 A 級公會考核即可獲得。",
@@ -198,7 +198,7 @@ _FIXED_TITLE_ROWS: dict[str, FixedTitleDef] = {
     ),
     "g_s_rank": FixedTitleDef(
         "g_s_rank",
-        "S 級傳說",
+        "S級傳說",
         TitleCategory.GUILD,
         "凌駕人類領域的委託也只有你能接下，傳說由你書寫。",
         "通過 S 級公會考核即可獲得。",

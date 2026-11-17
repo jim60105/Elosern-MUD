@@ -255,7 +255,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "29657d9c442b56f5062e66d4ebc9401f41cd1f00a452b9322a4abfb80f04283c",
+  "fingerprint": "ef40bcc478175fbb5c3e9ec46066b14903bdf92331cf59f4cd1e243cbb08ab61",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -16535,7 +16535,7 @@
     "world/lore/start_locations.py": "9fbd595adcab7054154dba8ad4e35786836695812c8969d97e36f9d2ab85362f",
     "world/lore/starting_kits.py": "eaacc3ea1c35ab104bb865b269c628874c6d2c6d849fc422e7157b287e8de2df",
     "world/lore/sync.py": "045d594a1f3eb873eef1567fb7a2a9c62332b50dc76eb59b1e0b18554796bf66",
-    "world/lore/titles.py": "c6ec4111be0991532cf35c9bc361dd20ca3e7f439d9f5a8d29ea11da9a1789de",
+    "world/lore/titles.py": "b124cd952d9029af7926ba504e9cf2b16601745e6f5b02d04e58754cd9f28be2",
     "world/lore/wilderness_entry.py": "7e816893f6ae071445bfbb8a62d8f32d79cc53722e36a34f4d405ed038e63b67",
     "world/lore/wilderness_regions.py": "78e42745940b8be25119259399ed92f25a8af67dc02af030c4828dc53f5af37f",
     "world/quests/__init__.py": "1ee2230f6b2f2893c1c1c71a339ccd2aabad28c2425c80d5989ac963d13a7f0d",
