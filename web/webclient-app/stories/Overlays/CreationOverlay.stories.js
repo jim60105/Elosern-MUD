@@ -8,6 +8,7 @@ import {
   CREATION_PANEL_PROPOSAL_TRANSIENT_SAMPLE,
   CREATION_PANEL_UNAVAILABLE_SAMPLE,
 } from "../fixtures.js";
+import { CREATION_PANEL_WALL_DRAFT_SAMPLE, CREATION_PANEL_WALL_SAMPLE } from "../fixtures/creation_wall.js";
 
 // CreationOverlay (B5 overlays family): the full-viewport character-creation
 // wizard for the committed `creation` v5 panel — preset pick, custom form
@@ -58,15 +59,33 @@ export default {
   component: CreationOverlay,
 };
 
-// The entry state: no server draft, the preset cards on the first tab.
+// The entry state: no server draft, the preset card wall on the first tab
+// with the first card expanded. These committed cards carry no official
+// image, so every figure is the shared loader's alpha-terminal silhouette.
 export const Default = {
   render: renderOverlay,
   args: { creation: CREATION_PANEL_SAMPLE },
 };
 
+// A saved preset draft: its card opens on entry with the 目前草稿 marker.
 export const PresetDraft = {
   render: renderOverlay,
   args: { creation: CREATION_PANEL_PRESET_DRAFT_SAMPLE },
+};
+
+// The card wall at its design size (eight cards with figures; one image is
+// missing and falls back to the silhouette). Opening a card is local; only
+// the expanded card's 以〈名字〉啟程 emits the preset save.
+export const PresetWall = {
+  render: renderOverlay,
+  args: { creation: CREATION_PANEL_WALL_SAMPLE },
+};
+
+// Browsing from a restored draft: the pointer opens the first collapsed
+// card, a local expansion that emits no action.
+export const PresetWallBrowsing = {
+  render: (args) => renderAfterSteps(args, [click("creation-preset-open")]),
+  args: { creation: CREATION_PANEL_WALL_DRAFT_SAMPLE },
 };
 
 // The custom form resumed from the server-persisted draft, with the sticky

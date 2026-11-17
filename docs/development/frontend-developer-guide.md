@@ -75,6 +75,18 @@ web/webclient/context_processors.py             webclient_vue_enabled 脈絡變�
 
 重構或新增疊在舞台上的 HUD 面板時，請依 [`hud-instrument-panels.md`](hud-instrument-panels.md) 的無框儀表式面板準則實作。生命值面板（`StatusPanel`、`ConditionChips`、`VitalsTrack`）是參考實作。
 
+## 角色創建介面
+
+`CreationOverlay` 是建角的全畫面外框：頁首三欄（標題、共用 `.ui-tabs` 模式分頁、副標），頁尾固定放「重設」與該模式的主要動作。確認畫面、結果訊息、表單訊息與不可用原因的 `data-testid` 由外框持有，子元件不得另建一條確認路徑。設計來源為 `docs/superpowers/specs/2026-11-17-creation-portrait-redesign-design.md` §4–§5。
+
+預設角色模式是 `CreationPresetWall` 卡牌牆：
+
+- **瀏覽與選取分開。** 「展開哪一張」是卡牌牆自己的本地狀態（`expandedKey`），與草稿中的 `preset_key` 無關。點收合的卡、← →、數字鍵 1–9 只移動展開，不送出任何動作，也不產生敘事回顯。只有展開卡片內的主要按鈕，或在卡牌牆情境按 Enter，才會發出 `choose(card)`，由外框交給 `use-creation-stage.js::selectPreset`，之後走既有的草稿儲存與啟用確認。`creation.preset` 的 pending-save 標記由 store 的 `dispatchAction` 記錄，確認畫面只在對應的成功結果之後開啟。
+- **按鍵所有權。** `composables/use-creation-wall-input.js` 由掛載中的卡牌牆安裝一個 document capture 監聽器，卸載時移除。它只處理目標在卡牌牆內，或 action dock 停在預設角色清單（`creationView.stage === "presets"`）時的按鍵；被處理的按鍵會在鍵盤橋接之前停止傳遞。dock 在根層時，數字鍵與 Enter 仍屬於 dock 的根選單。Enter 落在原生控制項上（卡牌牆的按鈕、dock 的返回鍵）時交給控制項自己的點擊，因此只會觸發一次。「目前草稿」標記與進入時展開的卡片只跟隨伺服器已提交的草稿。重複、帶修飾鍵與輸入法組字中的按鍵一律不處理；Escape 照舊由路由器返回一層。
+- **dock 的預設角色清單沒有任何列。** `creation_menu.js` 的 `menus.presets` 只是導覽標記（保留標題，讓 Escape 有一層可退），store 的 `handleCreationItem` 也沒有 preset 儲存分支。不要再加回可以直接儲存草稿的 dock 列。
+- **立繪。** 每張卡的 `artwork` descriptor 原樣交給 `ArtworkPreview`，瀏覽器不組圖片網址。立繪框在兩種狀態用同一套尺寸：高度等於卡片高度（`100cqh`），寬度為 `min(100%, 56.25cqh)`。收合卡比 9:16 窄，框就是卡片，`ArtworkPreview` 以 cover 與臉部框選置頂裁切；展開卡比 9:16 寬，立繪完整顯示。`flex-grow` 過渡時 `min()` 連續變化，所以不會跳動。時間與曲線只用 `--motion-*`／`--ease-*`，`reduced` 與 `off` 直接切換。
+- **測試。** 測試只用合成卡片，不指名出貨的預設角色、不釘卡片數量或文案；版面、裁切與文案由該變更的 `visual-review.md` 人工審查。Storybook 的 `Overlays/CreationPresetWall` 與 `Overlays/CreationOverlay` 用 `stories/fixtures/creation_wall.js` 的合成卡片，立繪借用內建預設圖。
+
 ## 等寬字體（Jim Mono TC）
 
 `--f-mono` 為 `"Jim Mono TC", "Noto Sans TC", monospace`。拉丁字母、數字、箭頭、框線字元與 CJK 都由自我代管的 [Jim Mono TC](https://github.com/jim60105/JimMonoTC)（SIL OFL 1.1）繪製，不依賴玩家電腦安裝的字型。Jim Mono TC 合併了拉丁基底字形與 Noto Sans CJK TC 的 CJK 字形，每個 CJK 字元的寬度剛好是兩個拉丁字元，因此含中文的框線地圖能逐欄對齊。地圖幾何使用的一格寬度（`CELL_EM`，拉丁字元的 advance 除以 upem）唯一來源是匯入清單 `codepoints.json` 的 `cell_advance`，由 `lib/mono_cells.js` 的產生區塊匯出；上游換版改變格寬時，所有地圖標簽預算自動隨產生值重算，不需要改寫任何常數。Noto Sans TC 只負責 Jim Mono TC 未收錄的罕用 CJK（寬 1em）。

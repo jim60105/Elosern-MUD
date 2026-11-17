@@ -10,10 +10,21 @@
 // (design D1) rejects BOTH the age and apparent_age fields below the
 // descriptor's minimum before activation. Every action emits the exact OOB `creation.*`
 // envelope — no field is invented; the server remains authoritative.
+// The preset mode is the CreationPresetWall card wall (creation-preset-card-
+// wall): browsing it is local, and only its `choose` reaches `selectPreset`.
 // The behavior groups live in ./composables/use-creation-*.js (each watch
 // stays with the state it mutates); every binding below is a group's verbatim
 // state/handler, destructured so the template is unchanged.
+import { computed } from "vue";
 import { useCreationOverlay } from "../composables/use-creation-overlay.js";
+import CreationPresetWall from "./CreationPresetWall.vue";
+
+// The shared mode tabs (design §4 labels), rendered in the header.
+const MODE_TABS = [
+  { mode: "preset", label: "預設角色" },
+  { mode: "custom", label: "自由創建" },
+  { mode: "concept", label: "概念生成" },
+];
 
 const props = defineProps({
   // The committed `creation` v5 panel payload (the available form, a
@@ -47,6 +58,11 @@ const props = defineProps({
 const emit = defineEmits(["action", "request-reset", "cancel-confirm"]);
 
 const creation = useCreationOverlay(props, emit);
+// The committed draft's preset key: the wall's entry card and its 目前草稿
+// marker follow the server draft, never an unconfirmed choose.
+const savedPresetKey = computed(() => (
+  props.creation?.draft?.mode === "preset" ? props.creation.draft.preset_key ?? null : null
+));
 const {
   available,
   reason,
@@ -55,7 +71,6 @@ const {
   mode,
   setMode,
   selectPreset,
-  selectedPresetKey,
   name,
   age,
   apparentAge,
@@ -129,11 +144,31 @@ function allocationFraction(axis) {
     :data-available="available ? 'true' : 'false'"
     :data-mode="mode"
   >
+    <!-- Three-column header (design §4): title | mode tabs | subtitle. The
+         tabs keep their hooks; they step aside while a confirmation stands. -->
     <header class="creation-overlay__header">
-      <div>
+      <div class="creation-overlay__brand">
         <p class="creation-overlay__eyebrow">ELOSERN ‧ 伊洛瑟恩</p>
         <h2 class="creation-overlay__title" data-testid="creation-overlay-title">角色創建</h2>
       </div>
+      <nav
+        v-if="available && !(stage && stage.stage === 'confirm')"
+        class="ui-tabs creation-overlay__modes"
+        aria-label="建角方式"
+      >
+        <button
+          v-for="tab in MODE_TABS"
+          :key="tab.mode"
+          type="button"
+          class="ui-tabs__tab creation-overlay__mode"
+          :class="{ 'is-active': mode === tab.mode }"
+          :aria-pressed="mode === tab.mode"
+          :data-testid="`creation-mode-${tab.mode}`"
+          @click="setMode(tab.mode)"
+        >
+          {{ tab.label }}
+        </button>
+      </nav>
       <p class="creation-overlay__intro">選擇起點，寫下你的故事。</p>
     </header>
 
@@ -174,64 +209,16 @@ function allocationFraction(axis) {
           </div>
         </template>
         <template v-else>
-          <nav class="ui-tabs creation-overlay__modes" aria-label="建角方式">
-            <button
-              type="button"
-              class="ui-tabs__tab creation-overlay__mode"
-              :class="{ 'is-active': mode === 'preset' }"
-              :aria-pressed="mode === 'preset'"
-              data-testid="creation-mode-preset"
-              @click="setMode('preset')"
-            >
-              預設
-            </button>
-            <button
-              type="button"
-              class="ui-tabs__tab creation-overlay__mode"
-              :class="{ 'is-active': mode === 'custom' }"
-              :aria-pressed="mode === 'custom'"
-              data-testid="creation-mode-custom"
-              @click="setMode('custom')"
-            >
-              自訂
-            </button>
-            <button
-              type="button"
-              class="ui-tabs__tab creation-overlay__mode"
-              :class="{ 'is-active': mode === 'concept' }"
-              :aria-pressed="mode === 'concept'"
-              data-testid="creation-mode-concept"
-              @click="setMode('concept')"
-            >
-              概念
-            </button>
-          </nav>
 
-        <div v-if="mode === 'preset'" class="creation-overlay__presets">
-          <button
-            v-for="(card, index) in presets"
-            :key="card.key"
-            type="button"
-            class="creation-preset-card"
-            data-testid="creation-preset-card"
-            :data-preset-key="card.key"
-            :data-selected="selectedPresetKey === card.key ? 'true' : 'false'"
-            :aria-pressed="selectedPresetKey === card.key"
-            :aria-current="selectedPresetKey === card.key ? 'true' : undefined"
-            @click="selectPreset(card)"
-          >
-            <span class="creation-preset-card__ornament" aria-hidden="true">
-              <span>{{ String(index + 1).padStart(2, "0") }}</span>
-            </span>
-            <span class="creation-preset-card__name" data-testid="creation-preset-name">
-              {{ card.display_name }}
-            </span>
-            <span class="creation-preset-card__race">{{ raceDisplayName(card.race) }}</span>
-            <span class="creation-preset-card__emphasis">{{ card.emphasis }}</span>
-            <span class="creation-preset-card__background">{{ card.background }}</span>
-            <span class="creation-preset-card__choose">{{ selectedPresetKey === card.key ? "已選擇" : "選擇此角色" }}</span>
-          </button>
-        </div>
+        <CreationPresetWall
+          v-if="mode === 'preset'"
+          :presets="presets"
+          :draft-preset-key="savedPresetKey"
+          :disabled="!!dispatchState?.inFlight"
+          :race-display-name="raceDisplayName"
+          :dock-browsing="stage?.stage === 'presets'"
+          @choose="selectPreset"
+        />
 
         <div v-else-if="mode === 'custom'" class="creation-overlay__custom">
           <section class="creation-region creation-identity" aria-labelledby="creation-identity-title">
@@ -416,8 +403,14 @@ function allocationFraction(axis) {
           >
             重設
           </button>
+          <!-- Preset mode's primary action lives on the expanded card; the
+               footer names the wall's keys instead (design §4). -->
+          <p v-if="mode === 'preset'" class="creation-overlay__keys" data-testid="creation-preset-keys">
+            <span><kbd>←</kbd><kbd>→</kbd> 或數字鍵 切換角色</span>
+            <span><kbd>Enter</kbd> 選擇</span>
+          </p>
           <button
-            v-if="mode === 'custom'"
+            v-else-if="mode === 'custom'"
             type="button"
             class="ui-btn ui-btn--primary creation-custom-confirm"
             data-testid="creation-submit"

@@ -63,7 +63,7 @@ export function applyCreation(ctx) {
   ctx.openCreationConfirm = openCreationConfirm;
 
   // Router submit for a creation item (the legacy `handleItem`): submenu opens,
-  // preset-card saves, confirm dispatches, and cancel pops one level. Returns
+  // confirm dispatches, and cancel pops one level. Returns
   // true when the item belonged to the creation dock.
   ctx.handleCreationItem = function handleCreationItem(item) {
     if (!ctx.creation) {
@@ -87,17 +87,10 @@ export function applyCreation(ctx) {
       ctx.pushFrame({ source: "creation.form", params: { view: "concept" } }, item.key);
       return true;
     }
-    if (item.presetKey) {
-      const requestId = ctx.dispatchAction(CreationMenu.PRESET_ACTION, {
-        preset_key: item.presetKey,
-      });
-      if (requestId !== null) {
-        ctx.creation.pendingSaveRequestId = requestId;
-        ctx.creation.pendingActivate = "preset";
-        ctx.creation.pendingActivateKey = item.presetKey;
-      }
-      return true;
-    }
+    // No preset-save branch (creation-preset-card-wall): the preset frame is a
+    // navigation marker with no rows, and the card wall's deliberate choose is
+    // the only `creation.preset` producer (its pending-save markers are
+    // recorded by `dispatchAction`).
     if (
       item.actionId === CreationMenu.ACTIVATE_ACTION ||
       item.actionId === CreationMenu.RESET_ACTION

@@ -479,11 +479,13 @@ describe("H6 overlay reachability: every full overlay has a live mount path", ()
     expect(wrapper.find('[data-testid="creation-body"]').exists()).toBe(true);
     // The creation overlay's presence is owned by the committed `creation` panel predicate;
     // creation mode presents no surface behind it, so a close control has no outcome and
-    // must not be rendered. Assert both the specific absent testid and that the header
-    // renders no button at all. The body may contain wizard action buttons (reset, confirm,
-    // cancel), but must not contain any dismissal-specific control.
+    // must not be rendered. Assert both the specific absent testid and that the header's
+    // only buttons are the shared mode tabs (creation-preset-card-wall moved them there).
+    // The body may contain wizard action buttons (reset, confirm, cancel), but must not
+    // contain any dismissal-specific control.
     expect(wrapper.find('[data-testid="creation-overlay-close"]').exists()).toBe(false);
-    expect(wrapper.find('.creation-overlay__header button').exists()).toBe(false);
+    const headerButtons = wrapper.findAll('.creation-overlay__header button');
+    expect(headerButtons.every((button) => button.classes("ui-tabs__tab"))).toBe(true);
     // Guard the body: no testid that names a close/exit/dismiss affordance.
     expect(wrapper.find('[data-testid*="close"]').exists()).toBe(false);
     expect(wrapper.find('[data-testid*="exit"]').exists()).toBe(false);

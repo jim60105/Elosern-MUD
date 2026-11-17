@@ -1,0 +1,256 @@
+/* CreationPresetWall (design §5.1): one row of portrait cards filling the
+   content height; the expanded card is about seven collapsed widths. */
+.creation-wall {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  gap: var(--sp-2);
+  padding-block: var(--sp-1);
+}
+
+.creation-wall__card {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  /* The card is the size container: the figure is sized in cqh so both
+     states share one size definition (§5.1). */
+  container-type: size;
+  background: linear-gradient(180deg, var(--ink-860), var(--ink-950));
+  border: 1px solid var(--band-edge-dim);
+  border-radius: var(--radius-sm);
+  transition:
+    flex-grow var(--motion-base) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard);
+}
+
+.creation-wall__card:hover { border-color: var(--gold-500); }
+
+.creation-wall__card[data-expanded="true"] {
+  flex-grow: 7;
+  border-color: var(--gold-400);
+}
+
+/* The warm pool of light the open figure stands in. */
+.creation-wall__card[data-expanded="true"]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 32cqh 56% at 28cqh 54%, var(--gold-glow), transparent 72%);
+  pointer-events: none;
+}
+
+.creation-wall__card[data-expanded="true"]:focus { outline: none; }
+.creation-wall__card[data-expanded="true"]:focus-visible {
+  outline: 2px solid var(--gold-400);
+  outline-offset: calc(-5px * var(--ui-scale));
+}
+
+/* One size definition for both states: the figure box is always card-height
+   tall and never wider than 9:16 of that height. A collapsed card is narrower
+   than 9:16, so the box is the card and ArtworkPreview's cover crop keeps the
+   top of the figure, centred on its face rectangle; an expanded card is wider,
+   so the box is exactly 9:16 and the figure is shown whole. min() follows the
+   card's width continuously while flex-grow moves, so nothing jumps; opening
+   only changes the box width and the transform scale. */
+.creation-wall__art {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: min(100%, 56.25cqh);
+  height: 100cqh;
+  transform-origin: 50% 0;
+  transform: scale(1.12);
+  filter: saturate(0.55) brightness(0.6) drop-shadow(0 0 0 transparent);
+  transition:
+    transform var(--motion-base) var(--ease-standard),
+    filter var(--motion-base) var(--ease-standard);
+}
+
+.creation-wall__card:hover .creation-wall__art {
+  filter: saturate(0.9) brightness(0.92) drop-shadow(0 0 0 transparent);
+}
+
+.creation-wall__card[data-expanded="true"] .creation-wall__art {
+  transform: scale(1);
+  filter: saturate(1) brightness(1) drop-shadow(0 0 calc(24px * var(--ui-scale)) var(--gold-glow));
+}
+
+/* The alpha-terminal silhouette keeps the full 9:16 figure width, centred on
+   the card, instead of shrinking into a collapsed card's narrow strip. */
+.creation-wall__art :deep(.artwork-preview) { overflow: visible; }
+.creation-wall__art :deep(.artwork-alpha) {
+  position: absolute;
+  inset: 0 auto 0 50%;
+  width: 56.25cqh;
+  transform: translateX(-50%);
+}
+
+/* The collapsed card's opening button covers the whole card. */
+.creation-wall__spine {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--sp-3);
+  padding: var(--sp-4) 0 var(--sp-5);
+  color: var(--paper-100);
+  background: linear-gradient(180deg, transparent 42%, color-mix(in srgb, var(--ink-950) 72%, transparent) 70%, var(--ink-950) 97%);
+  border: 0;
+  cursor: pointer;
+}
+
+.creation-wall__spine:focus { outline: none; }
+.creation-wall__spine:focus-visible {
+  outline: 2px solid var(--gold-400);
+  outline-offset: calc(-5px * var(--ui-scale));
+}
+
+.creation-wall__no {
+  color: var(--gold-500);
+  font: var(--text-xs) var(--f-num);
+  letter-spacing: 0.14em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Names hang from one line, so every ordinal sits at the same height. */
+.creation-wall__spine-name {
+  writing-mode: vertical-rl;
+  min-inline-size: 6em;
+  color: var(--gold-300);
+  font: var(--text-xl) / 1.2 var(--f-display);
+  letter-spacing: 0.18em;
+  text-shadow: 0 0 calc(8px * var(--ui-scale)) var(--ink-950);
+}
+
+.creation-wall__card:hover .creation-wall__no { color: var(--gold-400); }
+
+/* The dossier beside the open figure. */
+.creation-wall__dossier {
+  position: absolute;
+  inset: 0 0 0 56.25cqh;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: calc(560px * var(--ui-scale));
+  padding: var(--sp-6) var(--sp-6) var(--sp-6) var(--sp-4);
+  animation: creation-wall-dossier var(--motion-base) var(--ease-enter) both;
+}
+
+@keyframes creation-wall-dossier { from { opacity: 0; } }
+
+.creation-wall__eyebrow {
+  margin: 0;
+  color: var(--paper-500);
+  font-size: var(--text-xs);
+  letter-spacing: 0.18em;
+}
+
+.creation-wall__count {
+  margin-left: var(--sp-3);
+  color: var(--gold-500);
+  font-family: var(--f-num);
+  font-variant-numeric: tabular-nums;
+}
+
+.creation-wall__name {
+  margin: 0;
+  color: var(--gold-300);
+  font: 400 var(--text-initial) / 1.25 var(--f-display);
+  letter-spacing: 0.1em;
+  overflow-wrap: anywhere;
+}
+
+.creation-wall__race {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-3);
+  margin: 0;
+  color: var(--paper-200);
+  font: var(--text-md) var(--f-serif);
+  letter-spacing: 0.12em;
+}
+
+/* The saved-draft marker: a shape and a word, not colour alone. */
+.creation-wall__saved {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 0 var(--sp-2);
+  color: var(--gold-400);
+  border: 1px solid var(--band-edge-dim);
+  border-radius: var(--radius-sm);
+  font: var(--text-xs) var(--f-sans);
+  letter-spacing: 0.08em;
+}
+
+.creation-wall__saved i {
+  width: calc(6px * var(--ui-scale));
+  height: calc(6px * var(--ui-scale));
+  background: var(--gold-400);
+  transform: rotate(45deg);
+}
+
+.creation-wall__lineage {
+  margin: 0;
+  color: var(--paper-500);
+  font-size: var(--text-sm);
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.creation-wall__ornament {
+  flex: none;
+  width: 100%;
+  height: calc(11px * var(--ui-scale));
+  margin: var(--sp-2) 0;
+  border: 0;
+  background:
+    var(--band-ornament) center / contain no-repeat,
+    linear-gradient(var(--band-edge-dim), var(--band-edge-dim)) center / 100% 1px no-repeat;
+}
+
+.creation-wall__emphasis {
+  margin: 0;
+  color: var(--paper-50);
+  font: var(--text-base) / 1.7 var(--f-serif);
+  overflow-wrap: anywhere;
+}
+
+.creation-wall__background {
+  min-height: 0;
+  margin: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ink-600) transparent;
+  color: var(--paper-400);
+  font-size: var(--text-md);
+  line-height: 1.85;
+  overflow-wrap: anywhere;
+}
+
+.creation-wall__choose {
+  flex: none;
+  margin-top: auto;
+  min-height: calc(48px * var(--ui-scale));
+  font-size: var(--text-md);
+  letter-spacing: 0.12em;
+}
+
+/* Browser zoom/narrow-window fallback, not a separate mobile workflow: the
+   dossier lies over the lower figure instead of beside it. */
+@media (max-width: 1000px) {
+  .creation-wall__dossier {
+    inset: auto 0 0 0;
+    max-width: none;
+    max-height: 70%;
+    padding: var(--sp-8) var(--sp-4) var(--sp-4);
+    background: linear-gradient(180deg, transparent, var(--ink-950) var(--sp-8));
+  }
+}

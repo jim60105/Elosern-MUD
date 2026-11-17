@@ -200,25 +200,28 @@ function validPanel(overrides) {
   return Object.assign({}, panel, overrides || {});
 }
 
-test("root and preset menus route with exact payloads", () => {
+test("root menu opens the three creation paths", () => {
   const root = CreationMenu.rootItems(validPanel());
   assert.equal(root.length, 3);
   assert.equal(root[0].openSubmenu, "presets");
   assert.equal(root[1].openSubmenu, "custom");
   assert.equal(root[2].openSubmenu, "concept");
-
-  const presets = CreationMenu.presetItems(validPanel());
-  assert.equal(presets.length, 2);
-  assert.equal(presets[0].actionId, "creation.preset");
-  assert.deepEqual(presets[0].payload, { preset_key: SYNTH_PRESET.id });
-  assert.equal(presets[1].presetKey, T_PRESET_B.key);
+  root.forEach((item) => {
+    assert.equal(item.actionId, null);
+    assert.equal(item.payload, null);
+  });
 });
 
-test("disabled empty preset list stays focusable and submits nothing", () => {
-  const empty = CreationMenu.presetItems(validPanel({ presets: [] }));
-  assert.equal(empty.length, 1);
-  assert.equal(empty[0].enabled, false);
-  assert.equal(empty[0].actionId, null);
+// creation-preset-card-wall: browsing presets is the overlay card wall's
+// local state, so the dock's preset frame is a navigation marker with no row
+// a digit or Enter could submit, whatever cards the panel supplies.
+test("the preset frame carries no mutation rows for any supplied cards", () => {
+  [validPanel(), validPanel({ presets: [] })].forEach((panel) => {
+    const presets = CreationMenu.buildMenus(panel).menus.presets;
+    assert.deepEqual(presets.items, []);
+    assert.equal(presets.focusKey, null);
+  });
+  assert.equal(CreationMenu.presetItems, undefined);
 });
 
 test("profile resolution follows race and subrace selection", () => {
@@ -478,7 +481,7 @@ test("confirmation screens gate activation", () => {
 test("buildMenus exposes root and preset menus from the panel", () => {
   const model = CreationMenu.buildMenus(validPanel());
   assert.equal(model.menus.root.items.length, 3);
-  assert.equal(model.menus.presets.items.length, 2);
+  assert.equal(model.menus.presets.items.length, 0);
 });
 
 // -- sex channel (namegen-creation-ui D5/D11) --------------------------------
