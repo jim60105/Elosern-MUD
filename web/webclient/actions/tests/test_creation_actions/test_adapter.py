@@ -9,6 +9,7 @@ from web.webclient.actions.creation_actions import (
     _creation_activate_adapter,
     _creation_concept_adapter,
     _creation_custom_adapter,
+    _creation_portrait_adapter,
     _creation_preset_adapter,
     _creation_reset_adapter,
     validate_creation_activate_payload,
@@ -26,6 +27,7 @@ from ._support import (
     _T_OTHER_SUBRACE,
     _T_PRESET,
     _T_RACE,
+    _T_SUBRACE,
     _concept_payload,
     _element_keys,
     _proposal,
@@ -214,6 +216,107 @@ class CreationAdapterTests(CreationActionBase):
         self.assertEqual(self.character.race, None)
         self.assertTrue(self.character.creation_pending)
         self.assertEqual(self.character.traits.all(), [])
+
+
+class PortraitAdapterTests(CreationActionBase):
+    """The draft portrait adapter through the rules-owned admission."""
+
+    def setUp(self):
+        super().setUp()
+        import tempfile
+
+        from django.test import override_settings
+
+        from world.art import connectivity
+
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tempdir.cleanup)
+        self.art_settings = override_settings(
+            ART_STORE_ROOT=self.tempdir.name,
+            ART_SD_CLIENT="world.art.fake_sd_client.FakeSDWebUIClient",
+        )
+        self.art_settings.enable()
+        self.addCleanup(self.art_settings.disable)
+        connectivity._reset_for_testing()
+        self.addCleanup(connectivity._reset_for_testing)
+        from world.art.fake_sd_client import FakeSDWebUIClient
+
+        self.fake_client = FakeSDWebUIClient()
+
+    def _payload(self):
+        return {
+            "race": _T_RACE,
+            "subrace": _T_SUBRACE,
+            "sex": "female",
+            "apparent_age": 24,
+            "custom_prompt": "紅髮",
+        }
+
+    def _run(self):
+        from unittest.mock import patch
+
+        from web.webclient.actions.creation_actions import (
+            _creation_portrait_adapter,
+        )
+
+        with patch(
+            "world.art.connectivity.resolve_sd_client",
+            return_value=self.fake_client,
+        ):
+            with self.captureOnCommitCallbacks(execute=True):
+                return _creation_portrait_adapter(self.character, self._payload())
+
+    def _jobs(self):
+        from world.art.store import GalleryJobRecord
+
+        return [
+            record
+            for record in GalleryJobRecord.objects.all()
+            if str(record.db.gallery_image_id or "")
+        ]
+
+    def test_a_valid_request_reports_success_without_a_confirmation(self):
+        result = self._run()
+        self.assertEqual(result["outcome"], "success")
+        self.assertEqual(result["code"], "portrait_requested")
+        self.assertEqual(result["affected_panels"], ("creation",))
+        self.assertNotIn("fingerprint", result)
+        self.assertIsNone(read_draft(self.character))
+        self.assertEqual(len(self._jobs()), 1)
+        self.assertEqual(
+            self.character.db.portrait_policy,
+            {"mode": "named", "stable_key": str(self.character.pk)},
+        )
+
+    def test_a_rejection_preserves_an_existing_confirmation(self):
+        from web.webclient.actions.creation_actions import FINGERPRINT_NDB_KEY
+
+        setattr(self.character.ndb, FINGERPRINT_NDB_KEY, "confirmation")
+        result = _creation_portrait_adapter(
+            self.character, {**self._payload(), "race": "t_unregistered_race"}
+        )
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(
+            getattr(self.character.ndb, FINGERPRINT_NDB_KEY), "confirmation"
+        )
+        self.assertEqual(self._jobs(), [])
+        self.assertIsNone(self.character.db.portrait_policy)
+
+    def test_known_unavailable_rejects_with_the_creation_panel(self):
+        self.fake_client.fail_probe()
+        result = self._run()
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "portrait_service_unavailable")
+        self.assertEqual(result["affected_panels"], ("creation",))
+        self.assertEqual(self._jobs(), [])
+        self.assertIsNone(self.character.db.portrait_policy)
+
+    def test_an_activated_character_is_rejected_before_any_write(self):
+        self.character.creation_pending = False
+        result = self._run()
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "already_complete")
+        self.assertEqual(self._jobs(), [])
 
 if __name__ == "__main__":
     unittest.main()

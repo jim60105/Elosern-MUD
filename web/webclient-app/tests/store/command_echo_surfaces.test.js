@@ -742,6 +742,29 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
       },
       expected: ["character create", "character concept 流浪學者"],
     },
+    {
+      // The draft portrait request echoes its activating control's bounded
+      // label only; the prompt and the draft identity values never reach the
+      // narrative log.
+      id: "creation portrait request (control label, no prompt text)",
+      ids: ["creation.portrait.generate"],
+      prepare() {
+        openExploration();
+        enterCreation();
+        store.dispatchAction(
+          "creation.portrait.generate",
+          {
+            race: "human",
+            subrace: "t_synth_subrace",
+            sex: "female",
+            apparent_age: 24,
+            custom_prompt: "紅髮，綠色眼眸",
+          },
+          { actionLabel: "生成肖像" },
+        );
+      },
+      expected: "生成肖像",
+    },
 
     {
       // The name roll is a UI-only convenience: no typed-command equivalent,

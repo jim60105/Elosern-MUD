@@ -484,6 +484,14 @@
     "creation.reset": function (payload, display) {
       return label(display && display.actionLabel);
     },
+    // A draft portrait request has no typed command equivalent, so the echo is
+    // the activating control's own bounded label (with a literal fallback that
+    // keeps one line even before the panel supplies one). It is deliberately
+    // the LABEL only: the prompt text and every draft identity value stay out
+    // of the narrative log.
+    "creation.portrait.generate": function (payload, display) {
+      return label(display && display.actionLabel) || "生成肖像";
+    },
     // The persona edits replay the typed persona family verbatim
     // (commands/background.py / commands/persona.py): `設定背景|設定個性|
     // 設定生平|設定習慣 <文字>`. A null or blank text is the clear — the

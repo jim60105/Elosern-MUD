@@ -10,6 +10,7 @@
     "creation.activate",
     "creation.concept",
     "creation.custom",
+    "creation.portrait.generate",
     "creation.preset",
     "creation.roll_name",
     "creation.reset",

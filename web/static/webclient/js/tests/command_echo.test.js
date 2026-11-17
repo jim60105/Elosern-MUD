@@ -385,6 +385,29 @@ test("creation.reset has no typed command and emits its button label", () => {
   );
 });
 
+test("creation.portrait.generate echoes one bounded action label and never its input", () => {
+  const payload = {
+    race: "human",
+    subrace: "t_synth_subrace",
+    sex: "female",
+    apparent_age: 24,
+    custom_prompt: "紅髮，綠色眼眸",
+  };
+  assert.strictEqual(
+    Echo.commandLine("creation.portrait.generate", payload, {
+      actionLabel: "重新生成肖像",
+    }),
+    "重新生成肖像"
+  );
+  // No display label still resolves the literal control label, never the
+  // prompt or any draft identity value.
+  const literal = Echo.commandLine("creation.portrait.generate", payload, {});
+  assert.strictEqual(literal, "生成肖像");
+  assert.ok(!literal.includes("紅髮"));
+  assert.ok(!literal.includes("human"));
+  assert.strictEqual(Echo.commandLine("creation.portrait.generate", payload, {}).length <= Echo.MAX_LINE_LENGTH, true);
+});
+
 test("an unknown action id stays silent", () => {
   assert.strictEqual(Echo.commandLine("proof.noop", {}, {}), null);
 });
@@ -693,6 +716,16 @@ const REGISTERED_MUTATION_ACTIONS = {
   "creation.custom": { payload: {}, display: {} },
   "creation.preset": { payload: { preset_key: "elf_mage" }, display: {} },
   "creation.reset": { payload: {}, display: { actionLabel: "清除草稿" } },
+  "creation.portrait.generate": {
+    payload: {
+      race: "human",
+      subrace: "t_synth_subrace",
+      sex: "female",
+      apparent_age: 24,
+      custom_prompt: "紅髮，綠色眼眸",
+    },
+    display: { actionLabel: "重新生成肖像" },
+  },
   "creation.roll_name": null,
   // The collaborative dream surface (dream-sleep-surface): the browser panel
   // dispatches the same lifecycle the text client types, so each action keeps

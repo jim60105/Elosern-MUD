@@ -716,6 +716,42 @@ transport generation and epoch:
 
 Malformed envelopes keep the existing `invalid` / `missing_envelope` reasons.
 
+## Draft portrait request during creation
+
+`creation.portrait.generate` is an ordinary allowlisted mutation on the
+creation surface: its exact payload is `race`, `subrace`, `sex`,
+`apparent_age` and `custom_prompt`, it dispatches no text command, and it
+declares the `creation` panel so a refusal publishes the changed availability
+before the correlated result. The action request path is the ONLY place that
+probes the art connectivity surface; the creation panel reads
+`world.rules.creation_portrait.read_portrait_service_availability()`, a pure
+snapshot of the existing cache that never probes, never writes and never
+extends a verdict's life.
+
+Admission is serialized per subject: deferred commit callbacks, then the shared
+art queue lock, then one database transaction (policy, one gallery job, the
+`creation_portrait` receipt), then the gallery lock for any card write. Commit
+callbacks that take locks are registered through
+`world.rules.presentation_events.defer_publication_callbacks()` and drained only
+after the queue serialization is released, so no publication or automatic
+portrait ensure can reacquire it while the admission holds it.
+
+The bounded, server-owned receipt lives on the character attribute
+`creation_portrait` as exactly
+`{version: 1, image_id, retained_image_id, fallback_key}`: the newest admitted
+request id, the last readable creation-owned card (the only card a successful
+regeneration may replace), and the built-in fallback key that supplies ready
+descriptor geometry without re-reading uncommitted identity. It carries no
+prompt and no identity copy. A failure of the request transaction restores the
+policy and receipt attribute caches and leaves no policy, receipt, card or job
+behind; a failed generation keeps the previous card and default.
+
+The portrait result never opens the activation confirmation: the adapter does
+not record a draft fingerprint, store a proposal, or touch the saved draft, so
+the existing activation gate stays authoritative. Creation, activation and
+deterministic gameplay remain available while art is offline; only this
+optional admission is refused.
+
 ## Dialogue coupling
 
 Dialogue is a candidate dependency, not an unconditional transmission. Whenever
