@@ -131,10 +131,10 @@ ASSORTMENT_REGISTRY: dict[str, AssortmentDefinition] = {
         # specialist axes out. 王都飾品 is defined by a RULE, not a list: it
         # holds exactly the capital's accessory-slot goods (the item
         # registry's own ``equipment_slot``), so the next accessory added to
-        # the capital cannot quietly rot back onto the general store — the
+        # the capital cannot quietly rot back onto the general store; the
         # data-contract suite computes both sides. 儲物袋 and 滑翔斗篷 equip to
         # the accessory slot, so they are the jeweller's. 王都藥劑 is the
-        # drinkable and applied remedies — six of the seven potion-band
+        # drinkable and applied remedies, six of the seven potion-band
         # goods; 受洗聖水 is the seventh, and altoria-sanctum moved it to the
         # sanctuary's own bundle (a band is a pricing constraint, not a shop's
         # inventory).
@@ -179,7 +179,7 @@ ASSORTMENT_REGISTRY: dict[str, AssortmentDefinition] = {
         # ``intimacy_tool`` goods sit in the item registry in this order and
         # are sold here and nowhere else; 受洗聖水 moved over verbatim from
         # the sundries (the sanctuary's good, on the counter it belongs to).
-        # The five wearable devices equip to the accessory slot — the
+        # The five wearable devices equip to the accessory slot; the
         # partition rule carves the capital's accessories across exactly two
         # bundles, this one and 首飾坊's (see the sample-city-altoria spec).
         AssortmentDefinition(
@@ -232,8 +232,8 @@ ASSORTMENT_REGISTRY: dict[str, AssortmentDefinition] = {
             ),
         ),
         # ciaran-village-crafts: two more villagers' shelves. 精靈綴飾 is the
-        # adornment maker's work — the crescent earring moves here verbatim
-        # from 精靈雜貨, joined by the prism charm; 精靈調藥 is the hedge
+        # adornment maker's work; the crescent earring moves here verbatim
+        # from 精靈雜貨 and is joined by the prism charm; 精靈調藥 is the hedge
         # healer's remedies. Both remedies are also capital goods, offered in
         # the village at everyday prices under the same two-price rule that
         # keeps a shared capital good at everyday figures at home.
@@ -256,8 +256,8 @@ ASSORTMENT_REGISTRY: dict[str, AssortmentDefinition] = {
             ),
         ),
         # eolas-village-craft-homes: the 幽月谷村 shelves. Each one is one
-        # villager's home — the silk keeper's cloth, the proving-ground
-        # caster's wands, the kiln keeper's fired glass and lamps — never a
+        # villager's home (the silk keeper's cloth, the proving-ground
+        # caster's wands, the kiln keeper's fired glass and lamps), never a
         # storefront's stock.
         AssortmentDefinition(
             key="eolas_silkwork",
@@ -287,8 +287,8 @@ ASSORTMENT_REGISTRY: dict[str, AssortmentDefinition] = {
             ),
         ),
         # eolas-village-fare-homes: the 幽月谷村 shelves of daily need. Each
-        # one is one villager's home — the herb keeper's steeped remedies, the
-        # baker's fare for the trail — never a storefront's stock.
+        # one is one villager's home (the herb keeper's steeped remedies, the
+        # baker's fare for the trail), never a storefront's stock.
         AssortmentDefinition(
             key="eolas_remedies",
             display_name_zh="幽月調藥",
@@ -306,9 +306,9 @@ ASSORTMENT_REGISTRY: dict[str, AssortmentDefinition] = {
             ),
         ),
         # fionnen-village-craft-homes: the 翠綠森林村 shelves. Each one is one
-        # villager's home — the toy carver's bracers, tuned crystals and raised
+        # villager's home (the toy carver's bracers, tuned crystals and raised
         # vines; the bow maker's longbows; the weaver's hunting dress, veil and
-        # white dress — never a storefront's stock.
+        # white dress), never a storefront's stock.
         AssortmentDefinition(
             key="fionnen_trinkets",
             display_name_zh="森林巧作",
@@ -337,8 +337,8 @@ ASSORTMENT_REGISTRY: dict[str, AssortmentDefinition] = {
             ),
         ),
         # fionnen-village-fare-homes: the 翠綠森林村 shelves of daily need.
-        # Each one is one villager's home — the honey keeper's jars and honeyed
-        # blossom, the herbalist's salve, herb and potion — never a
+        # Each one is one villager's home (the honey keeper's jars and honeyed
+        # blossom, the herbalist's salve, herb and potion), never a
         # storefront's stock.
         AssortmentDefinition(
             key="fionnen_fare",

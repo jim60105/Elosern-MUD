@@ -14,7 +14,7 @@ nodes:
     y_m: 173
     prototype_parent: anchor_room
     key: 茶坡路口
-    desc: 路口的坡上是一畦畦茶樹，路肩放著採茶的竹簍，茶香順著風散開，採茶人的斗笠在坡間移動。
+    desc: 路口的坡上排著幾畦茶樹，路肩放著採茶的竹簍，茶香順著風散開，採茶人的斗笠在坡間移動。
     anchor_key: hamlet_tea_slope
     typeclass:
     scene_archetype: city_street
@@ -23,7 +23,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 炒茶農舍
-    desc: 農舍前架著炒茶的鐵鍋，往西南的路通往西礦港，屋後的茶園順著坡面層層排列。
+    desc: 農舍前架著炒茶的鐵鍋，往西南的路通往西礦港，屋後的茶園順著坡面排列。
     anchor_key:
     typeclass:
     scene_archetype: city_street

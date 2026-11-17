@@ -14,7 +14,7 @@ nodes:
     y_m: 155
     prototype_parent: anchor_room
     key: 路口
-    desc: 路口往西南通往東牧鎮，往東北接潮風鎮的海岸路。路邊的池塘長滿菱角，水面浮著一圈圈的葉子。
+    desc: 路口往西南通往東牧鎮，往東北接潮風鎮的海岸路。路邊的池塘長滿菱角，水面浮著成圈的葉子。
     anchor_key: hamlet_caltrop_pond
     typeclass:
     scene_archetype: city_street

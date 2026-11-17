@@ -41,7 +41,7 @@ nodes:
     y_m: 759
     prototype_parent: grid_room
     key: 西北大街
-    desc: 大街往西北爬升，兩旁的石屋牆上嵌著熊爪刻痕。路面乾淨，落葉總被住户掃到路邊堆成一垛。
+    desc: 大街往西北爬升，兩旁的石屋牆上嵌著熊爪刻痕。路面乾淨，落葉總被住戶掃到路邊堆成一垛。
     anchor_key:
     typeclass:
     scene_archetype: city_street

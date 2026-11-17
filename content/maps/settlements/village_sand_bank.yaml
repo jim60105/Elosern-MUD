@@ -32,7 +32,7 @@ nodes:
     y_m: 412
     prototype_parent: grid_room
     key: 北村口
-    desc: 北村口的道路通向獵鷹鎮，岸邊的沙地被車馬踩出硬道，渡船在河心缓缓擺渡。
+    desc: 北村口的道路通向獵鷹鎮，岸邊的沙地被車馬踩出硬道，渡船在河心擺渡。
     anchor_key:
     typeclass:
     scene_archetype: city_street

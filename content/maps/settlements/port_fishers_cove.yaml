@@ -14,7 +14,7 @@ nodes:
     y_m: 550
     prototype_parent: anchor_room
     key: 中央廣場
-    desc: 廣場離海灣不遠，東邊是河的出口，西南方向的海面在陽光下泛著碎光，漁婦在石階上分揀當日的魚獲。
+    desc: 廣場離海灣不遠，東邊是河的出口，西南方向的海面在陽光下泛著碎光，漁婦在石階上分揀當日的漁獲。
     anchor_key: port_fishers_cove
     typeclass:
     scene_archetype: city_street
@@ -50,7 +50,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 碼頭
-    desc: 碼頭伸進南面的小灣，漁船擠在木樁之間，船伕把當日魚獲直接抬上石階，海水順著階面流回灣裡。
+    desc: 碼頭伸進南面的小灣，漁船擠在木樁之間，船伕把當日漁獲直接抬上石階，海水順著階面流回灣裡。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -68,7 +68,7 @@ nodes:
     y_m: 550
     prototype_parent: grid_room
     key: 港務府前
-    desc: 港務總管府前掛著一只舊銅鐘，船主在此登記進出，屋簷下曬著一疊潮濕的單據，墨跡被水氣暈開。
+    desc: 港務總管府前掛著一口舊銅鐘，船主在此登記進出，屋簷下曬著一疊潮濕的單據，墨跡被水氣暈開。
     anchor_key:
     typeclass:
     scene_archetype: city_street

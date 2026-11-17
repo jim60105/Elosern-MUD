@@ -3,8 +3,8 @@
 A place is the single authored record of one service location's *service*
 facts: its non-map kind, the qualified interior room it joins, its host's
 identity, the host's explicit capability declarations, and the assortments the
-place sells. The room itself — name, prose, scene facts, connections and its
-one exterior entrance relationship — belongs solely to the permanent interior
+place sells. The room itself (name, prose, scene facts, connections and its
+one exterior entrance relationship) belongs solely to the permanent interior
 document under ``content/maps/interiors/``; a place never repeats it. The
 room's identity is the place key, so every existing room tag and service join
 survives; the exterior address is derived from the current settlement graph at
@@ -16,7 +16,7 @@ and never rewrites them on a later sync, so an authored edit takes effect
 through roster convergence rather than a backfill.
 
 A place's host is optional as ONE indivisible group: a place either authors
-the complete host (name, race, sex, profile key — with a subrace and
+the complete host (name, race, sex, profile key, with a subrace and
 capability declarations as its optional parts) or authors none of it,
 describing a place that simply exists: a plaza, a forecourt, a quay. A
 partially authored host is a load error, not a half-built NPC. A hosted place
@@ -40,7 +40,7 @@ from world.lore.settlements.settlements import SETTLEMENT_REGISTRY
 class PlaceKind(StrEnum):
     """Closed vocabulary of what a place's location IS in the world.
 
-    A kind names the location itself — the room, the ground, the building —
+    A kind names the location itself (the room, the ground, the building),
     never a capability its host happens to carry. The worked example is the
     four elven homes: every one of them trades, and every one of them is
     ``HOME``, because in the village a blade-maker's dwelling is a dwelling
@@ -114,7 +114,7 @@ class PlaceDefinition:
         default=(), metadata=ref_many("assortments", inverse="places")
     )
     # Per-place assortment adjustments (settlement-shops design §4). Additions
-    # stock items outside the referenced assortments — each addition MUST
+    # stock items outside the referenced assortments; each addition MUST
     # carry a complete override in the shop row (the commerce rulebook slice) because it has
     # no assortment base rule. Removals decline items the referenced
     # assortments contain. Both are shop-only concepts: a place without a
@@ -214,7 +214,7 @@ def place_is_hostless(place: PlaceDefinition) -> bool:
 
     The single definition of the group's ABSENCE, shared by the record
     validator and the roster derivation so the two never drift. A partially
-    authored host is NOT hostless — malformed material must fall through to
+    authored host is NOT hostless; malformed material must fall through to
     validation, never to a silently empty room. A stray capability declaration
     on an otherwise host-less row is likewise not hostless, and so is a stray
     ``host_profile_key`` (npc-persona-profile-registry D2): naming a host
@@ -233,7 +233,7 @@ def _validate_host_group(place: PlaceDefinition) -> None:
     Reached only when the row is NOT hostless, so the legal shapes here are
     exactly: every scalar authored (optionally with a subrace and capability
     declarations), or a row whose only offence is a stray subrace / capability
-    on an otherwise wholly absent group — each of which names the offending
+    on an otherwise wholly absent group; each of which names the offending
     fields.
     """
     found = [field for field in HOST_IDENTITY_FIELDS if getattr(place, field) is not None]
@@ -269,7 +269,7 @@ def validate_place_registry(
     The host is optional as one indivisible group (hostless-places): either
     every scalar host field is authored or none is, and a place authoring no
     host may declare no goods. A half-authored host names the fields found
-    and the fields missing — that message is the point of the rule, because
+    and the fields missing. That message is the point of the rule, because
     the failure mode it replaces is a half-authored host reaching the roster
     derivation several layers away.
 
@@ -282,8 +282,8 @@ def validate_place_registry(
     rejected on a hostless place, and otherwise must resolve in the NPC
     profile registry.
 
-    Two interiors sharing one exterior stay valid — a craft alley with a forge
-    and a tailor on it is one street with two doors — but the shared-doorway
+    Two interiors sharing one exterior stay valid. A craft alley with a forge
+    and a tailor on it is one street with two doors, but the shared-doorway
     rule now lives with the interior documents that author the doorway, so a
     place record carries no geometry to collide on.
     """
@@ -433,11 +433,11 @@ def validate_place_registry(
 # world/lore/items assembly precedent). Slice order is load-bearing: the
 # derived service-host roster and the derived SHOP_REGISTRY both iterate this
 # dict, and sync_service_content processes roster rows in this order. The
-# capital's own slices run in terrace order — lower, middle, upper — because
+# capital's own slices run in terrace order (lower, middle, upper), because
 # the terraces are how the city is described and a place's terrace is the
 # first thing that locates it; the village slices follow, 暗影谷村 then
-# 幽月谷村 then 翠綠森林村, so every capital row keeps its place ahead of the
-# village homes' in the derived registries.
+# 幽月谷村 then 翠綠森林村 in that order, so every capital row keeps its
+# place ahead of the village homes' in the derived registries.
 from world.lore.settlements.places_altoria_lower import ROWS as ALTORIA_LOWER_ROWS  # noqa: E402
 from world.lore.settlements.places_altoria_middle import ROWS as ALTORIA_MIDDLE_ROWS  # noqa: E402
 from world.lore.settlements.places_altoria_upper import ROWS as ALTORIA_UPPER_ROWS  # noqa: E402

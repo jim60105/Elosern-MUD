@@ -23,7 +23,7 @@ nodes:
     y_m: 163
     prototype_parent: grid_room
     key: 柏蔭農舍
-    desc: 農舍前的空地舖著柏木屑，西北方通往邊界河的方向據說可見渡口的燈，屋後林間終日陰涼。
+    desc: 農舍前的空地舖著柏木屑，往西北去是邊界河的方向，據說從那裡看得見渡口的燈，屋後林間終日陰涼。
     anchor_key:
     typeclass:
     scene_archetype: city_street

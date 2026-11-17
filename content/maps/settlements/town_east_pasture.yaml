@@ -41,7 +41,7 @@ nodes:
     y_m: 802
     prototype_parent: grid_room
     key: 西北街
-    desc: 西北街是進鎮之後最寬的一段，拴馬樁沿著街邊排開。馬蹄把路面踩出一個個淺坑，雨後積著水。
+    desc: 西北街是進鎮之後最寬的一段，拴馬樁沿著街邊排開。馬蹄把路面踩出許多淺坑，雨後積著水。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -59,7 +59,7 @@ nodes:
     y_m: 560
     prototype_parent: grid_room
     key: 公會前
-    desc: 公會前在廣場東側，分會的委託多半是找走失的牲口。板子上釘著手畫的馬與牛，畫得歪歪扭扭。
+    desc: 公會前在廣場東側，分會的委託多半是找走失的牲口。板子上釘著手畫的馬與牛，畫得歪斜。
     anchor_key:
     typeclass:
     scene_archetype: city_street

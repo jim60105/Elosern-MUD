@@ -32,7 +32,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 南寨門
-    desc: 南寨門朝向互市城，門邊堆著林木與炭窯的成品。這些貨物每隔幾天就有人來收。炭窯的煙順著樹梢慢慢散開，遠處也看得見。
+    desc: 南寨門朝向互市城，門邊堆著林木與炭窯的成品。這些貨物每隔幾天就有人來收。炭窯的煙順著樹梢散開，遠處也看得見。
     anchor_key:
     typeclass:
     scene_archetype: city_street

@@ -23,7 +23,7 @@ nodes:
     y_m: 354
     prototype_parent: grid_room
     key: 東北村口
-    desc: 東北村口的路沿著稜線往合流城去，兩側是一畦畦茶園，採茶人的竹簍排在路邊。
+    desc: 東北村口的路沿著稜線往合流城去，兩側是成畦的茶園，採茶人的竹簍排在路邊。
     anchor_key:
     typeclass:
     scene_archetype: city_street

@@ -14,7 +14,7 @@ nodes:
     y_m: 2600
     prototype_parent: anchor_room
     key: 中央廣場
-    desc: 輝煌帝都的中央廣場，城裡所有大道都在此交會。西邊的河風越過層層屋脊吹進來，往東南地勢漸高，石板一路抬向學院與大神殿所在的台地。
+    desc: 輝煌帝都的中央廣場，城裡所有大道都在此交會。西邊的河風越過成排的屋脊吹進來，往東南地勢漸高，石板一路抬向學院與大神殿所在的台地。
     anchor_key: capital_grandia
     typeclass:
     scene_archetype: city_street
@@ -23,7 +23,7 @@ nodes:
     y_m: 1600
     prototype_parent: grid_room
     key: 渡口
-    desc: 帝都西南的渡口，帝河在這一段放寬成平緩的水面，石砌的斜坡一直下到水邊。南來北往的貨車在此換上平底渡船，再順著大道往東進城。
+    desc: 帝都西南的渡口，帝河在這一段放寬成平緩的水面，石砌的斜坡一直下到水邊。南來北往的貨車在此改由平底渡船載運，再順著大道往東進城。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -41,7 +41,7 @@ nodes:
     y_m: 4085
     prototype_parent: grid_room
     key: 東北門
-    desc: 東北門外的大道通往麥浪城，糧車與糧商都從這扇門進出帝都。門樓的旗幟換得比別處勤，風一大就獵獵作響。
+    desc: 東北門外的大道通往麥浪城，糧車與糧商都從這扇門進出帝都。門樓的旗幟換得比別處勤，風一大就整面翻響。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -59,7 +59,7 @@ nodes:
     y_m: 5075
     prototype_parent: grid_room
     key: 北門
-    desc: 北門守著通往北面平原的路，清晨第一班糧隊總在門開的那一刻就到。門樓的火把是整段城牆上最後熄滅的一盞。
+    desc: 北門守著通往北面平原的路，門一開，清晨第一班糧隊就到了。門樓的火把是整段城牆上最後熄滅的一盞。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -122,7 +122,7 @@ nodes:
     y_m: 168
     prototype_parent: grid_room
     key: 王宮前庭
-    desc: 王宮前庭在廣場南端，是帝國議政的正門。石階兩側的衛兵不與任何人交談，宮牆上的浮雕記著歷代皇帝的功業。
+    desc: 王宮前庭在廣場南端，帝國議政就在這道門後舉行。石階兩側的衛兵不與任何人交談，宮牆上的浮雕記著歷代皇帝的功業。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -140,7 +140,7 @@ nodes:
     y_m: 2600
     prototype_parent: grid_room
     key: 河港碼頭
-    desc: 河港碼頭在帝都西側的帝河岸邊，平底貨船在此卸下南方的鹽與香料。搬運的人沿著石階上上下下，號子聲一刻不停。
+    desc: 河港碼頭在帝都西側的帝河岸邊，平底貨船在此卸下南方的鹽與香料。搬運的人沿著石階來回上下，號子聲一刻不停。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -149,7 +149,7 @@ nodes:
     y_m: 1219
     prototype_parent: grid_room
     key: 神殿前
-    desc: 神殿前是帝都大神殿前的廣場，規模在全大陸數一數二。鐘聲從台地上一路傳到河岸，連對岸的漁村都聽得見。
+    desc: 神殿前是帝都大神殿前的廣場，規模在全大陸排得上前幾。鐘聲從台地上一路傳到河岸，連對岸的漁村都聽得見。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -176,7 +176,7 @@ nodes:
     y_m: 3094
     prototype_parent: grid_room
     key: 商會前
-    desc: 商會前是帝國商會公所的門前，糧價與河運的契約在此簽下。書記官的算盤聲從窗裡傳出來，一整天沒停過。
+    desc: 商會前是帝國商會公所的門前空地，糧價與河運的契約在此簽下。書記官的算盤聲從窗裡傳出來，一整天沒停過。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -203,7 +203,7 @@ nodes:
     y_m: 1654
     prototype_parent: grid_room
     key: 學院前
-    desc: 學院前是皇家魔法學院的門前，也是大陸上最大的一所。學徒抱著書卷從石階上跑過，袍角掃過階面刻著的符文。
+    desc: 學院前是皇家魔法學院的門前廣場，這所學院也是大陸上最大的一所。學徒抱著書卷從石階上跑過，袍角掃過階面刻著的符文。
     anchor_key:
     typeclass:
     scene_archetype: city_street

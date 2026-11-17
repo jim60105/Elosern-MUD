@@ -23,7 +23,7 @@ nodes:
     y_m: 296
     prototype_parent: grid_room
     key: 東北村口
-    desc: 東北村口的路往合流城去，沿路堆著一袋袋紮好的木炭，車轍一路壓進山坳。
+    desc: 東北村口的路往合流城去，沿路堆著成袋紮好的木炭，車轍一路壓進山坳。
     anchor_key:
     typeclass:
     scene_archetype: city_street

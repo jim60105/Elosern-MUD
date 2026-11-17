@@ -14,7 +14,7 @@ nodes:
     y_m: 211
     prototype_parent: anchor_room
     key: 蘆灘綠地
-    desc: 綠地就鋪在蘆葦灘邊，井欄是用河灘上的圓石砌成的。清晨打水的人總要撥開垂到井口的葦葉，桶裡的水帶著一股淡淡的草腥味。
+    desc: 綠地就鋪在蘆葦灘邊，井欄用河灘上的圓石砌成。清晨打水的人總要撥開垂到井口的葦葉，桶裡的水帶著一股草腥味。
     anchor_key: village_reed_ford
     typeclass:
     scene_archetype: city_street
@@ -23,7 +23,7 @@ nodes:
     y_m: 211
     prototype_parent: grid_room
     key: 東村口
-    desc: 東村口接上往東南的東灣港官道，路面鋪著壓實的河沙。車轍裡常積著淺淺的水，雨天車夫得下車推著走。
+    desc: 東村口接上往東南的東灣港官道，路面鋪著壓實的河沙。車轍裡常積著一層淺水，雨天車夫得下車推著走。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -32,7 +32,7 @@ nodes:
     y_m: 211
     prototype_parent: grid_room
     key: 西村口
-    desc: 西村口往西北是通往雙流城的長路，路邊晾著成排的葦席。風一吹，葦席便沙沙作響，像有人沿路翻著書頁。
+    desc: 西村口往西北是通往雙流城的長路，路邊晾著成排的葦席。風一吹，葦席便作響，像有人沿路翻著書頁。
     anchor_key:
     typeclass:
     scene_archetype: city_street

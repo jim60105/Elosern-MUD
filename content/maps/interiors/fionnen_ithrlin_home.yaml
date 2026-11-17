@@ -8,7 +8,7 @@ id: fionnen_ithrlin_home
 rooms:
   fionnen_ithrlin_home:
     name_zh: 伊斯爾林的家
-    desc_zh: 平台搭在樹冠之間，離枝葉只有幾步，風從板縫穿過時腳下跟著晃。織機擺在光落下來的地方，幾幅輕紗掛在樑下，衣箱上疊著一件摺好的獵衣。
+    desc_zh: 平台搭在樹冠之間，離枝葉只有幾步，風從板縫穿過時，腳下的平台跟著晃。織機擺在光落下來的地方，幾幅輕紗掛在樑下，衣箱上疊著一件摺好的獵衣。
     scene_archetype: tavern_interior
 connections: []
 exterior:

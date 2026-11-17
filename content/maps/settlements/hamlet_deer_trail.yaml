@@ -23,7 +23,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 共火塘
-    desc: 共火塘的火不大，剛好夠烘乾獵物的毛皮。往西南的路通往鹿鳴渡，往西北通往月嚎城。毛皮掛在火塘上風處，煙會慢慢滲進去。
+    desc: 共火塘的火不大，剛好夠烘乾獵物的毛皮。往西南的路通往鹿鳴渡，往西北通往月嚎城。毛皮掛在火塘上風處，煙會逐漸滲進去。
     anchor_key:
     typeclass:
     scene_archetype: city_street

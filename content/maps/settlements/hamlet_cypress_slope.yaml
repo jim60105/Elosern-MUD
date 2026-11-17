@@ -14,7 +14,7 @@ nodes:
     y_m: 169
     prototype_parent: anchor_room
     key: 柏坡路口
-    desc: 路口順著柏樹坡展開，路肩堆著伐下的柏木，車轍沿著坡道下滑，煞車的木楔就擱在路邊。
+    desc: 路口順著柏樹坡展開，路肩堆著伐下的柏木，坡道一路往下，煞車的木楔就擱在路邊。
     anchor_key: hamlet_cypress_slope
     typeclass:
     scene_archetype: city_street

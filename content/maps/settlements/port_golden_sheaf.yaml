@@ -131,7 +131,7 @@ nodes:
     y_m: 468
     prototype_parent: grid_room
     key: 繩索巷
-    desc: 繩索巷靠海，麻繩絞盤在門口轉個不停。絞好的繩在牆上盤成一捲捲，走近就聞到焦油味。
+    desc: 繩索巷靠海，麻繩絞盤在門口轉個不停。絞好的繩在牆上盤成幾捲，走近就聞到焦油味。
     anchor_key:
     typeclass:
     scene_archetype: city_street

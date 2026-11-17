@@ -14,7 +14,7 @@ nodes:
     y_m: 322
     prototype_parent: anchor_room
     key: 潮野綠地
-    desc: 綠地點在潮水漫不到的草甸上，井離河岸有一段路。甸上的草被潮氣養得肥厚，牛群整日散在四周。
+    desc: 綠地位在潮水漫不到的草甸上，井離河岸有一段路。甸上的草被潮氣養得肥厚，牛群整日散在四周。
     anchor_key: village_tide_meadow
     typeclass:
     scene_archetype: city_street
@@ -41,7 +41,7 @@ nodes:
     y_m: 322
     prototype_parent: grid_room
     key: 教堂前
-    desc: 教堂前的空地朝西，日頭落在草甸盡頭。石階邊晾著漁網，風把網線吹得輕輕作響。漁網晾乾後，村人會在階上補網。
+    desc: 教堂前的空地朝西，日頭落在草甸盡頭。石階邊晾著漁網，風把網線吹得作響。漁網晾乾後，村人會在階上補網。
     anchor_key:
     typeclass:
     scene_archetype: city_street

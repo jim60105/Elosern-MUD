@@ -170,7 +170,7 @@ def validate_service_associations(
 
     Duplicate, dangling and cross-phase references are already structural (the
     carrier rejects them); this adds the policy leg: the referenced topic must
-    be one of this source's own supported entries. Rejection is atomic — the
+    be one of this source's own supported entries. Rejection is atomic. The
     caller discards the complete source or package.
     """
     supported = frozenset(supported_topic_ids)

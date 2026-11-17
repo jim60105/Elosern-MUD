@@ -14,7 +14,7 @@ nodes:
     y_m: 161
     prototype_parent: anchor_room
     key: 路口
-    desc: 兩條路在此交會：一條往西南去麥浪城，一條往東北去沉鐘鎮。路旁的黍田順著坡勢一層層上去，穗子在風裡低頭。
+    desc: 兩條路在此交會，一條往西南去麥浪城，一條往東北去沉鐘鎮。路旁的黍田順著坡勢往上排開，穗子在風裡低頭。
     anchor_key: hamlet_millet_slope
     typeclass:
     scene_archetype: city_street

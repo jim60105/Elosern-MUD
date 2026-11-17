@@ -1,6 +1,6 @@
 # Settlement local map authored source (schema version 1).
-# Hand-authored for 翠綠森林村: the graph, prototypes, options, entrances and
-# map-owned scene associations live here. `location_ref` is the only reverse
+# Hand-authored for 翠綠森林村，covering the graph, prototypes, options, entrances and
+# map-owned scene associations here. `location_ref` is the only reverse
 # link: a location's local map is discovered by this field, so a new map for
 # an existing location needs no Python registration.
 version: 1

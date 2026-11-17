@@ -14,7 +14,7 @@ nodes:
     y_m: 100
     prototype_parent: anchor_room
     key: 岔路口
-    desc: 岔路口往東接上海岸官道，順路下去便是東南方的東灣港。路口鋪著壓實的貝殼與細沙，車輪走過留下淺淺的印子。
+    desc: 岔路口往東接上海岸官道，順路下去便是東南方的東灣港。路口鋪著壓實的貝殼與細沙，車輪走過留下淺印。
     anchor_key: hamlet_bay_flat
     typeclass:
     scene_archetype: city_street
@@ -23,7 +23,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 農舍前
-    desc: 農舍前的西邊小路通向雙流城方向，路旁是低矮的防風籬。屋簷下晾著幾張補過的網，海風一吹便輕輕擺動。
+    desc: 農舍西邊的小路通向雙流城的方向，路旁是低矮的防風籬。屋簷下晾著幾張補過的網，海風一吹便擺動起來。
     anchor_key:
     typeclass:
     scene_archetype: city_street

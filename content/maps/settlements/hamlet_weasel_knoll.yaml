@@ -14,7 +14,7 @@ nodes:
     y_m: 100
     prototype_parent: anchor_room
     key: 鼬形圖騰
-    desc: 圖騰柱的鼬形雕得極瘦，柱上還留著幾道爪痕。站在柱旁能望見南邊鎮上的屋頂。屋頂的煙囪在無風的早晨會直直升起一道白煙。
+    desc: 圖騰柱的鼬形雕得極瘦，柱上還留著幾道爪痕。站在柱旁能望見南邊鎮上的屋頂。屋頂的煙囪在無風的早晨升起一道筆直的白煙。
     anchor_key: hamlet_weasel_knoll
     typeclass:
     scene_archetype: city_street

@@ -23,7 +23,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 獵戶農舍
-    desc: 農舍前的空地掛著風乾的鹿肉，南邊的稜線上是成群的鹿徑，屋角堆著弓箭與皮索。
+    desc: 農舍前的空地掛著風乾的鹿肉，南邊的稜線上滿是鹿徑，屋角堆著弓箭與皮索。
     anchor_key:
     typeclass:
     scene_archetype: city_street

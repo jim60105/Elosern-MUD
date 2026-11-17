@@ -2,7 +2,7 @@
 
 Shop identities are a view over the place registry: a place contributes a
 ``ShopDefinition`` iff it declares a merchant capability, and the
-derived keys ARE those merchant ``shop_key``s — every runtime consumer resolves
+derived keys ARE those merchant ``shop_key``s; every runtime consumer resolves
 ``SHOP_REGISTRY[merchant.shop_key]``. The goods a shop stocks are the union
 of the assortments its place references (settlement-shops design §3.1).
 Exact prices, hours, and stock quantities live in

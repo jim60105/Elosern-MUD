@@ -23,7 +23,7 @@ nodes:
     y_m: 352
     prototype_parent: grid_room
     key: 東北村口
-    desc: 東北村口朝向橄欖津的方向，路筆直穿過麥田。田埂上每隔一段就有一座石堆，標出官道的界線。
+    desc: 東北村口朝向橄欖津的方向，路筆直穿過麥田。田埂上每隔一段就有一堆石頭，標出官道的界線。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -32,7 +32,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 西南村口
-    desc: 西南村口接著往南潮港的路，風從海邊一路吹上來。口邊的草棚是給過路人遮雨的，牆上掛著別人留下的斗笠。
+    desc: 西南村口接著往南潮港的路，風從海邊一路吹上來。口邊的草棚給過路人遮雨，牆上掛著別人留下的斗笠。
     anchor_key:
     typeclass:
     scene_archetype: city_street

@@ -71,7 +71,7 @@ def validate_wearable_loadout(
     ``ACCESSORY_MAX_SLOTS``. Every rule is an authoring mistake with no useful
     runtime meaning, because ``world/rules/equipment.py::toggle_equipment``
     TOGGLES rather than equips, silently replaces a singleton occupant, and
-    rejects a sixth accessory at runtime — so each raises at registry load
+    rejects a sixth accessory at runtime, so each raises at registry load
     instead of mid-activation. ``owner`` (e.g. ``"starting kit 'human_plains'"``)
     and ``declaration`` (the noun each validator names the entry by: ``"item"``
     for kits, ``"starting equipment"`` for presets) parameterize only the stable

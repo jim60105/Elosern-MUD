@@ -23,7 +23,7 @@ nodes:
     y_m: 470
     prototype_parent: grid_room
     key: 北村口
-    desc: 北村口的路往合流城方向爬升，坡面露出灰色的岩層，石階一階階嵌進山徑。
+    desc: 北村口的路往合流城方向爬升，坡面露出灰色的岩層，石階逐階嵌進山徑。
     anchor_key:
     typeclass:
     scene_archetype: city_street

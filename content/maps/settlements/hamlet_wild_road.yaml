@@ -23,7 +23,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 農舍前
-    desc: 農舍前的西邊小路通往雙流城方向，屋後是一片空曠的荒草。院牆用草泥糊成，牆頭長著細細的野花。
+    desc: 農舍前的西邊小路通往雙流城方向，屋後是一片空曠的荒草。院牆用草泥糊成，牆頭長著細小的野花。
     anchor_key:
     typeclass:
     scene_archetype: city_street

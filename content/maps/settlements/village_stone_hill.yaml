@@ -32,7 +32,7 @@ nodes:
     y_m: 360
     prototype_parent: grid_room
     key: 西北村口
-    desc: 西北村口接著往鹽津城的路，兩側壘著乾砌的石牆。風從西北面的山口灌進來，牆縫裡發出低低的哨音。
+    desc: 西北村口接著往鹽津城的路，兩側壘著乾砌的石牆。風從西北面的山口灌進來，牆縫裡發出低沉的哨音。
     anchor_key:
     typeclass:
     scene_archetype: city_street

@@ -20,7 +20,7 @@ class GuildRank:
 
     @property
     def display_name_zh(self) -> str:
-        """The player-facing rank name (the codex title), e.g. ``F 級``."""
+        """The player-facing rank name (the codex title), in the ``F 級`` format."""
         return f"{self.key} 級"
 
 

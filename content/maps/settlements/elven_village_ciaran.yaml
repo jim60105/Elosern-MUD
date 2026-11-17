@@ -20,7 +20,7 @@ nodes:
     y_m: 85
     prototype_parent: grid_room
     key: 溪畔下游
-    desc: 溪流出了村子便寬了、緩了，水色轉深。下游有一片族人清洗染具的淺灘，石上還留著乾涸的藍色水痕；走到這裡的人多半只為坐一坐，聽水聲。
+    desc: 溪流出了村子便寬了、緩了，水色轉深。下游有一片族人清洗染具的淺灘，石上還留著乾涸的藍色水痕；走到這裡的人多半只是想坐下來聽水聲。
     anchor_key:
     typeclass:
     scene_archetype: wilderness_path
@@ -29,7 +29,7 @@ nodes:
     y_m: 135
     prototype_parent: grid_room
     key: 溪畔小徑
-    desc: 沿著潺潺溪流蜿蜒的土路，水邊幾塊平坦的石盤，正好讓人坐下歇腳。
+    desc: 土路沿著溪流蜿蜒，水邊有幾塊平坦的石盤，正好讓人坐下歇腳。
     anchor_key:
     typeclass:
     scene_archetype: wilderness_path
@@ -38,7 +38,7 @@ nodes:
     y_m: 192
     prototype_parent: grid_room
     key: 隱密小徑
-    desc: 藤蔓與落葉幾乎掩住了這條小徑；不認得這片林子的人，縱使走進去也看不出來。
+    desc: 藤蔓與落葉幾乎掩住了這條小徑；不認得這片林子的人，縱使走進去也找不出路。
     anchor_key:
     typeclass:
     scene_archetype: forest_path
@@ -47,7 +47,7 @@ nodes:
     y_m: 300
     prototype_parent: grid_room
     key: 藥草園
-    desc: 練刀場東邊，樹冠開處漏下整片陽光。矮石壘成的畦邊圈著一株株藥草與香草，空氣裡是苦味與清甜交錯的氣息。
+    desc: 練刀場東邊，樹冠開處漏下整片陽光。矮石壘成的畦裡種著藥草與香草，空氣裡是苦味與清甜交錯的氣息。
     anchor_key:
     typeclass:
     scene_archetype: forest_path
@@ -56,7 +56,7 @@ nodes:
     y_m: 305
     prototype_parent: anchor_room
     key: 村中廣場
-    desc: 村裡的空地，老樹繞著一塊被腳步踩實的泥地。族人聚集在這裡交談，交換一天的見聞。
+    desc: 村中的空地圍著老樹，中間是一塊被腳步踩實的泥地。族人聚集在這裡交談，交換一天的見聞。
     anchor_key: elven_village_ciaran
     typeclass:
     scene_archetype: city_street
@@ -65,7 +65,7 @@ nodes:
     y_m: 335
     prototype_parent: grid_room
     key: 練刀場
-    desc: 無數腳步踩硬的空地，四周樹幹佈滿練習留下的刀痕——村中的少年刀舞者從清晨練到日暮，練的就是這裡。
+    desc: 無數腳步踩硬的空地，四周樹幹佈滿練習留下的刀痕，村中的少年刀舞者從清晨練到日暮，都在這塊空地上練刀。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -74,7 +74,7 @@ nodes:
     y_m: 465
     prototype_parent: grid_room
     key: 村北古樹下
-    desc: 村北古樹之下，樹冠如屋簷般撐開；盤根間嵌著磨平的石座，孩子們聚在這裡聽長者說故事。
+    desc: 村北古樹之下，樹冠向四周張開，像一片屋簷；盤根間嵌著磨平的石座，孩子們聚在這裡聽長者說故事。
     anchor_key:
     typeclass:
     scene_archetype: forest_path
@@ -83,7 +83,7 @@ nodes:
     y_m: 495
     prototype_parent: grid_room
     key: 織房坡
-    desc: 通往林中住屋的緩坡，新染的布掛在繩上晾乾，風裡帶著植物染料的氣味。
+    desc: 緩坡通往林中的住屋，新染的布掛在繩上晾乾，風裡帶著植物染料的氣味。
     anchor_key:
     typeclass:
     scene_archetype: forest_path
@@ -92,7 +92,7 @@ nodes:
     y_m: 618
     prototype_parent: grid_room
     key: 長老古樹下
-    desc: 再往北，林子更老。最老的那株巨樹寬得數人合抱，盤根之間有磨平的坐石；族裡老一輩的決定，多在這棵樹下說出口。平日這裡安靜，只餘風穿過樹冠的聲音。
+    desc: 再往北，林子更老。最老的那株巨樹寬得數人合抱，盤根之間有磨平的坐石；族裡老一輩的決定，多在這棵樹下談成。平日這裡安靜，只餘風穿過樹冠的聲音。
     anchor_key:
     typeclass:
     scene_archetype: forest_path
@@ -101,7 +101,7 @@ nodes:
     y_m: 665
     prototype_parent: grid_room
     key: 銀葉坡
-    desc: 織房坡再往上，坡頂長著一叢銀葉樹，葉背在午後的光裡泛著細碎銀光。樹下曬著幾件完成的花邊與綴飾，綴著貝殼和磨圓的晶砂。
+    desc: 從織房坡再往上，坡頂長著一叢銀葉樹，葉背在午後的光裡泛著細碎銀光。樹下曬著幾件做好的花邊與綴飾，綴著貝殼和磨圓的晶砂。
     anchor_key:
     typeclass:
     scene_archetype: forest_path

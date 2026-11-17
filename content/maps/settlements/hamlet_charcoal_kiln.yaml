@@ -23,7 +23,7 @@ nodes:
     y_m: 173
     prototype_parent: grid_room
     key: 農舍前
-    desc: 農舍往西北通往東河城，屋前堆著捆好的木柴，坡上的樹叢被燒炭的人修剪得齊整，柴堆上蓋著防雨的草蓆。
+    desc: 農舍往西北的路通往東河城，屋前堆著捆好的木柴，坡上的樹叢被燒炭的人修剪得齊整，柴堆上蓋著防雨的草蓆。
     anchor_key:
     typeclass:
     scene_archetype: city_street

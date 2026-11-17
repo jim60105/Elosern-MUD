@@ -14,7 +14,7 @@ nodes:
     y_m: 100
     prototype_parent: anchor_room
     key: 貝塚岔路
-    desc: 岔路旁邊是一座長年堆積的貝塚，白花花的一片。往西北的路通往白帆港，路肩盡是碎貝與細沙。
+    desc: 岔路旁邊是一座長年堆積的貝塚，白成一片。往西北的路通往白帆港，路肩盡是碎貝與細沙。
     anchor_key: hamlet_shell_mound
     typeclass:
     scene_archetype: city_street
@@ -23,7 +23,7 @@ nodes:
     y_m: 161
     prototype_parent: grid_room
     key: 農舍前
-    desc: 農舍前以貝殼混沙鋪成，踩上去有細碎的聲響。屋主說貝塚是祖先留下的，取土時從不往深處挖。
+    desc: 農舍前以貝殼混沙鋪成，踩上去有細碎的聲響。屋主說貝塚由祖先堆成，取土時從不往深處挖。
     anchor_key:
     typeclass:
     scene_archetype: city_street

@@ -14,7 +14,7 @@ nodes:
     y_m: 226
     prototype_parent: anchor_room
     key: 平原綠地
-    desc: 綠地孤零零地立在空曠的原野上，井是這片平原少見的水源。井邊鋪著防風的草墊，坐上去還能聞到曬乾的草味。
+    desc: 綠地孤立在空曠的原野上，井是這片平原少見的水源。井邊鋪著防風的草墊，坐上去還能聞到曬乾的草味。
     anchor_key: village_open_plain
     typeclass:
     scene_archetype: city_street
@@ -32,7 +32,7 @@ nodes:
     y_m: 352
     prototype_parent: grid_room
     key: 西北村口
-    desc: 西北村口通往銀嶺鎮，路邊偶有放牧的帳篷。炊煙在遠處裊裊升起，走近了才聽得見羊叫。
+    desc: 西北村口通往銀嶺鎮，路邊偶有放牧的帳篷。炊煙在遠處升起，走近了才聽得見羊叫。
     anchor_key:
     typeclass:
     scene_archetype: city_street

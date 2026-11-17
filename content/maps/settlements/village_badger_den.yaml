@@ -32,7 +32,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 西南寨門
-    desc: 西南寨門朝疾風城的方向，門邊挖了淺淺的壕溝。守門人說這裡是寨子最容易被風雪撲到的一面。
+    desc: 西南寨門朝疾風城的方向，門邊挖了一道淺壕溝。守門人說這裡是寨子最容易被風雪撲到的一面。
     anchor_key:
     typeclass:
     scene_archetype: city_street

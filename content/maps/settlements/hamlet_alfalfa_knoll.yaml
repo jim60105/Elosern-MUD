@@ -23,7 +23,7 @@ nodes:
     y_m: 161
     prototype_parent: grid_room
     key: 農舍前
-    desc: 農舍前的空地朝東南，屋後堆著晒乾的苜蓿捆。牲口棚裡傳出鈴聲，混著草料的氣味。棚邊的草叉靠在牆上，柄被磨得光滑。
+    desc: 農舍前的空地朝東南，屋後堆著晒乾的苜蓿捆。牲口棚裡傳出鈴聲，空氣裡混著草料的氣味。棚邊的草叉靠在牆上，柄被磨得光滑。
     anchor_key:
     typeclass:
     scene_archetype: city_street

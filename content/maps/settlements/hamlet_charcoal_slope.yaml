@@ -14,7 +14,7 @@ nodes:
     y_m: 181
     prototype_parent: anchor_room
     key: 炭坑路口
-    desc: 路口旁的坡地留著一處處燒炭的圓坑，路面浮著黑灰與碎炭，腳步踩過便揚起一層細塵。
+    desc: 路口旁的坡地留著許多燒炭的圓坑，路面浮著黑灰與碎炭，腳步踩過便揚起一層細塵。
     anchor_key: hamlet_charcoal_slope
     typeclass:
     scene_archetype: city_street
@@ -23,7 +23,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 坡上農舍
-    desc: 農舍前的柴堆高過屋簷，往西南的路通往灰岩城，屋後坡上的樹樁冒著新芽，年輪清晰可見。
+    desc: 農舍前的柴堆高過屋簷，往西南的路通往灰岩城，屋後坡上的樹樁冒著新芽，斷面的年輪還看得清楚。
     anchor_key:
     typeclass:
     scene_archetype: city_street

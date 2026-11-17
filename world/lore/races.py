@@ -125,7 +125,7 @@ RACE_REGISTRY: dict[str, RaceProfile] = {
         static_baseline=_static_band(4, 34, 1, 30),
         learning_multiplier=1.0,
         can_use_divine_arts=False,
-        description="獸耳與尾巴的獸人族，體魄強健、感官敏銳，以部族文化與野性力量聞名。",
+        description="長著獸耳與尾巴的獸人族，體魄強健、感官敏銳，以部族文化與野性力量聞名。",
         display_name_zh="獸人",
     ),
     "elf": RaceProfile(
@@ -137,7 +137,7 @@ RACE_REGISTRY: dict[str, RaceProfile] = {
         static_baseline=_static_band(70, 95, 100, 900),
         learning_multiplier=10.0,
         can_use_divine_arts=True,
-        description="壽命數百年的精靈族，魔力深厚、體質超凡，與森林和魔法息息相關。",
+        description="壽命數百年的精靈族，魔力深厚、體質超凡，與森林和魔法的關係密不可分。",
         display_name_zh="精靈",
         allowed_sexes=("female",),
     ),
@@ -197,12 +197,12 @@ _ALL_ELEMENTS = ("fire", "water", "wind", "earth", "lightning", "ice", "light", 
 SUBRACE_REGISTRY: dict[str, Subrace] = {
     "human_royal": Subrace(
         "human_royal", "human", "王族", "王室血脈", None, None, (),
-        "王都王室的血脈。自幼受統御與學識的教養，長於謀略而非武藝，魔力底蘊高於同族。",
+        "王都王室的血脈。自幼受統御與學識的教養，長於謀略，武藝並非所長，魔力底蘊高於同族。",
         StatModifiers(-0.05, -0.05, 0.10), {"mp": (120, 220)},
     ),
     "human_noble": Subrace(
         "human_noble", "human", "貴族", "貴族血脈", None, None, (),
-        "領地貴族的血脈。自幼習劍術與馬術，攻守取捨偏向進取。",
+        "領地貴族的血脈。自幼習劍術與馬術，攻守之間偏向進取。",
         StatModifiers(0.10, 0.05, -0.15),
     ),
     "human_coastal": Subrace(
@@ -216,7 +216,7 @@ SUBRACE_REGISTRY: dict[str, Subrace] = {
     ),
     "human_highland": Subrace(
         "human_highland", "human", "山地民", "山地血脈", None, None, (),
-        "世居丘陵與谷地的血脈。礦坑與工坊的重勞動造就體魄與耐久，不以靈巧取勝。",
+        "世居丘陵與谷地的血脈。礦坑與工坊的粗重勞動造就體魄與耐久，不以靈巧取勝。",
         StatModifiers(0.10, -0.15, 0.05),
     ),
     "fionnen": Subrace(

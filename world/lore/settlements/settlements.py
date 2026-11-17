@@ -3,9 +3,10 @@
 A settlement is the map coordinate space its places sit in: its key equals
 the geographic anchor key, its archetype comes from the closed vocabulary of
 the six settlement types the world defines, and its coordinate space is the
-map the published anchor placement binds it to — never an authored copy. ``AnchorKind`` is deliberately left alone — it classifies
-geography (and includes non-settlements, e.g. dungeons), while archetypes
-classify how a settlement is built.
+map the published anchor placement binds it to, never an authored copy.
+``AnchorKind`` is deliberately left alone; it classifies geography (and
+includes non-settlements, e.g. dungeons), while archetypes classify how a
+settlement is built.
 """
 
 from dataclasses import dataclass

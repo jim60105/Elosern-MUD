@@ -4,7 +4,7 @@
 
 本文件是八張玩家角色模板（`world/lore/player_presets/data_pack_cards.py` 與
 `data_story_cards.py` 的 `PLAYER_PRESET_REGISTRY`）在
-`align-character-template-development` 這次對齊後的審查權威：開局技能組、宣告式練習
+`align-character-template-development` 這次對齊後的審查權威。開局技能組、宣告式練習
 XP、精通選擇、天生數值與角色描述的最終內容，以本文件為準。
 
 審查範圍：
@@ -27,7 +27,7 @@ XP、精通選擇、天生數值與角色描述的最終內容，以本文件為
 
 ## 3. 核准的一般根基線矩陣
 
-「一般根」＝技能登錄表中同時符合下列條件的節點：`ACTIVE`、沒有前置、類別屬於
+「一般根」＝技能登錄表中同時符合下列條件的節點，即 `ACTIVE`、沒有前置、類別屬於
 `elemental_magic`／`martial_arts`／`divine_mystery`、對該卡種族與亞種身分資格相符，
 且不是 `basic_attack` 這類人人天生持有的通用動作。六個僅限魔物物種的根
 （例如 `grain_shaking_peck`）依身分資格排除。
@@ -53,9 +53,9 @@ XP、精通選擇、天生數值與角色描述的最終內容，以本文件為
 
 精通（`fire_mastery`／`dark_mastery`／`wind_mastery`／`light_mastery`）的前置宣告
 閉合了整個元素的樹，啟動時由共用閉包補齊所有祖先、由共用 seed 把每個未滿足的前置邊
-播到剛好達標。**宣告式 XP 永遠壓過 seed**，所以失敗條件是：在精通閉包裡的尋常魔法
+播到剛好達標。**宣告式 XP 永遠壓過 seed**，所以失敗條件是在精通閉包裡的尋常魔法
 成員寫下**低於該條需求邊**的字面值（哪怕只是 Lv.1），該坐標就會反過來壓低精通所需的
-終端等級，使精通失效。落在精通閉包之外、屬於其他血脈的鍵不受此限——例如帶闇屬性傷害
+終端等級，使精通失效。落在精通閉包之外、屬於其他血脈的鍵不受此限；例如帶闇屬性傷害
 的武藝根 `shadow_slash` 仍在武藝樹裡照常宣告自己的字面值。因此：
 
 - 悠花、悠奈（火＋闇精通）不在火／闇的尋常魔法成員上寫任何字面 XP。
@@ -68,12 +68,12 @@ XP、精通選擇、天生數值與角色描述的最終內容，以本文件為
 | --- | --- | --- | --- | --- |
 | 希爾溫 `sylwen_stillwater` | `defense_instinct`、`elf_longevity`、盾與重甲裝載 | 完整一般根基線 + `flowing_strikes`、`body_enhancement`（×100） | 無 | `hardened_skin`、`heal`、`basic_swordplay` 各 Lv.3 |
 | 悠花 `yuka_darknight` | `dual_blade_waltz`、`shadow_slash`、`status_disguise`、雙刀架式、移動、轉生特典、×1000 身體超強化 | 非精通元素的一般根 + `elf_longevity` | 火、闇 | `dual_blade_waltz` Lv.8、`shadow_slash` Lv.3 |
-| 悠奈 `yuna_darknight` | `divine_sexual_arts`、`status_disguise`、性魔法專門、移動、×100 身體強化 | 非精通元素的一般根 + `elf_longevity` | 火、闇 | — |
-| 伊洛希雅 `elosia_shadowmoon` | `dominion_art`、`status_disguise`、移動、×100 身體強化 | 非風／光元素的一般根 + `elf_longevity` | 風、光 | — |
+| 悠奈 `yuna_darknight` | `divine_sexual_arts`、`status_disguise`、性魔法專門、移動、×100 身體強化 | 非精通元素的一般根 + `elf_longevity` | 火、闇 | 無 |
+| 伊洛希雅 `elosia_shadowmoon` | `dominion_art`、`status_disguise`、移動、×100 身體強化 | 非風／光元素的一般根 + `elf_longevity` | 風、光 | 無 |
 | 薇歐蕾特 `violet_altoria` | `fire_ball`、`wind_blade`、`magic_circle_comprehension`、`precise_mana_control`、`flight` | `fire_arrow` | 無 | `fire_arrow`、`fire_ball`、`wind_blade` 各 Lv.3（皆在扣除前置後的樹冠上限內） |
 | 莉茲婭 `lidzia_rosenthal` | `basic_swordplay`、`body_enhancement_basic`、隨從武藝訓練、護主本能 | `flowing_strikes` | 無 | `basic_swordplay` Lv.3（`flowing_strikes` 的前置邊） |
-| 艾莉莎 `elysa_snow` | 技能組不動（`basic_swordplay`、`body_enhancement_basic`） | — | 無 | — |
-| 娜茲卡 `nazka_bloodfang` | 技能組不動（`gale_step`、`flash_step`、風親和） | — | 無 | — |
+| 艾莉莎 `elysa_snow` | 技能組不動（`basic_swordplay`、`body_enhancement_basic`） | 無 | 無 | 無 |
+| 娜茲卡 `nazka_bloodfang` | 技能組不動（`gale_step`、`flash_step`、風親和） | 無 | 無 | 無 |
 
 悠花、悠奈、伊洛希雅三人另補上純敘事的 `elf_longevity`（希爾溫原本就有）。
 悠花維持只有 ×1000 身體超強化，不疊加 ×100 或 ×1.2。悠奈與伊洛希雅維持 ×100。
@@ -106,7 +106,7 @@ XP、精通選擇、天生數值與角色描述的最終內容，以本文件為
   並保留她原有的防禦定位、裝備與數值。
 - **薇歐蕾特**：`emphasis` 改為「天生高魔力、風系操控後天練成」，不給精通、也不弱化
   高魔敘事；天生魔力 56 與 5／6／6 的物理值不變。
-- **悠花**：移除「剩餘預算把魔力推高到故事值 250 以上」這類錯誤註解，改為正確陳述：
+- **悠花**：移除「剩餘預算把魔力推高到故事值 250 以上」這類錯誤註解，改為正確的陳述。
   配點是對基亞蘭下限的增量，最終天生魔力 477，×1000 身體超強化是技能不是配點。
 - **悠奈**：同上，最終天生 70／70／92、魔力 515。
 - **伊洛希雅**：移除 873 級、「超過創造上限」與「魔力是精靈平均百倍」這些過期且與
@@ -134,7 +134,7 @@ XP、精通選擇、天生數值與角色描述的最終內容，以本文件為
   斷言每張精靈卡都持有並正向發展每個根、且沒有任何已擁有技能留下未滿足的前置邊。
 - `world/rules/tests/test_character_creation/test_preset_activation_kit.py`：以合成卡
   走真實啟動、精通閉包、seed、可用性與提交後重讀，並保留一個未啟動的對照角色。
-- 角色面板的 actives 列上限 `MAX_ACTIVE_ROWS` 由 96 提高到 128：完整根基線讓悠奈的
+- 角色面板的 actives 列上限 `MAX_ACTIVE_ROWS` 由 96 提高到 128，因為完整根基線讓悠奈的
   合法 active 列達到 102 列（含 58 個解鎖的性愛技藝列），舊上限會讓面板失敗關閉。
   上限仍是失敗關閉的 wire guard，不是截斷機制；主規格
   `webclient-exploration-menu` 以本變更的 delta 同步該數值。

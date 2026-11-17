@@ -14,7 +14,7 @@ nodes:
     y_m: 432
     prototype_parent: anchor_room
     key: 苔石坪
-    desc: 石坪的縫隙裡長著厚厚的苔，踩上去有一種潮濕的彈性。往西兩里便是海岸，海霧常在傍晚順著樹根爬進城裡。
+    desc: 石坪的縫隙裡長滿苔蘚，踩上去有一種潮濕的彈性。往西兩里便是海岸，海霧常在傍晚順著樹根爬進城裡。
     anchor_key: city_shadow_wood
     typeclass:
     scene_archetype: city_street
@@ -23,7 +23,7 @@ nodes:
     y_m: 432
     prototype_parent: grid_room
     key: 東面柵門
-    desc: 東門外的路通往角原城，沿途全是高大的針葉木。守門人習慣在門柱上刻記進出人數，木頭已被刻得坑坑窪窪。
+    desc: 東門外的路通往角原城，沿途全是高大的針葉木。守門人習慣在門柱上刻記進出人數，木頭表面早已坑窪不平。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -41,7 +41,7 @@ nodes:
     y_m: 426
     prototype_parent: grid_room
     key: 東門大街
-    desc: 大街從東門一路鋪進城心，兩側的木屋屋簷壓得極低，好擋住海風帶來的雨。路面濕潤，長年不乾。
+    desc: 大街從東門一路鋪進城心，兩側木屋的屋簷壓得極低，好擋住海風帶來的雨。路面濕潤，長年不乾。
     anchor_key:
     typeclass:
     scene_archetype: city_street

@@ -23,7 +23,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 農舍前
-    desc: 農舍前豎著一根高高的木桿，掛布條給遠處的車隊指路。屋後有一個雨窖，存著得來不易的雨水。
+    desc: 農舍前豎著一根高木桿，掛布條給遠處的車隊指路。屋後有一個雨窖，存著得來不易的雨水。
     anchor_key:
     typeclass:
     scene_archetype: city_street

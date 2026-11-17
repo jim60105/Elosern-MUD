@@ -50,7 +50,7 @@ nodes:
     y_m: 394
     prototype_parent: grid_room
     key: 諸族市街
-    desc: 市街南側擺的是各族混雜的貨攤，獸皮、鐵器、鹽與草藥擠在同一排。講價的人常常換上對方的語言，講到最後乾脆用手勢成交。
+    desc: 市街南側擺的是各族混雜的貨攤，獸皮、鐵器、鹽與草藥擠在同一排。講價的人不時換上對方的語言，講到最後乾脆用手勢成交。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -77,7 +77,7 @@ nodes:
     y_m: 139
     prototype_parent: grid_room
     key: 操練空場
-    desc: 南面的空場是共用的操練地，木樁上綁著草束供人練習。清晨常有年輕獸人在此對練，掌聲與吆喝一路傳回石坪。
+    desc: 南面的空場是共用的操練地，木樁上綁著草束供人練習。清晨常有年輕獸人在此對練，擊打聲與吆喝一路傳回石坪。
     anchor_key:
     typeclass:
     scene_archetype: city_street

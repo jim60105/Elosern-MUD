@@ -23,7 +23,7 @@ nodes:
     y_m: 406
     prototype_parent: grid_room
     key: 東北村口
-    desc: 東北村口往麥浪城去，路順著坡勢緩緩爬升。兩旁的麥田一直鋪到坡頂，麥熟時整條路都是金色。
+    desc: 東北村口往麥浪城去，路順著坡勢爬升。兩旁的麥田一直鋪到坡頂，麥熟時整條路都是金色。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -32,7 +32,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 西南村口
-    desc: 西南村口朝著帝都的方向下坡，路面被車輪碾出兩道深溝。下坡的車夫總要拉緊韁繩，讓車慢慢滑下去。
+    desc: 西南村口朝著帝都的方向下坡，路面被車輪碾出兩道深溝。下坡的車夫總要拉緊韁繩，讓車順坡滑下去。
     anchor_key:
     typeclass:
     scene_archetype: city_street

@@ -14,7 +14,7 @@ nodes:
     y_m: 155
     prototype_parent: anchor_room
     key: 隼羽圖騰
-    desc: 圖騰柱頂插著隼羽，柱身在河風裡微微傾斜。往西北出營地的小徑走過灘地，才接上通往東渡鎮的官道。
+    desc: 圖騰柱頂插著隼羽，柱身在河風裡略微傾斜。往西北出營地的小徑走過灘地，才接上通往東渡鎮的官道。
     anchor_key: hamlet_falcon_shoal
     typeclass:
     scene_archetype: city_street
@@ -23,7 +23,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 火塘石圈
-    desc: 火塘石圈邊晾著網具，繩結打在石上，網具是族人自己編的，補過好幾回。補網的麻線繞在木樁上。
+    desc: 火塘石圈邊晾著網具，繩結打在石上，網具由族人自己編，補過好幾回。補網的麻線繞在木樁上。
     anchor_key:
     typeclass:
     scene_archetype: city_street

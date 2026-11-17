@@ -14,7 +14,7 @@ nodes:
     y_m: 100
     prototype_parent: anchor_room
     key: 岔路口
-    desc: 岔路口往東南通往橙花鎮，路旁的果園一直延伸到天邊。春天花開時，整條路都浸在淡淡的花香裡。
+    desc: 岔路口往東南通往橙花鎮，路旁的果園一直延伸到天邊。春天花開時，整條路都浸在花香裡。
     anchor_key: hamlet_flat_plain
     typeclass:
     scene_archetype: city_street

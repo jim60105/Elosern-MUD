@@ -23,7 +23,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 共火塘
-    desc: 共火塘旁的架子上晾著剛鞣過的皮子。往東北的官道通往狐火城，往西南通往鐵爪城。鞣過的皮子疊成整齊的一落。
+    desc: 共火塘旁的架子上晾著剛鞣過的皮子。往東北的官道通往狐火城，往西南通往鐵爪城。鞣過的皮子疊成整齊的一疊。
     anchor_key:
     typeclass:
     scene_archetype: city_street

@@ -41,7 +41,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 教堂前庭
-    desc: 小教堂前的庭地舖著白色河石，南邊的水勢平緩，傍晚可見到成群的鷺鳥落灘。
+    desc: 小教堂前的庭地舖著白色河石，南邊的水勢平緩，傍晚可見成群的鷺鳥落灘。
     anchor_key:
     typeclass:
     scene_archetype: city_street

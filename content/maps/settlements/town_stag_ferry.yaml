@@ -14,7 +14,7 @@ nodes:
     y_m: 825
     prototype_parent: anchor_room
     key: 鹿鳴石坪
-    desc: 石坪中央立著一根刻滿鹿角的木柱，是這座渡口聚落最早的地標。往南兩里多便是高地河的渡口，水聲在夜裡格外清楚。
+    desc: 石坪中央立著一根刻滿鹿角的木柱，是這座渡口聚落最早的地標。往南兩里多便是高地河的渡口，水聲在夜裡傳得遠。
     anchor_key: town_stag_ferry
     typeclass:
     scene_archetype: city_street

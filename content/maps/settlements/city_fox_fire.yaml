@@ -14,7 +14,7 @@ nodes:
     y_m: 495
     prototype_parent: anchor_room
     key: 狐火石坪
-    desc: 石坪邊緣插著幾盞陶燈，夜裡點起來像一簇簇不肯熄的狐火。往東北的坡地冒著熱氣，溫泉的水聲在石縫間持續作響。
+    desc: 石坪邊緣插著幾盞陶燈，夜裡點起來像一簇不肯熄的狐火。往東北的坡地冒著熱氣，溫泉的水聲在石縫間持續作響。
     anchor_key: city_fox_fire
     typeclass:
     scene_archetype: city_street
@@ -23,7 +23,7 @@ nodes:
     y_m: 495
     prototype_parent: grid_room
     key: 西面柵門
-    desc: 西門外是通往松濤渡的舊路，車轍深得能盛住雨水。守門人把一桶溫泉水擱在門邊，讓回城的人先暖一暖手。
+    desc: 西門外是通往松濤渡的舊路，車轍深得能盛住雨水。守門人把一桶溫泉水擱在門邊，讓回城的人先暖個手。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -32,7 +32,7 @@ nodes:
     y_m: 990
     prototype_parent: grid_room
     key: 西北關門
-    desc: 西北門朝巫醫窟的方向開，門外的石階一路爬向林線。獸醫與採藥人常由此進出，門邊總晾著一束束剛洗過的藥草。
+    desc: 西北門朝巫醫窟的方向開，門外的石階一路爬向林線。獸醫與採藥人常由此進出，門邊總晾著幾束剛洗過的藥草。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -77,7 +77,7 @@ nodes:
     y_m: 855
     prototype_parent: grid_room
     key: 成年獵場
-    desc: 東北的空場靠近林線，地面被蒸氣熏得柔軟。年輕人要在熱霧裡追蹤獵物，靠的是耳朵與耐心，不是腳程。
+    desc: 東北的空場靠近林線，地面被蒸氣熏得柔軟。年輕人要在熱霧裡追蹤獵物，靠的是耳朵與耐心，腳程幫不上忙。
     anchor_key:
     typeclass:
     scene_archetype: city_street

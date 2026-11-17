@@ -14,7 +14,7 @@ nodes:
     y_m: 176
     prototype_parent: anchor_room
     key: 窯邊路口
-    desc: 路口旁的炭窯日夜不熄，木炭整齊堆在路邊，風把灰燼掃成一圈圈細紋，行人經過都會掩住口鼻。
+    desc: 路口旁的炭窯日夜不熄，木炭整齊堆在路邊，風把灰燼掃出細紋，行人經過都會掩住口鼻。
     anchor_key: hamlet_charcoal_hollow
     typeclass:
     scene_archetype: city_street

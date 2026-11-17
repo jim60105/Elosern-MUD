@@ -68,7 +68,7 @@ nodes:
     y_m: 685
     prototype_parent: grid_room
     key: 集會石場
-    desc: 西北角的石場邊緣留著一圈供人跪坐的淺坑，是祭儀時留下的。集會多半在清晨，霧還沒散，鼓聲聽起來格外沉。
+    desc: 西北角的石場邊緣留著一圈供人跪坐的淺坑，歷次祭儀都在此跪下。集會多半在清晨，霧還沒散，鼓聲聽起來格外沉。
     anchor_key:
     typeclass:
     scene_archetype: city_street

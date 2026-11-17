@@ -41,7 +41,7 @@
 
 ## 機制備註
 
-天賦異能的效果類型（`passive_trait`／`growth_rate`／`combat_prediction`）都是既有的 typed effect，取得方式一律是匯入或劇情直接授予 ownership。在身心強化的「天賦」標籤底下不應該出現任何要求 `SkillPrerequisite` 的節點（原 `SkillCategory.INNATE_GIFT` 獨立分支已退休並收納為顯示標籤），也不應該出現在 [跨系譜解鎖規則表](/lore/skill-trees/cross-lineage-unlock) 裡，因為天賦的定義就是無法靠努力取得，一旦能靠練習換到，它就不是天賦。
+天賦異能的效果類型（`passive_trait`／`growth_rate`／`combat_prediction`）都是既有的 typed effect，取得方式一律是匯入或劇情直接授予持有。在身心強化的「天賦」標籤底下不應該出現任何要求 `SkillPrerequisite` 的節點（原 `SkillCategory.INNATE_GIFT` 獨立分支已退休並收納為顯示標籤），也不應該出現在 [跨系譜解鎖規則表](/lore/skill-trees/cross-lineage-unlock) 裡，因為天賦的定義就是無法靠努力取得，一旦能靠練習換到，它就不是天賦。
 
 如果未來設計出現「天賦異能還能再練得更強」的內容，應重新分類到身心強化通用被動或對應的元素系譜。
 

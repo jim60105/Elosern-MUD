@@ -9,7 +9,7 @@ id: altoria_jeweller
 rooms:
   altoria_jeweller:
     name_zh: 聖潔王都首飾坊
-    desc_zh: 聖潔王都的首飾坊，展示櫃裡打著光，為市場街的飾品交易而亮。
+    desc_zh: 聖潔王都的首飾坊，展示櫃裡亮著燈，等著市場街的飾品買賣。
     scene_archetype: tavern_interior
     art_key: altoria_jeweller
 connections: []

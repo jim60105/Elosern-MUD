@@ -184,7 +184,7 @@ class ItemUseMechanics:
 
     What a use *does* is declared in the item-effect rulebook keyed by the
     item key (``world/rules/item_effects.py``); this record only states that
-    the item can be used and what a use costs structurally — effects never
+    the item can be used and what a use costs structurally; effects never
     live in this registry (item-effect-model design §3.1).
     """
 

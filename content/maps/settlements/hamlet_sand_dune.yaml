@@ -14,7 +14,7 @@ nodes:
     y_m: 163
     prototype_parent: anchor_room
     key: 沙崙岔路
-    desc: 岔路立在沙崙的背風面，路兩側是半人高的沙丘。往西南的路通往漁灣鎮，沙上留著清楚的車轍印。
+    desc: 岔路開在沙崙的背風面，路兩側是半人高的沙丘。往西南的路通往漁灣鎮，沙上留著清楚的車轍印。
     anchor_key: hamlet_sand_dune
     typeclass:
     scene_archetype: city_street
@@ -23,7 +23,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 農舍前
-    desc: 農舍前鋪了一層壓實的貝殼，走路不會陷進沙裡。屋主每晚把門口的沙掃平，隔天又積起薄薄一層。
+    desc: 農舍前鋪了一層壓實的貝殼，走路不會陷進沙裡。屋主每晚把門口的沙掃平，隔天又積起一層。
     anchor_key:
     typeclass:
     scene_archetype: city_street

@@ -23,7 +23,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 農舍前
-    desc: 農舍前朝東北敞開，屋後緊貼著坡腳。冬天的風從山上灌下來，門前那道石牆就是為了擋風才壘的。
+    desc: 農舍前朝東北敞開，屋後緊貼著坡腳。冬天的風從山上灌下來，門前那道石牆專為擋風而壘。
     anchor_key:
     typeclass:
     scene_archetype: city_street

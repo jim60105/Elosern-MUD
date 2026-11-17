@@ -14,7 +14,7 @@ nodes:
     y_m: 232
     prototype_parent: anchor_room
     key: 井坳綠地
-    desc: 綠地圍著一口淺井，井欄上搭著蕎麥桿編的遮棚。坳地擋住風，正午的綠地熱烘烘，曬穀的人都在此歇腳。
+    desc: 綠地圍著一口淺井，井欄上搭著蕎麥桿編的遮棚。坳地擋住風，正午的綠地悶熱，曬穀的人都在此歇腳。
     anchor_key: village_buckwheat_hollow
     typeclass:
     scene_archetype: city_street
@@ -23,7 +23,7 @@ nodes:
     y_m: 364
     prototype_parent: grid_room
     key: 東北村口
-    desc: 東北村口順著往魔晶鎮的路爬出坳口，兩旁是成片的蕎麥花。花開時白得刺眼，蜂子整日在坡上嗡嗡作響。
+    desc: 東北村口順著往魔晶鎮的路爬出坳口，兩旁是成片的蕎麥花。花開時白得刺眼，蜂子整日在坡上飛。
     anchor_key:
     typeclass:
     scene_archetype: city_street

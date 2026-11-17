@@ -32,7 +32,7 @@ nodes:
     y_m: 416
     prototype_parent: grid_room
     key: 北村口
-    desc: 北村口是一條通往河灘的小徑，雨季水位上來時，村人會在這裡看河面決定要不要下網，岸邊的蘆葦在風裡彎成一片。
+    desc: 北村口是一條通往河灘的小徑，雨季水位上來時，村人會在這裡看河面，再決定要不要下網。岸邊的蘆葦在風裡彎成一片。
     anchor_key:
     typeclass:
     scene_archetype: city_street

@@ -1,7 +1,7 @@
 """The authored capability declaration carriers (npc-capability-declarations).
 
 A pure data leaf: the exact immutable shape an NPC's capability declaration
-takes in JSON — ``{type, kwargs, binding}`` — plus the two binding forms. It
+takes in JSON (``{type, kwargs, binding}``), plus the two binding forms. It
 imports nothing from ``typeclasses`` on purpose: the place registry (which
 authors these declarations in lore) imports it at load time, and lore must stay
 importable without an Evennia/Django environment. The vocabulary, validation

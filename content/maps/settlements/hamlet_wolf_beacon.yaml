@@ -23,7 +23,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 公火塘
-    desc: 公火塘邊排著幾張粗木凳，族人用它在霧重時分派任務。往東的官道通往角原城。霧重的日子裡，木凳上會多鋪一層獸皮。
+    desc: 公火塘邊排著幾張粗木凳，族人趁霧重時在此分派任務。往東的官道通往角原城。霧重的日子裡，木凳上會多鋪一層獸皮。
     anchor_key:
     typeclass:
     scene_archetype: city_street

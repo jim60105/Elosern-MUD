@@ -14,7 +14,7 @@ nodes:
     y_m: 100
     prototype_parent: anchor_room
     key: 路口
-    desc: 路口往西是帝河津的舊道，往東通往東牧鎮。路兩旁的地歇了幾年，野草長到膝頭。車轍斷斷續續，看得出很久沒有車經過。
+    desc: 路口往西是帝河津的舊道，往東通往東牧鎮。路兩旁的地歇了幾年，野草長到膝頭。車轍時有時無，看得出很久沒有車經過。
     anchor_key: hamlet_fallow_field
     typeclass:
     scene_archetype: city_street

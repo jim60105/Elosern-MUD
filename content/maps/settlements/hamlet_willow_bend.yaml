@@ -23,7 +23,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 農舍前
-    desc: 農舍前的空地朝東，屋後是通往帝都的官道。春天柳絮飛滿院子，掃起來能裝滿好幾筐，晒乾了當引火。
+    desc: 農舍前的空地朝東，屋後是通往帝都的官道。春天柳絮飛滿院子，掃起來能裝滿好幾筐，曬乾了當引火。
     anchor_key:
     typeclass:
     scene_archetype: city_street

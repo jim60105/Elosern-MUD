@@ -1,6 +1,6 @@
 # Settlement local map authored source (schema version 1).
-# Hand-authored for 幽月谷村: the graph, prototypes, options, entrances and
-# map-owned scene associations live here. `location_ref` is the only reverse
+# Hand-authored for 幽月谷村，covering the graph, prototypes, options, entrances and
+# map-owned scene associations here. `location_ref` is the only reverse
 # link: a location's local map is discovered by this field, so a new map for
 # an existing location needs no Python registration.
 version: 1
@@ -28,7 +28,7 @@ nodes:
     y_m: 512
     prototype_parent: grid_room
     key: 溪源
-    desc: 石壁下湧出的泉水是全村的水源，石槽接著水流，汲水的人把木桶擱在槽邊。溪水自此往南穿過谷底，水聲終日在坡上響著。
+    desc: 石壁下湧出的泉水是全村的水源，石槽接住水流，汲水的人把木桶擱在槽邊。溪水自此往南穿過谷底，水聲終日在坡上響著。
     anchor_key:
     typeclass:
     scene_archetype: mountain_path
@@ -37,7 +37,7 @@ nodes:
     y_m: 548
     prototype_parent: grid_room
     key: 試法坪
-    desc: 離住屋最遠、靠著獸徑的一塊空地，村裡的試法都在這裡進行。地面被燒過、凍過、裂開過，草長不齊，石上留著深淺不一的痕跡。
+    desc: 離住屋最遠的一塊空地靠著獸徑，村裡試法都在這裡舉行。地面被燒過、凍過、裂開過，草長不齊，石上留著深淺不一的痕跡。
     anchor_key:
     typeclass:
     scene_archetype: mountain_path
@@ -91,7 +91,7 @@ nodes:
     y_m: 121
     prototype_parent: grid_room
     key: 窯場
-    desc: 村裡共用的一座窯，燒陶也燒玻璃，火門前堆著待燒的坯。窯火旺的時候，順手把麥餅貼在窯壁上一併烤熟，出窯時掰開分著吃。
+    desc: 村裡共用的一座窯，燒陶也燒玻璃，火門前堆著待燒的坯。窯火旺的時候，村人順手把麥餅貼在窯壁上，一併烤熟，出窯時掰開分著吃。
     anchor_key:
     typeclass:
     scene_archetype: mountain_path

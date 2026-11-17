@@ -14,7 +14,7 @@ nodes:
     y_m: 220
     prototype_parent: anchor_room
     key: 三叉綠地
-    desc: 大道在此交會，綠地就長在路口圍出的空地上。井欄邊擺著賣鹽與賣魚的兩排攤子，清早最為熱鬧。
+    desc: 大道在此交會，綠地就鋪在路口圍出的空地上。井欄邊擺著賣鹽與賣魚的兩排攤子，清早最為熱鬧。
     anchor_key: village_three_forks
     typeclass:
     scene_archetype: city_street
@@ -23,7 +23,7 @@ nodes:
     y_m: 220
     prototype_parent: grid_room
     key: 東村口
-    desc: 東村口正對橄欖津方向的路，鹽車與漁車在此換道。路心的石板被壓出兩道深深的車轍，雨天積著水。
+    desc: 東村口正對橄欖津方向的路，鹽車與漁車在此換道。路心的石板被壓出兩道深車轍，雨天積著水。
     anchor_key:
     typeclass:
     scene_archetype: city_street

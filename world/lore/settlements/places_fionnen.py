@@ -1,11 +1,11 @@
 """翠綠森林村 (elven_village_fionnen) home place rows.
 
 Every row is a private dwelling whose host shares what she loves making: the
-toy-carver's bench between the buttress roots of 樹根屋, the bow maker's room
-beside 木作空地, the weaver's platform on 樹冠吊橋. fionnen-village-fare-homes
+toy-carver's bench between the buttress roots of 「樹根屋」, the bow maker's room
+beside 「木作空地」, the weaver's platform on 「樹冠吊橋」. fionnen-village-fare-homes
 adds the village's four fare homes: the archery instructor beside 靶道 and the
-elder on the highest platform of 樹冠吊橋, who converse and trade nothing, and
-the honey keeper at 花蕊蜜園 and the herbalist beside 林間菜圃, who keep a shelf
+elder on the highest platform of 「樹冠吊橋」, who converse and trade nothing, and
+the honey keeper at 花蕊蜜園 and the herbalist beside 「林間菜圃」, who keep a shelf
 of daily need. No row is a storefront; a visitor who finds the village is given
 a piece for coin because the village looks after its guests, never because a
 shop keeps stock.

@@ -14,7 +14,7 @@ nodes:
     y_m: 100
     prototype_parent: anchor_room
     key: 坪埔岔路
-    desc: 岔路立在一片平坦的草埔上，往西不遠就是西礦港的礦場。路邊堆著待運的礦石，碎石在日光下發亮。
+    desc: 岔路開在一片平坦的草埔上，往西不遠就是西礦港的礦場。路邊堆著待運的礦石，碎石在日光下發亮。
     anchor_key: hamlet_flat_meadow
     typeclass:
     scene_archetype: city_street
@@ -23,7 +23,7 @@ nodes:
     y_m: 165
     prototype_parent: grid_room
     key: 農舍前
-    desc: 農舍前用礦石廢料砌了矮牆，牆邊曬著一籃籃的野菜。屋主在礦場做半日工，其餘時間照顧這片草埔。
+    desc: 農舍前用礦石廢料砌了矮牆，牆邊曬著幾籃野菜。屋主在礦場做半日工，其餘時間照顧這片草埔。
     anchor_key:
     typeclass:
     scene_archetype: city_street

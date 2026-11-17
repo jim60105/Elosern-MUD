@@ -14,7 +14,7 @@ nodes:
     y_m: 165
     prototype_parent: anchor_room
     key: 岔路口
-    desc: 岔路口往東北接往雙流城的官道，路旁是空曠的平地。風從平地吹過，把路心的塵土掃成一道道細紋。
+    desc: 岔路口往東北接往雙流城的官道，路旁是空曠的平地。風從平地吹過，把路心的塵土掃出細紋。
     anchor_key: hamlet_flat_land
     typeclass:
     scene_archetype: city_street

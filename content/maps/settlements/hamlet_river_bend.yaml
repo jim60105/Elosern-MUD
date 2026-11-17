@@ -23,7 +23,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 農舍前
-    desc: 農舍前的南邊小路通往香道城，路肩外的葦叢高過人頭。屋後的小碼頭拴著一條平底船，船底積著淺淺的河水。
+    desc: 農舍前的南邊小路通往香道城，路肩外的葦叢高過人頭。屋後的小碼頭拴著一條平底船，船底積著淺水。
     anchor_key:
     typeclass:
     scene_archetype: city_street

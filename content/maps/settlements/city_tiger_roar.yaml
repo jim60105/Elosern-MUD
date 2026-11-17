@@ -14,7 +14,7 @@ nodes:
     y_m: 600
     prototype_parent: anchor_room
     key: 虎嘯石坪
-    desc: 石坪中央刻著一道深深的虎爪痕，據說是建城時留下的。城北不遠處便是深林的邊緣，夜裡傳來的獸吼能震得陶罐輕響。
+    desc: 石坪中央有一道深陷的虎爪痕，據傳建城時就已刻上。城北不遠處便是深林的邊緣，夜裡傳來的獸吼能震得陶罐輕響。
     anchor_key: city_tiger_roar
     typeclass:
     scene_archetype: city_street
@@ -50,7 +50,7 @@ nodes:
     y_m: 786
     prototype_parent: grid_room
     key: 虎皮市街
-    desc: 市街東北側擺著整排的皮貨與骨器，買家多是往王城去的行商。攤主喜歡先講一段獵虎的經過，再開口談價。
+    desc: 市街東北側擺著整排的皮貨與骨器，買家多是往王城去的行商。攤主喜歡講一段獵虎的經過，再開口談價。
     anchor_key:
     typeclass:
     scene_archetype: city_street

@@ -32,7 +32,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 西南村口
-    desc: 西南村口朝著聖潔王都的方向開，路緣的界石被牛角頂得歪斜，遠望是層層疊起的丘陵。
+    desc: 西南村口朝著聖潔王都的方向開，路緣的界石被牛角頂得歪斜，遠望是連綿的丘陵。
     anchor_key:
     typeclass:
     scene_archetype: city_street

@@ -9,7 +9,7 @@ The guild hall and general store are transcribed from the constants in
 ``world/maps/bootstrap.py`` and the roster rows removed from
 ``world/rules/rulebook/guild_economy.yaml``, so the derived shops and
 service-host roster reproduce the pre-change shipped identities exactly. The
-two specialist shops (聖潔王都鍛造鋪 / 聖潔王都裁縫坊) are authored content:
+two specialist shops（聖潔王都鍛造鋪、聖潔王都裁縫坊）are authored content:
 their interiors, hosts and assortments exist only here and in
 ``world/rules/rulebook/commerce/altoria.yaml``.
 
@@ -23,15 +23,15 @@ without the kwarg fails load naming the place. The tables live in
 ``world/lore/dialogue/altoria_middle.py`` under the same keys.
 
 altoria-learning-and-exchange appends the capital's last two middle-terrace
-rooms: 聖潔王都商會公所 off 東市 — the document's designated future source
+rooms: 聖潔王都商會公所 off 東市 is the document's designated future source
 of escort commissions, landed here as an attendant host who talks caravans
-and trade routes and offers no work, because the escort quest type the
-commissions need does not exist — and 聖潔王都市集棚 off 市場街, the
-capital's second host-less place, host-less on the document's authority
-rather than on an unwritten story: 「市場街本身不需要一位固定的街長型功能性
+and trade routes and offers no work (the escort quest type the commissions
+need does not exist), and 聖潔王都市集棚 off 市場街 is the capital's second
+host-less place, host-less on the document's authority rather than on an
+unwritten story: 「市場街本身不需要一位固定的街長型功能性
 NPC，遊戲性功能都掛在各個攤販身上」 (docs/lore/settlement-locations.md
-line 374). 市場街 now carries three doors (雜貨店、首飾坊、市集棚) and 東市
-two (鍊金坊、商會公所); the registry's doorway-name rule keeps them honest.
+line 374). 市場街 now carries three doors（雜貨店、首飾坊、市集棚）and 東市
+two（鍊金坊、商會公所）; the registry's doorway-name rule keeps them honest.
 """
 
 from world.lore.settlements.places import PlaceDefinition, PlaceKind
@@ -168,8 +168,8 @@ ROWS: tuple[PlaceDefinition, ...] = (
     ),
     # altoria-adornments-and-remedies: the last two specialists of the
     # forge/eatery/tailor family. The jeweller shares 市場街 with the general
-    # store — one exterior, two doors, distinguished by their authored
-    # doorway names (雜貨店 vs 首飾坊).
+    # store; one exterior, two doors, distinguished by their authored
+    # doorway names（雜貨店 vs 首飾坊）.
     PlaceDefinition(
         key="altoria_jeweller",
         settlement_key="capital_altoria",
@@ -220,12 +220,12 @@ ROWS: tuple[PlaceDefinition, ...] = (
             ),
         ),
     ),
-    # 聖潔王都商會公所 — the merchants' guild hall, off 東市 (5,3), sharing
+    # 聖潔王都商會公所 is the merchants' guild hall, off 東市 (5,3), sharing
     # that exterior with the alchemist under a different doorway name
-    # (鍊金坊 vs 商會公所). The document's 商會與貿易行 is 「未來的」護衛委託
+    # （鍊金坊 vs 商會公所）. The document's 商會與貿易行 is 「未來的」護衛委託
     # 發放處 and 「guild request」 already reports escort work closed: the
     # guild master talks caravans, routes and tariffs as world-building and
-    # offers nothing — a commission surface without the escort quest type
+    # offers nothing; a commission surface without the escort quest type
     # behind it would post work that cannot be completed, so this row ships
     # an attendant's dialogue table and no work board (design refusal two).
     PlaceDefinition(
@@ -247,14 +247,14 @@ ROWS: tuple[PlaceDefinition, ...] = (
             ),
         ),
     ),
-    # 聖潔王都市集棚 — the covered market stalls, off 市場街 (2,3), sharing
+    # 聖潔王都市集棚 is the covered market stalls, off 市場街 (2,3), sharing
     # that exterior with the general store and the jeweller under a third
-    # doorway name (雜貨店 vs 首飾坊 vs 市集棚). Host-less on the document's
+    # doorway name（雜貨店 vs 首飾坊 vs 市集棚）. Host-less on the document's
     # authority, not by omission: line 374 says a market street's function
     # hangs on individual stallholders, not on a fixed street-chief NPC, so
     # this emptiness is a design statement, not the palace's unwritten
     # story. When stallholders arrive they will be transient scene NPCs on
-    # the quest path — the same rooms-only shape hostless-places reserves,
+    # the quest path, the same rooms-only shape hostless-places reserves,
     # with no permanent roster row expected behind it.
     PlaceDefinition(
         key="altoria_market_stalls",

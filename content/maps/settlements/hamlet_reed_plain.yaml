@@ -23,7 +23,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 農舍前
-    desc: 農舍前堆著曬乾的蘆葦，屋後的小路往西北通向雙流城。院牆是用葦捆疊起來的，牆頭壓著幾塊防風的石頭。
+    desc: 農舍前堆著曬乾的蘆葦，屋後的小路往西北通向雙流城。院牆以葦捆疊成，牆頭壓著幾塊防風的石頭。
     anchor_key:
     typeclass:
     scene_archetype: city_street

@@ -14,7 +14,7 @@ nodes:
     y_m: 161
     prototype_parent: anchor_room
     key: 路口
-    desc: 路口往西南接麥浪城的來路，往東北通往沉鐘鎮。路旁的麻田已經剝完，田裡只剩光禿禿的稈子。
+    desc: 路口往西南接麥浪城的來路，往東北通往沉鐘鎮。路旁的麻田已經剝完，田裡只剩光禿的稈子。
     anchor_key: hamlet_hemp_knoll
     typeclass:
     scene_archetype: city_street

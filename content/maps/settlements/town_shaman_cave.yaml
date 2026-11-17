@@ -14,7 +14,7 @@ nodes:
     y_m: 542
     prototype_parent: anchor_room
     key: 藥煙石坪
-    desc: 石坪上常年飄著熬藥的煙，氣味苦中帶甘，連石縫都染成一種暗褐色。往南的坡地漸高，林地裡藏著幾處採藥的小徑。
+    desc: 石坪上常年飄著熬藥的煙，氣味苦中帶甘，連石縫都染成暗褐色。往南的坡地漸高，林地裡藏著幾處採藥的小徑。
     anchor_key: town_shaman_cave
     typeclass:
     scene_archetype: city_street
@@ -23,7 +23,7 @@ nodes:
     y_m: 542
     prototype_parent: grid_room
     key: 西面柵門
-    desc: 西門朝虎嘯城的方向開，門外是林間較寬的一條路。採藥人與獵戶由此進出，門邊總晾著一串串待乾的根莖。
+    desc: 西門朝虎嘯城的方向開，門外是林間較寬的一條路。採藥人與獵戶由此進出，門邊總晾著成串待乾的根莖。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -50,7 +50,7 @@ nodes:
     y_m: 636
     prototype_parent: grid_room
     key: 藥材市街
-    desc: 市街東北角擺著一籃籃乾草與獸骨，買家會湊近聞一聞再問價。誰家的藥效如何，在這裡是公開的閒談話題。
+    desc: 市街東北角擺著幾籃乾草與獸骨，買家會湊近聞一聞再問價。誰家的藥效如何，在這裡是公開的閒談話題。
     anchor_key:
     typeclass:
     scene_archetype: city_street

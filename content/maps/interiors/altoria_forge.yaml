@@ -9,7 +9,7 @@ id: altoria_forge
 rooms:
   altoria_forge:
     name_zh: 聖潔王都鍛造鋪
-    desc_zh: 聖潔王都的鍛造鋪，砧聲在屋簷下響著，替這座王都的兵器生意一聲聲定了價。
+    desc_zh: 聖潔王都的鍛造鋪，砧聲在屋簷下響著，這座王都的兵器生意從這裡開價。
     scene_archetype: tavern_interior
     art_key: altoria_forge
 connections: []

@@ -60,7 +60,7 @@ ROWS: tuple[ItemDefinition, ...] = (
                 kind=ItemKind.TOY,
                 icon_key=ItemIconKey.TOY,
                 rarity=ItemRarity.UNCOMMON,
-                summary_zh="聖所販售的祝禱掛飾，效果直白：佩戴期間皮膚的觸感被整體放大，衣料摩擦都變成細密的電流，平日無感的輕觸都會一路鑽進神經，從早到晚渾身不對勁。",
+                summary_zh="聖所販售的祝禱掛飾，效果直白，佩戴期間皮膚的觸感被整體放大，衣料摩擦都變成細密的電流，平日無感的輕觸都會一路鑽進神經，從早到晚渾身不對勁。",
             ),
             equipment_slot=EquipmentSlot.ACCESSORY,
             modifier_key=EquipmentModifierKey.HYPERESTHESIA_CHARM,
@@ -104,7 +104,7 @@ ROWS: tuple[ItemDefinition, ...] = (
                 kind=ItemKind.TOY,
                 icon_key=ItemIconKey.TOY,
                 rarity=ItemRarity.UNCOMMON,
-                summary_zh="浴場的招牌入浴劑，泡完整個皮膚的敏感度輕飄飄地抬高整個晚上，冒險歸來的定番享受。",
+                summary_zh="浴場的招牌入浴劑，泡完之後全身皮膚的敏感度提高，飄飄然地持續一整晚，冒險歸來的定番享受。",
             ),
             use_mechanics=ItemUseMechanics(
                 consumable=True,
@@ -136,7 +136,7 @@ ROWS: tuple[ItemDefinition, ...] = (
                 kind=ItemKind.TOY,
                 icon_key=ItemIconKey.TOY,
                 rarity=ItemRarity.RARE,
-                summary_zh="聖所禮儀用的小巧香爐，爐煙沾上肌膚就化作綿長酥癢，越是動情燒得越是歡。",
+                summary_zh="聖所禮儀用的小巧香爐，爐煙沾上肌膚就化作綿長酥癢，越是動情燒得越旺。",
             ),
             use_mechanics=ItemUseMechanics(
                 consumable=False,
@@ -184,7 +184,7 @@ ROWS: tuple[ItemDefinition, ...] = (
                 kind=ItemKind.TOY,
                 icon_key=ItemIconKey.TOY,
                 rarity=ItemRarity.UNCOMMON,
-                summary_zh="〔素材〕史萊姆黏液的下游製品：滅菌處理過的黏液分裝包，滑潤持久怎麼塗都不會乾，讓摩擦的每一寸都變成放大的觸感。",
+                summary_zh="〔素材〕史萊姆黏液的下游製品，滅菌處理過的黏液分裝包，滑潤持久怎麼塗都不會乾，讓摩擦的每一寸都變成放大的觸感。",
             ),
             use_mechanics=ItemUseMechanics(
                 consumable=True,

@@ -23,7 +23,7 @@ nodes:
     y_m: 289
     prototype_parent: grid_room
     key: 東北村口
-    desc: 東北村口沿著往帝都的大路穿出坳口，樺樹在路邊排成長列。樹皮剝落的地方露出白木，遠遠看像一排旗幟。
+    desc: 東北村口沿著往帝都的大路穿出坳口，樺樹在路邊排成長列。樹皮剝落的地方露出白木，遠看像一排旗幟。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -32,7 +32,7 @@ nodes:
     y_m: 163
     prototype_parent: grid_room
     key: 西村口
-    desc: 西村口往楓麓鎮，路穿過一片低矮的樺林。秋天落葉鋪滿路面，走過去沙沙作響，車輪壓過時聲音更沉。
+    desc: 西村口往楓麓鎮，路穿過一片低矮的樺林。秋天落葉鋪滿路面，走過去腳下作響，車輪壓過時聲音更沉。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -41,7 +41,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 教堂前
-    desc: 教堂前的空地面向東南，晨霧散得比坳外晚。石牆上爬著藤蔓，雨後總掛著水珠。晴天的時候，藤葉的影子落在石階上。
+    desc: 教堂前的空地面向東南，晨霧散得比坳外晚。石牆上爬著藤蔓，雨後總掛著水珠。晴天時，藤葉的影子落在石階上。
     anchor_key:
     typeclass:
     scene_archetype: city_street

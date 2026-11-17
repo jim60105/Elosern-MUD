@@ -9,7 +9,7 @@ id: ciaran_gwenaera_home
 rooms:
   ciaran_gwenaera_home:
     name_zh: 格威娜拉的家
-    desc_zh: 銀絲與做了一半的飾品攤在工作檯的布上，分的標準出自手藝人的眼光，不是商人的眼光。完成的作品掛在窗邊的繩上，旁邊晾著從下面坡上採來的花頭；爐火溫著一壺水，沒人指望會有客人要用。這是一個喜歡綴飾工作的人的家，會做買賣只是因為村子請她做。
+    desc_zh: 銀絲與做了一半的飾品攤在工作檯的布上，分堆的標準是手藝，價錢排在後面。完成的作品掛在窗邊的繩上，旁邊晾著從下面坡上採來的花頭；爐火溫著一壺水，這戶人家不靠客人上門。這是個喜歡做飾品的人的家，她會做買賣，只因為村子請她做。
     scene_archetype: tavern_interior
     art_key: ciaran_gwenaera_home
 connections: []

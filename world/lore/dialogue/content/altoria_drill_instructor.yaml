@@ -33,7 +33,7 @@ topics:
       speaker: actor
       text: 「冒險者若是想評定階級或提升位階，校場這裡負責考核嗎？」
     - kind: narration
-      text: 伊沃‧高丘搖了搖頭，把木棍往咯吱窩下一夾，眼神顯得十分坦率。
+      text: 伊沃‧高丘搖了搖頭，把木棍往胳肢窩下一夾，眼神顯得十分坦率。
     - kind: speech
       speaker: host
       text: 「想升階哪？那是冒險者公會的事啦，考官會親自審查你的功績與能耐。」
@@ -42,7 +42,7 @@ topics:
       text: 「報名得去中央廣場東邊的公會櫃檯，我這裡不代辦考核，也給不了你保證通過的憑證。」
     - kind: speech
       speaker: host
-      text: 「先把基礎底子磨紮實，免得站到考官面前連幾個照面都撐不住，那才叫丟臉哪。」
+      text: 「先把底子磨紮實，免得站到考官面前連幾個照面都撐不住，那才叫丟臉哪。」
 - topic_id: altoria_drill_yard.topic_03
   keyword: 切磋
   label: 切磋

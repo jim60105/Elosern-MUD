@@ -14,7 +14,7 @@ nodes:
     y_m: 100
     prototype_parent: anchor_room
     key: 獼猴圖騰
-    desc: 圖騰柱上雕著攀爬的獼猴，柱身留著供人手抓握的凹槽。岡上的灌木結著小紅果。凹槽的深度剛好能握住，往上攀的人不會滑手。
+    desc: 圖騰柱上雕著攀爬的獼猴，柱身留著供人手抓握的凹槽。岡上的灌木結著小紅果。凹槽的深度剛好讓手握住，往上攀的人不會滑手。
     anchor_key: hamlet_macaque_knoll
     typeclass:
     scene_archetype: city_street

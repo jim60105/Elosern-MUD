@@ -23,7 +23,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 農舍前
-    desc: 農舍前的西南小路通往香道城，屋簷下掛著一串串紅椒。院裡攤著曬椒的竹匾，匾邊蹲著挑椒的婦人。
+    desc: 農舍前的西南小路通往香道城，屋簷下掛著成串的紅椒。院裡攤著曬椒的竹匾，匾邊蹲著挑椒的婦人。
     anchor_key:
     typeclass:
     scene_archetype: city_street

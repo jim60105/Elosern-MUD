@@ -14,7 +14,7 @@ nodes:
     y_m: 178
     prototype_parent: anchor_room
     key: 旱田岔路
-    desc: 岔路旁是一片靠天吃飯的旱田，作物排得疏疏落落。往西的路通往橄欖津，收成好的年份才見得到車隊。
+    desc: 岔路旁是一片靠天吃飯的旱田，作物排得稀疏。往西的路通往橄欖津，收成好的年份才見得到車隊。
     anchor_key: hamlet_dry_field
     typeclass:
     scene_archetype: city_street

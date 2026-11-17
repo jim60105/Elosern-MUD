@@ -14,7 +14,7 @@ nodes:
     y_m: 100
     prototype_parent: anchor_room
     key: 兔首圖騰
-    desc: 圖騰柱上刻著躍起的兔首，柱腳塞著幾束乾草。土穴的洞口就在柱旁，是營地最暖和的地方。
+    desc: 圖騰柱上刻著躍起的兔首，柱腳塞著幾束乾草。土穴的洞口就在柱旁，那裡是營地最暖和的地方。
     anchor_key: hamlet_hare_den
     typeclass:
     scene_archetype: city_street
@@ -23,7 +23,7 @@ nodes:
     y_m: 161
     prototype_parent: grid_room
     key: 共用火塘
-    desc: 火塘的火常年不熄，旁邊鋪著給旅人過夜的乾草。往南的路通往月嚎城的官道。乾草每隔幾天就換一次，免得受潮。
+    desc: 火塘的火常年不熄，旁邊鋪著給旅人過夜的乾草。往南的路接上通往月嚎城的官道。乾草每隔幾天就換一次，免得受潮。
     anchor_key:
     typeclass:
     scene_archetype: city_street

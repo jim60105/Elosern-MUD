@@ -23,7 +23,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 農舍前
-    desc: 農舍前的空地朝東，屋後堆著去年留下的蕎麥稈。風一吹，稈堆裡就傳出細碎的響聲。稈堆被風吹得東倒西歪，孩子在上頭打滾。
+    desc: 農舍前的空地朝東，屋後堆著去年留下的蕎麥稈。風一吹，稈堆裡就傳出細碎的響聲，草稈被吹得東倒西歪，孩子在上頭打滾。
     anchor_key:
     typeclass:
     scene_archetype: city_street

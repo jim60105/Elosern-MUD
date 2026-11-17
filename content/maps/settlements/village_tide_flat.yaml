@@ -23,7 +23,7 @@ nodes:
     y_m: 514
     prototype_parent: grid_room
     key: 北村口
-    desc: 北村口朝向鹽津城，路兩旁是一塊塊圍起來的鹽田。曬鹽的人把木耙擱在田埂上，白鹽在日光下晃眼。
+    desc: 北村口朝向鹽津城，路兩旁是成塊圍起來的鹽田。曬鹽的人把木耙擱在田埂上，白鹽在日光下晃眼。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -41,7 +41,7 @@ nodes:
     y_m: 307
     prototype_parent: grid_room
     key: 教堂前灘
-    desc: 教堂前的空地朝東，灘地在此慢慢升高。退潮時孩子會到階下的淺水裡撿貝，鐘聲一響便各自散去。
+    desc: 教堂前的空地朝東，灘地在此漸次升高。退潮時孩子會到階下的淺水裡撿貝，鐘聲一響便各自散去。
     anchor_key:
     typeclass:
     scene_archetype: city_street

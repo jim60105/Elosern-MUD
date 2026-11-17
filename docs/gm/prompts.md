@@ -24,7 +24,7 @@ prompts/
 
 ## YAML 格式
 
-每個檔案宣告 `schema_version: 1` 與一個 `prompts:` 對應表：
+每個檔案宣告 `schema_version: 1` 與一個 `prompts:` 對應表。
 
 ```yaml
 schema_version: 1
@@ -51,7 +51,7 @@ prompts:
 | `art.negative_prompt` | `art.yaml` | 無 |
 | `character_creation.system` | `character_creation.yaml` | 無 |
 
-只有允許清單內的 `{token}` 會被替換，替換是逐一且精確的：
+只有允許清單內的 `{token}` 會被替換，而且逐一精確處理。
 
 - `{name}`、`{location}` 這類允許的預留位置會被代入實際值。
 - 兩個大括號包住的名稱（如 `{{name}}`）是字面文字，不會被替換。
@@ -74,7 +74,7 @@ prompts:
 
 ## 故障隔離
 
-一個壞掉的提示詞檔案只會影響它自己的層。載入時該鍵會被標記為不可用，並記錄具名錯誤（檔案、鍵、問題），伺服器照常啟動。消費該鍵的生成層會回到既有的確定性降級路徑：
+一個壞掉的提示詞檔案只會影響它自己的層。載入時該鍵會被標記為不可用，並記錄具名錯誤（檔案、鍵、問題），伺服器照常啟動。消費該鍵的生成層會回到既有的確定性降級路徑。
 
 - 旁白 → 模板渲染器
 - NPC 對話 → 問候或沉默
@@ -87,11 +87,11 @@ prompts:
 
 ## 美術生成提示詞（`art.scene_prompt` / `art.portrait_prompt` / `art.negative_prompt`）
 
-引擎內的 sd-webui 客戶端（`world/art/sd_worker.py`）是美術圖像生成的唯一消費者，提示詞文字只存在於 `prompts/art.yaml`：
+引擎內的 sd-webui 客戶端（`world/art/sd_worker.py`）是美術圖像生成的唯一消費者，提示詞文字只存在於 `prompts/art.yaml`。
 
-- `art.scene_prompt` — 場景主體的正向提示詞範本，含一個 `{description}` 預留位置；代入值是該場景在登錄表中的確定性一句話描述。場景不在去背階段的主體允許清單內，因此保留前景、中景與背景的繪製構圖。
-- `art.portrait_prompt` — 角色／怪物肖像的正向提示詞範本，同樣含 `{description}` 預留位置；代入值是確定性角色／怪物描述。已出貨範本要求完整身形與白色平坦背景，讓去背階段取得適合的輸入。管理員可修改掛載範本中的背景措辭，變更會透過已渲染提示詞摘要顯示。
-- `art.negative_prompt` — 每個請求共用的負向提示詞，純文字、無預留位置。
+- `art.scene_prompt`：場景主體的正向提示詞範本，含一個 `{description}` 預留位置；代入值是該場景在登錄表中的確定性一句話描述。場景不在去背階段的主體允許清單內，因此保留前景、中景與背景的繪製構圖。
+- `art.portrait_prompt`：角色／怪物肖像的正向提示詞範本，同樣含 `{description}` 預留位置；代入值是確定性角色／怪物描述。已出貨範本要求完整身形與白色平坦背景，讓去背階段取得適合的輸入。管理員可修改掛載範本中的背景措辭，變更會透過已渲染提示詞摘要顯示。
+- `art.negative_prompt`：每個請求共用的負向提示詞，純文字、無預留位置。
 
 範本文字以自然語言英文撰寫，涵蓋風格、構圖、光線與鏡頭，並與其他層一樣在載入時驗證。未知的 `{token}` 是載入時錯誤。改動三個鍵中任何一個，都會改變記錄的「已渲染提示詞摘要」（rendered-prompt digest）。既有的 `done` 記錄會標記為 `hash_changed` 供管理員審核，已完成的圖片不會被悄悄取代，也不會在一般遊玩中重新生成。本次範本異動後，管理員可對標記的主體執行 `@art requeue`，以新提示詞重新產生圖片。
 
@@ -107,11 +107,11 @@ prompts:
 | `ART_SD_STYLES` / `ART_SD_MODULES` | 同名 | 空字串 | 逗號分隔的風格名稱／Forge 模組檔名清單；空＝請求省略該欄（`styles`／`forge_additional_modules`）；名稱逐字通過，可用 `@art options styles`／`@art options modules` 查伺服器實際名稱 |
 | `ART_SD_SCENE_WIDTH/HEIGHT` | 同名 | `1344` / `768` | 場景（16:9）輸出尺寸，必須是正的 8 倍數（SDXL 友善） |
 | `ART_SD_PORTRAIT_WIDTH/HEIGHT` | 同名 | `768` / `1024` | 肖像（3:4）輸出尺寸，必須是正的 8 倍數 |
-| `ART_SD_CLIENT` | —（僅限程式碼） | `world.art.sd_worker.SDWebUIClient` | 客戶端類別的可抽換點（dotted path）；測試與瀏覽器測試掛鉤指向 `world.art.fake_sd_client.FakeSDWebUIClient`，永不開啟 socket。基於匯入注入風險刻意不提供環境變數 |
+| `ART_SD_CLIENT` | 無（僅限程式碼） | `world.art.sd_worker.SDWebUIClient` | 客戶端類別的可抽換點（dotted path）；測試與瀏覽器測試掛鉤指向 `world.art.fake_sd_client.FakeSDWebUIClient`，永不開啟 socket。基於匯入注入風險刻意不提供環境變數 |
 | `ART_SD_MAX_RESPONSE_BYTES` | 同名 | `52428800`（50 MiB） | 回應本文／base64 上限 |
 | `ART_SD_MAX_IMAGE_DIMENSIONS` / `ART_SD_MAX_IMAGE_PIXELS` | 同名 | `4096` / `16777216`（16 MiP） | 解碼 PNG 的寬高與總像素上限 |
 | `ART_SD_PREPIN_SAMPLES_FORMAT` | 同名 | `False` | 選用：首次生成前把伺服器持久設定 `samples_format` 預先設為 `png`（`POST /sdapi/v1/options`，每行程式一次；僅在生成流程觸發，`@art health` 探測不會觸發）。⚠️ 這會永久改變共用伺服器的持久預設值，只建議用於專屬 sd-webui 執行個體；一般情況靠請求內 `override_settings.samples_format` 即足夠 |
-| `ART_SD_SERVER_RETAIN_IMAGES` | 同名 | `True` | 明確設定 txt2img 頂層的 `save_images` 布林值。`True` 依伺服器輸出設定開啟遠端樣本／圖組儲存；`False` 關閉儲存，並一併送出 `do_not_save_samples: true` 與 `do_not_save_grid: true`。這個逐請求控制不會改動伺服器的持久設定，也不影響本機美術庫的落地。改變環境變數值後請重新啟動遊戲伺服器 |
+| `ART_SD_SERVER_RETAIN_IMAGES` | 同名 | `True` | 明確設定 txt2img 頂層的 `save_images` 布林值。`True` 依伺服器輸出設定開啟遠端樣本／圖組儲存；`False` 關閉儲存，並一併送出 `do_not_save_samples: true` 與 `do_not_save_grid: true`。這個逐請求控制不會改動伺服器的持久設定，也不影響本機美術庫的入庫。改變環境變數值後請重新啟動遊戲伺服器 |
 | `ART_SD_OUTPUT_FORMAT` | 同名 | `png` | 本機轉碼輸出的格式（`png`／`webp`／`jpeg`／`avif`，大小寫不拘）；衍生副檔名 `.png`／`.webp`／`.jpg`／`.avif`。切換格式後既有資產照常展示與服務，直到個別主題重新生成才換檔（換檔時舊檔在新狀態提交後才刪除） |
 | `ART_SD_OUTPUT_QUALITY` | 同名 | `80` | 有損格式（webp／jpeg／avif）的品質 1–100；png 忽略此值 |
 | `ART_SD_PRESERVE_GENERATION_METADATA` | 同名 | `True` | 是否在輸出內嵌 A1111 形式的生成資訊（提示詞、負向提示詞、步驟、CFG、取樣器、排程器、seed、尺寸、模型）；`png` 走文字區塊、有損格式走 EXIF，來源一律是引擎-known 的請求值；`False`＝完全不寫入（此時 seed 仍存於記錄供程式使用） |
@@ -124,13 +124,13 @@ prompts:
 | `ART_TRANSLATE_ENABLED` | 同名 | `False` | 提示詞本機前處理總開關。只翻譯含 Han 字的行，保留 authored `source_description` 與 `source_hash`；翻譯失敗會用原始提示詞生成圖片。執行引擎由 `add-ctranslate2-translate-backend` 提供 |
 | `ART_TRANSLATE_DOWNLOAD_ENABLED` | 同名 | `True` | 允許首次使用時由 backend 下載翻譯模型到持久 volume（與 `ART_REMBG_DOWNLOAD_ENABLED` 同為布林政策，但兩者的取得時機不同：rembg 的權重已內建於標準映像，只有裸機／自訂目錄才會取得；約 74 MB 的 `translate-zh_en-1_9` 封包則由 backend 首次使用時抓取）。`false` 加上預置的 `server/.translate` volume＝無執行期網路配置；模型缺席時立即以有界的 `art_translate_unavailable` 失敗 |
 | `ART_TRANSLATE_THREADS` | 同名 | `0` | CTranslate2 intra-op 執行緒上限，0–256；`0`＝CTranslate2 自行決定；非零在建構時送達 translator |
-| `ART_TRANSLATE_BACKEND` | —（僅限程式碼） | `world.art.translate_ct2.CTranslate2Backend` | 第三個 import-executing dotted-path seam，不提供環境變數。測試與瀏覽器 harness 使用 `world.art.fake_translate.FakeTranslator`，不載入翻譯函式庫也不開啟網路連線 |
+| `ART_TRANSLATE_BACKEND` | 無（僅限程式碼） | `world.art.translate_ct2.CTranslate2Backend` | 第三個 import-executing dotted-path seam，不提供環境變數。測試與瀏覽器 harness 使用 `world.art.fake_translate.FakeTranslator`，不載入翻譯函式庫也不開啟網路連線 |
 
 標註「同名」的設定由同名環境變數設定（變數不存在或空白時用預設值；存在但無效的值會在啟動時直接報錯並點名變數，絕不靜默失效）。完整的三層設定模型、優先順序與驗證規則見[設定與環境變數](/development/settings-and-environment)。
 
 ### 去背模型與映像（rembg）
 
-去背階段只有一個模型：鎖定依賴的預設權重 `bria-rmbg`（BRIA RMBG-2.0）。標準映像在**建置時**無條件下載並內建它（未壓縮約 1.02 GB），所以即使 `.env` 關掉去背或關掉執行期下載，映像仍然變大這麼多；建置機器需要能連到模型來源。執行期不需要下載、不需要預置任何 rembg volume，映像也未宣告該路徑為 volume、compose 也不掛載它——**既有的 `evennia-rembg` volume 不會被使用、也不會被刪除或遷移**，它既不能遮蔽映像層，也不影響任何資料。離線環境的作法是把在連網機器上建好的**完整映像**傳過去再設 `ART_REMBG_DOWNLOAD_ENABLED=false`，而不是在離線機器上重新建置。裸機或自訂模型目錄則相反：把 `models/bria-rmbg/bria-rmbg.onnx` 預先放到 `ART_REMBG_MODEL_DIR` 再關下載。若你以自訂 compose override／掛載覆蓋 `/app/server/.rembg`，該掛載就必須自行提供這個權重。⚠️ 授權：`bria-rmbg` 非商業使用免費，商業使用與任何再散布需向 BRIA 取得適用權利；建置或散布映像的人自行負責合規。
+去背階段只有一個模型，也就是鎖定依賴的預設權重 `bria-rmbg`（BRIA RMBG-2.0）。標準映像在**建置時**無條件下載並內建它（未壓縮約 1.02 GB），所以即使 `.env` 關掉去背或關掉執行期下載，映像仍然變大這麼多；建置機器需要能連到模型來源。執行期不需要下載、不需要預置任何 rembg volume，映像也未宣告該路徑為 volume、compose 也不掛載它；**既有的 `evennia-rembg` volume 不會被使用、也不會被刪除或遷移**，它既不能遮蔽映像層，也不影響任何資料。離線環境的作法是把在連網機器上建好的**完整映像**傳過去再設 `ART_REMBG_DOWNLOAD_ENABLED=false`，而不是在離線機器上重新建置。裸機或自訂模型目錄則相反，把 `models/bria-rmbg/bria-rmbg.onnx` 預先放到 `ART_REMBG_MODEL_DIR` 再關下載。若你以自訂 compose override／掛載覆蓋 `/app/server/.rembg`，該掛載就必須自行提供這個權重。⚠️ 授權方面，`bria-rmbg` 非商業使用免費，商業使用與任何再散布需向 BRIA 取得適用權利；建置或散布映像的人自行負責合規。
 
 ### 翻譯模型種子（zh→en）
 
@@ -138,14 +138,14 @@ prompts:
 
 **佈局契約**：`ART_TRANSLATE_MODEL_DIR`（裸機 `server/.translate`、容器 `/app/server/.translate`）必須包含
 
-- `model/` — CTranslate2 模型目錄（`config.json` + `model.bin`）
-- `sentencepiece.model` — SentencePiece 來源模型
+- `model/`：CTranslate2 模型目錄（`config.json` + `model.bin`）
+- `sentencepiece.model`：SentencePiece 來源模型
 
-兩條種子路線產生完全相同的佈局，引擎對模型來源不做任何假設（D3：換模型是操作者動作，不是程式碼變更）。
+兩條種子路線產生完全相同的佈局，引擎對模型來源不做任何假設（依 D3，換模型屬於操作者動作，不必改動程式碼）。
 
 #### 路線一：Argos Open Tech `.argosmodel` 封包（建議，一條指令）
 
-Argos 發行 CTranslate2 模型；它的 Python wrapper 體積肥大，是本專案刻意不引入的重量級依賴。封包本身解壓就是上述佈局。使用隨附腳本（在主機執行，只依賴 `curl` 與 `unzip`）：
+Argos 發行 CTranslate2 模型；它的 Python wrapper 體積肥大，是本專案刻意不引入的重量級依賴。封包本身解壓就是上述佈局。使用隨附腳本（在主機執行，只依賴 `curl` 與 `unzip`）。
 
 ```sh
 scripts/fetch-translate-model.sh                # 裸機預設種到 server/.translate
@@ -155,11 +155,11 @@ scripts/fetch-translate-model.sh /some/path     # 指定目錄
 
 腳本下載 `translate-zh_en-1_9.argosmodel`（官方封包索引指向 `https://argos-net.com/v1/`），驗證 zip 與所需項目（`model/config.json`、`model/model.bin`、`sentencepiece.model`），解出 `model/`＋`sentencepiece.model`，任何一環失敗都寫出錯誤訊息並以非零狀態退出。封包內含的 `stanza/`（wrapper 的斷句資料）不需要，刻意不解出，因為 seam 已經按行切分。
 
-⚠️ **授權**：封包 README 記載其模型衍生自 OPUS-MT zh→en（Tiedemann & Thottingal, EAMT 2020），**CC-BY 4.0**。腳本會把 `README.md` 一併種下作為來源與授權紀錄。
+⚠️ **授權**方面，封包 README 記載其模型衍生自 OPUS-MT zh→en（Tiedemann & Thottingal, EAMT 2020），**CC-BY 4.0**。腳本會把 `README.md` 一併種下作為來源與授權紀錄。
 
 #### 路線二：自 `Helsinki-NLP/opus-mt-zh-en` 離線轉換
 
-在有網路的工作站（不必是遊戲主機）用 CTranslate2 轉換器：
+在有網路的工作站（不必是遊戲主機）用 CTranslate2 轉換器。
 
 ```sh
 ct2-transformers-converter --model Helsinki-NLP/opus-mt-zh-en \
@@ -171,7 +171,7 @@ cp   ct2-zh-en/source.spm /path/to/server/.translate/sentencepiece.model
 
 （Helsinki 的 OPUS 倉庫用 `source.spm`／`target.spm` 命名 Marian 的 SentencePiece 檔；轉換輸出直接構成 `model/`，再把 `source.spm` 複製為套件根目錄的 `sentencepiece.model`，即為引擎要求的佈局。轉換前先 `ls ct2-zh-en` 確認產生的是 `source.spm` 這個名字，不同筆轉換指令輸出略有出入，以實際檔名為準。若已存在種子，先確認兩個檔案都在再覆寫。）
 
-⚠️ **授權**：`Helsinki-NLP/opus-mt-zh-en` 的 model card 標示 **CC-BY 4.0**（與路線一同一模型譜系與授權）。
+⚠️ **授權**方面，`Helsinki-NLP/opus-mt-zh-en` 的 model card 標示 **CC-BY 4.0**（與路線一同一模型譜系與授權）。
 
 #### 操作者食譜（端到端）
 

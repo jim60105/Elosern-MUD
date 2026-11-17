@@ -3,7 +3,7 @@
 This package holds registry-backed identity for settlements (the map
 coordinate spaces), places (one authored record per service location) and
 goods bundles (assortments). Shop identities are derived from places in
-:mod:`world.lore.settlements.shops` — never authored here.
+:mod:`world.lore.settlements.shops`, never authored here.
 """
 
 from world.lore.settlements.places import PLACE_REGISTRY, PlaceDefinition, PlaceKind

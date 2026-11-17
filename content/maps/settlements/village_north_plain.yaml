@@ -14,7 +14,7 @@ nodes:
     y_m: 226
     prototype_parent: anchor_room
     key: 井臺綠地
-    desc: 綠地中央的井是方圓數里唯一的水源，井臺上總擱著幾只木桶。桶沿被繩子磨得光滑，提水的人得排著隊等。
+    desc: 綠地中央的井是方圓數里唯一的水源，井臺上總擱著幾隻木桶。桶沿被繩子磨得光滑，提水的人得排著隊等。
     anchor_key: village_north_plain
     typeclass:
     scene_archetype: city_street
@@ -41,7 +41,7 @@ nodes:
     y_m: 163
     prototype_parent: grid_room
     key: 教堂前
-    desc: 教堂前朝西南，石牆擋住海風，牆根晾著一疊疊採回來的草藥。藥香混著土味，在牆邊久久不散。
+    desc: 教堂前朝西南，石牆擋住海風，牆根晾著成疊採回來的草藥。藥香混著土味，在牆邊許久不散。
     anchor_key:
     typeclass:
     scene_archetype: city_street

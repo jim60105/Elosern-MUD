@@ -14,7 +14,7 @@ nodes:
     y_m: 100
     prototype_parent: anchor_room
     key: 獐角圖騰
-    desc: 圖騰柱上掛著一對獐角，柱腳埋在一圈低矮的石籬裡。坡上的草長得比膝蓋還高。石籬的石頭是從坡上撿來的。
+    desc: 圖騰柱上掛著一對獐角，柱腳埋在一圈低矮的石籬裡。坡上的草長得比膝蓋還高。石籬的石頭從坡上撿來。
     anchor_key: hamlet_roe_slope
     typeclass:
     scene_archetype: city_street
@@ -23,7 +23,7 @@ nodes:
     y_m: 163
     prototype_parent: grid_room
     key: 共火塘
-    desc: 共火塘的火苗總壓得低低的，免得引燃坡上的乾草。往南的官道通往月嚎城。坡上的乾草捆成一束束靠在火塘邊。
+    desc: 共火塘的火苗壓得很低，免得引燃坡上的乾草。往南的官道通往月嚎城。坡上的乾草捆成小束靠在火塘邊。
     anchor_key:
     typeclass:
     scene_archetype: city_street

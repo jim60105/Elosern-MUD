@@ -41,7 +41,7 @@ nodes:
     y_m: 156
     prototype_parent: grid_room
     key: 教堂前庭
-    desc: 小教堂前的庭地舖著切割過的石板，西南方望得見層層的岩階，風起時塵土貼地而行。
+    desc: 小教堂前的庭地舖著切割過的石板，西南方望得見成層的岩階，風起時塵土貼地而行。
     anchor_key:
     typeclass:
     scene_archetype: city_street

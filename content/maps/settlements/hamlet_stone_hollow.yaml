@@ -14,7 +14,7 @@ nodes:
     y_m: 186
     prototype_parent: anchor_room
     key: 石坳路口
-    desc: 路口落在石礫環繞的凹地，路面被沖刷出淺溝，雨後積水久久不退，往來的人得踩著石塊過。
+    desc: 路口落在石礫環繞的凹地，路面被沖刷出淺溝，雨後積水好幾天不退，往來的人得踩著石塊過。
     anchor_key: hamlet_stone_hollow
     typeclass:
     scene_archetype: city_street

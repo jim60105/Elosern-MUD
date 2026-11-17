@@ -14,7 +14,7 @@ nodes:
     y_m: 1550
     prototype_parent: anchor_room
     key: 中央廣場
-    desc: 楓麓鎮的中央廣場，西支流的源頭就在鎮南不遠。北邊是山口，鎮上的人慣常往高處走，連井都打在坡上。
+    desc: 這裡是楓麓鎮的中央廣場，西支流的源頭就在鎮南不遠。北邊是山口，鎮上的人慣常往高處走，連井都打在坡上。
     anchor_key: town_maple_foot
     typeclass:
     scene_archetype: city_street

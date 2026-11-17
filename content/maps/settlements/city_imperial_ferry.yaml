@@ -23,7 +23,7 @@ nodes:
     y_m: 1075
     prototype_parent: grid_room
     key: 北門
-    desc: 北門外的官道上行就是輝煌帝都，關防在門內查驗。往來的車馬在此排成兩列，一列進城，一列出城。
+    desc: 出了北門，官道一路往上就是輝煌帝都，關防設在門內。往來的車馬在此排成兩列，一列進城，一列出城。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -95,7 +95,7 @@ nodes:
     y_m: 1050
     prototype_parent: grid_room
     key: 工匠巷
-    desc: 工匠巷在城西水門旁，船匠與繩匠共用一段河灘。翻修中的船底朝天擱在沙上，木屑浮在水面慢慢漂走。
+    desc: 工匠巷在城西水門旁，船匠與繩匠共用一段河灘。翻修中的船底朝天擱在沙上，木屑浮在水面，隨水漂走。
     anchor_key:
     typeclass:
     scene_archetype: city_street

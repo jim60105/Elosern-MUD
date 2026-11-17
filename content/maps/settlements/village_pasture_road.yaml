@@ -14,7 +14,7 @@ nodes:
     y_m: 287
     prototype_parent: anchor_room
     key: 牧欄綠地
-    desc: 綠地邊圍著矮木欄，井旁拴著幾匹剛飲過水的牧馬。馬尾不時掃過井臺，把拴馬樁上的蒼蠅趕得團團轉。
+    desc: 綠地邊圍著矮木欄，井旁拴著幾匹剛飲過水的牧馬。馬尾不時掃過井臺，把拴馬樁上的蒼蠅趕得亂轉。
     anchor_key: village_pasture_road
     typeclass:
     scene_archetype: city_street
@@ -23,7 +23,7 @@ nodes:
     y_m: 474
     prototype_parent: grid_room
     key: 北村口
-    desc: 北村口往東牧鎮，路上常有趕著牛群的牧人。蹄印深深淺淺地印在土裡，牛鈴聲隔著老遠就聽得見。
+    desc: 北村口往東牧鎮，路上常有趕著牛群的牧人。蹄印深淺不一地印在土裡，牛鈴聲隔著老遠就聽得見。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -32,7 +32,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 南村口
-    desc: 南村口順著官道下東灣港，海風把草香一路帶到海邊。路旁的草叢伏得低低的，像被誰用手撫過。
+    desc: 南村口順著官道下東灣港，海風把草香一路帶到海邊。路旁的草叢伏得很低，像被誰用手撫過。
     anchor_key:
     typeclass:
     scene_archetype: city_street

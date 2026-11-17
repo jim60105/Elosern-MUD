@@ -14,7 +14,7 @@ nodes:
     y_m: 234
     prototype_parent: anchor_room
     key: 貓影圖騰
-    desc: 寨心鋪著山貓形狀的石板，中央的圖騰柱刻著躍起的貓影。石板縫裡嵌滿了細碎的獸牙。石板的貓形輪廓在黃昏時最清楚。
+    desc: 寨心鋪著山貓形狀的石板，中央的圖騰柱刻著躍起的貓影。石板縫裡嵌滿了細碎的獸牙。石板的貓形輪廓在黃昏最分明。
     anchor_key: village_lynx_den
     typeclass:
     scene_archetype: city_street

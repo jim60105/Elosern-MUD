@@ -14,7 +14,7 @@ nodes:
     y_m: 100
     prototype_parent: anchor_room
     key: 河岸岔路
-    desc: 岔路就在河岸邊，河水的涼氣一直漫到路口。往西通往鹽道城的路沿著河走，路基年年都要補一次。
+    desc: 岔路就在河岸邊，河水的涼氣一直漫到路口。往西通往鹽道城的路沿著河走，路基每年都要補一次。
     anchor_key: hamlet_river_side
     typeclass:
     scene_archetype: city_street

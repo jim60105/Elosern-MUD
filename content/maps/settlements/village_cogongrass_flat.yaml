@@ -14,7 +14,7 @@ nodes:
     y_m: 218
     prototype_parent: anchor_room
     key: 白茅綠地
-    desc: 綠地被及腰的白茅圍著，井台上的水瓢是用半個葫蘆做的。風吹過時，整片茅草像水面一樣起伏。
+    desc: 綠地被及腰的白茅圍著，井台上的水瓢是半個葫蘆。風吹過時，整片茅草像水面一樣起伏。
     anchor_key: village_cogongrass_flat
     typeclass:
     scene_archetype: city_street
@@ -32,7 +32,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 東南村口
-    desc: 東南村口通往南潮港，路旁是一排排壓沙的茅束。走遠一點就能看見海，白色的浪線在日光下很清楚。
+    desc: 東南村口通往南潮港，路旁是成排壓沙的茅束。走遠一點就能看見海，白色的浪線在日光下發亮。
     anchor_key:
     typeclass:
     scene_archetype: city_street

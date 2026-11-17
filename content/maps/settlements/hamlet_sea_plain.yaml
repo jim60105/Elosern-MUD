@@ -14,7 +14,7 @@ nodes:
     y_m: 192
     prototype_parent: anchor_room
     key: 鹽田路口
-    desc: 路口旁的鹽田泛著白光，路面結著薄薄的鹽霜，踩過會留下清楚的腳印，海鳥在田埂上歇腳。
+    desc: 路口旁的鹽田泛著白光，路面結著一層鹽霜，踩過會留下清楚的腳印，海鳥在田埂上歇腳。
     anchor_key: hamlet_sea_plain
     typeclass:
     scene_archetype: city_street

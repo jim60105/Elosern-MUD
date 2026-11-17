@@ -23,7 +23,7 @@ nodes:
     y_m: 456
     prototype_parent: grid_room
     key: 北村口
-    desc: 北村口往黑土鎮，路穿過一片休耕的荒地。草長得齊腰高，車過時驚起一群群的雀鳥。村人說再過幾年，這片荒地也要翻成田。
+    desc: 北村口往黑土鎮，路穿過一片休耕的荒地。草長得齊腰高，車過時驚起成群的雀鳥。村人說再過幾年，這片荒地也要翻成田。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -41,7 +41,7 @@ nodes:
     y_m: 278
     prototype_parent: grid_room
     key: 教堂前
-    desc: 教堂前的空地朝東，擺著幾張石凳。日頭好的時候，村裡的老人坐在凳上縫補農具。凳腳埋在土裡，坐上去很穩。
+    desc: 教堂前的空地朝東，擺著幾張石凳。日頭好時，村裡的老人坐在凳上縫補農具。凳腳埋在土裡，坐上去很穩。
     anchor_key:
     typeclass:
     scene_archetype: city_street

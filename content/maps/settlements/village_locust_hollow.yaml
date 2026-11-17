@@ -41,7 +41,7 @@ nodes:
     y_m: 166
     prototype_parent: grid_room
     key: 教堂前
-    desc: 教堂前的石階朝東南，階上落著槐花。風一吹花便從屋簷滑下來，堆在牆腳。掃攏的槐花堆在牆腳，晒乾了可當柴。
+    desc: 教堂前的石階朝東南，階上落著槐花。風一吹花便從屋簷落下來，堆在牆腳。掃攏的槐花堆在牆腳，晒乾了可當柴。
     anchor_key:
     typeclass:
     scene_archetype: city_street

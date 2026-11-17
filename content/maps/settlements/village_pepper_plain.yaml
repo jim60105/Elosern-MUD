@@ -41,7 +41,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 教堂前
-    desc: 教堂前朝南，階下是整齊的椒田。陽光把田壟照出一條條深淺分明的影子，風過時紅椒微微搖晃。
+    desc: 教堂前朝南，階下是整齊的椒田。陽光把田壟照出深淺分明的影子，風過時紅椒跟著搖晃。
     anchor_key:
     typeclass:
     scene_archetype: city_street

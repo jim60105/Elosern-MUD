@@ -41,7 +41,7 @@ nodes:
     y_m: 531
     prototype_parent: grid_room
     key: 市場街
-    desc: 市場街在廣場西側，香料與藥材的攤子一路擺到城門。秤盤上墊著紙，怕香料沾上上一筆的氣味。
+    desc: 市場街在廣場西側，香料與藥材的攤子一路擺到城門。秤盤上墊著紙，怕香料沾上前一筆的氣味。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -77,7 +77,7 @@ nodes:
     y_m: 207
     prototype_parent: grid_room
     key: 工匠巷
-    desc: 工匠巷在東南，製香與鞣皮的手藝都集中在這一段。曬架上的香料一排排鋪開，顏色從深褐到淺黃。
+    desc: 工匠巷在東南，製香與鞣皮的手藝都集中在這一段。曬架上的香料分層鋪開，顏色從深褐到淺黃。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -95,7 +95,7 @@ nodes:
     y_m: 1028
     prototype_parent: grid_room
     key: 井欄巷
-    desc: 井欄巷在西北，巷底的石井供著半條街的水。井欄上的繩痕一圈圈深下去，像刻上去的年輪。
+    desc: 井欄巷在西北，巷底的石井供著半條街的水。井欄上留下深陷的繩痕，一圈疊著一圈，像刻上去的年輪。
     anchor_key:
     typeclass:
     scene_archetype: city_street

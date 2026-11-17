@@ -23,7 +23,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 農舍前
-    desc: 農舍前的空地朝東北，屋後是河道沖積的沙洲。秋天荻花開時，整片洲子覆著一層白絮。白絮被風捲起，落在水面又慢慢漂走。
+    desc: 農舍前的空地朝東北，屋後是河道沖積的沙洲。秋天荻花開時，整片洲子覆著一層白絮。白絮被風捲起，落在水面順水漂走。
     anchor_key:
     typeclass:
     scene_archetype: city_street

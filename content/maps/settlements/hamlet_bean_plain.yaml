@@ -23,7 +23,7 @@ nodes:
     y_m: 161
     prototype_parent: grid_room
     key: 農舍前
-    desc: 農舍前的空地朝東南，屋後晾著一排在田裡揀回的豆稈。夜裡風大，豆莢碰在一起發出細碎的聲響。
+    desc: 農舍前的空地朝東南，屋後晾著從田裡揀回的豆稈。夜裡風大，豆莢碰在一起發出細碎的聲響。
     anchor_key:
     typeclass:
     scene_archetype: city_street

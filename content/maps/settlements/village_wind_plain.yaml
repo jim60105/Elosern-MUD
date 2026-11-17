@@ -14,7 +14,7 @@ nodes:
     y_m: 269
     prototype_parent: anchor_room
     key: 防風井邊
-    desc: 綠地邊的井架上綁著防風的草繩，水桶總被吹得輕輕作響。繩結上還掛著幾片落葉，像是誰隨手別在那裡。
+    desc: 綠地邊的井架上綁著防風的草繩，水桶總被吹得作響。繩結上還掛著幾片落葉，像是誰隨手別在那裡。
     anchor_key: village_wind_plain
     typeclass:
     scene_archetype: city_street
@@ -23,7 +23,7 @@ nodes:
     y_m: 438
     prototype_parent: grid_room
     key: 北村口
-    desc: 北村口接往東牧鎮的牧道，路兩旁是低矮的石欄。欄內是剛剪過毛的羊群，遠遠望去像散在草上的灰白石子。
+    desc: 北村口接往東牧鎮的牧道，路兩旁是低矮的石欄。欄內是剛剪過毛的羊群，遠望像散在草上的灰白石子。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -32,7 +32,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 南村口
-    desc: 南村口順著官道往東灣港，海風從背後一路推著行人。衣角獵獵作響，連說話都得提高嗓子。
+    desc: 南村口順著官道往東灣港，海風從背後一路推著行人。衣角被風扯得作響，連說話都得提高嗓子。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -41,7 +41,7 @@ nodes:
     y_m: 269
     prototype_parent: grid_room
     key: 教堂前
-    desc: 教堂前朝東，屋簷壓得很低，正好擋住從海岸捲來的風。階上掃得乾乾淨淨，只有幾片被風送來的乾草。
+    desc: 教堂前朝東，屋簷壓得很低，正好擋住從海岸捲來的風。階上掃得乾淨，只有幾片被風送來的乾草。
     anchor_key:
     typeclass:
     scene_archetype: city_street

@@ -23,7 +23,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 渡口
-    desc: 渡口橫在南面的淺灘，石塊排成一線，兩岸的車馬在此等候涉水而過，船伕把長篙插進河心試深。
+    desc: 渡口設在南面的淺灘，石塊排成一線，兩岸的車馬在此等候涉水而過，船伕把長篙插進河心試深。
     anchor_key:
     typeclass:
     scene_archetype: city_street

@@ -14,7 +14,7 @@ nodes:
     y_m: 229
     prototype_parent: anchor_room
     key: 攀岩圖騰
-    desc: 寨心貼著崖壁築起，獼猴圖騰攀在突出的大石上。石面被雨水沖出幾道深溝，圖騰的爪痕卻還清楚。
+    desc: 寨心貼著崖壁築起，獼猴圖騰攀在突出的大石上。石面被雨水沖出幾道深溝，圖騰的爪痕卻還看得出來。
     anchor_key: village_macaque_cliff
     typeclass:
     scene_archetype: city_street
@@ -23,7 +23,7 @@ nodes:
     y_m: 358
     prototype_parent: grid_room
     key: 東北寨門
-    desc: 東北寨門通往疾風城，門外石階沿崖面折了七次。階旁的鐵鏈是給老人和小獸扶著走的。七折之後的階梯出口是一塊平緩的岩臺。
+    desc: 東北寨門通往疾風城，門外石階沿崖面折了七次。階旁的鐵鏈供老人和小獸扶著走。七折之後的階梯出口是一塊平緩的岩臺。
     anchor_key:
     typeclass:
     scene_archetype: city_street

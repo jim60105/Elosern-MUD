@@ -32,7 +32,7 @@ nodes:
     y_m: 204
     prototype_parent: grid_room
     key: 西村口
-    desc: 西村口是村裡最安靜的一頭，門外的小徑一直下到河邊的菜地。欄邊掛著斗笠，風一來便輕輕撞著木樁。
+    desc: 西村口是村裡最安靜的一頭，門外的小徑一直下到河邊的菜地。欄邊掛著斗笠，風一來便撞著木樁。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -41,7 +41,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 教堂前
-    desc: 教堂前朝南，河上的霧常常漫過階前的矮牆。石階被打濕得發亮，清早走上去得扶著牆才不會滑倒。
+    desc: 教堂前朝南，河上的霧時常漫過階前的矮牆。石階被打濕得發亮，清早走上去得扶著牆才不會滑倒。
     anchor_key:
     typeclass:
     scene_archetype: city_street

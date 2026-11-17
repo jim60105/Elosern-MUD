@@ -5,20 +5,20 @@ ships is Traditional Chinese prose, and a room's name and description are in
 the same language. The check is deliberately a heuristic over the text rather
 than a translation-quality judgement (design: "The guard checks prose, not
 characters"): "contains a CJK character" would pass on exactly the shipped
-defect this rule exists to prevent — a Chinese room name over an English body.
+defect this rule exists to prevent, a Chinese room name over an English body.
 
 Two conditions make a description pass:
 
 1. It is predominantly Han. The shipped corpus carries zero ASCII letter
    runs, and the old English corpus carried zero Han characters, so a Han
    character-count majority separates the two states with enormous margin.
-2. It contains no run of five consecutive Latin-letter words — long enough
+2. It contains no run of five consecutive Latin-letter words, long enough
    to be a sentence, short enough that an author leaking a clause into an
    otherwise Chinese room still trips it. The threshold was tuned against
    the converted corpus, not before it (tasks 3.3): the shipped prose needs
    zero such tolerance today, and five is the shortest run that could still
    plausibly be a kept proper noun rather than prose. The check is on run
-   length rather than on any Latin character precisely so a future
+   length rather than on any Latin character, so that a future
    description may name a command or keep a Latin-script term (design
    "Risks").
 """
@@ -31,7 +31,7 @@ __all__ = ("english_prose_defects",)
 _MAX_LATIN_WORD_RUN = 5
 
 # A Latin-letter word (apostrophes/hyphens kept inside the word), then four
-# more separated only by whitespace or punctuation — never another script's
+# more separated only by whitespace or punctuation; never another script's
 # letters, which is what keeps a Chinese room citing a short Latin term safe.
 _LATIN_WORD_RUN = re.compile(
     r"[A-Za-z]+(?:['’-]*[A-Za-z]+)*"

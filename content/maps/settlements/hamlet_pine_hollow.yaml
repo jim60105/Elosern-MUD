@@ -14,7 +14,7 @@ nodes:
     y_m: 100
     prototype_parent: anchor_room
     key: 松林路口
-    desc: 路口藏在松林凹處，路面積著厚厚的松針，腳步聲被吸得幾乎聽不見，只有風穿過樹梢的低鳴。
+    desc: 路口藏在松林凹處，路面積著松針，腳步聲被吸得幾乎聽不見，只有風穿過樹梢的低鳴。
     anchor_key: hamlet_pine_hollow
     typeclass:
     scene_archetype: city_street

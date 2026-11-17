@@ -2,7 +2,7 @@
 
 Every trading place in the village is a private home, not a storefront: a
 villager who happens to make or collect things trades from their own
-dwelling. The room names use the given name alone — a village refers to a
+dwelling. The room names use the given name alone. A village refers to a
 neighbour's house by the neighbour, not by the full 名‧姓 form.
 
 The tuple order is load-bearing: ``PLACE_REGISTRY`` appends this slice after
@@ -12,19 +12,19 @@ rows first and the village's four homes after (sync iterates in this order).
 Every merchant row carries a ``dialogue_key`` beside its ``shop_key``: the
 merchant blueprint answers as well as trades (merchant-dialogue). The
 village tables in ``world/lore/dialogue/ciaran.py`` speak as villagers
-sharing what they make — never as shopkeepers.
+sharing what they make, never as shopkeepers.
 
 ciaran-village-crafts adds the two homes the document names: 格威娜拉的家 off
-銀葉坡, whose host makes the village's ornaments, and 妮瑞斯的家 off 藥草園,
-whose hedge-healer keeps the remedies out of the 調藥坊's absence. Rows stay
+「銀葉坡」, whose host makes the village's ornaments, and 妮瑞斯的家 off
+「藥草園」, whose hedge-healer keeps the remedies out of the 調藥坊's absence. Rows stay
 alphabetical by host given name.
 
 ciaran-village-commons adds the three shared spaces the document names and the
-village lacked: 共食棚 off 村中廣場 — a host-less commons, because eating
-together is not a transaction in this culture — and the two homes whose people
-converse instead of trading: 泰莉爾的家 off 練刀場, where the village's sword
+village lacked: 共食棚 off 「村中廣場」, a host-less commons, because eating
+together is not a transaction in this culture, and the two homes whose people
+converse instead of trading: 泰莉爾的家 off 「練刀場」, where the village's sword
 instructor lives beside the blade-smith's doorstep, and 艾莉妮斯的家 off
-長老古樹下, home of the village's elder. Rows stay alphabetical by key.
+「長老古樹下」, home of the village's elder. Rows stay alphabetical by key.
 """
 
 from world.lore.settlements.places import PlaceDefinition, PlaceKind

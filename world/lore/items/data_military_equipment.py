@@ -12,7 +12,7 @@ _ROWS = (
     ("e", "新兵", ItemRarity.COMMON, "鍛坊量產的新兵裝備，結構簡潔。"),
     ("d", "步兵", ItemRarity.UNCOMMON, "鍛坊量產的步兵裝備，適合長途行軍。"),
     ("c", "遊騎兵", ItemRarity.UNCOMMON, "鍛坊量產的遊騎兵裝備，兼顧防護與靈活。"),
-    ("b", "符文老兵", ItemRarity.RARE, "軍械庫以制式符文附魔量產的老兵裝備。"),
+    ("b", "符文老兵", ItemRarity.RARE, "軍械庫以制式符文附魔後量產的老兵裝備。"),
     ("a", "軍械騎士", ItemRarity.EPIC, "軍械庫以制式附魔量產的騎士裝備。"),
     ("s", "軍械統帥", ItemRarity.LEGENDARY, "軍械庫以高階制式附魔量產的統帥裝備。"),
 )

@@ -14,7 +14,7 @@ nodes:
     y_m: 224
     prototype_parent: anchor_room
     key: 鶴頸圖騰
-    desc: 寨心立在崗頂，鶴形圖騰的長頸指向天空。崗下的官道看得一清二楚，連遠處的車隊都能數出來。
+    desc: 寨心立在崗頂，鶴形圖騰的長頸指向天空。崗下的官道一覽無遺，連遠處的車隊都能數出來。
     anchor_key: village_crane_knoll
     typeclass:
     scene_archetype: city_street
@@ -23,7 +23,7 @@ nodes:
     y_m: 348
     prototype_parent: grid_room
     key: 東北寨門
-    desc: 東北寨門通往祖靈聖地，門外是一段徐徐上升的崗道。崗道兩側長著成排的矮松，松針積在路邊。
+    desc: 東北寨門通往祖靈聖地，門外是一段緩升的崗道。崗道兩側長著成排的矮松，松針積在路邊。
     anchor_key:
     typeclass:
     scene_archetype: city_street

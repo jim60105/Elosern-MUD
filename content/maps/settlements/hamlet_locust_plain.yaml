@@ -14,7 +14,7 @@ nodes:
     y_m: 182
     prototype_parent: anchor_room
     key: 路口
-    desc: 路口往南通往駿原鎮，往北接楓麓鎮的舊道。路旁的槐樹稀疏，樹下的草被牛啃得很短。牛群沿著路邊慢慢走，蹄印疊在車轍上。
+    desc: 路口往南通往駿原鎮，往北接楓麓鎮的舊道。路旁的槐樹稀疏，樹下的草被牛啃得很短。牛群沿著路邊走，蹄印疊在車轍上。
     anchor_key: hamlet_locust_plain
     typeclass:
     scene_archetype: city_street

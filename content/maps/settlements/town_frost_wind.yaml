@@ -41,7 +41,7 @@ nodes:
     y_m: 580
     prototype_parent: grid_room
     key: 東門大街
-    desc: 大街往東鋪出去，兩旁是石砌的低屋，窗子開得極小。屋簷壓著厚厚的草束，是為了擋住從海上灌來的風。
+    desc: 大街往東鋪出去，兩旁是石砌的低屋，窗子開得極小。屋簷壓著粗草束，是為了擋住從海上灌來的風。
     anchor_key:
     typeclass:
     scene_archetype: city_street

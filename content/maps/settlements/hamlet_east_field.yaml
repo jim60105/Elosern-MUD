@@ -23,7 +23,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 農舍前
-    desc: 農舍前的南邊小路通往雙流城方向，屋後拴著兩匹役馬。院裡放著一副舊犁，犁頭擦得發亮。
+    desc: 農舍南邊的小路通往雙流城的方向，屋後拴著兩匹役馬。院裡放著一副舊犁，犁頭擦得發亮。
     anchor_key:
     typeclass:
     scene_archetype: city_street

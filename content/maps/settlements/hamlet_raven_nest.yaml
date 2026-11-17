@@ -14,7 +14,7 @@ nodes:
     y_m: 100
     prototype_parent: anchor_room
     key: 烏鴉圖騰
-    desc: 圖騰柱頂端削成鴉首，柱上釘著收集來的黑羽。林梢的鴉群在營地上空盤旋。黑羽在柱上排成一圈，像一道深色的環。
+    desc: 圖騰柱頂端削成鴉首，柱上釘著收集來的黑羽。林梢的鴉群在營地上空盤旋。黑羽在柱上圍成一道深色的環。
     anchor_key: hamlet_raven_nest
     typeclass:
     scene_archetype: city_street

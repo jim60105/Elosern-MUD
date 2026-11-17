@@ -14,7 +14,7 @@ nodes:
     y_m: 205
     prototype_parent: anchor_room
     key: 岔路口
-    desc: 岔路口往北接往香道城的官道，路面鋪著碎石子。路旁是低窪的草地，雨季時常積起一汪汪淺水。
+    desc: 岔路口往北接往香道城的官道，路面鋪著碎石子。路旁是低窪的草地，雨季時常積水成窪。
     anchor_key: hamlet_south_river
     typeclass:
     scene_archetype: city_street
@@ -23,7 +23,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 農舍前
-    desc: 農舍前的南邊小路通往金穗港，路邊長著一叢叢耐旱的芒草。屋前立著一根晾衣繩，繩上掛著粗布衣裳。
+    desc: 農舍前的南邊小路通往金穗港，路邊長著叢生的耐旱芒草。屋前立著一根晾衣繩，繩上掛著粗布衣裳。
     anchor_key:
     typeclass:
     scene_archetype: city_street

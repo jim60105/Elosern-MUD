@@ -14,7 +14,7 @@ nodes:
     y_m: 189
     prototype_parent: anchor_room
     key: 岔路口
-    desc: 岔路口往北接上牧道，通往東牧鎮。坡上的草被牲口啃得短短的，路旁立著幾根被磨亮的拴馬樁。
+    desc: 岔路口往北接上牧道，通往東牧鎮。坡上的草被牲口啃得很短，路旁立著幾根磨亮的拴馬樁。
     anchor_key: hamlet_wild_slope
     typeclass:
     scene_archetype: city_street

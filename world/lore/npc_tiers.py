@@ -38,7 +38,7 @@ class NPCTier:
 
 
 _NPC_TIERS = (
-    NPCTier("civilian", "平民", "沒有戰鬥能力的普通市民。", "human", "human_commoner"),
+    NPCTier("civilian", "平民", "沒有戰鬥能力的平民。", "human", "human_commoner"),
     NPCTier("guard", "衛兵", "維持治安的守衛，受過基本戰鬥訓練。", "human", "human_adventurer"),
     NPCTier("merchant", "商人", "往來各地的商人，攜帶貨物與錢財。", "human", "human_commoner"),
     NPCTier("adventurer", "冒險者", "以討伐與探索為業的冒險者。", "human", "human_adventurer"),

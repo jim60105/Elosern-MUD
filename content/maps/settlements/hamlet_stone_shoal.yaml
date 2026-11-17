@@ -23,7 +23,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 屋前曬場
-    desc: 屋前的空地朝東，曬著洗淨的麻布。屋主在門邊掛了一只木牌，記著每日過路的車數與人數。
+    desc: 屋前的空地朝東，曬著洗淨的麻布。屋主在門邊掛了一塊木牌，記著每日過路的車數與人數。
     anchor_key:
     typeclass:
     scene_archetype: city_street

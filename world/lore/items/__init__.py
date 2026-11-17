@@ -4,8 +4,8 @@ Item definitions carry no tunable numeric rules; exact prices, stock, and
 restock quantities live in ``world/rules/rulebook/guild_economy.yaml`` and are
 joined to these identities by the guild-economy catalog loader.
 
-Presentation metadata — closed item kind, closed SVG icon key, closed rarity,
-and a bounded Traditional Chinese summary — is registry-owned and read-only.
+Presentation metadata (closed item kind, closed SVG icon key, closed rarity,
+and a bounded Traditional Chinese summary) is registry-owned and read-only.
 It is visual identity only: numeric combat, recovery, or comparison values
 never enter this registry; the deterministic item-effects rulebook in
 ``world/rules/rulebook/item_effects.yaml`` owns every magnitude.

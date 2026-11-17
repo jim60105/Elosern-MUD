@@ -32,7 +32,7 @@ nodes:
     y_m: 598
     prototype_parent: grid_room
     key: 西門
-    desc: 西門朝著翠湖鎮，湖邊的蘆葦與魚乾由此進城。蘆蓆捆成一束束斜靠在門洞牆邊等驗，風一過就沙沙作響。
+    desc: 西門朝著翠湖鎮，湖邊的蘆葦與魚乾由此進城。蘆蓆捆好，成束斜靠在門洞牆邊等驗，風一過就沙沙作響。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -68,7 +68,7 @@ nodes:
     y_m: 929
     prototype_parent: grid_room
     key: 神殿前
-    desc: 神殿前在西北，鐘聲與作坊的敲擊聲常常撞在一起。祭司習慣在敲鐘時停一停，等回音散盡再落第二下。
+    desc: 神殿前在西北，鐘聲與作坊的敲擊聲不時撞在一起。祭司習慣在敲鐘時停一停，等回音散盡再落第二下。
     anchor_key:
     typeclass:
     scene_archetype: city_street

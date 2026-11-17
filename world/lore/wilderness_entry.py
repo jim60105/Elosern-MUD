@@ -5,7 +5,7 @@ footprint, and which face-gates of that footprint lead back to its grid rooms
 Each settlement document's ``wilderness_entry`` row is the authored source; this
 module exposes the composed view of the published settlement world (the DB
 mirror in ``world.lore.sync`` is a projection of it). All geometry helpers are
-pure and derived from the authored mask — consumers never re-derive it.
+pure and derived from the authored mask; consumers never re-derive it.
 """
 
 from collections.abc import Mapping

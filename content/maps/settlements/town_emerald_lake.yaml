@@ -23,7 +23,7 @@ nodes:
     y_m: 940
     prototype_parent: grid_room
     key: 北門
-    desc: 北門外的路沿著湖岸上行，通往帝河津。岸邊的蘆葦比人高，風一過就像有人在那裡走動。
+    desc: 北門外的路沿著湖岸上行，通往帝河津。岸邊的蘆葦比人高，風一吹，葦葉互相摩擦，發出細碎的聲響。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -50,7 +50,7 @@ nodes:
     y_m: 301
     prototype_parent: grid_room
     key: 市場街
-    desc: 市場街在廣場西南，晒過的魚乾在此論斤賣。繩上掛著的魚乾一排排，像是給整條街遮陽。
+    desc: 市場街在廣場西南，曬過的魚乾在此論斤賣。繩上掛滿魚乾，替整條街遮去日光。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -68,7 +68,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 神殿前
-    desc: 神殿前在西南，船匠下水前會來此上香。廟前立著一截舊船骨，據說是從湖底撈上來的，木紋已經發黑。
+    desc: 神殿前在西南，船匠下水前會來此上香。廟前立著一截舊船骨，從湖底撈起，木紋已經發黑。
     anchor_key:
     typeclass:
     scene_archetype: city_street

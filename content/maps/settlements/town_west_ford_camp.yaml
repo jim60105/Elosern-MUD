@@ -59,7 +59,7 @@ nodes:
     y_m: 823
     prototype_parent: grid_room
     key: 議事廳前庭
-    desc: 前庭西北角掛著渡口的排班木牌，誰守夜、誰出船寫得清清楚楚。族人議事時，最先談的總是如何看住這一段河面。
+    desc: 前庭西北角掛著渡口的排班木牌，誰守夜、誰出船寫得分明。族人議事時，最先談的總是如何看住這一段河面。
     anchor_key:
     typeclass:
     scene_archetype: city_street

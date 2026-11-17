@@ -14,7 +14,7 @@ nodes:
     y_m: 243
     prototype_parent: anchor_room
     key: 橙蔭綠地
-    desc: 綠地被橙樹圍著，井水微甜。村人都說用這口井的水泡茶最好，井邊因此常擺著幾只粗陶茶壺。
+    desc: 綠地被橙樹圍著，井水微甜。村人都說用這口井的水泡茶最好，井邊因此常擺著幾隻粗陶茶壺。
     anchor_key: village_orange_grove
     typeclass:
     scene_archetype: city_street

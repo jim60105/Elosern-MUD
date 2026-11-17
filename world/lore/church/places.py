@@ -2,7 +2,7 @@
 
 Church venues are a view over the place registry: a place joins the church
 venue set iff its authored ``church`` venue flag is set, and the derived
-set IS the venue authority — the accrual change's venue check and the
+set IS the venue authority; the accrual change's venue check and the
 enrollment change's host resolution read this set, never a second authored
 list. The flag is a boolean (a place either is a church venue or is not), so
 the old duplicate/conflicting-kwarg authoring is not representable; the

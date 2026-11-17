@@ -14,7 +14,7 @@ nodes:
     y_m: 401
     prototype_parent: anchor_room
     key: 野牛石坪
-    desc: 石坪上留著一圈踩實的土痕，是野牛群每年遷徙時繞行留下的。往東北的高地望去，坡線一路抬升，風裡混著草籽與獸群的氣味。
+    desc: 石坪上有一圈踩實的土痕，野牛群每年遷徙時都繞著這裡走。往東北的高地望去，坡線一路抬升，風裡混著草籽與獸群的氣味。
     anchor_key: city_horn_plain
     typeclass:
     scene_archetype: city_street

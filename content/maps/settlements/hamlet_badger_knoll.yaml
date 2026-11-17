@@ -23,7 +23,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 火塘石圈
-    desc: 火塘四周圍著一圈石頭，石頭被煙熏得漆黑。往東的路通往獵鷹鎮，往西北則是灰熊鎮。石圈外的地面被踩出一條通往官道的小徑。
+    desc: 火塘四周圍著一圈石頭，都被煙熏得漆黑。往東的路通往獵鷹鎮，往西北則是灰熊鎮。石圈外的地面被踩出一條通往官道的小徑。
     anchor_key:
     typeclass:
     scene_archetype: city_street

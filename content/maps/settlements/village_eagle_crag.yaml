@@ -23,7 +23,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 東南寨門
-    desc: 東南寨門開在崖壁的緩折處，門外石階盤下山腰，接上通往疾風城的官道。石階末端接上一座窄橋，橋板每隔幾年就得換。
+    desc: 東南寨門開在崖壁的緩折處，門外石階盤下山腰，接上通往疾風城的官道。石階末端是一座窄橋，橋板每隔幾年就得換。
     anchor_key:
     typeclass:
     scene_archetype: city_street

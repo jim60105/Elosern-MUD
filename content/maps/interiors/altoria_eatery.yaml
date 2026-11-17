@@ -9,7 +9,7 @@ id: altoria_eatery
 rooms:
   altoria_eatery:
     name_zh: 聖潔王都餐館
-    desc_zh: 聖潔王都的餐館，廚房蒸氣從門口漫出去，罩在南大道的人流上頭。
+    desc_zh: 聖潔王都的餐館，廚房的蒸氣從門口漫出去，飄在南大道的人流上。
     scene_archetype: tavern_interior
     art_key: altoria_eatery
 connections: []

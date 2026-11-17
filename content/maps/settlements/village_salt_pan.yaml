@@ -14,7 +14,7 @@ nodes:
     y_m: 238
     prototype_parent: anchor_room
     key: 鹽池綠地
-    desc: 綠地旁攤著曬鹽的淺池，井水帶著淡淡的鹹味。村人只用它洗滌與澆菜，飲水仍要走遠路去挑河泉。
+    desc: 綠地旁攤著曬鹽的淺池，井水帶著一點鹹味。村人只用它洗滌與澆菜，飲水仍要走遠路去挑河泉。
     anchor_key: village_salt_pan
     typeclass:
     scene_archetype: city_street
@@ -23,7 +23,7 @@ nodes:
     y_m: 376
     prototype_parent: grid_room
     key: 東北村口
-    desc: 東北村口往雙流城的路，鹽車一輛接一輛，把路面磨得發白。車輪碾過碎鹽，晴天裡閃著細細的光。
+    desc: 東北村口往雙流城的路，鹽車一輛接一輛，把路面磨得發白。車輪碾過碎鹽，晴天裡閃著細碎的光。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -41,7 +41,7 @@ nodes:
     y_m: 169
     prototype_parent: grid_room
     key: 教堂前
-    desc: 教堂前朝東南，階上總鋪著一層細白的鹽霜。海風一來便打著旋兒飛散，落在牆根的草葉上。
+    desc: 教堂前朝東南，階上總鋪著一層細白的鹽霜。海風一來便打著旋飛散，落在牆根的草葉上。
     anchor_key:
     typeclass:
     scene_archetype: city_street

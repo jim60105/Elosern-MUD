@@ -3,7 +3,7 @@
 Two frozen-dataclass registries, validated at import exactly like every
 other lore registry in this package:
 
-- :data:`OFFERING_CATALOG` — the sexual-ministry offering rows
+- :data:`OFFERING_CATALOG`, the sexual-ministry offering rows
   ``{key, act_key, merit, copper, min_lineage?}``. Seeds ship for the act
   keys that are currently ownable at character creation (the ``unlock={}``,
   non-``ownership_gated`` seed acts of the solo/partner/shame lines), and
@@ -13,11 +13,11 @@ other lore registry in this package:
   the same ``SKILL_REGISTRY`` row with zero duplicated data (design
   §4.2/§5.3, advanced rows). A ``copper`` of ``None`` means the offering
   pays the rulebook band default (``church.yaml`` ``offering_payout_band``).
-- :data:`REDEEM_CATALOG` — the ordination redemption rows
+- :data:`REDEEM_CATALOG`, the ordination redemption rows
   ``{skill_key, merit_price, tier, prereq_keys, polarity}``: the 16
   Series A/B/D rows with their price finals (decide-and-record task 1.1,
   design §5.5/§5.6; Series C/E arrive with the order-catalogue change).
-  Placeholder prices are forbidden — the row validator rejects
+  Placeholder prices are forbidden. The row validator rejects
   ``merit_price <= 0``. Catalogue-internal prereq chains ride the Series D
   high rows only.
 
@@ -63,7 +63,7 @@ class OfferingRow:
 class RedeemRow:
     """One ordination redemption entry (design §4.2/§5.6).
 
-    ``prereq_keys`` reference catalogue-internal keys ONLY — never lineage
+    ``prereq_keys`` reference catalogue-internal keys ONLY, never lineage
     machinery; ``polarity`` is the closed ``passive``/``active`` vocabulary
     the rulebook polarity gate classifies.
     """
@@ -113,10 +113,10 @@ def validate_redeem_rows(rows: tuple[RedeemRow, ...]) -> None:
     """Fail closed on malformed redemption rows, naming the row.
 
     Rejects by name: missing/empty ``skill_key``, a placeholder
-    ``merit_price`` (prices are finals — ``<= 0`` is forbidden), an unknown
+    ``merit_price`` (prices are finals and ``<= 0`` is forbidden), an unknown
     ``tier`` or ``polarity``, an empty or non-string ``prereq_keys`` entry, a
     duplicated prereq, and any lineage-flavoured prereq reference
-    (catalogue-internal prereqs are plain keys — a ``:``-bearing marker is
+    (catalogue-internal prereqs are plain keys; a ``:``-bearing marker is
     lineage machinery and has no place in this list).
     """
     seen: set[str] = set()
@@ -170,7 +170,7 @@ def validate_redeem_rows(rows: tuple[RedeemRow, ...]) -> None:
 
 #: The shipped offering rows: seed rows for the currently-ownable act keys
 #: (the ``unlock={}``, non-``ownership_gated`` seed acts of the solo, partner
-#: and shame lines — see the act catalogue, which is the single source of
+#: and shame lines; see the act catalogue, which is the single source of
 #: what a fresh character owns) plus the four advanced Series D ministry
 #: rows (``act_key`` = the redemption skill key; ``implement-church-
 #: redemption`` decided their per-row merits: the ministry acts pay above
@@ -215,7 +215,7 @@ OFFERING_CATALOG: tuple[OfferingRow, ...] = (
         copper=None,
     ),
     # Advanced Series D sexual-ministry rows (design §5.5): the same rows
-    # serve both catalogues by key — ``act_key`` equals the redemption
+    # serve both catalogues by key; ``act_key`` equals the redemption
     # skill_key, so the offering menu projection and the ordination ladder
     # reference one ``SKILL_REGISTRY`` entry with no duplicated data.
     OfferingRow(
@@ -244,7 +244,7 @@ OFFERING_CATALOG: tuple[OfferingRow, ...] = (
     ),
 )
 
-#: The shipped ordination rows — the 16 Series A/B/D price finals
+#: The shipped ordination rows, the 16 Series A/B/D price finals
 #: (decide-and-record task 1.1 inside the design §5.5 placeholders; Series
 #: C/E append with the order-catalogue change). Price bands: entry
 #: 300-600, mid 1200-2500, high 4000-8000.
@@ -295,7 +295,7 @@ OFFERING_CATALOG: tuple[OfferingRow, ...] = (
 #: blessing mounts a single-stat buff with clock cooldown). All 8 rows are
 #: prereq-free. Daily prayer accrual (40 merit * 3 prayers base = 120 merit/day;
 #: 160 with morning devotion), offerings (20..80 copper + row merit), and
-#: climax accrual (10 merit) ensure rung 1 (3 skills, ~1150-1550 merit) is
+#: climax accrual (10 merit) make rung 1 (3 skills, ~1150-1550 merit)
 #: reachable in a workday's grind and rung 2 (6 skills) in 2-3 days.
 REDEEM_CATALOG: tuple[RedeemRow, ...] = (
     RedeemRow(

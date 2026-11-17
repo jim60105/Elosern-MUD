@@ -14,7 +14,7 @@ nodes:
     y_m: 100
     prototype_parent: anchor_room
     key: 沙地路口
-    desc: 路口鋪在沙地上，車轍很快被風填平，路旁的枯草被吹得貼地，遠看只剩下幾道模糊的痕跡。
+    desc: 路口開在沙地上，車轍很快被風填平，路旁的枯草被吹得貼地，遠看只剩下幾道模糊的痕跡。
     anchor_key: hamlet_sand_plain
     typeclass:
     scene_archetype: city_street

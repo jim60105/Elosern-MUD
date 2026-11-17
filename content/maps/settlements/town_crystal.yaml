@@ -68,7 +68,7 @@ nodes:
     y_m: 413
     prototype_parent: grid_room
     key: 神殿前
-    desc: 神殿前在東側靠礦區，礦工出門前會來此求平安。神像手上纏著礦工留下的布條，顏色深深淺淺。
+    desc: 神殿前在東側靠礦區，礦工出門前會來此求平安。神像手上纏著礦工留下的布條，顏色深淺不一。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -77,7 +77,7 @@ nodes:
     y_m: 405
     prototype_parent: grid_room
     key: 客棧巷
-    desc: 客棧巷在鎮南，收購原礦的行商在此落腳。房裡擺著秤與油燈，談價常常談到深夜才熄火。
+    desc: 客棧巷在鎮南，收購原礦的行商在此落腳。房裡擺著秤與油燈，談價常到深夜才熄火。
     anchor_key:
     typeclass:
     scene_archetype: city_street

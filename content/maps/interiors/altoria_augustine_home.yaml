@@ -9,7 +9,7 @@ id: altoria_augustine_home
 rooms:
   altoria_augustine_home:
     name_zh: 奧古斯丁的家
-    desc_zh: 窗外排列盆栽，爐邊有水壺與兩張椅子。寢室陳設樸素，舊地圖摺好收在旅行箱裡。
+    desc_zh: 窗外擺著一排盆栽，爐邊有水壺與兩張椅子。寢室陳設樸素，舊地圖摺好收在旅行箱裡。
     scene_archetype: tavern_interior
     art_key: altoria_augustine_home
 connections: []

@@ -65,7 +65,7 @@ class NamePack:
     ``given`` is declared ``Mapping`` but holds a concrete ``FrozenDict``
     (a ``dict`` subclass) at runtime: the sync mirror path runs
     ``dataclasses.asdict``, which deepcopies non-dataclass fields, and a
-    ``MappingProxyType`` cannot be deepcopied — yet the value must still
+    ``MappingProxyType`` cannot be deepcopied, yet the value must still
     reject mutation so the frozen-registry invariant holds below the top
     level. The declaration type keeps consumers reading it as a Mapping.
     """

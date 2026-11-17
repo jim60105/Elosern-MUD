@@ -23,7 +23,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 農舍前
-    desc: 農舍前的空地朝東北，望得見潮風鎮方向的低平海岸。屋簷下掛著補過的漁網，海風一吹便輕輕擺動。
+    desc: 農舍前的空地朝東北，望得見潮風鎮方向的低平海岸。屋簷下掛著補過的漁網，海風一吹便擺動。
     anchor_key:
     typeclass:
     scene_archetype: city_street

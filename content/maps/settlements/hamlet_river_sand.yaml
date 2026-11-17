@@ -14,7 +14,7 @@ nodes:
     y_m: 189
     prototype_parent: anchor_room
     key: 岔路口
-    desc: 岔路口往北接往香道城的官道，路旁是帝河沖下的沙地。沙裡混著細碎的貝殼，踩上去會發出輕輕的聲響。
+    desc: 岔路口往北接往香道城的官道，路旁是帝河沖下的沙地。沙裡混著細碎的貝殼，踩上去會發出輕微的聲響。
     anchor_key: hamlet_river_sand
     typeclass:
     scene_archetype: city_street

@@ -23,7 +23,7 @@ nodes:
     y_m: 194
     prototype_parent: grid_room
     key: 東村口
-    desc: 東村口往香道城，粟米車在路口一輛挨著一輛。車轅上掛著驅鳥的布條，風一吹便啪啪作響。
+    desc: 東村口往香道城，粟米車在路口一輛挨著一輛。車轅上掛著驅鳥的布條，風一吹便拍出聲響。
     anchor_key:
     typeclass:
     scene_archetype: city_street

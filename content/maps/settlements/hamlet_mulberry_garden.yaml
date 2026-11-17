@@ -14,7 +14,7 @@ nodes:
     y_m: 100
     prototype_parent: anchor_room
     key: 路口
-    desc: 兩條路在此交會：一條往西去麥浪城，一條往東去日出鎮。路邊的桑園連成一片，葉子被採得只剩枝梢。
+    desc: 兩條路在此交會，一條往西去麥浪城，一條往東去日出鎮。路邊的桑園連成一片，葉子被採得只剩枝梢。
     anchor_key: hamlet_mulberry_garden
     typeclass:
     scene_archetype: city_street
@@ -23,7 +23,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 農舍前
-    desc: 農舍前的空地朝東，屋簷下擺著幾隻養蠶的竹匾。春天蠶食桑葉的聲音，整夜都不停。竹匾裡的蠶已經三眠，吃葉的聲音更密。
+    desc: 農舍前的空地朝東，屋簷下擺著幾隻養蠶的竹匾。春天夜裡，蠶食桑葉的聲音整夜不停。竹匾裡的蠶已經三眠，吃葉的聲音更密。
     anchor_key:
     typeclass:
     scene_archetype: city_street

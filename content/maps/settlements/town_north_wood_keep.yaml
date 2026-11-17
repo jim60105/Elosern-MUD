@@ -14,7 +14,7 @@ nodes:
     y_m: 600
     prototype_parent: anchor_room
     key: 中央廣場
-    desc: 北林堡的中央廣場，城牆比鎮上的屋舍還老。北邊的林子一直長到牆腳下，枝條越過垛口垂進城裡。
+    desc: 這裡是北林堡的中央廣場，城牆比鎮上的屋舍還老。北邊的林子一直長到牆腳下，枝條越過垛口垂進城裡。
     anchor_key: town_north_wood_keep
     typeclass:
     scene_archetype: city_street

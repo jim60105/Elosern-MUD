@@ -23,7 +23,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 東南村口
-    desc: 東南村口通往麥浪城，路從坳口緩緩下到平原。運穀的車隊常在這裡整隊，車轍把路面壓得很實。
+    desc: 東南村口通往麥浪城，路從坳口順坡下到平原。運穀的車隊常在這裡整隊，車轍把路面壓得很實。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -32,7 +32,7 @@ nodes:
     y_m: 364
     prototype_parent: grid_room
     key: 西北村口
-    desc: 西北村口朝魔晶鎮，路沿著坳邊的矮坡走。坡上種著耐寒的穀子，風過時穗子一層層倒下去。
+    desc: 西北村口朝魔晶鎮，路沿著坳邊的矮坡走。坡上種著耐寒的穀子，風過時穗子成片倒下去。
     anchor_key:
     typeclass:
     scene_archetype: city_street

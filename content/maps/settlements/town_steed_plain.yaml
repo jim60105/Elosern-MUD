@@ -14,7 +14,7 @@ nodes:
     y_m: 595
     prototype_parent: anchor_room
     key: 中央廣場
-    desc: 駿原鎮的中央廣場，練馬場就在廣場北邊的草地上。馬蹄聲從早到晚沒有停過，連夜裡都有人在遛馬。
+    desc: 這裡是駿原鎮的中央廣場，練馬場就在廣場北邊的草地上。馬蹄聲從早到晚沒有停過，連夜裡都有人在遛馬。
     anchor_key: town_steed_plain
     typeclass:
     scene_archetype: city_street
@@ -23,7 +23,7 @@ nodes:
     y_m: 1090
     prototype_parent: grid_room
     key: 東北門
-    desc: 東北門外的路通往翠湖鎮，趕馬的人沿著草原走。路邊每隔一段就有水槽，槽沿被馬啃得坑坑窪窪。
+    desc: 東北門外的路通往翠湖鎮，趕馬的人沿著草原走。路邊每隔一段就有水槽，槽沿被馬啃得坑窪不平。
     anchor_key:
     typeclass:
     scene_archetype: city_street

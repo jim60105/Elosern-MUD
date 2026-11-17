@@ -37,7 +37,7 @@ ROWS: tuple[ItemDefinition, ...] = (
                 kind=ItemKind.FOOD,
                 icon_key=ItemIconKey.FOOD,
                 rarity=ItemRarity.COMMON,
-                summary_zh="公會統一配發的壓縮口糧，D 級以下常見裝備。",
+                summary_zh="公會統一配發的壓縮口糧，D 級以下的常見配給。",
             ),
         ),
         ItemDefinition(
@@ -85,7 +85,7 @@ ROWS: tuple[ItemDefinition, ...] = (
                 kind=ItemKind.FOOD,
                 icon_key=ItemIconKey.FOOD,
                 rarity=ItemRarity.RARE,
-                summary_zh="精靈少量流出人類社會的花蕊蜜餞，甜而不膩。",
+                summary_zh="少量流入人類社會的精靈花蕊蜜餞，甜而不膩。",
             ),
         ),
         # Inspect-only lore codex items: 5 Remedies
@@ -122,7 +122,7 @@ ROWS: tuple[ItemDefinition, ...] = (
                 kind=ItemKind.POTION,
                 icon_key=ItemIconKey.POTION,
                 rarity=ItemRarity.UNCOMMON,
-                summary_zh="黑市流傳的催情酊劑，〔飾品〕迷情絲頸環便是浸過這類藥劑製成；效力溫和，可被意志壓制。",
+                summary_zh="黑市流傳的催情酊劑，〔飾品〕迷情絲頸環就是浸過這類藥劑製成的；效力溫和，可被意志壓制。",
             ),
         ),
         ItemDefinition(
@@ -134,7 +134,7 @@ ROWS: tuple[ItemDefinition, ...] = (
                 kind=ItemKind.POTION,
                 icon_key=ItemIconKey.POTION,
                 rarity=ItemRarity.EPIC,
-                summary_zh="以鮮活精靈體液為藥引低溫蒸餾出的金色藥劑，以極強的催情效力聞名，傳聞飲下者會在高潮般的熱浪中親眼看著自己的傷口合攏。",
+                summary_zh="以鮮活精靈體液為藥引，低溫蒸餾出的金色藥劑，以極強的催情效力聞名；傳聞飲下者會在高潮般的熱浪中親眼看著自己的傷口合攏。",
             ),
         ),
         ItemDefinition(
@@ -232,7 +232,7 @@ ROWS: tuple[ItemDefinition, ...] = (
                 kind=ItemKind.MATERIAL,
                 icon_key=ItemIconKey.MATERIAL,
                 rarity=ItemRarity.RARE,
-                summary_zh="地龍蛻下或討伐後取得的鱗片，質地堅硬耐熱。",
+                summary_zh="地龍蛻下的或討伐後取得的鱗片，質地堅硬耐熱。",
             ),
         ),
         ItemDefinition(
@@ -305,7 +305,7 @@ ROWS: tuple[ItemDefinition, ...] = (
                 kind=ItemKind.MISC,
                 icon_key=ItemIconKey.MISC,
                 rarity=ItemRarity.COMMON,
-                summary_zh="精靈孩童隨手製作的簡陋玩具，若被外人拾獲，通常代表附近有精靈幼體活動——世界觀提醒：精靈幼體對其他種族十分危險，因為他們不擅控制力道、不分是非。",
+                summary_zh="精靈孩童隨手製作的簡陋玩具。若被外人拾獲，通常代表附近有精靈幼體活動；精靈幼體對其他種族十分危險，因為他們不擅控制力道，也不分是非。",
             ),
         ),
 )

@@ -14,7 +14,7 @@ nodes:
     y_m: 243
     prototype_parent: anchor_room
     key: 芒原綠地
-    desc: 綠地中間的井臺用青石砌成，井邊長著一圈芒草。風起時芒花掃過井欄，像一層薄薄的白霧。
+    desc: 綠地中間的井臺用青石砌成，井邊長著一圈芒草。風起時芒花掃過井欄，像一層薄霧。
     anchor_key: village_awn_plain
     typeclass:
     scene_archetype: city_street
@@ -32,7 +32,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 西南巷尾
-    desc: 村子西南的巷尾通向帝都的官道，路邊立著一座指路的石堆。往來的人在此添一塊石頭，堆得比人還高。
+    desc: 村子西南的巷尾通向帝都的官道，路邊立著一堆指路的石頭。往來的人在此添一塊石頭，堆得比人還高。
     anchor_key:
     typeclass:
     scene_archetype: city_street

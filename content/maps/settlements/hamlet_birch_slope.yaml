@@ -14,7 +14,7 @@ nodes:
     y_m: 182
     prototype_parent: anchor_room
     key: 路口
-    desc: 路口往南通往魔晶鎮，往北是北林堡的林道。路旁的樺樹皮剝落，露出底下發亮的白木。樹皮下的白木在日頭下反光，遠遠就看得見。
+    desc: 路口往南通往魔晶鎮，往北是北林堡的林道。路旁的樺樹皮剝落，露出底下發亮的白木，在日頭下反光，遠處就看得見。
     anchor_key: hamlet_birch_slope
     typeclass:
     scene_archetype: city_street

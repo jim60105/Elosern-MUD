@@ -1,13 +1,13 @@
 """聖潔王都 (capital_altoria) LOWER-terrace place rows (settlement-shops design §6.1).
 
-The lower terrace is 南門一帶最老也最擁擠的舊城區, the market belt running
-along the cleared wall line — the food trade's ground (docs/lore/
+The lower terrace is 「南門一帶最老也最擁擠的舊城區」, the market belt running
+along the cleared wall line, the food trade's ground (docs/lore/
 settlement-locations.md). The 南大道 eatery is the capital slice's first row;
 the hospitality change (altoria-hospitality) adds this terrace's tavern,
 lodging and bathhouse here: the three are the capital's first places that
-sell nothing — attendant hosts whose whole service is conversation, so each
-authors a ``dialogue_key`` and no goods, and the lane's two (客棧巷's tavern
-and inn) carry distinct doorway names over the one shared exterior.
+sell nothing. They are attendant hosts whose whole service is conversation,
+so each authors a ``dialogue_key`` and no goods, and the lane's two, 客棧巷's
+tavern and inn, carry distinct doorway names over the one shared exterior.
 
 The assembled tuple order is load-bearing (see the assembly comment in
 ``places.py``): this slice leads the capital's three, so its rows reach the
@@ -18,12 +18,12 @@ blueprint answers as well as trades (merchant-dialogue), and a merchant place
 without the kwarg fails load naming the place. The tables live in
 ``world/lore/dialogue/altoria_lower.py`` under the same keys.
 
-altoria-crown-and-watch adds this terrace's 衛兵駐所 off 南門 — the gates
+altoria-crown-and-watch adds this terrace's 衛兵駐所 off 南門 where the gates
 already existed and the guardhouse behind them did not. Its captain is the
-document's 衛兵隊長: an attendant whose table orients the traveller coming
-through the arch, and who explicitly posts no work of his own (the document
-rules a parallel bounty system out at its line 410; the guild board and
-``npc:`` private commissions already carry that road).
+document's 衛兵隊長 whose table orients the traveller coming through the
+arch; he explicitly posts no work of his own (the document rules a parallel
+bounty system out at its line 410; the guild board and ``npc:`` private
+commissions already carry that road).
 """
 
 from world.lore.settlements.places import PlaceDefinition, PlaceKind
@@ -60,7 +60,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
         ),
     ),
     # 蘿溫‧古橡's tavern is the lane's information room: the document's
-    # designated place for 招募同伴 and 打聽情報, so her table names the
+    # designated place for 招募同伴 and 打聽情報 so her table names the
     # commands that already work (talk, invite) and promises no drink
     # effect or gamble the source document leaves 〔提案〕.
     PlaceDefinition(
@@ -84,7 +84,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
     ),
     # 溫弗蕾德‧古林's inn shares the lane and its doorstep with the tavern.
     # Her rooms host rest, sleep and practice exactly as those commands
-    # work anywhere else — the room is narrative, never a mechanism, and
+    # work anywhere else. The room is narrative, never a mechanism, and
     # the lodging fee the document marks 〔提案〕 stays un-invented.
     PlaceDefinition(
         key="altoria_lodging",
@@ -129,7 +129,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
             ),
         ),
     ),
-    # 聖潔王都衛兵駐所 — the guardhouse behind the south gate. The document
+    # 聖潔王都衛兵駐所 is the guardhouse behind the south gate. The document
     # keeps its 懸賞任務板 〔提案〕 pointed at the guild board and private
     # commissions instead (line 410), so the room ships no board, the host
     # ships no issuing component, and the change's second refusal is the

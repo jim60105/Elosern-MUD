@@ -14,7 +14,7 @@ nodes:
     y_m: 169
     prototype_parent: anchor_room
     key: 柳灘路口
-    desc: 路口就在河灘邊，柳枝垂到淺水上，渡水的石塊半沒在流裡，往來的行人挽起褲腳涉水而過。
+    desc: 路口就在河灘邊，柳枝垂到淺水上，渡水的石塊半沒在水流裡，往來的行人挽起褲腳涉水而過。
     anchor_key: hamlet_willow_shallows
     typeclass:
     scene_archetype: city_street

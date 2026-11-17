@@ -23,7 +23,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 西南門
-    desc: 西南門外通往日出鎮的路，沿著丘陵慢慢往內陸去。路旁的草被海風吹得貼地，走遠了才直起來。
+    desc: 西南門外通往日出鎮的路，沿著丘陵往內陸去。路旁的草被海風吹得貼地，走遠了才直起來。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -86,7 +86,7 @@ nodes:
     y_m: 389
     prototype_parent: grid_room
     key: 公會前
-    desc: 公會前在東南，分會的委託多與海上的失蹤船隻有闕。張貼的紙被海風掀起一角，上頭壓著一塊石頭。
+    desc: 公會前在東南，分會的委託多半與海上失蹤的船隻有關。張貼的紙被海風掀起一角，上頭壓著一塊石頭。
     anchor_key:
     typeclass:
     scene_archetype: city_street

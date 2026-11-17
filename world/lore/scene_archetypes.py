@@ -41,7 +41,7 @@ _SCENE_ARCHETYPES = (
     SceneArchetype(
         "city_street",
         "城市街道",
-        "鋪著石板的主要街道上人來人往，攤販的叫賣聲與馬車的輪聲此起彼落。",
+        "鋪著石板的主要街道上人來人往，攤販的叫賣聲與馬車的車輪聲此起彼落。",
     ),
     SceneArchetype(
         "wilderness_path",
@@ -71,17 +71,17 @@ _SCENE_ARCHETYPES = (
     SceneArchetype(
         "shrine_interior",
         "神殿內部",
-        "莊嚴的神殿內燭光搖曳，香氣裊繞，虔誠的信徒在神像前低聲祈禱。",
+        "莊嚴的神殿內燭光搖曳，香煙繚繞，虔誠的信徒在神像前低聲祈禱。",
     ),
     SceneArchetype(
         "rite_spring",
         "泉之石龕",
-        "苔蘚覆滿的泉池上緣開著一座低矮石龕，墨黑的水面映著林隙間垂落的冷光。",
+        "苔蘚覆滿的泉池上緣有一座低矮石龕，墨黑的水面映著林隙間垂落的冷光。",
     ),
     SceneArchetype(
         "rite_statue",
         "鹿影石雕",
-        "風掃過的草原上立著白色鹿形石雕，斷角與苔痕在斜陽下拖出長長的影子。",
+        "風掃過的草原上立著白色鹿形石雕，斷角與苔痕在斜陽下拖出細長的影子。",
     ),
     SceneArchetype(
         "rite_megalith",

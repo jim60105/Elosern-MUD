@@ -14,7 +14,7 @@ nodes:
     y_m: 100
     prototype_parent: anchor_room
     key: 路口
-    desc: 路口往西北通往日出鎮，往東南則下到潮風鎮。路旁的桐樹排成一列，樹下積著厚厚一層落葉。
+    desc: 路口往西北通往日出鎮，往東南則下到潮風鎮。路旁的桐樹排成一列，樹下積著一層落葉。
     anchor_key: hamlet_paulownia_knoll
     typeclass:
     scene_archetype: city_street

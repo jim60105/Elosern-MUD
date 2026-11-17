@@ -23,7 +23,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 東南村口
-    desc: 東南村口往雙流城，路旁堆著剛收割的麥捆。穗尖在風裡輕輕點頭，路上散落的麥粒引來成群麻雀。
+    desc: 東南村口往雙流城，路旁堆著剛收割的麥捆。穗尖在風裡晃動，路上散落的麥粒引來成群麻雀。
     anchor_key:
     typeclass:
     scene_archetype: city_street

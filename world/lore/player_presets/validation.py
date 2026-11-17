@@ -204,9 +204,9 @@ def _validate_preset_starting_equipment(registry: dict[str, PlayerPreset]) -> No
     subset rule and the wearable-set arithmetic (duplicates, the
     equipment-slot rule, singleton-slot collisions, accessory overflow) all
     raise at import instead of mid-activation. The wearable-set rules are the
-    shared helper's (custom-kit-worn-at-activation D3) — the same arithmetic
+    shared helper's (custom-kit-worn-at-activation D3), the same arithmetic
     ``_validate_starting_kit`` runs on subrace kits once custom activation
-    wears them — keeping the five-rule contract this validator declares
+    wears them, keeping the five-rule contract this validator declares
     observable through identical stable messages AND per-key error precedence:
     the malformed-entry and subset guards stay here (preset-specific) and run
     as the helper's per-entry guard, so one key's subset error still precedes

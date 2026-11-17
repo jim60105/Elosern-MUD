@@ -9,7 +9,7 @@ id: altoria_general_store
 rooms:
   altoria_general_store:
     name_zh: 阿爾托利亞雜貨店
-    desc_zh: 阿爾托利亞的雜貨店，貨架總留著幾格空位，像在任何一支商隊趕來之前先替它們留好位置。
+    desc_zh: 阿爾托利亞的雜貨店，貨架總留著幾格空位，等著還沒趕到的商隊。
     scene_archetype: tavern_interior
     art_key: altoria_general_store
 connections: []

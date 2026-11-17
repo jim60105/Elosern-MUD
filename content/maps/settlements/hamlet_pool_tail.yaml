@@ -14,7 +14,7 @@ nodes:
     y_m: 192
     prototype_parent: anchor_room
     key: 潭尾岔路
-    desc: 岔路在河潭的尾端，水面平靜得像一塊石頭。往西的路通往鹽道城，路口常停著剛洗淨的貨車。
+    desc: 岔路在河潭的尾端，水面平靜無波。往西的路通往鹽道城，路口常停著剛洗淨的貨車。
     anchor_key: hamlet_pool_tail
     typeclass:
     scene_archetype: city_street

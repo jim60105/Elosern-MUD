@@ -14,7 +14,7 @@ nodes:
     y_m: 243
     prototype_parent: anchor_room
     key: 河灘綠地
-    desc: 綠地緊挨著帝河的河灘，井水清得能看見井底的卵石。井繩常年是濕的，井口的木架被水氣浸得發黑。
+    desc: 綠地緊挨著帝河的河灘，井水清得能看見井底的卵石。井繩常年濕著，井口的木架被水氣浸得發黑。
     anchor_key: village_river_plain
     typeclass:
     scene_archetype: city_street
@@ -32,7 +32,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 東南村口
-    desc: 東南村口外是收割後的河灘地，只有一條牛車道通向水邊。車道兩旁立著蘆捆，風過時沙沙作響。
+    desc: 東南村口外是收割後的河灘地，只有一條牛車道通向水邊。車道兩旁立著蘆捆，風過時窸窣作響。
     anchor_key:
     typeclass:
     scene_archetype: city_street

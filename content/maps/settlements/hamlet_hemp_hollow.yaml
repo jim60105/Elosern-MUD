@@ -23,7 +23,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 紡麻農舍
-    desc: 農舍前架著紡麻的木輪，往西的路通往合流城，屋簷下掛著成束的麻線，風一吹便輕輕擺動。
+    desc: 農舍前架著紡麻的木輪，往西的路通往合流城，屋簷下掛著成束的麻線，隨風擺動。
     anchor_key:
     typeclass:
     scene_archetype: city_street

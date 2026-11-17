@@ -23,7 +23,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 屋前土埕
-    desc: 屋前有一片夯實的土埕，曬著豆子與辣椒。屋主把水缸埋進土裡，上頭覆著草蓆，免得日頭把水曬壞。
+    desc: 屋前有一片夯實的土埕，曬著豆子與辣椒。屋主把水缸埋進土裡，上頭覆著草蓆，免得日頭把水曬熱。
     anchor_key:
     typeclass:
     scene_archetype: city_street

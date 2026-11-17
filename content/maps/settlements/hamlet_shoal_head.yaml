@@ -23,7 +23,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 農舍前
-    desc: 農舍前曬著一席剛撈起的河魚，屋後的小徑直通鹽道。主人把多餘的柴堆在路口，讓過路人自行取用。
+    desc: 農舍前曬著剛撈起的河魚，屋後的小徑直通鹽道。主人把多餘的柴堆在路口，讓過路人自行取用。
     anchor_key:
     typeclass:
     scene_archetype: city_street

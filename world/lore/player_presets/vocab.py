@@ -37,7 +37,7 @@ _PERSONA_PROSE_FIELDS = ("personality", "life_story", "habit", "background")
 
 @dataclass(frozen=True)
 class PresetIdentity:
-    """The two identity layers PersonaStore renders (公開身分／隱秘身分)."""
+    """The two identity layers PersonaStore renders: public and hidden."""
 
     public: str = ""
     hidden: str = ""

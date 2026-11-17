@@ -14,7 +14,7 @@ nodes:
     y_m: 220
     prototype_parent: anchor_room
     key: 坡腳綠地
-    desc: 綠地靠著西邊的坡腳，井邊砌著擋風的石牆。牆頭壓著幾塊從坡上滾落的碎石，石縫裡長出細細的野草。
+    desc: 綠地靠著西邊的坡腳，井邊砌著擋風的石牆。牆頭壓著幾塊從坡上滾落的碎石，石縫裡長出細瘦的野草。
     anchor_key: village_west_plain
     typeclass:
     scene_archetype: city_street
@@ -23,7 +23,7 @@ nodes:
     y_m: 340
     prototype_parent: grid_room
     key: 東北村口
-    desc: 東北村口往駿原鎮，牧人趕著羊群從這裡經過。路口總留下一層細密的蹄印，雨後就成了淺淺的水窪。
+    desc: 東北村口往駿原鎮，牧人趕著羊群從這裡經過。路口總留下一層細密的蹄印，雨後就成了水窪。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -41,7 +41,7 @@ nodes:
     y_m: 160
     prototype_parent: grid_room
     key: 教堂前
-    desc: 教堂前朝東南，階下是一片剛翻過的旱田。土塊在風裡慢慢吹散，露出底下顏色更深的濕土。
+    desc: 教堂前朝東南，階下是一片剛翻過的旱田。土塊在風裡漸次吹散，露出底下顏色更深的濕土。
     anchor_key:
     typeclass:
     scene_archetype: city_street

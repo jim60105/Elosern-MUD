@@ -23,7 +23,7 @@ nodes:
     y_m: 200
     prototype_parent: grid_room
     key: 東寨門
-    desc: 東寨門通往鹿鳴渡，門外的路沿著河灘延伸。趕鹿的族人從這裡把鹿群帶去下游。河灘上的蹄印密密麻麻，一直延伸到淺水邊。
+    desc: 東寨門通往鹿鳴渡，門外的路沿著河灘延伸。趕鹿的族人從這裡把鹿群帶去下游。河灘上的蹄印密布，一直延伸到淺水邊。
     anchor_key:
     typeclass:
     scene_archetype: city_street

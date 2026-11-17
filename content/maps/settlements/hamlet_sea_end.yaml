@@ -14,7 +14,7 @@ nodes:
     y_m: 174
     prototype_parent: anchor_room
     key: 海尾路口
-    desc: 路口在海岸路的盡頭，路邊堆著曬鹽的木盤，海風把細沙吹進路面，行走時腳下不斷滑動。
+    desc: 路口在海岸路的盡頭，路邊堆著曬鹽的木盤，海風把細沙吹上路面，走起來腳下不斷打滑。
     anchor_key: hamlet_sea_end
     typeclass:
     scene_archetype: city_street

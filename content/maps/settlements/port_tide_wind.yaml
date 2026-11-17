@@ -50,7 +50,7 @@ nodes:
     y_m: 550
     prototype_parent: grid_room
     key: 碼頭
-    desc: 碼頭在鎮東的沙岸上，漁船趁退潮時整排靠在灘邊。船底的貝殼晒得發白，孩子蹲在旁邊撿。
+    desc: 碼頭在鎮東的沙岸上，漁船趁退潮時整排靠在灘邊。船底的貝殼曬得發白，孩子蹲在旁邊撿。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -59,7 +59,7 @@ nodes:
     y_m: 680
     prototype_parent: grid_room
     key: 市場街
-    desc: 市場街在廣場東北，天未亮開市，日頭一起就收。散市後地上只剩魚鱗，被海水沖上岸的浪帶走。
+    desc: 市場街在廣場東北，天未亮開市，日頭一起就收。散市後地上只剩魚鱗，海水一漲就把它們帶走。
     anchor_key:
     typeclass:
     scene_archetype: city_street

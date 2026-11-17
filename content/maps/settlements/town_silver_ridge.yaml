@@ -14,7 +14,7 @@ nodes:
     y_m: 337
     prototype_parent: anchor_room
     key: 中央廣場
-    desc: 銀嶺鎮的中央廣場，山就在鎮子背後立著。運礦的騾隊從東北的坡上下來，鈴聲比人先到。
+    desc: 這裡是銀嶺鎮的中央廣場，山就在鎮子背後立著。運礦的騾隊從東北的坡上下來，鈴聲比人先到。
     anchor_key: town_silver_ridge
     typeclass:
     scene_archetype: city_street

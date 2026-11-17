@@ -14,7 +14,7 @@ nodes:
     y_m: 297
     prototype_parent: anchor_room
     key: 溪埔綠地
-    desc: 綠地旁有一道引水的小渠，是從上游大河分出來的，井就鑿在渠邊。村人把成束的稻穗攤在綠地上曬。
+    desc: 綠地旁有一道引水的小渠，從上游大河分出，井就鑿在渠邊。村人把成束的稻穗攤在綠地上曬。
     anchor_key: village_creek_flat
     typeclass:
     scene_archetype: city_street
@@ -23,7 +23,7 @@ nodes:
     y_m: 494
     prototype_parent: grid_room
     key: 北村口
-    desc: 北村口通往鹽津城，口外的路沿著河岸往上游走。運穀的牛車常在此停下讓牲口飲水，轍印深深陷進濕土。
+    desc: 北村口通往鹽津城，口外的路沿著河岸往上游走。運穀的牛車常在此停下讓牲口飲水，轍印陷進濕土。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -41,7 +41,7 @@ nodes:
     y_m: 297
     prototype_parent: grid_room
     key: 教堂前渠
-    desc: 教堂前的地坪靠著水渠，階前的石槽是公用洗衣的地方。傍晚婦女在槽邊捶衣，水聲與鐘聲常常混在一起。
+    desc: 教堂前的地坪靠著水渠，階前的石槽是公用洗衣的地方。傍晚婦女在槽邊捶衣，水聲與鐘聲混在一起。
     anchor_key:
     typeclass:
     scene_archetype: city_street

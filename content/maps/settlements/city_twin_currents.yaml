@@ -50,7 +50,7 @@ nodes:
     y_m: 558
     prototype_parent: grid_room
     key: 市場街
-    desc: 市場街在廣場南邊，河鮮與穀物在此交易日日不歇。木盆裡的魚還帶著河底的泥，買賣的人蹲在盆邊講價。
+    desc: 市場街在廣場南邊，河鮮與穀物在此交易，一天也不歇。木盆裡的魚還帶著河底的泥，買賣的人蹲在盆邊講價。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -68,7 +68,7 @@ nodes:
     y_m: 803
     prototype_parent: grid_room
     key: 河港碼頭
-    desc: 河港碼頭在城東的匯流口，平底船在此換艙轉運。兩條河的水色不同，在船舷邊交會成一條清晰的界線。
+    desc: 河港碼頭在城東的匯流口，平底船在此換艙轉運。兩條河的水色不同，在船舷邊交會成一條分明的界線。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -104,7 +104,7 @@ nodes:
     y_m: 353
     prototype_parent: grid_room
     key: 河岸道
-    desc: 河岸道沿著匯流口鋪開，拉縴的人沿著石階上上下下。水退時露出成排的樁孔，那是更早的碼頭留下的痕跡。
+    desc: 河岸道沿著匯流口鋪開，拉縴的人沿著石階來回上下。水退時露出成排的樁孔，那是更早的碼頭留下的痕跡。
     anchor_key:
     typeclass:
     scene_archetype: city_street

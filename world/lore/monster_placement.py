@@ -10,7 +10,7 @@ This module is data and validation only (requirement R1 of the change's
 `lore-registries` delta). Placement *execution* belongs to ``world/maps/``:
 ``regional_population`` owns ordinary births and recovery, ``monster_sites``
 owns the site half, and both read these registries. Nothing here spawns,
-places, reconciles, recovers, or mutates any game state — the public surface
+places, reconciles, recovers, or mutates any game state. The public surface
 is the frozen registries, the builder/validator, and pure read helpers.
 
 Habitat tags constrain what an author MAY place, never what spawns: the
@@ -63,7 +63,7 @@ MONSTER_SITE_KINDS: tuple[str, ...] = (
 
 # The closed recovery-condition vocabulary. One in-game-clock condition ships
 # (`recover_after_ticks`, measured in game seconds by the world clock); a future
-# approved deterministic predicate joins this tuple by name — never free-form
+# approved deterministic predicate joins this tuple by name; never free-form
 # text and never wall-clock time. Validation reads the vocabulary from here, so
 # a condition no reader understands cannot be authored.
 RECOVERY_CONDITION_FIELDS: tuple[str, ...] = ("recover_after_ticks",)
@@ -79,7 +79,7 @@ class MonsterSite:
     :class:`EncounterComposition`: the site's individuals are exactly that
     composition's member rows, so a mixed group, a same-variant group, and a
     solitary stray each express their whole membership directly. ``capacity``
-    is the ceiling every legal outcome of that composition must fit — a
+    is the ceiling every legal outcome of that composition must fit, a
     definition-validation bound, never an instruction to fill absent rows.
     ``one_shot`` sites stay cleared after their individuals are defeated until
     an author-side re-issue; a recoverable site declares exactly one condition

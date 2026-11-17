@@ -50,7 +50,7 @@ nodes:
     y_m: 1483
     prototype_parent: grid_room
     key: 市場街
-    desc: 市場街往東伸展，攤上堆著當日上岸的魚獲與曬乾的海帶，蒼蠅在竹簍邊打轉，買主蹲著翻看魚鰓。
+    desc: 市場街往東伸展，攤上堆著當日上岸的漁獲與曬乾的海帶，蒼蠅在竹簍邊打轉，買主蹲著翻看魚鰓。
     anchor_key:
     typeclass:
     scene_archetype: city_street

@@ -14,7 +14,7 @@ nodes:
     y_m: 100
     prototype_parent: anchor_room
     key: 隼首圖騰
-    desc: 圖騰柱細長，柱頂的隼首朝向南邊的開闊地。岡上的風把柱頂的羽毛吹得不停顫動。羽毛是族人從巢裡撿回來的。
+    desc: 圖騰柱細長，柱頂的隼首朝向南邊的開闊地。岡上的風把柱頂的羽毛吹得不停顫動。羽毛由族人從巢裡撿回。
     anchor_key: hamlet_falcon_knoll
     typeclass:
     scene_archetype: city_street

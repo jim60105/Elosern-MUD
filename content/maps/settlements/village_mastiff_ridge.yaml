@@ -14,7 +14,7 @@ nodes:
     y_m: 192
     prototype_parent: anchor_room
     key: 獒犬圖騰
-    desc: 寨心的獒犬圖騰朝南蹲坐，石雕的鼻頭被摸得光滑。嶺上的風把旗繩打得啪啪作響。旗繩上的布條已經被風撕成細條。
+    desc: 寨心的獒犬圖騰朝南蹲坐，石雕的鼻頭被摸得光滑。嶺上的風把旗繩拍出聲響。旗繩上的布條已經被風撕成細條。
     anchor_key: village_mastiff_ridge
     typeclass:
     scene_archetype: city_street

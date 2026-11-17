@@ -14,7 +14,7 @@ nodes:
     y_m: 1600
     prototype_parent: anchor_room
     key: 中央石坪
-    desc: 四條獸道在此交會，腳下的石坪被獸蹄磨得發亮。部族的鼓聲一響，全城都聽得見，連林線上的鳥也一齊飛起。
+    desc: 四條獸道在此交會，腳下的石坪被獸蹄磨得發亮。部族的鼓聲一響，全城的人都聽得見，連林線上的鳥也一齊飛起。
     anchor_key: capital_valhalla
     typeclass:
     scene_archetype: city_street
@@ -23,7 +23,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 南面山口
-    desc: 木柵門朝祖靈聖地的方向敞開，門邊石堆是獵隊進出時添上的。誰要往南邊的丘陵去，都得先在這道門下讓守門人看一眼腰間的行囊。
+    desc: 木柵門朝祖靈聖地的方向敞開，門邊石堆由獵隊進出時添上。誰要往南邊的丘陵去，都得先在這道門下讓守門人看一眼腰間的行囊。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -41,7 +41,7 @@ nodes:
     y_m: 115
     prototype_parent: grid_room
     key: 西南隘門
-    desc: 這道門面向疾風城，風從草原一路灌進來，門板上的獸皮條被吹得啪啪作響。守門人裹緊毛披，仍舊站得筆直。
+    desc: 這道門面向疾風城，風從草原一路灌進來，門板上的獸皮條被吹得拍打作響。守門人裹緊毛披，仍舊站得筆直。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -95,7 +95,7 @@ nodes:
     y_m: 1249
     prototype_parent: grid_room
     key: 西南坡道
-    desc: 坡道順著地勢往下滑，推車得兩個人一前一後才煞得住。路旁每隔幾步就有供人歇腳的平石，被坐得發亮。
+    desc: 坡道順著地勢往下斜，推車得兩個人一前一後才煞得住。路旁每隔幾步就有供人歇腳的平石，被坐得發亮。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -113,7 +113,7 @@ nodes:
     y_m: 2154
     prototype_parent: grid_room
     key: 西北石階
-    desc: 石階上每隔十步有一處凹槽，是歷年扛祭品上山的人踩出來的。階旁的鐵鍊換過幾回，磨得比石頭還滑。
+    desc: 石階上每隔十步有一處凹槽，歷年扛祭品上山的人把石面踩凹了。階旁的鐵鍊換過幾回，磨得比石頭還滑。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -167,7 +167,7 @@ nodes:
     y_m: 1461
     prototype_parent: grid_room
     key: 祖靈祭壇
-    desc: 祭壇以巨石壘成，四時供應獸骨與野果，風一吹，懸著的骨鈴便輕輕作響。祭壇腳下不許喧嘩，連孩子經過都會自動放輕腳步。
+    desc: 祭壇以巨石壘成，四時供應獸骨與野果，風一吹，懸著的骨鈴便發出輕響。祭壇腳下不許喧嘩，連孩子經過都會自動放輕腳步。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -212,7 +212,7 @@ nodes:
     y_m: 2139
     prototype_parent: grid_room
     key: 西坊巷
-    desc: 西邊的作坊街，木桶、繩具與鞍具沿牆排開，敲打聲從早到晚不停。地上鋪著一層木屑，踩過去軟軟的。
+    desc: 西邊的作坊街，木桶、繩具與鞍具沿牆排開，敲打聲從早到晚不停。地上鋪著一層木屑，踩過去腳下發軟。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -221,7 +221,7 @@ nodes:
     y_m: 2625
     prototype_parent: grid_room
     key: 北坡巷
-    desc: 北坡的住屋沿地勢錯落，屋頂壓著石塊，好抵擋從山上灌下來的風。傍晚家家升火，煙順著坡面一起往南飄。
+    desc: 北坡的住屋沿地勢錯落，屋頂壓著石塊，好抵擋從山上灌下來的風。傍晚各戶升火，煙順著坡面一起往南飄。
     anchor_key:
     typeclass:
     scene_archetype: city_street

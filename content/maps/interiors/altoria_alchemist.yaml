@@ -9,7 +9,7 @@ id: altoria_alchemist
 rooms:
   altoria_alchemist:
     name_zh: 聖潔王都鍊金坊
-    desc_zh: 聖潔王都的鍊金坊，一排排瓶罐塞好、貼好標籤，望著東市那條貨運道路。
+    desc_zh: 聖潔王都的鍊金坊，架上排著塞好瓶口、貼好標籤的瓶罐，門面朝著東市那條貨運道路。
     scene_archetype: tavern_interior
     art_key: altoria_alchemist
 connections: []

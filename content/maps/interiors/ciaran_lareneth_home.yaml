@@ -9,7 +9,7 @@ id: ciaran_lareneth_home
 rooms:
   ciaran_lareneth_home:
     name_zh: 拉瑞內斯的家
-    desc_zh: 溪畔小徑旁這戶人家，空氣裡懸著糖漬花的香氣。曬乾的花瓣織在籃裡擱著，挨著一方小爐石；窗邊一張矮凳上擺著今日待客的小點，為每個經過的人留著。
+    desc_zh: 溪畔小徑旁這戶人家，空氣裡懸著糖漬花的香氣。曬乾的花瓣收在籃裡，籃子挨著一方小爐石；窗邊一張矮凳上擺著今日待客的小點，為每個經過的人留著。
     scene_archetype: tavern_interior
     art_key: ciaran_lareneth_home
 connections: []

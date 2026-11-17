@@ -14,7 +14,7 @@ nodes:
     y_m: 195
     prototype_parent: anchor_room
     key: 路口
-    desc: 路口往南通往帝河津，往北接帝都的官道。路旁的池塘浮著萍葉，水面被風推出一圈圈的紋路。
+    desc: 路口往南通往帝河津，往北接帝都的官道。路旁的池塘浮著萍葉，水面被風推出細紋。
     anchor_key: hamlet_duckweed_pond
     typeclass:
     scene_archetype: city_street

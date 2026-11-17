@@ -23,7 +23,7 @@ nodes:
     y_m: 178
     prototype_parent: grid_room
     key: 農舍前
-    desc: 農舍前的空地朝南，屋後是塘邊的泥地。採藕時村人赤腳下塘，挖出的藕節堆在岸上。藕節上的泥還沒乾，堆在岸邊散著土腥味。
+    desc: 農舍前的空地朝南，屋後是塘邊的泥地。採藕時村人赤腳下塘，挖出的藕節堆在岸上。藕節上的泥還沒乾，散著土腥味。
     anchor_key:
     typeclass:
     scene_archetype: city_street

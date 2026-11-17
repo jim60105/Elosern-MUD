@@ -14,7 +14,7 @@ nodes:
     y_m: 479
     prototype_parent: anchor_room
     key: 鐵砧石坪
-    desc: 石坪中央嵌著一塊平坦的赤鐵岩，各部族的礦工都習慣在這裡攤開自己的收穫。北面坡地一路往上，風裡帶著爐渣與鐵鏽的氣味。
+    desc: 石坪中央嵌著一塊平坦的赤鐵岩，各部族的礦工都習慣在這裡攤開挖到的礦石。北面坡地一路往上，風裡帶著爐渣與鐵鏽的氣味。
     anchor_key: city_iron_claw
     typeclass:
     scene_archetype: city_street
@@ -50,7 +50,7 @@ nodes:
     y_m: 689
     prototype_parent: grid_room
     key: 礦石市街
-    desc: 市街上堆著一筐筐原礦與粗鐵，行家拿起石頭對著光翻看，用手背敲兩下便出價。成交之後，買賣雙方會一起把礦石抬上木架稱重。
+    desc: 市街上堆著成筐的原礦與粗鐵，行家拿起石頭對著光翻看，用手背敲兩下便出價。成交之後，買賣雙方會一起把礦石抬上木架稱重。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -59,7 +59,7 @@ nodes:
     y_m: 698
     prototype_parent: grid_room
     key: 議事廳前庭
-    desc: 前庭的立柱綁著各族族徽，門口那張長桌是議事時擺圖用的。平日裡，長老們坐在階上修整皮甲，順便聽過路旅人帶來的消息。
+    desc: 前庭的立柱綁著各族的族徽，門口那張長桌議事時用來擺圖。平日裡，長老們坐在階上修整皮甲，順便聽過路旅人帶來的消息。
     anchor_key:
     typeclass:
     scene_archetype: city_street

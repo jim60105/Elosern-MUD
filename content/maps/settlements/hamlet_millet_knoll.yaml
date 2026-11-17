@@ -14,7 +14,7 @@ nodes:
     y_m: 100
     prototype_parent: anchor_room
     key: 路口
-    desc: 路口往西通往麥浪城，往東是日出鎮的長路。路旁的黍田已經收割，田裡只剩短短的茬子。
+    desc: 路口往西通往麥浪城，往東是日出鎮的長路。路旁的黍田已經收割，田裡只剩短茬。
     anchor_key: hamlet_millet_knoll
     typeclass:
     scene_archetype: city_street

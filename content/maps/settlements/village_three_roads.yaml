@@ -14,7 +14,7 @@ nodes:
     y_m: 345
     prototype_parent: anchor_room
     key: 路口綠地
-    desc: 綠地就在三條大道交會的空地上，井欄邊放著幾只公用木桶。趕路的人在此歇腳飲馬，井臺四周終日人聲不斷。
+    desc: 綠地就在三條大道交會的空地上，井欄邊放著幾隻公用木桶。趕路的人在此歇腳飲馬，井臺四周終日人聲不斷。
     anchor_key: village_three_roads
     typeclass:
     scene_archetype: city_street
@@ -23,7 +23,7 @@ nodes:
     y_m: 590
     prototype_parent: grid_room
     key: 北村口
-    desc: 北村口往雙流城，車馬在渡口前排成一線。轄具的聲響從早到晚不絕，連河上的水鳥都被驚得飛起。
+    desc: 北村口往雙流城，車馬在渡口前排成一線。馬具的聲響從早到晚不絕，連河上的水鳥都被驚得飛起。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -32,7 +32,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 南村口
-    desc: 南村口分往香道城與金穗港，路口立著兩塊指路石。石面被來往行人的手掌摸得發亮，字跡卻還清楚。
+    desc: 南村口分往香道城與金穗港，路口立著兩塊指路石。石面被來往行人的手掌摸得發亮，字跡卻還讀得出來。
     anchor_key:
     typeclass:
     scene_archetype: city_street

@@ -41,7 +41,7 @@ nodes:
     y_m: 181
     prototype_parent: grid_room
     key: 教堂前庭
-    desc: 小教堂前的庭地舖著河石，北邊的路通往東渡鎮，禮拜堂的窗正對著上遊的河灣。
+    desc: 小教堂前的庭地舖著河石，北邊的路通往東渡鎮，禮拜堂的窗正對著上游的河灣。
     anchor_key:
     typeclass:
     scene_archetype: city_street

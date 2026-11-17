@@ -27,7 +27,7 @@ MAX_TITLE_DISPLAY_CODE_POINTS = 63
 
 # Epithet nomination throttle (change G, title-system D4): a declined ballot
 # suppresses re-nomination for this many world-clock day boundaries. Decline is
-# the only cooldown source — pending ballots never expire. Plain module
+# the only cooldown source; pending ballots never expire. Plain module
 # constant; registry rows, not constants, are what ``world.lore.sync`` mirrors
 # into Scripts.
 NOMINATION_COOLDOWN_DAYS = 2
@@ -127,7 +127,7 @@ class StarterEpithet:
 
 STARTER_EPITHET = StarterEpithet(
     "南門新客",
-    "你在公會完成第一次任務回報，成為阿爾托利亞冒險者中的新面孔。",
+    "你在公會回報第一個任務，成為阿爾托利亞冒險者中的新面孔。",
 )
 
 
@@ -150,7 +150,7 @@ def _predicate(
 _FIXED_TITLE_ROWS: dict[str, FixedTitleDef] = {
     "g_f_rank": FixedTitleDef(
         "g_f_rank",
-        "F級冒險者",
+        "F 級冒險者",
         TitleCategory.GUILD,
         "你在公會名冊上留下第一個名字，冒險者的旅程由此開始。",
         "完成公會註冊即可獲得。",
@@ -158,7 +158,7 @@ _FIXED_TITLE_ROWS: dict[str, FixedTitleDef] = {
     ),
     "g_e_rank": FixedTitleDef(
         "g_e_rank",
-        "E級斥候",
+        "E 級斥候",
         TitleCategory.GUILD,
         "你踏足荒野、獵殺低階魔物，成了公會眼中可靠的斥候。",
         "通過 E 級公會考核即可獲得。",
@@ -166,7 +166,7 @@ _FIXED_TITLE_ROWS: dict[str, FixedTitleDef] = {
     ),
     "g_d_rank": FixedTitleDef(
         "g_d_rank",
-        "D級傭兵",
+        "D 級傭兵",
         TitleCategory.GUILD,
         "你已能獨當一面接下委託，傭兵的名號隨之遠播。",
         "通過 D 級公會考核即可獲得。",
@@ -174,15 +174,15 @@ _FIXED_TITLE_ROWS: dict[str, FixedTitleDef] = {
     ),
     "g_c_rank": FixedTitleDef(
         "g_c_rank",
-        "C級騎士",
+        "C 級騎士",
         TitleCategory.GUILD,
-        "你以劍與魔法守護委託與弱者，被賦予騎士之銜。",
+        "你以劍與魔法完成委託並守護弱者，被賦予騎士之銜。",
         "通過 C 級公會考核即可獲得。",
         _predicate(TitlePredicateFamily.GUILD_RANK_REACHED, guild_rank="C"),
     ),
     "g_b_rank": FixedTitleDef(
         "g_b_rank",
-        "B級英雄",
+        "B 級英雄",
         TitleCategory.GUILD,
         "高難度委託對你已成日常，坊間開始以英雄稱呼你。",
         "通過 B 級公會考核即可獲得。",
@@ -190,7 +190,7 @@ _FIXED_TITLE_ROWS: dict[str, FixedTitleDef] = {
     ),
     "g_a_rank": FixedTitleDef(
         "g_a_rank",
-        "A級傳奇",
+        "A 級傳奇",
         TitleCategory.GUILD,
         "你的事蹟被吟遊詩人寫入歌謠，傳奇之名實至名歸。",
         "通過 A 級公會考核即可獲得。",
@@ -198,7 +198,7 @@ _FIXED_TITLE_ROWS: dict[str, FixedTitleDef] = {
     ),
     "g_s_rank": FixedTitleDef(
         "g_s_rank",
-        "S級傳說",
+        "S 級傳說",
         TitleCategory.GUILD,
         "凌駕人類領域的委託也只有你能接下，傳說由你書寫。",
         "通過 S 級公會考核即可獲得。",
@@ -230,7 +230,7 @@ _FIXED_TITLE_ROWS: dict[str, FixedTitleDef] = {
         "c_priest",
         "神官",
         TitleCategory.CLERGY,
-        "掌握諸多神聖祭儀，主持彌撒與恩寵傳播的神官。",
+        "掌握諸多神聖祭儀，主持彌撒並傳布恩寵的神官。",
         "在教會兌換 10 個聖職項目即可獲得。",
         _predicate(TitlePredicateFamily.CHURCH_SKILLS_REDEEMED, threshold=10),
     ),
@@ -238,7 +238,7 @@ _FIXED_TITLE_ROWS: dict[str, FixedTitleDef] = {
         "c_bishop",
         "主教",
         TitleCategory.CLERGY,
-        "總攬一方教區之牧靈職責，具備崇高威望與威信的主教。",
+        "主持一方教區的牧靈工作，在教會中享有崇高威望的主教。",
         "在教會兌換 15 個聖職項目即可獲得。",
         _predicate(TitlePredicateFamily.CHURCH_SKILLS_REDEEMED, threshold=15),
     ),

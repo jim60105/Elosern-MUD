@@ -14,7 +14,7 @@ nodes:
     y_m: 100
     prototype_parent: anchor_room
     key: 豹斑圖騰
-    desc: 圖騰柱上刻滿豹斑狀的淺坑，坑裡積著雨水。岡下的官道東西向穿過。淺坑裡的雨水要等到日頭曬足才會乾。
+    desc: 圖騰柱上刻滿豹斑狀的淺坑，坑裡積著雨水。岡下的官道由東向西穿過。淺坑裡的雨水要等到日頭曬足才會乾。
     anchor_key: hamlet_panther_knoll
     typeclass:
     scene_archetype: city_street

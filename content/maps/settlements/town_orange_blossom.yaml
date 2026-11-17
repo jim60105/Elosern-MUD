@@ -14,7 +14,7 @@ nodes:
     y_m: 129
     prototype_parent: anchor_room
     key: 中央廣場
-    desc: 橙花鎮的中央廣場，四周都是果園，春天滿鎮都是花香。西邊地勢略高，老宅都蓋在那頭，屋瓦上落著花瓣。
+    desc: 這裡是橙花鎮的中央廣場，四周都是果園，春天滿鎮都是花香。西邊地勢略高，老宅都蓋在那頭，屋瓦上落著花瓣。
     anchor_key: town_orange_blossom
     typeclass:
     scene_archetype: city_street
@@ -68,7 +68,7 @@ nodes:
     y_m: 241
     prototype_parent: grid_room
     key: 神殿前
-    desc: 神殿前在鎮西高處，花季的祭禮在此舉行。階前的石槽裡浮著一層花瓣，是來客隨手放進去的。
+    desc: 神殿前在鎮西高處，花季的祭禮在此舉行。階前的石槽裡浮著一層花瓣，來客隨手放進去。
     anchor_key:
     typeclass:
     scene_archetype: city_street

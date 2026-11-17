@@ -14,7 +14,7 @@ nodes:
     y_m: 200
     prototype_parent: anchor_room
     key: 麥坳井台
-    desc: 村中的井台旁是壓麥的石碾，井水拌著磨坊的粉塵，麥稈在空地邊堆成高高的垛。
+    desc: 村中的井台旁是壓麥的石碾，井水拌著磨坊的粉塵，麥稈在空地邊堆成高垛。
     anchor_key: village_wheat_hollow
     typeclass:
     scene_archetype: city_street
@@ -23,7 +23,7 @@ nodes:
     y_m: 200
     prototype_parent: grid_room
     key: 東村口
-    desc: 東村口的路往葡萄鎮方向開，路旁是一塊塊麥田，收割後的田裡留著整齊的麥茬。
+    desc: 東村口的路往葡萄鎮方向開，路旁是成塊的麥田，收割後的田裡留著整齊的麥茬。
     anchor_key:
     typeclass:
     scene_archetype: city_street

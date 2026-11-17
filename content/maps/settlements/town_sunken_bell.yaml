@@ -14,7 +14,7 @@ nodes:
     y_m: 577
     prototype_parent: anchor_room
     key: 中央廣場
-    desc: 沉鐘鎮的中央廣場，湖就在鎮子邊上，水面平得像塊鐵。鎮裡的人說湖底沉著一座鐘樓，風大的夜裡還聽得見鐘聲。
+    desc: 這裡是沉鐘鎮的中央廣場，湖就在鎮子邊上，水面平得像塊鐵。鎮裡的人說湖底沉著一座鐘樓，風大的夜裡還聽得見鐘聲。
     anchor_key: town_sunken_bell
     typeclass:
     scene_archetype: city_street
@@ -50,7 +50,7 @@ nodes:
     y_m: 549
     prototype_parent: grid_room
     key: 市場街
-    desc: 市場街在廣場西側，湖魚在此論簍賣。賣不完的魚當場剖開抹鹽，掛在簷下風乾，一排排對著湖面。
+    desc: 市場街在廣場西側，湖魚在此論簍賣。賣不完的魚當場剖開抹鹽，掛在簷下風乾，成排對著湖面。
     anchor_key:
     typeclass:
     scene_archetype: city_street

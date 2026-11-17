@@ -198,7 +198,7 @@ REGISTRY_INDEX: tuple[RegistrySpec, ...] = (
     ),
     _spec(
         "interiors",
-        "永久室內",
+        "常設室內",
         "聚落",
         _interiors,
         "content/maps/interiors",
@@ -221,7 +221,7 @@ REGISTRY_INDEX: tuple[RegistrySpec, ...] = (
     _spec("quest_definitions", "任務定義", "任務", _quest_definitions, "world/quests/catalog.py", "display_name", "quest_type", "rank"),
     # 規則書
     _spec("shop_configs", "商店營業設定", "規則書", _guild_section("shop_configs"), f"{_RULEBOOK}/commerce", "display_name_zh", "open_hour", "close_hour"),
-    _spec("service_hosts", "服務主持人", "規則書", _guild_section("service_hosts"), f"{_LORE}/settlements/places.py", "name", "spawn_room"),
+    _spec("service_hosts", "服務負責人", "規則書", _guild_section("service_hosts"), f"{_LORE}/settlements/places.py", "name", "spawn_room"),
     _spec("monster_behaviour_profiles", "魔物行為設定", "規則書", _attr("world.rules.monster_behaviour", "BEHAVIOUR_PROFILES"), f"{_RULEBOOK}/monster_behaviour.yaml", "target_strategy", "skill_choice"),
 )
 

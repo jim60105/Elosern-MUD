@@ -35,9 +35,11 @@ def setUpModule():
 
 
 def _place_fields(place) -> tuple:
-    """The place's own authored data, in the capture's shape.
+    """The place's identity fields, in the capture's shape.
 
-    Deliberately excludes the host's name, profession, service identity,
+    Deliberately excludes the room description: the prose is authored in
+    content/maps/interiors/ and is free to change without touching place
+    identity. Also excludes the host's name, profession, service identity,
     profile key and the offered-item keys: those follow the current place-to-
     roster correspondence and the shop registry, and belong to no snapshot.
     """
@@ -50,7 +52,6 @@ def _place_fields(place) -> tuple:
         place.settlement_key,
         place.kind,
         room.name_zh,
-        room.desc_zh,
         None if exterior is None else exterior.node,
         None if exterior is None else exterior.doorway_key,
         () if exterior is None else exterior.doorway_aliases,
@@ -83,7 +84,7 @@ class SettlementRegistryTests(unittest.TestCase):
 
 
 class PlaceRegistryTests(unittest.TestCase):
-    """Place records: transcription of the shipped pair and record validity."""
+    """Place records: identity-field parity of the shipped pair and validity."""
 
     @classmethod
     def setUpClass(cls):
@@ -125,14 +126,14 @@ class PlaceRegistryTests(unittest.TestCase):
         self.assertTrue(all(place_is_hostless(place) for place in branches))
         self.assertTrue(all(place.kind == PlaceKind.COURIER_STATION for place in branches))
 
-    # The altoria-place-slices content-parity guard, split into the place's own
-    # authored data. Every captured row is transcribed verbatim from a live
-    # dump BEFORE the terrace split: the split moves rows between slice files
-    # and must change no place field, so key, settlement, kind, room name,
-    # room description, exterior, doorway name and aliases, plus the dwelling
-    # lineage values, are literals here. Shape: place key -> (key,
-    # settlement_key, kind, room_name_zh, room_desc_zh, exterior node id,
-    # doorway_key_zh, doorway_aliases, host_race, host_subrace, host_sex).
+    # The altoria-place-slices identity-parity guard, split into the place's own
+    # identity fields. Every captured row's identity fields were recorded from
+    # a live dump BEFORE the terrace split: the split moves rows between slice
+    # files and must change no place identity field, so key, settlement, kind,
+    # room name, exterior, doorway name and aliases, plus the dwelling lineage
+    # values, are literals here. Shape: place key -> (key, settlement_key,
+    # kind, room_name_zh, exterior node id, doorway_key_zh, doorway_aliases,
+    # host_race, host_subrace, host_sex).
     # Keyed by place key rather than listed in registry order on purpose — the
     # split deliberately reorders the assembly, and the iteration-order test
     # above owns that change. If a row disappears, duplicates, or drifts a
@@ -146,77 +147,67 @@ class PlaceRegistryTests(unittest.TestCase):
     PRE_SPLIT_PLACE_CAPTURE = {
         "altoria_guild_hall": (
             'altoria_guild_hall', 'capital_altoria', PlaceKind.GUILD_HALL, '阿爾托利亞冒險者公會大廳',
-            '阿爾托利亞的冒險者公會大廳，屋裡最顯眼的是一面大任務板，以及一座環形訓練場。', 'guild_forecourt',
+            'guild_forecourt',
             '冒險者公會大廳', ('guild hall', 'hall'),
             'human', None, 'other',
         ),
         "altoria_general_store": (
             'altoria_general_store', 'capital_altoria', PlaceKind.GENERAL_STORE, '阿爾托利亞雜貨店',
-            '阿爾托利亞的雜貨店，貨架總留著幾格空位，像在任何一支商隊趕來之前先替它們留好位置。',
             'market_street', '雜貨店', ('general store', 'store', 'shop'),
             'human', None, 'other',
         ),
         "altoria_forge": (
             'altoria_forge', 'capital_altoria', PlaceKind.WEAPONSMITH, '聖潔王都鍛造鋪',
-            "聖潔王都的鍛造鋪，砧聲在屋簷下響著，替這座王都的兵器生意一聲聲定了價。",
             'craft_alley', '鍛造鋪', ('forge', 'smithy'),
             'human', 'human_plains', 'male',
         ),
         "altoria_eatery": (
             'altoria_eatery', 'capital_altoria', PlaceKind.EATERY, '聖潔王都餐館',
-            "聖潔王都的餐館，廚房蒸氣從門口漫出去，罩在南大道的人流上頭。",
             'south_avenue', '餐館', ('eatery', 'restaurant', 'diner'),
             'human', 'human_plains', 'male',
         ),
         "altoria_tailor": (
             'altoria_tailor', 'capital_altoria', PlaceKind.OUTFITTER, '聖潔王都裁縫坊',
-            "聖潔王都的裁縫坊，一卷卷布匹擱在案邊，等著北大道那些貴族的訂單。",
             'craft_alley', '裁縫坊', ('tailor', 'tailor shop'),
             'human', 'human_plains', 'female',
         ),
         "ciaran_hailiel_home": (
             'ciaran_hailiel_home', 'elven_village_ciaran', PlaceKind.HOME, '海莉爾的家',
-            "一道厚樑下是一間低矮溫暖的屋子。爐膛用餘燼蓋著過夜，窗邊的坐位望出去正是村中的練刀場，年幼的刀舞者從清晨到日暮都在那裡練刀。這屋家的器具沿牆收得整整齊齊；沒有任何一樣擺著等誰來買。",
             'training_clearing', '海莉爾的家', ('hailiel', "hailiel's home"),
             'elf', 'ciaran', 'female',
         ),
         "ciaran_gwenaera_home": (
             'ciaran_gwenaera_home', 'elven_village_ciaran', PlaceKind.HOME, '格威娜拉的家',
-            "銀絲與做了一半的飾品攤在工作檯的布上，分的標準出自手藝人的眼光，不是商人的眼光。完成的作品掛在窗邊的繩上，旁邊晾著從下面坡上採來的花頭；爐火溫著一壺水，沒人指望會有客人要用。這是一個喜歡綴飾工作的人的家，會做買賣只是因為村子請她做。",
             'silver_leaf_slope', '格威娜拉的家', ('gwenaera', "gwenaera's home"),
             'elf', 'ciaran', 'female',
         ),
         "ciaran_lareneth_home": (
             'ciaran_lareneth_home', 'elven_village_ciaran', PlaceKind.HOME, '拉瑞內斯的家',
-            "溪畔小徑旁這戶人家，空氣裡懸著糖漬花的香氣。曬乾的花瓣織在籃裡擱著，挨著一方小爐石；窗邊一張矮凳上擺著今日待客的小點，為每個經過的人留著。",
             'stream_path', '拉瑞內斯的家', ('lareneth', "lareneth's home"),
             'elf', 'ciaran', 'female',
         ),
         "ciaran_nireth_home": (
             'ciaran_nireth_home', 'elven_village_ciaran', PlaceKind.HOME, '妮瑞斯的家',
-            "成把的藥草與塞著木塞的小藥罐擠滿這間曬得到太陽的屋子，按摘下的時辰排，不按值多少錢排。窗邊一方臼，窗外望得見村子的藥草園，門口一帶的空氣苦裡帶甜。藥是留給需要的人的；被村子請託把藥換成錢賣，是同一座種藥的村子順便想到的事。",
             'herb_garden', '妮瑞斯的家', ('nireth', "nireth's home"),
             'elf', 'ciaran', 'female',
         ),
         "ciaran_valwyn_home": (
             'ciaran_valwyn_home', 'elven_village_ciaran', PlaceKind.HOME, '瓦爾溫的家',
-            "村北那株老樹下，樹根環抱間是這戶人家。沿著每一面牆，一輩子蒐羅來的零物擱在織籃與挖空的石臼裡，羽毛、種子、壓實的藍染料塊與幾罐晶砂，樣樣被細心留著，樣樣有一個故事。屋裡裝滿留下來的東西，沒有鋪子的樣子。",
             'old_tree_north', '瓦爾溫的家', ('valwyn', "valwyn's home"),
             'elf', 'ciaran', 'female',
         ),
         "ciaran_vethiel_home": (
             'ciaran_vethiel_home', 'elven_village_ciaran', PlaceKind.HOME, '維特希爾的家',
-            "藥草倒掛在椽上晾乾，染好的線繞在織機邊的木釘上。木架上看得見許多手的磨損，可這間屋子首先是個住家，地上一個坐墊，火邊一壺水，織品之間攤著幾件衣服等人欣賞。",
             'weaving_slope', '維特希爾的家', ('vethiel', "vethiel's home"),
             'elf', 'ciaran', 'female',
         ),
     }
 
-    def test_pre_split_captured_rows_remain_verbatim_in_assembled_registry(self):
+    def test_pre_split_captured_rows_keep_their_identity_fields(self):
         # The comparison projects onto the CAPTURED keys instead of the whole
         # live registry: the capture is a historical migration guard (the
-        # terrace split moved these rows and changed no place field), not a
-        # growing current-state snapshot — a later change adds a row (the
+        # terrace split moved these rows and changed no place identity field),
+        # not a growing current-state snapshot — a later change adds a row (the
         # jeweller and the alchemist, say) by editing THIS module's pins nowhere
         # except the order and kind tests below.
         self.assertTrue(

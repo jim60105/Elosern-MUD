@@ -14,7 +14,7 @@ nodes:
     y_m: 2100
     prototype_parent: anchor_room
     key: 中央廣場
-    desc: 廣場四周種著老橄欖樹，南面傳來渡口的槳聲，東北的坡上是一片銀綠的枝葉，油商在樹蔭下清點罈數。
+    desc: 廣場四周種著老橄欖樹，南面傳來渡口的槳聲，東北的坡上是一片銀綠的枝葉，油商在樹蔭下清點罈子。
     anchor_key: town_olive_ferry
     typeclass:
     scene_archetype: city_street
