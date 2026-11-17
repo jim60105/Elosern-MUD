@@ -1,0 +1,58 @@
+# 幽月谷村 commerce slice (commerce-rulebook-slices).
+# Assortment offer rules bind exact integer buy/sell copper, max/initial stock and
+# restock quantity to the immutable item sets in world/lore/settlements/assortments.py;
+# the shops section carries the village homes' opening/restock hours. Joined by the
+# catalog loader in world/rules/guild_config.py with every other rulebook/commerce/*.yaml.
+assortments:
+  - key: eolas_silkwork
+    offers:
+      - item_key: elven_spider_silk
+        buy_copper: 60
+        sell_copper: 30
+        max_stock: 20
+        initial_stock: 10
+        restock_quantity: 5
+      - item_key: elven_traditional_robe
+        buy_copper: 120
+        sell_copper: 60
+        max_stock: 3
+        initial_stock: 1
+        restock_quantity: 1
+  - key: eolas_wandcraft
+    offers:
+      - item_key: eolas_proving_wand
+        buy_copper: 100
+        sell_copper: 50
+        max_stock: 3
+        initial_stock: 1
+        restock_quantity: 1
+  - key: eolas_kilnware
+    offers:
+      - item_key: eolas_glass_pendant
+        buy_copper: 110
+        sell_copper: 55
+        max_stock: 3
+        initial_stock: 1
+        restock_quantity: 1
+      - item_key: magic_lamp
+        buy_copper: 40
+        sell_copper: 20
+        max_stock: 10
+        initial_stock: 5
+        restock_quantity: 2
+
+# Per-shop opening/closing/restock hours. Hours are in CLOCK_YAML["seconds_per_hour"]
+# units relative to the world-day boundary.
+shops:
+  - shop_key: eolas_naelara_home
+    open_hour: 7
+    close_hour: 19
+    restock_hour: 6
+  - shop_key: eolas_sirelwen_home
+    open_hour: 7
+    close_hour: 19
+    restock_hour: 6
+  - shop_key: eolas_taelith_home
+    open_hour: 7
+    close_hour: 19
+    restock_hour: 6

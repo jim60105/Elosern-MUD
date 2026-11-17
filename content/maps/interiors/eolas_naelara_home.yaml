@@ -1,0 +1,21 @@
+# Permanent interior authored source (schema version 1).
+# The sole authority for the room's identity, name, prose, scene metadata and
+# its one exterior entrance relationship. The room id is the stable place key
+# a service record joins to, so a service record declares no geometry.
+version: 1
+kind: interior
+id: eolas_naelara_home
+rooms:
+  eolas_naelara_home:
+    name_zh: 奈拉拉的家
+    desc_zh: 岩壁鑿出的石室緊挨著蛛絲林，木釘上掛著幾綑捲好的絲，門邊擺著一架織機。石架上的白布疊得平整，屋裡靜得只聽見絲線滑過木梭的聲音。
+    scene_archetype: tavern_interior
+connections: []
+exterior:
+  settlement: elven_village_eolas
+  node: silk_grove
+  room: eolas_naelara_home
+  doorway_key: 奈拉拉的家
+  doorway_aliases:
+  - naelara
+  - naelara's home

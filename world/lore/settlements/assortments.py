@@ -256,5 +256,36 @@ ASSORTMENT_REGISTRY: dict[str, AssortmentDefinition] = {
                 "greater_healing_potion", "mana_potion",
             ),
         ),
+        # eolas-village-craft-homes: the 幽月谷村 shelves. Each one is one
+        # villager's home — the silk keeper's cloth, the proving-ground
+        # caster's wands, the kiln keeper's fired glass and lamps — never a
+        # storefront's stock.
+        AssortmentDefinition(
+            key="eolas_silkwork",
+            display_name_zh="幽月絲織",
+            allowed_item_kinds=frozenset({ItemKind.MATERIAL, ItemKind.ARMOR}),
+            allowed_equipment_slots=frozenset({EquipmentSlot.ARMOR}),
+            item_keys=(
+                "elven_spider_silk", "elven_traditional_robe",
+            ),
+        ),
+        AssortmentDefinition(
+            key="eolas_wandcraft",
+            display_name_zh="幽月杖作",
+            allowed_item_kinds=frozenset({ItemKind.WEAPON}),
+            allowed_equipment_slots=frozenset({EquipmentSlot.WEAPON_MAIN}),
+            item_keys=(
+                "eolas_proving_wand",
+            ),
+        ),
+        AssortmentDefinition(
+            key="eolas_kilnware",
+            display_name_zh="幽月窯作",
+            allowed_item_kinds=frozenset({ItemKind.ACCESSORY, ItemKind.TOOL}),
+            allowed_equipment_slots=frozenset({EquipmentSlot.ACCESSORY}),
+            item_keys=(
+                "eolas_glass_pendant", "magic_lamp",
+            ),
+        ),
     )
 }
