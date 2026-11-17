@@ -1,0 +1,21 @@
+# Permanent interior authored source (schema version 1).
+# The sole authority for the room's identity, name, prose, scene metadata and
+# its one exterior entrance relationship. The room id is the stable place key
+# a service record joins to, so a service record declares no geometry.
+version: 1
+kind: interior
+id: fionnen_lumeth_home
+rooms:
+  fionnen_lumeth_home:
+    name_zh: 盧梅斯的家
+    desc_zh: 屋子夾在花蕊蜜園的花圃之間，窗一開，蜜蜂就在窗台邊進出。架子的各層都擺著封好的蜜罐，罐口用布紮緊，旁邊的布上攤著正在陰乾的花瓣。屋裡有一股熬過蜜的甜味，灶上那口鍋還溫著，鍋邊擱著一支木勺。
+    scene_archetype: tavern_interior
+connections: []
+exterior:
+  settlement: elven_village_fionnen
+  node: blossom_garden
+  room: fionnen_lumeth_home
+  doorway_key: 盧梅斯的家
+  doorway_aliases:
+  - lumeth
+  - lumeth's home

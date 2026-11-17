@@ -52,6 +52,46 @@ assortments:
         max_stock: 3
         initial_stock: 1
         restock_quantity: 1
+  - key: fionnen_fare
+    offers:
+      - item_key: fionnen_wildflower_honey
+        buy_copper: 15
+        sell_copper: 8
+        max_stock: 20
+        initial_stock: 10
+        restock_quantity: 5
+      - item_key: elven_candied_blossom
+        buy_copper: 20
+        sell_copper: 10
+        max_stock: 20
+        initial_stock: 10
+        restock_quantity: 5
+      - item_key: meal
+        buy_copper: 6
+        sell_copper: 3
+        max_stock: 20
+        initial_stock: 10
+        restock_quantity: 5
+  - key: fionnen_remedies
+    offers:
+      - item_key: fionnen_beeswax_salve
+        buy_copper: 70
+        sell_copper: 35
+        max_stock: 10
+        initial_stock: 5
+        restock_quantity: 5
+      - item_key: healing_herb
+        buy_copper: 20
+        sell_copper: 10
+        max_stock: 20
+        initial_stock: 10
+        restock_quantity: 5
+      - item_key: healing_potion
+        buy_copper: 60
+        sell_copper: 30
+        max_stock: 10
+        initial_stock: 5
+        restock_quantity: 5
 
 shops:
   - shop_key: fionnen_corith_home
@@ -63,6 +103,14 @@ shops:
     close_hour: 19
     restock_hour: 6
   - shop_key: fionnen_ithrlin_home
+    open_hour: 7
+    close_hour: 19
+    restock_hour: 6
+  - shop_key: fionnen_lumeth_home
+    open_hour: 7
+    close_hour: 19
+    restock_hour: 6
+  - shop_key: fionnen_sylara_home
     open_hour: 7
     close_hour: 19
     restock_hour: 6
