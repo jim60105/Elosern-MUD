@@ -1033,6 +1033,31 @@ describe("CreationPresetWall: local browsing until deliberate selection", () => 
     expect(bubbled).toEqual([]);
   });
 
+  it("leaves Enter on a dock control and text entry inside the dock to their owners", async () => {
+    const dock = document.createElement("div");
+    dock.id = "action-dock";
+    const back = document.createElement("button");
+    back.type = "button";
+    const field = document.createElement("input");
+    dock.append(back, field);
+    document.body.appendChild(dock);
+    mountWall({ stage: { stage: "presets" } });
+    back.focus();
+    expect(keydown(back, "Enter").defaultPrevented).toBe(false);
+    expect(keydown(field, "Enter").defaultPrevented).toBe(false);
+    expect(keydown(field, "2").defaultPrevented).toBe(false);
+    expect(expandedKeyOf(wall())).toBe(WALL_CARDS[0].key);
+    expect(actions()).toEqual([]);
+  });
+
+  it("marks only the committed draft card, never an unconfirmed choose", async () => {
+    mountWall();
+    wall().querySelector('[data-testid="creation-preset-choose"]').click();
+    await nextTick();
+    expect(actions()).toHaveLength(1);
+    expect(wall().querySelectorAll('[data-selected="true"]').length).toBe(0);
+  });
+
   it("removes its document listener when the wall unmounts", async () => {
     mountWall();
     const removed = vi.spyOn(document, "removeEventListener");
@@ -1116,6 +1141,25 @@ describe("CreationPresetWall real-store integration (creation-preset-card-wall)"
     expect(store.view.creationView.stage).toBe("confirm");
     expect(store.view.creationView.pendingPresetKey).toBe(WALL_CARDS[1].key);
     expect(host.querySelector('[data-testid="creation-confirm"]')).not.toBeNull();
+  });
+
+  it("re-choosing the already-saved card still opens the confirmation after its success", async () => {
+    openCreation(wallPanel({ draft: { mode: "preset", stage: "preset_selected", preset_key: WALL_CARDS[1].key } }));
+    const host = await mountApp();
+    // A resumed preset draft opens its confirmation; cancel back to the wall.
+    expect(store.view.creationView.stage).toBe("confirm");
+    host.querySelector('[data-testid="creation-confirm-cancel"]').click();
+    await nextTick();
+    await nextTick();
+    expect(store.view.creationView.stage).toBe("presets");
+    const wallEl = host.querySelector('[data-testid="creation-preset-wall"]');
+    expect(expandedKeyOf(wallEl)).toBe(WALL_CARDS[1].key);
+    wallEl.querySelector('[data-testid="creation-preset-choose"]').click();
+    await nextTick();
+    expect(sender.sent.actions.map((a) => a.payload)).toEqual([{ preset_key: WALL_CARDS[1].key }]);
+    store.receive(1, "ui_action_result", [fx.actionResult({ request_id: sender.sent.actions[0].request_id })], {});
+    await nextTick();
+    expect(store.view.creationView.stage).toBe("confirm");
   });
 
   it("a rejected preset save opens no confirmation", async () => {

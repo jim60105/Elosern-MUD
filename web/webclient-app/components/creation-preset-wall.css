@@ -98,7 +98,7 @@
   gap: var(--sp-3);
   padding: var(--sp-4) 0 var(--sp-5);
   color: var(--paper-100);
-  background: linear-gradient(180deg, transparent 42%, rgba(11, 13, 16, 0.72) 70%, var(--ink-950) 97%);
+  background: linear-gradient(180deg, transparent 42%, color-mix(in srgb, var(--ink-950) 72%, transparent) 70%, var(--ink-950) 97%);
   border: 0;
   cursor: pointer;
 }

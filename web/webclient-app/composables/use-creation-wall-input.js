@@ -10,10 +10,10 @@
 // - ← / →  move the local expansion one card, clamped at both ends.
 // - 1–9    expand the card at that displayed ordinal; a missing ordinal is
 //          consumed and inert.
-// - Enter  on a native button inside the wall is left to the button (the
-//          opening button expands, the primary button chooses), so the click
-//          is the single activation; anywhere else in wall context it chooses
-//          the expanded card.
+// - Enter  on a native control is left to the control (the opening button
+//          expands, the primary button chooses, the dock's back chevron goes
+//          back), so its click is the single activation; anywhere else in wall
+//          context it chooses the expanded card.
 // Repeated, modified and composing keys are never handled; a repeated Enter
 // on a wall button is swallowed so a held key cannot re-activate it. Text
 // entries and nested dialogs keep their own keys, and Escape, Tab, Space and
@@ -46,9 +46,11 @@ export function useCreationWallInput({ root, dockBrowsing, move, jump, choose })
     const inDock = !inWall && dockBrowsing() && !!target.closest?.("#action-dock");
     if (!inWall && !inDock) return;
     if (isTextEntry(target) || (inWall && nestedSurface(el, target))) return;
-    const onButton = inWall && !!target.closest?.("button");
+    // Enter on a native control (a wall button, or a dock control such as its
+    // back chevron) belongs to that control's own activation.
+    const onControl = !!target.closest?.('button, a[href], [role="button"]');
     if (event.repeat) {
-      if (event.key === "Enter" && onButton) consume(event);
+      if (event.key === "Enter" && inWall && onControl) consume(event);
       return;
     }
     const key = event.key;
@@ -58,7 +60,7 @@ export function useCreationWallInput({ root, dockBrowsing, move, jump, choose })
     } else if (DIGITS.has(key)) {
       consume(event);
       jump(Number(key) - 1, inWall);
-    } else if (key === "Enter" && !onButton) {
+    } else if (key === "Enter" && !onControl) {
       consume(event);
       choose();
     }

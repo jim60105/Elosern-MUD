@@ -15,6 +15,7 @@
 // The behavior groups live in ./composables/use-creation-*.js (each watch
 // stays with the state it mutates); every binding below is a group's verbatim
 // state/handler, destructured so the template is unchanged.
+import { computed } from "vue";
 import { useCreationOverlay } from "../composables/use-creation-overlay.js";
 import CreationPresetWall from "./CreationPresetWall.vue";
 
@@ -57,6 +58,11 @@ const props = defineProps({
 const emit = defineEmits(["action", "request-reset", "cancel-confirm"]);
 
 const creation = useCreationOverlay(props, emit);
+// The committed draft's preset key: the wall's entry card and its 目前草稿
+// marker follow the server draft, never an unconfirmed choose.
+const savedPresetKey = computed(() => (
+  props.creation?.draft?.mode === "preset" ? props.creation.draft.preset_key ?? null : null
+));
 const {
   available,
   reason,
@@ -65,7 +71,6 @@ const {
   mode,
   setMode,
   selectPreset,
-  selectedPresetKey,
   name,
   age,
   apparentAge,
@@ -208,7 +213,7 @@ function allocationFraction(axis) {
         <CreationPresetWall
           v-if="mode === 'preset'"
           :presets="presets"
-          :draft-preset-key="selectedPresetKey"
+          :draft-preset-key="savedPresetKey"
           :disabled="!!dispatchState?.inFlight"
           :race-display-name="raceDisplayName"
           :dock-browsing="stage?.stage === 'presets'"
