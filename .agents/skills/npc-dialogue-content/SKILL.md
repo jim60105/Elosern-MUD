@@ -58,7 +58,8 @@ to these traps, which generic fantasy gets wrong:
   `docs/development/adding-npcs.md` Step 3.
 - `world/lore/npc_profiles/*.py` — persona profiles, compact cards, voice lines
   (`voice.greeting` stays `None` for a scripted host; the YAML greeting owns the
-  opener). Read-only for a content slice.
+  opener). Read-only for a dialogue slice; a persona slice writes it, and its
+  prose answers to *Card prose* below.
 - `world/lore/npc_card.py` — the card contract. Leaves are capped at 600 code
   points, the identity section at 600, the whole card block at 2000, and the
   offline greeting at 300.
@@ -111,6 +112,19 @@ particles 喔／啦／吧／嘛 and short clauses. Never essay prose for a shopk
 
 Each scene holds 3–8 lines, starts with a complete actor utterance, and carries
 at least one real host response.
+
+### Card prose
+
+A persona card answers to the same standard. Its leaves are short character
+description, not a stat block, and `npc_card.py` bounds their length only, so
+every compressed clause survives to the player. Lint the slice with `--profiles`
+and read each leaf as a sentence.
+
+- Keep the subject and the connective. 「讓旅人有地方歇息、睡覺，也能安靜地練劍」 changes subject from the inn to the guest.
+- Unfold a stacked modifier: 一個靠黑水潭淬火的鐵匠村 → 一座鐵匠村，村裡的鐵都用黑水潭的水淬火。
+- Give a state change its cause instead of an event adverbial: 黑髮在一場火之後剪短 → 有回爐火燒到她的頭髮，索性剪短。
+- Name what happened, not a placeholder (發生的事、各種、瑣事), and prefer the everyday verb over a report noun (當熱源 → 借她的窯火加熱).
+- A bare adjective between commas (句子短、熱心又務實) is a list item; attach it to a clause that carries the verb.
 
 ## Nothing invented
 
@@ -255,7 +269,9 @@ Editorial quality is carried by the review document, not by an assertion.
    carries. Exit 1 means an ERROR finding; WARN findings are prompts and fail
    only under `--strict`. Add `--places` when the scene names streets or
    buildings to get a heuristic list of place-like words missing from
-   `places*.py` (warnings there are prompts, not verdicts).
+   `places*.py` (warnings there are prompts, not verdicts). Persona card prose
+   uses the same script with `--profiles world/lore/npc_profiles/<slice>.py`,
+   which lints every card and voice leaf of that slice.
 3. Read the lint's WARN lines, then sweep every proper noun by hand and resolve
    it to a registry row (see *Nothing invented*). The lint cannot detect an
    invented title, fee, commission type or institution.
@@ -265,7 +281,9 @@ Editorial quality is carried by the review document, not by an assertion.
    sentence-final 的, no mid-sentence colon, no 疊字 such as 慢慢／輕輕, no
    half-width punctuation beside Chinese, single space between CJK and
    alphanumerics, no English calques (折入／賦能／拉齊, and 回填／深潛／落地 when
-   used as calques rather than literally), no 中式武俠 vocabulary.
+   used as calques rather than literally), no 中式武俠 vocabulary, and no clause
+   that drops its subject, its connective, or the content of the event (see
+   *Card prose*).
 6. Check scene shape: actor-first formal scene, actor line possession-safe, no new
    player commitment, at least one host line, 3–8 lines, complete beats.
 7. Check qualification: only optional personal content is gated, service access is
@@ -295,13 +313,14 @@ Editorial quality is carried by the review document, not by an assertion.
   not wrap an old one-line answer in actor/host padding: the old prose is
   discarded, only service behaviour and stable IDs survive.
 - Write, then read the whole file aloud once as a conversation. Stiff actor lines
-  and clipped host endings are the defects that survive a schema check.
+  and clipped host endings are the defects that survive a schema check. Read each
+  card leaf the same way, one sentence at a time.
 - Behaviour tests use synthetic fixtures; naming shipped content needs a tagged
   data-contract test (first docstring line `Data-contract test: <rationale>`,
   registered in `tools/test_data_freeze.json`) — but a content slice adds none,
   because it adds no logic.
 - Before handoff run `scripts/npc_content_lint.py` over every owned dialogue YAML
-  file you changed,
+  file you changed and with `--profiles` over every owned persona slice module,
   the focused module for the owning package, and
   `uv run --locked python -m tools.test_data_lint check`,
   `uv run --locked python -m tools.spec_traceability check`, and

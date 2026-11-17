@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Authoring lint for authored NPC dialogue YAML.
+"""Authoring lint for authored NPC dialogue YAML and persona card prose.
 
 Focuses on what the dialogue loader cannot see: out-of-character tokens,
 中式武俠 vocabulary, zh-TW punctuation and spacing, fake or mistyped condition
@@ -13,6 +13,7 @@ Usage::
         world/lore/dialogue/content/altoria_merchant.yaml
     ... scripts/npc_content_lint.py <content-dir> --json
     ... scripts/npc_content_lint.py <file> --places     # heuristic place check
+    ... scripts/npc_content_lint.py --profiles world/lore/npc_profiles/<slice>.py
     ... scripts/npc_content_lint.py <file> --no-registry
 
 The repository used for registry and place lookups is the checkout that contains
@@ -246,6 +247,57 @@ class Lint:
         greeting = document.get("greeting")
         if isinstance(greeting, str):
             self._check_text(greeting, "greeting", "greeting")
+
+    def run_profiles(self) -> None:
+        """Lint every prose leaf of the profiles a slice module declares."""
+        rows = self._profile_rows()
+        if rows is None:
+            return
+        for profile in rows:
+            card = profile.card
+            leaves = (
+                ("identity.public", card.identity.public),
+                ("identity.hidden", card.identity.hidden),
+                ("appearance", card.appearance),
+                ("personality", card.personality),
+                ("speech_style", card.speech_style),
+                ("life_story", card.life_story),
+                ("habit", card.habit),
+                ("social_connection", card.social_connection),
+                ("voice.greeting", profile.voice.greeting or ""),
+                ("voice.misunderstood", profile.voice.misunderstood or ""),
+            )
+            for where, text in leaves:
+                if text:
+                    self._check_text(text, profile.key, where)
+
+    def _profile_rows(self):
+        if not self.path.is_file():
+            self.error("<file>", "file", "file-read", f"{self.path} is not a file")
+            return None
+        sys.path.insert(0, str(self.repo))
+        try:
+            from world.lore.npc_profiles import PROFILE_SLICES
+        except Exception as exc:  # slice assembly validates every card on import
+            self.error(
+                "<profiles>",
+                "registry",
+                "registry-unavailable",
+                f"{type(exc).__name__}: {exc}",
+            )
+            return None
+        finally:
+            sys.path.remove(str(self.repo))
+        for label, rows in PROFILE_SLICES:
+            if self.path.name == f"{label}.py":
+                return rows
+        self.error(
+            "<profiles>",
+            "slice",
+            "unknown-slice",
+            f"{self.path.name} is not a declared npc_profiles slice",
+        )
+        return None
 
     def _check_root(self, document: dict) -> None:
         allowed = {"schema_version", "greeting", "topics"}
@@ -674,12 +726,18 @@ def resolve_repo(target: Path, override: str | None) -> Path:
     return SCRIPT_CHECKOUT
 
 
-def expand_paths(targets: list[str]) -> list[Path]:
+def expand_paths(targets: list[str], profiles: bool = False) -> list[Path]:
     paths: list[Path] = []
     for target in targets:
         path = Path(target)
         if path.is_dir():
-            paths.extend(sorted(path.glob("*.yaml")))
+            if profiles:
+                for candidate in sorted(path.glob("*.py")):
+                    text = candidate.read_text(encoding="utf-8", errors="ignore")
+                    if re.search(r"^ROWS\s*:", text, re.MULTILINE):
+                        paths.append(candidate)
+            else:
+                paths.extend(sorted(path.glob("*.yaml")))
         else:
             paths.append(path)
     return paths
@@ -687,7 +745,7 @@ def expand_paths(targets: list[str]) -> list[Path]:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("targets", nargs="+", help="YAML file or directory of YAML files")
+    parser.add_argument("targets", nargs="+", help="YAML file, directory of YAML files, or slice module with --profiles")
     parser.add_argument("--json", action="store_true", help="machine-readable output")
     parser.add_argument("--no-registry", action="store_true", help="skip project registry imports")
     parser.add_argument(
@@ -697,6 +755,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--strict", action="store_true", help="treat WARN findings as failures")
     parser.add_argument(
+        "--profiles",
+        action="store_true",
+        help="targets are npc_profiles slice modules; lint every card and voice leaf",
+    )
+    parser.add_argument(
         "--repo",
         help="checkout used for registry and place lookups (default: the target's checkout)",
     )
@@ -704,11 +767,14 @@ def main(argv: list[str] | None = None) -> int:
 
     findings: list[Finding] = []
     checked: list[str] = []
-    for path in expand_paths(args.targets):
+    for path in expand_paths(args.targets, profiles=args.profiles):
         repo = resolve_repo(path, args.repo)
         checked.append(str(path))
         lint = Lint(path, repo, check_places=args.places)
-        lint.run(use_registry=not args.no_registry)
+        if args.profiles:
+            lint.run_profiles()
+        else:
+            lint.run(use_registry=not args.no_registry)
         findings.extend(lint.findings)
 
     if args.json:
