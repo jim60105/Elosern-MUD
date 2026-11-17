@@ -353,7 +353,7 @@ Each card fills the seven fields of `NpcCard` from the brief below, in Tradition
 - appearance: Fionnen look; lean, blonde hair cropped at the jaw; a bracer on the left arm and little else; a quiver worn low
 - personality: quiet, focused, generous with silence; praises nothing but notices everything
 - speech_style: sparse, exact, speaks between shots; calls the listener 你
-- life_story: six centuries at the lane; hunts the deep forest when she wants a living target; the village's young learn by standing next to her
+- life_story: a long life at the lane; hunts the deep forest when she wants a living target; the village's young learn by standing next to her
 - habit: walks the lane at dawn and resets every tag by hand
 - social_connection: tests every bow 格威內爾‧斯威夫塔羅 finishes; they share a dwelling name
 - `identity.hidden`: leave empty.
@@ -365,9 +365,9 @@ Each card fills the seven fields of `NpcCard` from the brief below, in Tradition
 - appearance: Fionnen look; silver-blonde hair to the knees; bare under a single open mantle; a longbow older than the kingdom on the wall behind her
 - personality: serene, warm, impossible to hurry; finds mortal urgency endearing
 - speech_style: slow and melodic; begins with what she can see from her platform; calls everyone 孩子
-- life_story: a thousand years in these trees; remembers the clearing before the canopy opened; has loved most of the village at one time or another
+- life_story: has lived in these trees longer than anyone remembers; remembers the clearing before the canopy opened; has loved most of the village at one time or another
 - habit: names the first bird she hears each morning
-- social_connection: taught 埃倫溫‧斯威夫塔羅 to draw a bow five centuries ago
+- social_connection: taught 埃倫溫‧斯威夫塔羅 to draw a bow before the archery lane was laid out
 - `identity.hidden`: leave empty.
 - `voice.misunderstood`: serene; says she did not follow, and that the day is long. `voice.greeting` stays `None`.
 
@@ -377,7 +377,7 @@ Each card fills the seven fields of `NpcCard` from the brief below, in Tradition
 - appearance: Fionnen look; sun-gold curls; bare arms sticky to the wrist; a bee or two riding her shoulder unbothered
 - personality: sweet-natured, generous, a little vain about her honey; puts a taste on a guest's lips before a word is said
 - speech_style: cheerful, everyday, uses 喔 and 呀; calls the listener 你
-- life_story: the youngest of the village's makers at three and a half centuries; took the hives from an elder who went back to her bow
+- life_story: the youngest of the village's makers; took the hives from an elder who went back to her bow
 - habit: licks the spoon and names the flower before she seals a jar
 - social_connection: 希拉拉‧希倫特布魯克 takes her beeswax for salve
 - `identity.hidden`: leave empty.
@@ -389,7 +389,7 @@ Each card fills the seven fields of `NpcCard` from the brief below, in Tradition
 - appearance: Fionnen look; ash-blonde hair pinned up with a twig; green-eyed, level gaze; a salve tin on a cord at her hip
 - personality: composed, practical, kind without softness; treats a wound before she asks how it happened
 - speech_style: measured, complete sentences, gives instructions clearly; calls the listener 你
-- life_story: six centuries patching hunters who came back from the deep forest; elves mend by themselves, so she learned her craft on the village's guests and animals
+- life_story: a long life patching hunters who came back from the deep forest; elves mend by themselves, so she learned her craft on the village's guests and animals
 - habit: washes her hands in the brook before and after every bed
 - social_connection: 盧梅斯‧布瑞特莉夫 brings her wax after every harvest
 - `identity.hidden`: leave empty.
@@ -407,6 +407,7 @@ One file per host. The filename stem is the profile key; the file declares no ow
 - Name only places that exist: the village's nodes and shared interiors listed in Context, and the hosts of this village named in the Decision 1 table of this change or an earlier applied one.
 - Speak as a villager sharing what she makes. Elves need nothing from outsiders and are neither servants nor curiosities.
 - That body ease rides in the greeting and in 菲爾溫's 森林 scene; it never becomes a sexual scene in a fare host's home.
+- No age is stated in player-facing prose: no greeting, scene line, narration or card carries a figure in 歲, an apparent age, or a count of years. The host's long life shows only in what she remembers and how she speaks.
 - An existing test reads every village table and rejects proprietor vocabulary. No greeting or line contains any of: 老闆, 店主, 本店, 營業時間, 營業, 庫存, 存貨, 存量, 售價, 光臨, 開店, 開門, 打烊. Say the world-side thing instead: the door is never shut, the shelf is what she finished this season.
 
 **`world/lore/dialogue/content/fionnen_elunwen.yaml`** — topic ID prefix `fionnen_elunwen_home`. Greeting: lowers her bow after the shot lands, glances at the guest's stance, and nods toward the spare bows.

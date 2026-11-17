@@ -293,41 +293,41 @@ Create `world/lore/npc_profiles/eolas_homes_b.py` in the shape of `world/lore/np
 
 World source, mandatory: read `/var/home/jim60105/repos/MUD/tmp/story_settings/world_info.md` (`tmp/` is git-ignored, so the file exists only in the primary checkout, not in a worktree; read it by this absolute path), sections 種族設定 › 精靈族, 社會與文化 and 特殊設定, before writing, and write every card from it. All elves are women. About 300 exist and the three nations rank them above royalty. They have no fixed trades, no marriage and no schooling; ability comes from lifespan. A host shares what she loves making and takes coin because the village wants guests looked after, so no card speaks of a shop, stock or business. Eolas look, from the world source: appearance fixed at twenty years, 135-145 cm, varied hair and eye colours. Every host is centuries old and speaks with an adult's knowledge and an elder's patience. The village is defined by magic study in all elements, by what its people have read and written, and by a valley that feeds and clothes itself: write each host through her craft, her experiments and her daily work. Dress is the village's own white spider-silk cloth.
 
-Eolas feel no shame about the bare body or about being seen (world source 生活方式 › 性文化 and 社會與文化 › 倫理觀; `docs/lore/overview.md` 性愛與身體; `docs/lore/settlement-locations.md` 〈公共浴場〉聚落差異 puts all three villages at open pools with no partitions and no attendant, and keeps that contrast as the hook for stories). Write every host with that ease: it sits in how she dresses, how she sits and how she speaks of what she makes, at the frankness of `world/lore/dialogue/content/ciaran_vethiel.yaml` topic_03 (「身軀原本就值得坦然展現，因此織得極薄透光」). The ease stays in bearing, dress and everyday talk: no scene stages a sexual act, and no line remarks on the guest's body. The Eolas look twenty and are centuries old; the prose never uses that gap for sexual content.
+Eolas feel no shame about the bare body, about being seen, or about sex (world source 生活方式 › 性文化: 「對裸露、性器官、性行為完全沒有羞恥概念」 and 「視性愛為如同呼吸般自然的生理需求」, with 社會與文化 › 倫理觀; `docs/lore/overview.md` 性愛與身體; `docs/lore/settlement-locations.md` 〈公共浴場〉聚落差異 puts all three villages at open pools with no partitions and no attendant, and keeps that contrast as the hook for stories). The village's days are mostly its own: the world source gives sex about 80% of an elf's time, and the cards and scenes say so outright rather than hinting. Write every host with that ease and that appetite at the frankness of `world/lore/dialogue/content/ciaran_vethiel.yaml` topic_03 (「身軀原本就值得坦然展現，因此織得極薄透光」) and past it wherever her own subject invites it: the herb keeper of what a spent body wants, the baker of feeding a guest before bed and what she expects after, the elder of how the village spends its nights. Explicit wording belongs in the host's own speech, narration and card, in the world's terms, with no OOC vocabulary and no game mechanic. The one hard limit is the scene schema, not the tone: an actor line never grants consent, initiates or agrees to an act, so the frankness rides in what the host says and does, never in a performed scene the player is written into.
 
 Each card fills the seven fields of `NpcCard` from the brief below, in Traditional Chinese, within the card limits (leaf 600, identity section 600, whole card 2000 code points). The brief fixes the facts; the sentences are yours. Follow `.agents/skills/npc-dialogue-content/SKILL.md` and the two writing-guideline skills.
 
-**`eolas_nirnel` 妮爾內爾‧德米多** — `age=660`, `apparent_age=10`
+**`eolas_nirnel` 妮爾內爾‧德米多** — `age=660`, `apparent_age=20`
 
 - public: the villager who tends the herb rows of 石階菜畦 and steeps what she grows; keeps tonic, mana potion and strong healing potion for anyone who needs them
 - appearance: Eolas look; moss-green hair under a straw hat; soil under her nails; a row of stoppered jars at her belt
 - personality: calm, observant, weighs a person's tiredness at a glance; never hurries a steeping
 - speech_style: even and gentle, complete sentences, ends advice with 喔; calls the listener 你
-- life_story: elves take no illness, so she studied exhaustion instead: of body and of mana; six centuries of notes on which herb restores what
+- life_story: elves take no illness, so she studied exhaustion instead: of body and of mana; shelves of notes on which herb restores what
 - habit: crushes a leaf between her fingers and smells it before she picks the row
 - social_connection: 雷林‧莉特弗特 takes her kitchen herbs every morning
 - `identity.hidden`: leave empty.
 - `voice.misunderstood`: calm; asks whether it is tiredness, mana or a wound. `voice.greeting` stays `None`.
 
-**`eolas_raellin` 雷林‧莉特弗特** — `age=380`, `apparent_age=10`
+**`eolas_raellin` 雷林‧莉特弗特** — `age=380`, `apparent_age=20`
 
 - public: the villager who loves cooking, living on 岩屋坡; bakes bean flatbread in the shared kiln and packs food for anyone heading up the trail
 - appearance: Eolas look; honey-brown hair in two short braids; flour to the elbows; a wooden paddle tucked in her belt
 - personality: warm, talkative, feeds people before asking their business; particular about herbs
 - speech_style: everyday and lively, uses 喔 and 嘛, short clauses; calls the listener 你
-- life_story: learned the bread from whoever baked before her and has changed the herbs every century since; the shelter eats her bread daily
+- life_story: learned the bread from whoever baked before her and has changed the herbs again and again since; the shelter eats her bread daily
 - habit: breaks the first bread of a batch in half to smell it
 - social_connection: picks her herbs from 妮爾內爾‧德米多's terraces
 - `identity.hidden`: leave empty.
 - `voice.misunderstood`: friendly; offers bread first and asks for the question again. `voice.greeting` stays `None`.
 
-**`eolas_saelnel` 賽爾內爾‧妮格汀加勒** — `age=1040`, `apparent_age=10`
+**`eolas_saelnel` 賽爾內爾‧妮格汀加勒** — `age=1040`, `apparent_age=20`
 
 - public: the elder of 幽月谷村, living in the oldest dwelling on 岩屋坡; the village rarely has anything for an elder to decide, so she reads, remembers and talks with whoever comes
 - appearance: Eolas look; white hair to her waist, loosely tied; calm grey eyes; a worn book always within reach
 - personality: unhurried, dry-humoured, amused by urgency; turns a request for a ruling back into a question
 - speech_style: slow, with pauses; begins answers with a small remembered detail; calls everyone 孩子
-- life_story: over a thousand years in this valley; has read every shelf of the library and wrote many of them; saw the kiln built and the grove planted
+- life_story: has lived in this valley longer than anyone remembers; has read every shelf of the library and wrote many of them; saw the kiln built and the grove planted
 - habit: reads one page aloud to nobody each evening
 - social_connection: 希瑞爾溫‧布瑞特瓦特爾 brings her every new note to hear whether it was tried before
 - `identity.hidden`: leave empty.
@@ -344,7 +344,8 @@ One file per host. The filename stem is the profile key; the file declares no ow
 - A merchant's scenes name only goods on her own shelf, by registry display name, and state no number: no price, no quantity. The 收回 topic matches the service: a merchant buys back only what her shelf offers.
 - Name only places that exist: the village's nodes and shared interiors listed in Context, and the hosts of this village named in the Decision 1 table of this change or an earlier applied one.
 - Speak as a villager sharing what she makes. Elves need nothing from outsiders and are neither servants nor curiosities.
-- The body ease of Decision 6 rides in the greeting and in the 山谷 and 外人 scenes; it never becomes a sexual scene.
+- The body ease and sexual frankness of Decision 6 ride in the greeting and in the 山谷 and 外人 scenes wherever the host's own subject invites them; explicit speech is allowed. An actor line never initiates, consents to or promises an act.
+- No age is stated in player-facing prose: no greeting, scene line, narration or card carries a figure in 歲, an apparent age, or a count of years. The host's long life shows only in what she remembers and how she speaks.
 - An existing test reads every village table and rejects proprietor vocabulary. No greeting or line contains any of: 老闆, 店主, 本店, 營業時間, 營業, 庫存, 存貨, 存量, 售價, 光臨, 開店, 開門, 打烊. Say the world-side thing instead: the door is never shut, the shelf is what she finished this season.
 
 **`world/lore/dialogue/content/eolas_nirnel.yaml`** — topic ID prefix `eolas_nirnel_home`. Greeting: sets down a basket of cut herbs, looks the guest over for tiredness, and names what is bottled today.
@@ -370,7 +371,7 @@ One file per host. The filename stem is the profile key; the file declares no ow
 | `topic_id` | `keyword` and `label` | The scene covers |
 | --- | --- | --- |
 | `eolas_saelnel_home.topic_01` | 山谷 | how the valley feeds and clothes itself: terraces, grove, kiln, brook, and the open pool at 溫泉浴場 where washing, laundry and talk share one edge |
-| `eolas_saelnel_home.topic_02` | 圖書館 | the library nobody runs: centuries of experiment notes anyone may read |
+| `eolas_saelnel_home.topic_02` | 圖書館 | the library nobody runs: shelves of experiment notes anyone may read |
 | `eolas_saelnel_home.topic_03` | 外人 | how the village regards visitors: neither wary nor eager; a guest who is here is simply here, and neither a guest who bathes at 溫泉浴場 nor one who keeps dressed is remarked on |
 | `eolas_saelnel_home.topic_04` | 往事 | pure_chain successor of 山谷: a small memory of the valley from long ago |
 

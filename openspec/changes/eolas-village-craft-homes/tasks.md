@@ -9,7 +9,8 @@ Rules that hold for every task:
 - Add no test and no assertion that names a place, host, item, price or line from this change.
 - Use the names, keys, ages, prices and stock figures of `design.md` exactly.
 - Before writing any card, room prose or dialogue, read `/var/home/jim60105/repos/MUD/tmp/story_settings/world_info.md` (`tmp/` is git-ignored, so the file exists only in the primary checkout, not in a worktree; read it by this absolute path), `.agents/skills/npc-dialogue-content/SKILL.md` with its `references/scene-schema.md`, and the `chinese-content-writing-guideline` and `writing-style-guideline` skills.
-- Give the world source's 生活方式 › 性文化 and 社會與文化 › 倫理觀 the same weight as 種族設定 when writing cards, room prose and dialogue, and read `docs/lore/overview.md` 性愛與身體: the host speaks of the body plainly. That ease lives in dress, bearing and everyday talk; stage no sexual act and remark on no guest's body.
+- Give the world source's 生活方式 › 性文化 and 社會與文化 › 倫理觀 the same weight as 種族設定 when writing cards, room prose and dialogue, and read `docs/lore/overview.md` 性愛與身體: the host speaks of the body and of sex plainly, and explicit wording is expected where her subject invites it. Keep an actor line free of consent or commitment to an act.
+- Put no age into player-facing prose: no `歲` figure, no apparent age and no count of years in any greeting, scene line, narration or card. Verify by searching the files you write for `歲` and for a spelled or numeric span of years.
 - The server refuses to start until every gate of a host is satisfied, so the registries load only after groups 2 to 6 are all done. Verification that loads them is in group 7.
 - Run every Evennia test command alone, exactly as written, with nothing before or after it. If the test guard refuses a command for discovering more than 100 tests, run its labels as separate commands.
 
@@ -30,7 +31,7 @@ Rules that hold for every task:
 
 ## 4. Profiles
 
-- [ ] 4.1 Create `world/lore/npc_profiles/eolas_homes_a.py` and register it as in design Decision 6. Write the 3 cards and `misunderstood` lines from their briefs. Verify each card shows the Decision 6 body ease through dress and bearing and stages no sexual act.
+- [ ] 4.1 Create `world/lore/npc_profiles/eolas_homes_a.py` and register it as in design Decision 6. Write the 3 cards and `misunderstood` lines from their briefs. Verify each card carries the Decision 6 ease and appetite in the host's own words.
 
 ## 5. Dialogue
 

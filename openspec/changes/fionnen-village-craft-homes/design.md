@@ -353,7 +353,7 @@ Each card fills the seven fields of `NpcCard` from the brief below, in Tradition
 - appearance: Fionnen look; short tousled blonde hair; a loose wrap worn open; a tuned crystal on a cord between her breasts; green stains on her fingers from the vines
 - personality: playful, frank, endlessly inventive about pleasure; tries every piece on herself first and says how it went
 - speech_style: lively and direct, laughs easily, uses 嘛 and 啦; describes what a piece does to the body in plain words; calls the listener 你
-- life_story: four centuries of making things that feel good; her crystals are the ones human scholars cannot read; half the village keeps one of her vines
+- life_story: a long life of making things that feel good; her crystals are the ones human scholars cannot read; half the village keeps one of her vines
 - habit: wears whatever she finished last for a full day before she lets it go
 - social_connection: trades shuttles for veils with 伊斯爾林‧斯塔爾威維爾, and tests new pieces with her
 - `identity.hidden`: leave empty.
@@ -365,7 +365,7 @@ Each card fills the seven fields of `NpcCard` from the brief below, in Tradition
 - appearance: Fionnen look; tall, blonde hair in one long braid; wood shavings on her bare shoulders; a draw-hand calloused at two fingers
 - personality: steady, exacting, measures a person's arm with her eyes; little patience for a bow left strung
 - speech_style: plain and brief, craft words, few particles; calls the listener 你
-- life_story: has made bows for five centuries; each stave seasons for years before she touches it; most bows in 弓棚 are hers
+- life_story: has made bows since before the canopy walk went up; each stave seasons until it is ready; most bows in 弓棚 are hers
 - habit: sights down every stave against the light before the first cut
 - social_connection: 科瑞斯‧蒙希斯佩爾 carves the grips and nocks of her bows
 - `identity.hidden`: leave empty.
@@ -377,7 +377,7 @@ Each card fills the seven fields of `NpcCard` from the brief below, in Tradition
 - appearance: Fionnen look; pale gold hair loose to the hips; wears her own sheer veil and nothing under it; thread wound round two fingers
 - personality: gentle, sensual, unembarrassed; chooses cloth by how it feels on skin; teases a guest who looks away
 - speech_style: soft, unhurried, uses 呢 and 喔; invites the listener to touch the cloth; calls the listener 你
-- life_story: has woven in the canopy for four centuries; gathers dew thread at dawn; dressed most of the village and undressed a good part of it
+- life_story: has woven in the canopy since the first platform went up; gathers dew thread at dawn; dressed most of the village and undressed a good part of it
 - habit: holds new cloth against her own body before she lets anyone wear it
 - social_connection: 科瑞斯‧蒙希斯佩爾 carves her loom shuttles and is paid in veils
 - `identity.hidden`: leave empty.
@@ -394,6 +394,7 @@ One file per host. The filename stem is the profile key; the file declares no ow
 - A merchant's scenes name only goods on her own shelf, by registry display name, and state no number: no price, no quantity. The 收回 topic matches the service: a merchant buys back only what her shelf offers.
 - Name only places that exist: the village's nodes and shared interiors listed in Context, and the hosts of this village named in the Decision 1 table of this change or an earlier applied one.
 - Speak as a villager sharing what she makes. Elves need nothing from outsiders and are neither servants nor curiosities.
+- No age is stated in player-facing prose: no greeting, scene line, narration or card carries a figure in 歲, an apparent age, or a count of years. The host's long life shows only in what she remembers and how she speaks.
 - An existing test reads every village table and rejects proprietor vocabulary. No greeting or line contains any of: 老闆, 店主, 本店, 營業時間, 營業, 庫存, 存貨, 存量, 售價, 光臨, 開店, 開門, 打烊. Say the world-side thing instead: the door is never shut, the shelf is what she finished this season.
 
 **`world/lore/dialogue/content/fionnen_corith.yaml`** — topic ID prefix `fionnen_corith_home`. Greeting: looks up from a crystal she is tuning against her own skin and asks which kind of toy the guest came for.
