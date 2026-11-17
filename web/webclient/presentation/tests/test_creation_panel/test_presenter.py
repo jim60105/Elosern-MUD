@@ -1,4 +1,8 @@
 """Creation panel presenter tests: form and preset-card envelope rendering."""
+from dataclasses import replace
+from pathlib import Path
+
+from django.conf import settings
 from tools.spec_traceability import covers_requirement
 from unittest.mock import patch
 from evennia.utils.create import create_account, create_object
@@ -7,13 +11,19 @@ from typeclasses.accounts import Account
 from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
 from typeclasses.rooms import Room
+from world.art import official
+from world.art.fallback_keys import FALLBACK_EXTENSION
+from world.art.gallery import GalleryRecord
+from world.art.gallery_fallback import band_key_for
+from world.art.official import OfficialCatalog, OfficialContent, OfficialImage
+from world.art.store import GalleryJobRecord
 from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.creation import AFFINITY_ELEMENT_KEYS, CREATION_SCHEMA_VERSION, MAX_PROPOSAL_NAME_CODE_POINTS, validate_creation
 from web.webclient.presentation.protocol import MAX_CANONICAL_JSON_BYTES, json_byte_size
 from web.webclient.presentation.registry import build_production_registry
 from world.rules.creation_wizard import ALLOCATABLE_AXES, read_draft
 from world.tests.synthetic_data import SYNTH_PRESETS
-from ._support import _T_RACE, _T_SUBRACE, _open_t_creation_scope, _shipped_race_affinity, _t_profile_pairs, _t_spend
+from ._support import _T_PRESET, _T_RACE, _T_SUBRACE, _live, _open_t_creation_scope, _shipped_race_affinity, _t_profile_pairs, _t_spend
 import unittest
 from world.tests.start_room_fixture import stub_start_room
 
@@ -395,6 +405,156 @@ class CreationPanelPresenterTests(EvenniaTest):
             4 * MAX_PROPOSAL_NAME_CODE_POINTS + 2,
         )
         self.assertLessEqual(json_byte_size(payload), MAX_CANONICAL_JSON_BYTES)
+
+
+    # -- creation panel artwork (creation-panel-artwork) -------------------
+
+    def _write_state(self):
+        """The creation presenter's mutation surface: DB rows, policy, files."""
+        store_root = Path(settings.ART_STORE_ROOT)
+        files = (
+            sorted(str(path) for path in store_root.rglob("*"))
+            if store_root.exists()
+            else []
+        )
+        return (
+            GalleryRecord.objects.count(),
+            GalleryJobRecord.objects.count(),
+            self.character.db.portrait_policy,
+            files,
+        )
+
+    def _catalog(self, elements):
+        contents = {}
+        images = {}
+        for key, identity, fingerprint in elements:
+            image = OfficialImage(
+                identity=identity,
+                kind="preset",
+                key=key,
+                fingerprint=fingerprint * 64,
+                image_size={"width": 8, "height": 8},
+                face_rect={"x": 0.2, "y": 0.1, "w": 0.4, "h": 0.5},
+                stage={"scale": 1.25, "x": 0.1, "y": -0.1},
+            )
+            contents[("preset", key)] = OfficialContent(
+                kind="preset",
+                key=key,
+                default_identity=identity,
+                images=(identity,),
+            )
+            images[identity] = image
+        return OfficialCatalog(contents, images)
+
+    def _card(self, payload, key):
+        return next(card for card in payload["presets"] if card["key"] == key)
+
+
+    @covers_requirement("webclient-character-creation-ui::preset-cards-carry-a-server-built-artwork-descriptor")
+    def test_a_preset_with_official_artwork_offers_only_its_own_default(self):
+        identity = f"preset/{_T_PRESET}/hero.png"
+        other_identity = "preset/t_ash_finch/other.png"
+        catalog = self._catalog(
+            [
+                (_T_PRESET, identity, "a"),
+                ("t_ash_finch", other_identity, "b"),
+            ]
+        )
+        # A stored personal selection must never be consulted by a preview.
+        self.character.db.official_selection = other_identity
+        before = self._write_state()
+        with patch.object(official, "_CATALOG", catalog):
+            payload = self._render()
+        card = self._card(payload, _T_PRESET)
+        artwork = card["artwork"]
+        self.assertEqual(artwork["subject_id"], f"creation:preset:{_T_PRESET}")
+        self.assertEqual(len(artwork["attempts"]), 1)
+        attempt = artwork["attempts"][0]
+        resource = attempt["resource"]
+        self.assertEqual(attempt["type"], "image")
+        self.assertEqual(resource["origin"], "official")
+        self.assertEqual(resource["url"], f"/art/official/{'a' * 64}/{identity}")
+        self.assertEqual(resource["version"], "a" * 64)
+        self.assertEqual(
+            resource["geometry"]["face_rect"], {"x": 0.2, "y": 0.1, "w": 0.4, "h": 0.5}
+        )
+        self.assertEqual(
+            resource["geometry"]["stage"], {"scale": 1.25, "x": 0.1, "y": -0.1}
+        )
+        self.assertNotIn(other_identity, str(artwork))
+        self.assertIsNone(artwork["generation_subject"])
+        self.assertIsNone(artwork["generation_state"])
+        self.assertEqual(artwork["retention_sources"], [])
+        self.assertEqual(artwork["terminal"]["kind"], "alpha_mask")
+        self.assertEqual(artwork["terminal"]["source_id"], "portrait.alpha:woman")
+        self.assertEqual(self._write_state(), before)
+
+
+    @covers_requirement("webclient-character-creation-ui::preset-cards-carry-a-server-built-artwork-descriptor")
+    def test_a_preset_without_official_artwork_resolves_the_builtin_figure(self):
+        before = self._write_state()
+        with patch.object(official, "_CATALOG", OfficialCatalog({}, {})):
+            payload = self._render()
+        female = self._card(payload, _T_PRESET)["artwork"]
+        male = self._card(payload, "t_ash_finch")["artwork"]
+        self.assertEqual(female["attempts"], [])
+        self.assertEqual(male["attempts"], [])
+        self.assertEqual(female["terminal"]["source_id"], "portrait.alpha:woman")
+        self.assertEqual(male["terminal"]["source_id"], "portrait.alpha:man")
+        for artwork in (female, male):
+            self.assertIsNone(artwork["generation_subject"])
+            self.assertIsNone(artwork["generation_state"])
+            self.assertEqual(artwork["retention_sources"], [])
+        self.assertEqual(self._write_state(), before)
+
+
+    @covers_requirement("art-gallery-fallback::a-fallback-key-resolves-by-declaration-then-band-then-deterministic-hash")
+    def test_a_declared_preset_fallback_key_wins_over_the_band_rule(self):
+        registry = _live("world.lore.player_presets", "PLAYER_PRESET_REGISTRY")
+        preset = registry[_T_PRESET]
+        with patch.dict(
+            registry,
+            {_T_PRESET: replace(preset, fallback_key="elder")},
+            clear=False,
+        ):
+            with patch.object(official, "_CATALOG", OfficialCatalog({}, {})):
+                payload = self._render()
+        artwork = self._card(payload, _T_PRESET)["artwork"]
+        self.assertEqual(artwork["terminal"]["source_id"], "portrait.alpha:elder")
+        self.assertEqual(
+            artwork["terminal"]["resource"]["resource_id"],
+            f"defaults/elder{FALLBACK_EXTENSION}",
+        )
+
+
+    @covers_requirement("webclient-character-creation-ui::the-custom-descriptor-carries-the-silhouette-table")
+    def test_silhouette_table_is_actor_specific_and_matches_later_resolution(self):
+        payload = self._render()
+        table = payload["custom"]["silhouettes"]
+        self.assertEqual(len(table), 9)
+        for entry in table:
+            expected = band_key_for(
+                f"portrait:character:{self.character.pk}",
+                entry["sex"],
+                entry["apparent_age_minimum"],
+            )
+            self.assertEqual(
+                entry["artwork"]["terminal"]["source_id"],
+                f"portrait.alpha:{expected}",
+            )
+            self.assertIn(
+                f":{self.character.pk}:{entry['sex']}:", entry["artwork"]["subject_id"]
+            )
+            self.assertEqual(entry["artwork"]["attempts"], [])
+        # A second pending character gets its own identity, never a shared
+        # cached table.
+        other = create_object(PlayerCharacter, key="pending-shell-2")
+        self.account.at_post_create_character(other)
+        other_payload = self.registry.render(
+            "creation", PresentationContext(actor=other, protocol_version=1)
+        )
+        for entry in other_payload["custom"]["silhouettes"]:
+            self.assertIn(f":{other.pk}:{entry['sex']}:", entry["artwork"]["subject_id"])
 
 
 if __name__ == "__main__":

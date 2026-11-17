@@ -1,9 +1,9 @@
 // Story fixture slices: see stories/fixtures.js (facade) for the public surface.
 
 // B5 (webclient-vue-06-showcase-overlays): full-overlays fixtures. The
-// `creation` panel (schema v5) mirrors web/webclient/presentation/creation.py
+// `creation` panel (schema v7) mirrors web/webclient/presentation/creation.py
 // exactly: presets (at most 8 cards), the custom descriptor (name/age
-// bounds, races, subraces, profiles, affinity, sex), and the optional saved
+// bounds, races, subraces, profiles, affinity, sex, silhouettes), and the optional saved
 // wizard draft (preset/custom + background + affinity + persona + sex) plus
 // the optional transient concept proposal slot. The age
 // bounds advertise the 0 minimum on BOTH age and apparent_age (the
@@ -19,8 +19,73 @@ const ELEMENTS = [
   { key: "dark", label: "暗" },
 ];
 
+// Canonical preview descriptors (creation-panel-artwork): the story fixture
+// mirrors the schema-7 wire shape exactly, with the alpha terminal only for
+// silhouette entries and an optional official attempt on a preset card.
+const CREATION_DIGEST = "a".repeat(64);
+
+function creationAlphaArtwork(subjectId, key) {
+  return {
+    subject_id: subjectId,
+    revision: CREATION_DIGEST,
+    generation_subject: null,
+    generation_state: null,
+    attempts: [],
+    terminal: {
+      kind: "alpha_mask",
+      source_id: "portrait.alpha:" + key,
+      rank: 100,
+      resource: {
+        resource_id: "defaults/" + key + ".webp",
+        version: CREATION_DIGEST,
+        url: "/art/defaults/" + key + ".webp",
+        origin: "silhouette",
+        geometry: {
+          image_size: null,
+          face_rect: { x: 0.35, y: 0.02, w: 0.28, h: 0.16 },
+          stage: null,
+          aspect_ratio: "3:4",
+        },
+      },
+    },
+    retention_sources: [],
+  };
+}
+
+function creationPresetArtwork(key) {
+  return creationAlphaArtwork("creation:preset:" + key, "woman");
+}
+
+function creationSilhouettes() {
+  const bands = [
+    [0, 12],
+    [13, 59],
+    [60, 10000],
+  ];
+  const keys = {
+    female: ["girl", "woman", "elder"],
+    male: ["boy", "man", "elder"],
+    other: ["woman", "man", "elder"],
+  };
+  const table = [];
+  ["female", "male", "other"].forEach((sex) => {
+    bands.forEach((band, index) => {
+      table.push({
+        sex,
+        apparent_age_minimum: band[0],
+        apparent_age_maximum: band[1],
+        artwork: creationAlphaArtwork(
+          `creation:silhouette:1:${sex}:${band[0]}:${band[1]}`,
+          keys[sex][index]
+        ),
+      });
+    });
+  });
+  return table;
+}
+
 export const CREATION_PANEL_SAMPLE = {
-  schema_version: 6,
+  schema_version: 7,
   available: true,
   kind: "creation",
   draft: null,
@@ -33,6 +98,7 @@ export const CREATION_PANEL_SAMPLE = {
       subrace: "subrace_wolf",
       emphasis: "重擊與近戰",
       background: "一位尋找冒險者公會試煉的流浪劍客。",
+      artwork: creationPresetArtwork("preset_wandering_blade"),
     },
     {
       key: "preset_lantern_scholar",
@@ -42,6 +108,7 @@ export const CREATION_PANEL_SAMPLE = {
       subrace: null,
       emphasis: "法術與研究",
       background: "在燈下研讀古籍的學士。",
+      artwork: creationPresetArtwork("preset_lantern_scholar"),
     },
     {
       key: "preset_harbor_hauler",
@@ -51,6 +118,7 @@ export const CREATION_PANEL_SAMPLE = {
       subrace: null,
       emphasis: "搬運與交易",
       background: "在霧骨渡口搬運貨物的腳夫。",
+      artwork: creationPresetArtwork("preset_harbor_hauler"),
     },
   ],
   custom: {
@@ -149,6 +217,7 @@ export const CREATION_PANEL_SAMPLE = {
       { key: "male", label: "男性" },
       { key: "other", label: "其他" },
     ],
+    silhouettes: creationSilhouettes(),
   },
 };
 
@@ -230,7 +299,7 @@ export const CREATION_PANEL_PROPOSAL_TRANSIENT_SAMPLE = {
 // The `creation` panel unavailable form (registry-owned reason, the common
 // unavailable envelope).
 export const CREATION_PANEL_UNAVAILABLE_SAMPLE = {
-  schema_version: 6,
+  schema_version: 7,
   available: false,
   reason: { code: "creation_unavailable", message: "角色創建目前無法顯示" },
 };

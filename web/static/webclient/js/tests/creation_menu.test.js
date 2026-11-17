@@ -42,6 +42,66 @@ const T_SR_GALE_COMMON_ZH = "暮窟林語族";
 const T_DRAFT_NAME_A = "苔娜";
 const T_DRAFT_NAME_B = "蕾語者";
 
+// The menu model ignores artwork, but its synthetic panel must still be a
+// schema-valid v7 wire shape so it can be shared with protocol checks.
+const MENU_DIGEST = "a".repeat(64);
+
+function menuAlphaArtwork(subjectId, key) {
+  return {
+    subject_id: subjectId,
+    revision: MENU_DIGEST,
+    generation_subject: null,
+    generation_state: null,
+    attempts: [],
+    terminal: {
+      kind: "alpha_mask",
+      source_id: "portrait.alpha:" + key,
+      rank: 100,
+      resource: {
+        resource_id: "defaults/" + key + ".webp",
+        version: MENU_DIGEST,
+        url: "/art/defaults/" + key + ".webp",
+        origin: "silhouette",
+        geometry: {
+          image_size: null,
+          face_rect: { x: 0.35, y: 0.02, w: 0.28, h: 0.16 },
+          stage: null,
+          aspect_ratio: "3:4",
+        },
+      },
+    },
+    retention_sources: [],
+  };
+}
+
+function menuSilhouettes() {
+  const bands = [
+    [0, 12],
+    [13, 59],
+    [60, 10000],
+  ];
+  const keys = {
+    female: ["girl", "woman", "elder"],
+    male: ["boy", "man", "elder"],
+    other: ["woman", "man", "elder"],
+  };
+  const table = [];
+  ["female", "male", "other"].forEach((sex) => {
+    bands.forEach((band, index) => {
+      table.push({
+        sex,
+        apparent_age_minimum: band[0],
+        apparent_age_maximum: band[1],
+        artwork: menuAlphaArtwork(
+          `creation:silhouette:1:${sex}:${band[0]}:${band[1]}`,
+          keys[sex][index]
+        ),
+      });
+    });
+  });
+  return table;
+}
+
 function validPanel(overrides) {
   const axes = {
     hp: { axis: "hp", label: "生命值", explanation: "決定承受", minimum: 0, maximum: 100 },
@@ -56,7 +116,7 @@ function validPanel(overrides) {
     Object.assign({}, axes[k])
   );
   const panel = {
-    schema_version: 6,
+    schema_version: 7,
     available: true,
     kind: "creation",
     draft: null,
@@ -69,6 +129,7 @@ function validPanel(overrides) {
         subrace: T_SR_COMMONER,
         emphasis: "均衡",
         background: "來自南境的旅人",
+        artwork: menuAlphaArtwork("creation:preset:" + SYNTH_PRESET.id, "woman"),
       },
       {
         key: T_PRESET_B.key,
@@ -78,6 +139,7 @@ function validPanel(overrides) {
         subrace: T_SR_LEAF,
         emphasis: "守護",
         background: "斐歐恩護衛",
+        artwork: menuAlphaArtwork("creation:preset:" + T_PRESET_B.key, "woman"),
       },
     ],
     custom: {
@@ -109,6 +171,7 @@ function validPanel(overrides) {
         { key: "male", label: "男性" },
         { key: "other", label: "其他" },
       ],
+      silhouettes: menuSilhouettes(),
       affinity: {
         human: {
           maximum: 2,

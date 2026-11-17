@@ -2,6 +2,7 @@
 
 var C = require("../constants.js");
 var core = require("../core.js");
+var artwork = require("../artwork.js");
 
 var isPlainObject = core.isPlainObject;
 var codePoints = core.codePoints;
@@ -42,20 +43,65 @@ var CREATION_PERSONA_KEYS = C.CREATION_PERSONA_KEYS;
 var CREATION_SEX_VALUES = C.CREATION_SEX_VALUES;
 var CREATION_MAX_SEX_OPTIONS = C.CREATION_MAX_SEX_OPTIONS;
 var CREATION_SCHEMA_VERSION = C.CREATION_SCHEMA_VERSION;
+var CREATION_MAX_SILHOUETTES = C.CREATION_MAX_SILHOUETTES;
 var CREATION_MAX_AFFINITY_ELEMENTS = C.CREATION_MAX_AFFINITY_ELEMENTS;
 var CREATION_AFFINITY_ELEMENTS = C.CREATION_AFFINITY_ELEMENTS;
 var CREATION_AFFINITY_RACES = C.CREATION_AFFINITY_RACES;
 var CREATION_AFFINITY_MAXIMUMS = C.CREATION_AFFINITY_MAXIMUMS;
 
 // ---------------------------------------------------------------------------
-// creation panel v2 validator (mirror of web.webclient.presentation.creation).
+// creation panel v7 validator (mirror of web.webclient.presentation.creation).
 // ---------------------------------------------------------------------------
+
+function validateCreationPreviewArtworkSemantics(value, field) {
+  // A creation preview is not a generated subject and carries no backend
+  // retention authorization, so both claims stay explicitly empty and the
+  // terminal is the built-in alpha mask.
+  if (value.generation_subject !== null || value.generation_state !== null) {
+    throw new Error(field + " must claim no generation");
+  }
+  if (value.retention_sources.length !== 0) {
+    throw new Error(field + " must carry no retention");
+  }
+  if (value.terminal === null || value.terminal.kind !== "alpha_mask") {
+    throw new Error(field + " must carry an alpha terminal");
+  }
+  if (
+    value.terminal.resource.origin !== artwork.ORIGIN_SILHOUETTE ||
+    value.terminal.resource.url.indexOf("/art/defaults/") !== 0
+  ) {
+    throw new Error(field + " terminal must name the built-in silhouette route");
+  }
+}
+
+function validateCreationPresetArtwork(value, key) {
+  var checked = artwork.validateArtwork(value);
+  if (checked.subject_id !== "creation:preset:" + key) {
+    throw new Error("preset artwork subject_id does not match the card");
+  }
+  validateCreationPreviewArtworkSemantics(checked, "preset artwork");
+  var images = checked.attempts.filter(function (attempt) {
+    return attempt.type === "image";
+  });
+  if (images.length !== checked.attempts.length || images.length > 1) {
+    throw new Error("preset artwork must carry at most one image attempt and no fault");
+  }
+  if (images.length === 1) {
+    if (images[0].resource.origin !== artwork.ORIGIN_OFFICIAL) {
+      throw new Error("preset artwork attempt must be official");
+    }
+    if (images[0].resource.url.indexOf("/art/official/") !== 0) {
+      throw new Error("preset artwork attempt must name the official art route");
+    }
+  }
+  return checked;
+}
 
 function validateCreationPresetCard(value) {
   requireExactFields(
     value,
     "preset card",
-    ["key", "display_name", "race", "race_description", "subrace", "emphasis", "background"],
+    ["key", "display_name", "race", "race_description", "subrace", "emphasis", "background", "artwork"],
     []
   );
   var key = validateIdentifier(value.key, "preset key");
@@ -76,6 +122,7 @@ function validateCreationPresetCard(value) {
   }
   requireString(value.emphasis, "emphasis", CREATION_MAX_EMPHASIS);
   requireString(value.background, "background", CREATION_MAX_BACKGROUND);
+  validateCreationPresetArtwork(value.artwork, key);
   return value;
 }
 
@@ -227,11 +274,125 @@ function validateCreationProfile(value) {
   return value;
 }
 
+function validateCreationSilhouetteArtwork(value, sex, minimum, maximum) {
+  // The actor segment is position-stable but not bound: the panel payload
+  // carries no actor identity, so only its non-emptiness is checkable here.
+  var checked = artwork.validateArtwork(value);
+  var prefix = "creation:silhouette:";
+  var suffix = ":" + sex + ":" + minimum + ":" + maximum;
+  var subjectId = checked.subject_id;
+  if (subjectId.indexOf(prefix) !== 0 || subjectId.slice(-suffix.length) !== suffix) {
+    throw new Error("silhouette artwork subject_id does not match the entry");
+  }
+  if (subjectId.slice(prefix.length, subjectId.length - suffix.length) === "") {
+    throw new Error("silhouette artwork subject_id is empty");
+  }
+  validateCreationPreviewArtworkSemantics(checked, "silhouette artwork");
+  if (checked.attempts.length !== 0) {
+    throw new Error("silhouette artwork must carry no attempt");
+  }
+  return checked;
+}
+
+function validateCreationSilhouettes(value, sexKeys, age) {
+  // Mirror of creation._validate_silhouettes: every advertised sex carries a
+  // complete, gap-free partition of the advertised apparent-age range, and
+  // every descriptor is a canonical alpha-only preview.
+  if (
+    !Array.isArray(value) ||
+    value.length === 0 ||
+    value.length > CREATION_MAX_SILHOUETTES
+  ) {
+    throw new Error("silhouettes must be a non-empty bounded entry list");
+  }
+  var advertised = Object.create(null);
+  sexKeys.forEach(function (key) {
+    advertised[key] = true;
+  });
+  var apparentMinimum = age.apparent_age_minimum;
+  var apparentMaximum = age.apparent_age_maximum;
+  var bySex = Object.create(null);
+  value.forEach(function (entry) {
+    requireExactFields(
+      entry,
+      "silhouette entry",
+      ["sex", "apparent_age_minimum", "apparent_age_maximum", "artwork"],
+      []
+    );
+    var sex = validateIdentifier(entry.sex, "silhouette sex");
+    if (codePoints(sex) > CREATION_MAX_SUBRACE_KEY) {
+      throw new Error("silhouette sex exceeds its bound");
+    }
+    if (!advertised[sex]) {
+      throw new Error("silhouette sex is not an advertised sex option");
+    }
+    var minimum = requireInt(
+      entry.apparent_age_minimum,
+      "apparent_age_minimum",
+      apparentMinimum,
+      apparentMaximum
+    );
+    var maximum = requireInt(
+      entry.apparent_age_maximum,
+      "apparent_age_maximum",
+      apparentMinimum,
+      apparentMaximum
+    );
+    if (minimum > maximum) {
+      throw new Error("silhouette interval minimum must not exceed maximum");
+    }
+    var checked = validateCreationSilhouetteArtwork(
+      entry.artwork,
+      sex,
+      minimum,
+      maximum
+    );
+    if (!bySex[sex]) {
+      bySex[sex] = [];
+    }
+    bySex[sex].push({
+      sex: sex,
+      apparent_age_minimum: minimum,
+      apparent_age_maximum: maximum,
+      artwork: checked,
+    });
+  });
+  var coveredSexes = Object.keys(bySex);
+  if (coveredSexes.length !== sexKeys.length) {
+    throw new Error("silhouettes must cover every advertised sex exactly once");
+  }
+  var normalized = [];
+  sexKeys.forEach(function (sex) {
+    if (!bySex[sex]) {
+      throw new Error("silhouettes must cover every advertised sex exactly once");
+    }
+    bySex[sex].sort(function (left, right) {
+      return left.apparent_age_minimum - right.apparent_age_minimum;
+    });
+    var expected = apparentMinimum;
+    bySex[sex].forEach(function (entry) {
+      if (entry.apparent_age_minimum !== expected) {
+        throw new Error(
+          "silhouette intervals must be contiguous without gaps or overlaps"
+        );
+      }
+      expected = entry.apparent_age_maximum + 1;
+      normalized.push(entry);
+    });
+    if (expected !== apparentMaximum + 1) {
+      throw new Error(
+        "silhouette intervals must cover the advertised apparent-age range"
+      );
+    }
+  });
+  return normalized;
+}
+
 function validateCreationCustom(value) {
   requireExactFields(
     value,
     "custom",
-    ["name", "age", "races", "subraces", "profiles", "affinity", "sex"],
+    ["name", "age", "races", "subraces", "profiles", "affinity", "sex", "silhouettes"],
     []
   );
   validateCreationName(value.name);
@@ -247,6 +408,13 @@ function validateCreationCustom(value) {
   value.profiles.forEach(validateCreationProfile);
   validateCreationAffinity(value.affinity);
   validateCreationSex(value.sex);
+  validateCreationSilhouettes(
+    value.silhouettes,
+    value.sex.map(function (option) {
+      return option.key;
+    }),
+    value.age
+  );
   return value;
 }
 

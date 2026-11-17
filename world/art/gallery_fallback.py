@@ -218,23 +218,35 @@ def _hash_into_pool(subject_full_key: str, pool: tuple[str, ...]) -> str:
     return pool[int.from_bytes(digest, "big") % len(pool)]
 
 
-def _band_or_hash(identity: str, entity: Any) -> str:
-    """The band's sex key for ``entity``, else ``identity``'s pool entry.
+def band_key_for(identity: str, sex: object, apparent_age: object) -> str:
+    """The band's sex key for explicit values, else ``identity``'s pool entry.
 
-    The one band rule: an apparent age at or below the child ceiling uses the
-    child band, at or above the elder floor the elder band, and everything
-    else (including a missing or malformed value) the adult band; ``female``
-    and ``male`` resolve that band's key directly and every other sex hashes
-    ``identity`` into the band's ordered pool.
+    The one band rule, exposed as a pure value seam so preview callers can
+    resolve a prospective character without an entity (creation previews):
+    an apparent age at or below the child ceiling uses the child band, at or
+    above the elder floor the elder band, and everything else (including a
+    missing or malformed value) the adult band; ``female`` and ``male``
+    resolve that band's key directly and every other sex hashes ``identity``
+    into the band's ordered pool.
     """
-    sex = getattr(entity, "sex", None) if entity is not None else None
-    stored = getattr(entity, "db", None) if entity is not None else None
-    apparent_age = getattr(stored, "apparent_age", None) if stored is not None else None
     band = _AGE_BANDS[_band_name_for_apparent_age(apparent_age)]
     sex_key = band["female"] if sex == "female" else band["male"] if sex == "male" else None
     if sex_key is not None:
         return str(sex_key)
     return _hash_into_pool(identity, band["pool"])
+
+
+def _band_or_hash(identity: str, entity: Any) -> str:
+    """The band's sex key for ``entity``, else ``identity``'s pool entry.
+
+    The entity-shaped wrapper around :func:`band_key_for`: a stored sex and
+    apparent age are read from the entity so every existing caller keeps its
+    behavior, including the fail-closed adult band for malformed values.
+    """
+    sex = getattr(entity, "sex", None) if entity is not None else None
+    stored = getattr(entity, "db", None) if entity is not None else None
+    apparent_age = getattr(stored, "apparent_age", None) if stored is not None else None
+    return band_key_for(identity, sex, apparent_age)
 
 
 def fallback_key_for(subject: ArtSubject, entity: Any = None) -> str:
@@ -297,6 +309,7 @@ __all__ = [
     "FALLBACK_FACE_RECTS",
     "NPC_TIER_PROVENANCE_ATTRIBUTE",
     "PRESET_PROVENANCE_ATTRIBUTE",
+    "band_key_for",
     "fallback_face_rect",
     "fallback_identity_and_rect",
     "fallback_key_for",

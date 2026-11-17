@@ -5,6 +5,7 @@ import unittest
 from unittest.mock import patch
 from web.webclient.presentation.creation import AFFINITY_ELEMENT_KEYS, AGE_MAXIMUM, AGE_MINIMUM, APPARENT_AGE_MAXIMUM, APPARENT_AGE_MINIMUM, CREATION_SCHEMA_VERSION, CreationPanelError, MAX_BACKGROUND_CODE_POINTS, MAX_DESCRIPTION_CODE_POINTS, MAX_DISPLAY_NAME_CODE_POINTS, MAX_EMPHASIS_CODE_POINTS, MAX_EXPLANATION_CODE_POINTS, MAX_LABEL_CODE_POINTS, MAX_NAME_LENGTH, MAX_PRESET_KEY_CODE_POINTS, MAX_PRESETS, MAX_PROFILES, MAX_RACES, MAX_RACE_KEY_CODE_POINTS, MAX_SPECIALTY_CODE_POINTS, MAX_SUBRACES, MAX_SUBRACE_KEY_CODE_POINTS, validate_creation
 from web.webclient.presentation.protocol import MAX_CANONICAL_JSON_BYTES, json_byte_size
+from world.art.presenter import preset_artwork, silhouette_table
 from world.rules.character_creation import max_affinity_elements
 from world.rules.creation_wizard import ALLOCATABLE_AXES
 from world.tests.synthetic_data import SYNTH_RACES
@@ -185,14 +186,16 @@ class CreationPanelValidationTests(unittest.TestCase):
         def huge(value):
             return "x" * value
 
+        card_key = "p" * MAX_PRESET_KEY_CODE_POINTS
         card = {
-            "key": "p" * MAX_PRESET_KEY_CODE_POINTS,
+            "key": card_key,
             "display_name": huge(MAX_DISPLAY_NAME_CODE_POINTS),
             "race": "r" * MAX_RACE_KEY_CODE_POINTS,
             "race_description": huge(MAX_DESCRIPTION_CODE_POINTS),
             "subrace": "s" * MAX_SUBRACE_KEY_CODE_POINTS,
             "emphasis": huge(MAX_EMPHASIS_CODE_POINTS),
             "background": huge(MAX_BACKGROUND_CODE_POINTS),
+            "artwork": preset_artwork(card_key),
         }
         race = {
             "key": "r" * MAX_RACE_KEY_CODE_POINTS,
@@ -266,6 +269,9 @@ class CreationPanelValidationTests(unittest.TestCase):
                     {"key": key, "label": "x" * MAX_LABEL_CODE_POINTS}
                     for key in ("female", "male", "other")
                 ],
+                "silhouettes": silhouette_table(
+                    "1", ["female", "male", "other"], 0, 10000
+                ),
             },
         }
         self.assertGreater(

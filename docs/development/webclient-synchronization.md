@@ -78,6 +78,38 @@ unchanged, while its own `map.view` completions (updates) never do.
 | `status` | 6 | Each `fatigue` row is `{identity, name, reserve_percent, stage, label, severity, restriction, asleep}`; `asleep` is the canonical posture (voluntary and forced sleep) and agrees with the sleeping stages. Rows are the status source, the controlled body, then each further source-present traveller with readable physiology, at most 8. Version 6 adds the required `travel_capacity` (wilderness-travel-leg-ui): `null` outside wilderness exploration, when the party has no constructed physiology, or when the read fails (logged as `status_travel_capacity_unavailable`; the rest of the panel still renders). Inside it is exactly `{capacity: {normal, light, moderate, severe}, neighbours: [{exit_ref, seconds}], at_pace: {cautious, standard}}`: `capacity` counts hypothetical one-cell orthogonal foot steps on the current cell's terrain by worst after-step stage (the terminal exact-zero `forced_sleep` arrival counts in `severe`; flight never applies); `neighbours` holds at most 12 quotes, one per committed exploration move row by its opaque `exit_ref`, with `seconds` the existing preflight duration after the flight waiver (0 when flying) or `null` for a withheld destination, a disabled row, a settlement gateway or a refused/unresolved step; `at_pace` says whether the current worst stage already meets the cautious (light) and standard (moderate) thresholds. Neither field is an eligibility decision. Version 5 is rejected; there is no compatibility form. |
 | `area_map` | 2 | Unchanged. The travel stage decodes the wilderness window through `lib/travel-grid.js` until window-ui's schema cutover. |
 
+### Creation panel artwork (schema 7)
+
+`creation` schema version 7 adds two canonical artwork fields
+(`creation-panel-artwork`): every `presets[]` card carries `artwork`, and
+`custom` carries `silhouettes`. `CREATION_SCHEMA_VERSION` in
+`web/webclient/presentation/creation.py` is the single version authority; the
+browser mirror (`protocol/constants.js` `CREATION_SCHEMA_VERSION` and
+`PANEL_ALLOWLIST.creation`) and every fixture move with it, and both exact
+validators reject v6 and any other version.
+
+Each `presets[].artwork` is exactly the seven-key canonical descriptor with
+stable subject id `creation:preset:<key>`. It may carry at most one image
+attempt — the preset's own catalog default, origin `official`, at its
+fingerprinted same-origin URL — and never a fault: an unadmitted preview
+default is normal absence. Its terminal is always the built-in alpha mask; the
+preview claims no generation and no retention, and it never consults a
+character's gallery or personal official selection. When the preset declares
+no fallback key the terminal uses the ordinary band rule with
+`preset:<preset key>` as the hash input.
+
+`custom.silhouettes` is a 1..16-entry list of
+`{sex, apparent_age_minimum, apparent_age_maximum, artwork}`. For every
+advertised sex the entries partition the advertised apparent-age range
+exactly once, with no gap or overlap. Each artwork is alpha-only (no attempts,
+no generation, no retention) with stable subject id
+`creation:silhouette:<actor pk>:<sex>:<minimum>:<maximum>`. The server builds
+the table per pending character, using the prospective identity
+`portrait:character:<actor pk>` and the child/adult/elder boundaries imported
+from `world/art/gallery_fallback.py`; the browser only looks a row up and
+copies no age-band rule. The preview is read-only and creates no character,
+gallery record, job or file.
+
 ### Travel map repaint keys
 
 The travel stage paints the adopted grid once per content change

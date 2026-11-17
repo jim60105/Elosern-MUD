@@ -51,6 +51,14 @@ Official candidates SHALL use snapshot-admitted fingerprinted same-origin URLs a
 - **WHEN** the bytes at the same root-relative path are replaced and the server restarts
 - **THEN** the presented image updates under the same stable identity while the entity's personal selection identity is retained, selection behavior owned by the personalization capability
 
+#### Scenario: A preset preview uses only its own catalog default
+- **WHEN** creation previews a registered synthetic preset directly from its preset key
+- **THEN** its artwork offers only that content reference’s snapshot-admitted default as an official image attempt with validated geometry, and never consults a character’s gallery or personal selection
+
+#### Scenario: Absent preset artwork is normal preview absence
+- **WHEN** the mounted snapshot admits no default for the preview’s own preset reference
+- **THEN** the preview offers no image attempt or fault and falls through to its built-in alpha terminal without acquisition, record creation or policy change
+
 ### Requirement: Eligibility checks order before official and runtime presentation
 Portrait age and eligibility validation SHALL run before official or runtime character artwork may be presented, exactly as it guards generation today: neither mounted-directory metadata nor a crafted media URL SHALL bypass the existing checks, and a rejected character SHALL present the existing truthful placeholder/placeholder-selector outcome with no subject key, no URL, and no prompt content.
 

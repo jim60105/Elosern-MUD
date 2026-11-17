@@ -13,6 +13,88 @@ const assert = require("node:assert/strict");
 const Protocol = require("../elosern/protocol.js");
 const { T_DARK_LABEL, T_EARTH_LABEL, T_EL_LIGHTNING, T_FIRE_LABEL, T_ICE_LABEL, T_LIGHTNING_LABEL, T_LIGHT_LABEL, T_PRESET_A, T_PRESET_A_DISPLAY, T_PRESET_B, T_PRESET_B_DISPLAY, T_SR_COMMONER, T_SR_GALE, T_SR_LEAF, T_WATER_LABEL, T_WIND_LABEL, VALID_EPOCH, deepMerge, serverTime } = require("./protocol_support.js");
 
+const CREATION_DIGEST = "a".repeat(64);
+
+function alphaArtwork(subjectId, key) {
+  return {
+    subject_id: subjectId,
+    revision: CREATION_DIGEST,
+    generation_subject: null,
+    generation_state: null,
+    attempts: [],
+    terminal: {
+      kind: "alpha_mask",
+      source_id: "portrait.alpha:" + key,
+      rank: 100,
+      resource: {
+        resource_id: "defaults/" + key + ".webp",
+        version: CREATION_DIGEST,
+        url: "/art/defaults/" + key + ".webp",
+        origin: "silhouette",
+        geometry: {
+          image_size: null,
+          face_rect: { x: 0.35, y: 0.02, w: 0.28, h: 0.16 },
+          stage: null,
+          aspect_ratio: "3:4",
+        },
+      },
+    },
+    retention_sources: [],
+  };
+}
+
+function presetArtwork(key, withOfficial) {
+  const art = alphaArtwork("creation:preset:" + key, "woman");
+  if (withOfficial) {
+    art.attempts.push({
+      type: "image",
+      source_id: "portrait.official:preset/" + key,
+      rank: 50,
+      resource: {
+        resource_id: "preset/" + key + "/hero.png",
+        version: CREATION_DIGEST,
+        url: "/art/official/" + CREATION_DIGEST + "/preset/" + key + "/hero.png",
+        origin: "official",
+        geometry: {
+          image_size: { width: 8, height: 8 },
+          face_rect: { x: 0.2, y: 0.1, w: 0.4, h: 0.5 },
+          stage: { scale: 1.25, x: 0.1, y: -0.1 },
+          aspect_ratio: "3:4",
+        },
+      },
+    });
+  }
+  return art;
+}
+
+function silhouetteTable() {
+  const bands = [
+    [0, 12],
+    [13, 59],
+    [60, 10000],
+  ];
+  const keys = {
+    female: ["girl", "woman", "elder"],
+    male: ["boy", "man", "elder"],
+    other: ["woman", "man", "elder"],
+  };
+  const table = [];
+  ["female", "male", "other"].forEach((sex) => {
+    bands.forEach((band, index) => {
+      table.push({
+        sex,
+        apparent_age_minimum: band[0],
+        apparent_age_maximum: band[1],
+        artwork: alphaArtwork(
+          `creation:silhouette:1:${sex}:${band[0]}:${band[1]}`,
+          keys[sex][index]
+        ),
+      });
+    });
+  });
+  return table;
+}
+
 
 function validCreationPanel(overrides) {
   const axes = Protocol.CREATION_AXES.map((axis) => ({
@@ -24,7 +106,7 @@ function validCreationPanel(overrides) {
   }));
   return deepMerge(
     {
-      schema_version: 6,
+      schema_version: 7,
       available: true,
       kind: "creation",
       draft: null,
@@ -37,6 +119,7 @@ function validCreationPanel(overrides) {
           subrace: T_SR_COMMONER,
           emphasis: "均衡",
           background: "旅人",
+          artwork: presetArtwork(T_PRESET_A, true),
         },
         {
           key: T_PRESET_B,
@@ -46,6 +129,7 @@ function validCreationPanel(overrides) {
           subrace: T_SR_LEAF,
           emphasis: "守護",
           background: "護衛",
+          artwork: presetArtwork(T_PRESET_B, false),
         },
       ],
       custom: {
@@ -116,6 +200,7 @@ function validCreationPanel(overrides) {
           { key: "male", label: "男性" },
           { key: "other", label: "其他" },
         ],
+        silhouettes: silhouetteTable(),
       },
     },
     overrides
@@ -129,7 +214,7 @@ test("accepts a valid creation panel and the common unavailable form", () => {
       "creation",
       Protocol.PANEL_ALLOWLIST.creation,
       {
-        schema_version: 6,
+        schema_version: 7,
         available: false,
         reason: { code: "creation_unavailable", message: "角色建立畫面目前無法顯示" },
       }
@@ -146,6 +231,8 @@ test("creation panel rejects malformed and unknown-node fields", () => {
   assert.throws(() => Protocol.validateCreationPanel(validCreationPanel({ schema_version: 3 })));
   assert.throws(() => Protocol.validateCreationPanel(validCreationPanel({ schema_version: 4 })));
   assert.throws(() => Protocol.validateCreationPanel(validCreationPanel({ schema_version: 5 })));
+  // v6 is the pre-artwork version: the exact gate rejects it.
+  assert.throws(() => Protocol.validateCreationPanel(validCreationPanel({ schema_version: 6 })));
   assert.throws(() => Protocol.validateCreationPanel(validCreationPanel({ schema_version: 2 })));
   const badDraft = validCreationPanel({ draft: { mode: "preset", stage: "custom_filled", preset_key: "x" } });
   assert.throws(() => Protocol.validateCreationPanel(badDraft));
@@ -201,7 +288,7 @@ test("creation panel v5 carries the draft persona, sex, and the proposal slot", 
   };
   const payload = validCreationPanel({ draft: customDraft, proposal });
   const validated = Protocol.validateCreationPanel(payload);
-  assert.equal(validated.schema_version, 6);
+  assert.equal(validated.schema_version, 7);
   assert.equal(validated.draft.sex, "other");
   assert.deepEqual(validated.draft.persona, customDraft.persona);
   assert.deepEqual(validated.proposal, proposal);
@@ -469,6 +556,201 @@ test("custom.sex mirrors the server vocabulary and the draft gate requires it", 
   );
 });
 
+test("creation v7 carries preset artwork and the custom silhouette table", () => {
+  const validated = Protocol.validateCreationPanel(validCreationPanel());
+  assert.equal(validated.schema_version, 7);
+  const card = validated.presets[0];
+  assert.equal(card.artwork.subject_id, "creation:preset:" + T_PRESET_A);
+  assert.equal(card.artwork.attempts.length, 1);
+  assert.equal(card.artwork.attempts[0].resource.origin, "official");
+  assert.equal(card.artwork.terminal.kind, "alpha_mask");
+  assert.equal(card.artwork.generation_subject, null);
+  assert.equal(card.artwork.retention_sources.length, 0);
+  const silhouettes = validated.custom.silhouettes;
+  assert.equal(silhouettes.length, 9);
+  const sexes = validated.custom.sex.map((option) => option.key);
+  assert.deepEqual(
+    silhouettes.map((entry) => entry.sex),
+    sexes.flatMap((sex) => [sex, sex, sex])
+  );
+  for (const entry of silhouettes) {
+    assert.deepEqual(entry.artwork.attempts, []);
+    assert.equal(entry.artwork.terminal.kind, "alpha_mask");
+    assert.equal(entry.artwork.generation_subject, null);
+  }
+});
+
+test("creation panel rejects malformed preset artwork", () => {
+  const clone = () => JSON.parse(JSON.stringify(validCreationPanel()));
+  const cases = [
+    ["missing artwork", (panel) => { delete panel.presets[0].artwork; }],
+    ["null artwork", (panel) => { panel.presets[0].artwork = null; }],
+    [
+      "non same-origin url",
+      (panel) => {
+        panel.presets[0].artwork.attempts[0].resource.url = "https://example.invalid/art/x.png";
+      },
+    ],
+    [
+      "non-official origin",
+      (panel) => {
+        panel.presets[0].artwork.attempts[0].resource.origin = "runtime";
+      },
+    ],
+    [
+      "fault attempt",
+      (panel) => {
+        panel.presets[0].artwork.attempts.push({
+          type: "fault",
+          source_id: "portrait.official:preset/other",
+          rank: 50,
+          reason: "source_unavailable",
+        });
+      },
+    ],
+    [
+      "two image attempts",
+      (panel) => {
+        const second = JSON.parse(JSON.stringify(panel.presets[0].artwork.attempts[0]));
+        second.source_id = "portrait.official:preset/other";
+        second.resource.resource_id = "preset/other/hero.png";
+        panel.presets[0].artwork.attempts.push(second);
+      },
+    ],
+    [
+      "claimed generation",
+      (panel) => {
+        panel.presets[0].artwork.generation_subject = "portrait:character:1";
+        panel.presets[0].artwork.generation_state = "pending";
+      },
+    ],
+    [
+      "retention",
+      (panel) => {
+        panel.presets[0].artwork.retention_sources = [
+          { source_id: "portrait.official:x", token: CREATION_DIGEST },
+        ];
+      },
+    ],
+    ["missing terminal", (panel) => { panel.presets[0].artwork.terminal = null; }],
+    [
+      "terminal wrong route",
+      (panel) => {
+        panel.presets[0].artwork.terminal.resource.origin = "runtime";
+        panel.presets[0].artwork.terminal.resource.url = "/art/runtime/x.png";
+      },
+    ],
+    [
+      "wrong subject id",
+      (panel) => {
+        panel.presets[0].artwork.subject_id = "creation:preset:another";
+      },
+    ],
+  ];
+  for (const [label, mutate] of cases) {
+    const panel = clone();
+    mutate(panel);
+    assert.throws(() => Protocol.validateCreationPanel(panel), undefined, label);
+  }
+});
+
+test("creation panel rejects malformed silhouette tables", () => {
+  const clone = () => JSON.parse(JSON.stringify(validCreationPanel()));
+  const cases = [
+    ["empty table", (panel) => { panel.custom.silhouettes = []; }],
+    [
+      "over-bound table",
+      (panel) => {
+        panel.custom.silhouettes = panel.custom.silhouettes.concat(
+          JSON.parse(JSON.stringify(panel.custom.silhouettes))
+        );
+      },
+    ],
+    ["unknown sex", (panel) => { panel.custom.silhouettes[0].sex = "dwarf"; }],
+    [
+      "noninteger endpoint",
+      (panel) => { panel.custom.silhouettes[0].apparent_age_minimum = 1.5; },
+    ],
+    [
+      "boolean endpoint",
+      (panel) => { panel.custom.silhouettes[0].apparent_age_minimum = true; },
+    ],
+    [
+      "reversed interval",
+      (panel) => {
+        panel.custom.silhouettes[0].apparent_age_minimum = 500;
+        panel.custom.silhouettes[0].apparent_age_maximum = 100;
+      },
+    ],
+    [
+      "out-of-range endpoint",
+      (panel) => { panel.custom.silhouettes[0].apparent_age_minimum = -1; },
+    ],
+    [
+      "gap",
+      (panel) => { panel.custom.silhouettes[0].apparent_age_maximum = 11; },
+    ],
+    [
+      "overlap",
+      (panel) => { panel.custom.silhouettes[0].apparent_age_maximum = 13; },
+    ],
+    [
+      "extra entry field",
+      (panel) => { panel.custom.silhouettes[0].extra = true; },
+    ],
+    [
+      "missing advertised sex",
+      (panel) => {
+        panel.custom.silhouettes = panel.custom.silhouettes.filter(
+          (entry) => entry.sex !== "male"
+        );
+      },
+    ],
+    [
+      "terminal removed",
+      (panel) => { panel.custom.silhouettes[0].artwork.terminal = null; },
+    ],
+    [
+      "terminal wrong route",
+      (panel) => {
+        panel.custom.silhouettes[0].artwork.terminal.resource.origin = "runtime";
+        panel.custom.silhouettes[0].artwork.terminal.resource.url = "/art/runtime/x.png";
+      },
+    ],
+    [
+      "attempt present",
+      (panel) => {
+        panel.custom.silhouettes[0].artwork.attempts.push({
+          type: "fault",
+          source_id: "portrait.official:preset/other",
+          rank: 50,
+          reason: "source_unavailable",
+        });
+      },
+    ],
+    [
+      "subject id mismatch",
+      (panel) => {
+        panel.custom.silhouettes[0].artwork.subject_id =
+          "creation:silhouette:1:male:0:12";
+      },
+    ],
+    [
+      "retention present",
+      (panel) => {
+        panel.custom.silhouettes[0].artwork.retention_sources = [
+          { source_id: "portrait.alpha:woman", token: CREATION_DIGEST },
+        ];
+      },
+    ],
+  ];
+  for (const [label, mutate] of cases) {
+    const panel = clone();
+    mutate(panel);
+    assert.throws(() => Protocol.validateCreationPanel(panel), undefined, label);
+  }
+});
+
 test("a structurally maximal realistic creation payload fits the envelope", () => {
   const payload = validCreationPanel();
   assert.ok(Protocol.jsonByteSize(payload) < Protocol.MAX_CANONICAL_JSON_BYTES / 4);
@@ -491,6 +773,7 @@ test("creation payload maximizing every string field fails the byte gate", () =>
     subrace: "s".repeat(Protocol.CREATION_MAX_SUBRACE_KEY),
     emphasis: "x".repeat(Protocol.CREATION_MAX_EMPHASIS),
     background: "x".repeat(Protocol.CREATION_MAX_BACKGROUND),
+    artwork: presetArtwork("p".repeat(Protocol.CREATION_MAX_PRESET_KEY), true),
   };
   const race = {
     key: "r".repeat(Protocol.CREATION_MAX_RACE_KEY),
@@ -521,7 +804,7 @@ test("creation payload maximizing every string field fails the byte gate", () =>
     (key) => Object.assign({}, affinityElement, { key })
   );
   const payload = {
-    schema_version: 6,
+    schema_version: 7,
     available: true,
     kind: "creation",
     draft: null,
@@ -546,6 +829,7 @@ test("creation payload maximizing every string field fails the byte gate", () =>
         key,
         label: "x".repeat(Protocol.CREATION_MAX_LABEL),
       })),
+      silhouettes: silhouetteTable(),
     },
   };
   assert.ok(Protocol.jsonByteSize(payload) > Protocol.MAX_CANONICAL_JSON_BYTES);
@@ -553,7 +837,7 @@ test("creation payload maximizing every string field fails the byte gate", () =>
 });
 
 test("creation is in the production panel allowlist and a bad panel rejects atomically", () => {
-  assert.equal(Protocol.PANEL_ALLOWLIST.creation, 6);
+  assert.equal(Protocol.PANEL_ALLOWLIST.creation, 7);
   const envelope = {
     protocol_version: 1,
     presentation_epoch: VALID_EPOCH,
@@ -569,5 +853,12 @@ test("creation is in the production panel allowlist and a bad panel rejects atom
   assert.equal(accepted.accepted, false);
   assert.equal(accepted.reason, "invalid");
   assert.equal(store.getState().phase, "awaiting_initial_snapshot");
+});
+
+test("the Storybook creation fixture validates against schema 7", async () => {
+  const { CREATION_PANEL_SAMPLE } = await import(
+    "../../../../webclient-app/stories/fixtures/creation_panels.js"
+  );
+  assert.doesNotThrow(() => Protocol.validateCreationPanel(CREATION_PANEL_SAMPLE));
 });
 

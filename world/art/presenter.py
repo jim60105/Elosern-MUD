@@ -56,6 +56,7 @@ from dataclasses import dataclass
 from world.observability import log_warn
 
 from world.art import descriptors
+from world.art.fallback_keys import validate_fallback_key
 from world.art.gallery import (
     DEFAULT_FACE_RECT,
     GalleryRecordError,
@@ -67,7 +68,13 @@ from world.art.gallery import (
     validate_stage,
     identity_stage,
 )
-from world.art.gallery_fallback import fallback_identity_and_rect, fallback_key_for_entity
+from world.art.gallery_fallback import (
+    CHILD_APPARENT_AGE_MAXIMUM,
+    ELDER_APPARENT_AGE_MINIMUM,
+    band_key_for,
+    fallback_identity_and_rect,
+    fallback_key_for_entity,
+)
 from world.art.gallery_kinds import capabilities_for
 from world.art.gallery_match import (
     fallback_for,
@@ -218,10 +225,31 @@ def _official_geometry(
     snapshot that cannot have come from the catalog's own admission nor
     replaced bytes can ship unvalidated geometry.
     """
+    return _validated_official_geometry(
+        official,
+        preferences.geometry.get(official["identity"]),
+        subject_label=subject.full(),
+    )
+
+
+def _validated_official_geometry(
+    official: dict, override: dict | None, *, subject_label: str
+) -> dict:
+    """The validated canonical geometry of one official image.
+
+    ``override`` is the caller's optional stored geometry for this exact
+    identity (``None`` for a preview with no entity preference). A stored
+    rectangle the CURRENT bytes invalidate degrades to the catalog's
+    metadata-or-fitted rectangle with ONE bounded
+    ``art_official_override_invalid`` diagnostic, and the stored preference
+    itself is retained because this builder only ever reads it. The catalog's
+    geometry is then re-validated exactly as a stored card's is, so neither a
+    snapshot that cannot have come from the catalog's own admission nor
+    replaced bytes can ship unvalidated geometry.
+    """
     image_size = official.get("image_size")
     face_rect = official["face_rect"]
     stage = official["stage"]
-    override = preferences.geometry.get(official["identity"])
     if override is not None and "face_rect" in override:
         try:
             face_rect = validate_face_rect(override["face_rect"], image_size=image_size)
@@ -229,7 +257,7 @@ def _official_geometry(
             log_warn(
                 "art_official_override_invalid",
                 context={
-                    "subject": subject.full(),
+                    "subject": subject_label,
                     "identity": official.get("identity"),
                     "component": "face_rect",
                 },
@@ -239,14 +267,14 @@ def _official_geometry(
     try:
         face_rect = validate_face_rect(face_rect, image_size=image_size)
     except GalleryRecordError:  # observability: ignore R2: malformed rect degrades per contract; payload must never fail
-        log_warn("art_face_rect_invalid", context={"subject": subject.full()})
+        log_warn("art_face_rect_invalid", context={"subject": subject_label})
         face_rect = default_face_rect(image_size) if image_size else dict(DEFAULT_FACE_RECT)
     try:
         stage = validate_stage(stage)
     except GalleryRecordError:  # observability: ignore R2: malformed placement degrades with its bounded diagnostic
         log_warn(
             "art_stage_invalid",
-            context={"subject": subject.full(), "identity": official.get("identity")},
+            context={"subject": subject_label, "identity": official.get("identity")},
         )
         stage = identity_stage()
     return descriptors.geometry(
@@ -395,6 +423,209 @@ def _alpha_terminal(fallback) -> dict | None:
             ),
         ),
     )
+
+
+# ---------------------------------------------------------------------------
+# Creation previews (creation-panel-artwork).
+#
+# These are the only builders of the creation panel's artwork metadata. They
+# are pure previews: no character, gallery record, job or file is created, no
+# portrait policy is installed, and no entity's personal official selection is
+# consulted. The catalog is read as the restart-scoped snapshot; an unadmitted
+# preview default is normal absence (no attempt, no fault), exactly like a
+# subject that never had artwork.
+# ---------------------------------------------------------------------------
+
+CREATION_PRESET_SUBJECT_PREFIX = "creation:preset:"
+CREATION_SILHOUETTE_SUBJECT_PREFIX = "creation:silhouette:"
+
+
+def _creation_alpha_terminal(key: str) -> dict | None:
+    """The built-in alpha terminal of one resolved fallback key."""
+    identity, face_rect = fallback_identity_and_rect(key)
+    return _alpha_terminal(
+        {"identity": identity, "key": key, "face_rect": face_rect}
+    )
+
+
+def _creation_alpha_descriptor(subject_id: str, key: str) -> dict:
+    """One preview descriptor carrying no attempt and only the alpha terminal."""
+    return descriptors.descriptor(
+        subject_id=subject_id,
+        generation_subject=None,
+        generation_state=None,
+        attempts=[],
+        terminal_payload=_creation_alpha_terminal(key),
+        retention_sources=[],
+    )
+
+
+def _preset_fallback_key(preset_key: str, preset: object) -> str:
+    """The preset preview's terminal key: declared key wins, else the band rule.
+
+    A preset has no future actor identity, so the preview hash input is the
+    stable ``preset:<preset key>`` (never a character subject). A malformed
+    late-declared key is treated as undeclared, the same fail-closed stance the
+    entity resolver takes for runtime provenance.
+    """
+    declared = getattr(preset, "fallback_key", None)
+    if declared is not None:
+        try:
+            validate_fallback_key(declared, f"preset {preset_key!r}")
+        except ValueError:  # observability: ignore R2: malformed late-declared key treated as undeclared, band rule decides
+            declared = None
+        else:
+            return declared
+    return band_key_for(
+        f"preset:{preset_key}",
+        getattr(preset, "sex", None),
+        getattr(preset, "apparent_age", None),
+    )
+
+
+def _preset_official_attempt(reference, subject_id: str) -> dict | None:
+    """The card's own catalog default as one official image attempt, or ``None``.
+
+    Only the content reference's snapshot-admitted default can be attempted;
+    an absent, refused or over-budget default contributes nothing at all (no
+    attempt and no fault) because preview absence is normal. No personal
+    selection and no entity gallery is ever consulted.
+    """
+    from world.art import official
+
+    catalog = official.current_catalog()
+    content = catalog.content(reference.kind, reference.key)
+    if content is None or content.default_identity is None:
+        return None
+    nearest = content.default_identity
+    if nearest not in content.images:
+        return None
+    image = catalog.entry(nearest)
+    if image is None:
+        return None
+    url = catalog.url_for(image.identity)
+    if url is None or len(url) > descriptors.MAX_MEDIA_URL:
+        return None
+    facts = {
+        "identity": image.identity,
+        "fingerprint": image.fingerprint,
+        "url": url,
+        "face_rect": dict(image.face_rect),
+        "stage": dict(image.stage),
+        "image_size": dict(image.image_size),
+    }
+    source_id, rank = _slot_source("official", f"{reference.kind}/{reference.key}")
+    return descriptors.image_attempt(
+        source_id,
+        rank,
+        descriptors.resource(
+            facts["identity"],
+            facts["fingerprint"],
+            facts["url"],
+            descriptors.ORIGIN_OFFICIAL,
+            geometry_payload=_validated_official_geometry(
+                facts, None, subject_label=subject_id
+            ),
+        ),
+    )
+
+
+def preset_artwork(preset_key: str) -> dict:
+    """The canonical artwork descriptor of one creation preset card.
+
+    The stable subject id is ``creation:preset:<key>``. The preset's own
+    ``official_content_reference_for_preset`` is resolved against the mounted
+    snapshot; its admitted default is the ONLY possible image attempt. The
+    chain always carries the built-in alpha terminal and claims no generation
+    and no retention. A pure read: nothing is created or written. An
+    unregistered key is defensive only — the caller's card set comes from the
+    same registry — and falls back to the adult band so serialization stays
+    total instead of failing the whole panel.
+    """
+    from world.art.official_refs import official_content_reference_for_preset
+    from world.lore.player_presets import PLAYER_PRESET_REGISTRY
+
+    preset = PLAYER_PRESET_REGISTRY.get(preset_key)
+    subject_id = f"{CREATION_PRESET_SUBJECT_PREFIX}{preset_key}"
+    attempts: list[dict] = []
+    reference = official_content_reference_for_preset(preset_key)
+    if reference is not None:
+        attempt = _preset_official_attempt(reference, subject_id)
+        if attempt is not None:
+            attempts.append(attempt)
+    return descriptors.descriptor(
+        subject_id=subject_id,
+        generation_subject=None,
+        generation_state=None,
+        attempts=attempts,
+        terminal_payload=_creation_alpha_terminal(
+            _preset_fallback_key(preset_key, preset)
+        ),
+        retention_sources=[],
+    )
+
+
+def _band_intervals(
+    apparent_minimum: int, apparent_maximum: int
+) -> list[tuple[int, int]]:
+    """The non-empty built-in age bands intersected with an advertised range.
+
+    The child/adult/elder boundaries are imported from the fallback resolver,
+    never copied into the browser or the panel: an apparent age at or below
+    ``CHILD_APPARENT_AGE_MAXIMUM`` is a child, at or above
+    ``ELDER_APPARENT_AGE_MINIMUM`` an elder, and everything between an adult.
+    """
+    intervals: list[tuple[int, int]] = []
+    child_end = min(apparent_maximum, CHILD_APPARENT_AGE_MAXIMUM)
+    if apparent_minimum <= child_end:
+        intervals.append((apparent_minimum, child_end))
+    adult_start = max(apparent_minimum, CHILD_APPARENT_AGE_MAXIMUM + 1)
+    adult_end = min(apparent_maximum, ELDER_APPARENT_AGE_MINIMUM - 1)
+    if adult_start <= adult_end:
+        intervals.append((adult_start, adult_end))
+    elder_start = max(apparent_minimum, ELDER_APPARENT_AGE_MINIMUM)
+    if elder_start <= apparent_maximum:
+        intervals.append((elder_start, apparent_maximum))
+    return intervals
+
+
+def silhouette_table(
+    actor_pk: object,
+    sex_keys: object,
+    apparent_minimum: int,
+    apparent_maximum: int,
+) -> list[dict]:
+    """The custom-form silhouette lookup table for one pending character.
+
+    Each advertised sex gets a complete, gap-free partition of the advertised
+    apparent-age range, and every entry resolves the built-in band rule with
+    the full prospective identity ``portrait:character:<actor pk>`` — the same
+    subject activation will establish — so the table agrees with later
+    undeclared resolution for this character, including a sex outside the
+    female/male pair. The table is rebuilt per pending character and never
+    cached; it neither writes nor reads stored portrait state.
+    """
+    actor_identity = str(actor_pk)
+    subject_identity = f"{ArtSubjectKind.CHARACTER.value}:{actor_identity}"
+    entries: list[dict] = []
+    for sex in sex_keys:
+        for minimum, maximum in _band_intervals(
+            apparent_minimum, apparent_maximum
+        ):
+            key = band_key_for(subject_identity, sex, minimum)
+            subject_id = (
+                f"{CREATION_SILHOUETTE_SUBJECT_PREFIX}{actor_identity}:"
+                f"{sex}:{minimum}:{maximum}"
+            )
+            entries.append(
+                {
+                    "sex": sex,
+                    "apparent_age_minimum": minimum,
+                    "apparent_age_maximum": maximum,
+                    "artwork": _creation_alpha_descriptor(subject_id, key),
+                }
+            )
+    return entries
 
 
 def _enumerate_portrait(subject: ArtSubject, entity=None) -> _PortraitEnumeration:
