@@ -30,6 +30,7 @@ from world.art.fallback_keys import (
     validate_fallback_key,
 )
 from world.art.gallery_fallback import (
+    band_key_for,
     fallback_key_for,
     fallback_key_for_entity,
     resolve_fallback,
@@ -384,6 +385,59 @@ class BandRuleTests(unittest.TestCase):
     @covers_requirement("art-gallery-fallback::a-fallback-key-resolves-by-declaration-then-band-then-deterministic-hash")
     def test_no_entity_fails_closed_to_the_adult_band(self):
         self.assertIn(fallback_key_for(_character("ghost"), None), ("man", "woman"))
+
+    @covers_requirement("art-gallery-fallback::a-fallback-key-resolves-by-declaration-then-band-then-deterministic-hash")
+    def test_the_explicit_value_seam_matches_the_entity_rule(self):
+        # The creation-preview seam consumes explicit sex/age values; the
+        # entity wrapper must remain exactly the same rule, including the
+        # fail-closed adult band for malformed values.
+        identity = "portrait:character:17"
+        for sex in ("female", "male", "other", None, 17, ""):
+            for apparent_age in (0, 12, 13, 30, 59, 60, 10000, None, "thirty", True):
+                with self.subTest(sex=sex, apparent_age=apparent_age):
+                    entity = _entity(sex=sex, apparent_age=apparent_age)
+                    self.assertEqual(
+                        band_key_for(identity, sex, apparent_age),
+                        fallback_key_for_entity(entity, identity),
+                    )
+
+    @covers_requirement("art-gallery-fallback::a-fallback-key-resolves-by-declaration-then-band-then-deterministic-hash")
+    def test_the_seam_partitions_the_boundary_ages(self):
+        identity = "portrait:character:17"
+        for sex, expected in (
+            ("female", {12: "girl", 13: "woman", 59: "woman", 60: "elder"}),
+            ("male", {12: "boy", 13: "man", 59: "man", 60: "elder"}),
+        ):
+            for apparent_age, key in expected.items():
+                with self.subTest(sex=sex, apparent_age=apparent_age):
+                    self.assertEqual(band_key_for(identity, sex, apparent_age), key)
+
+    @covers_requirement("art-gallery-fallback::a-fallback-key-resolves-by-declaration-then-band-then-deterministic-hash")
+    def test_an_other_sex_seam_hashes_the_full_identity_deterministically(self):
+        for identity in ("portrait:character:17", "portrait:character:41"):
+            digest = hashlib.sha256(identity.encode("utf-8")).digest()
+            for apparent_age, pool in (
+                (8, ("boy", "girl")),
+                (30, ("man", "woman")),
+                (75, ("elder",)),
+            ):
+                expected = pool[int.from_bytes(digest, "big") % len(pool)]
+                with self.subTest(identity=identity, apparent_age=apparent_age):
+                    self.assertEqual(
+                        band_key_for(identity, "other", apparent_age), expected
+                    )
+                    self.assertEqual(
+                        band_key_for(identity, "other", apparent_age),
+                        band_key_for(identity, "other", apparent_age),
+                    )
+
+    def test_the_seam_takes_values_and_writes_no_entity_state(self):
+        # The preview seam is a pure value function: it receives no entity, so
+        # it cannot install a portrait policy or mutate a stored identity.
+        entity = SimpleNamespace(sex="female", db=SimpleNamespace(apparent_age=30))
+        before = (entity.sex, entity.db.apparent_age)
+        band_key_for("portrait:character:17", "other", 8)
+        self.assertEqual((entity.sex, entity.db.apparent_age), before)
 
 
 class EntityDecorationRuleTests(unittest.TestCase):
