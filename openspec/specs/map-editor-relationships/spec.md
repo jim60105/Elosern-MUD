@@ -13,8 +13,8 @@ Entrance tools SHALL identify and navigate both qualified endpoints and their di
 - **THEN** one source document records both meanings and navigation reaches either endpoint with return context
 
 #### Scenario: Protected start and invalid target
-- **WHEN** a start entry is edited or an entrance selects an absent/wrong-domain target
-- **THEN** one-way start semantics remain and invalid fields identify their relationship without saving
+- **WHEN** an entrance selects an absent/wrong-domain target, or the entrance tool's kinds are listed
+- **THEN** invalid fields identify their relationship without saving, and no starting-room entry kind is offered or saved, because settlements declare no starting-room entrance
 
 ### Requirement: Deletion requires established absence of incoming static references
 Object deletion SHALL require no map-internal incoming references and current external context establishing no external incoming static references, without cascading changes.

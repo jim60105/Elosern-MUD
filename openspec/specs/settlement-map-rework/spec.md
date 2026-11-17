@@ -6,7 +6,7 @@ Rework an existing settlement local map from a generated plan without losing any
 ## Requirements
 
 ### Requirement: Replacing a settlement preserves every referenced node identity
-A replace operation SHALL require a binding for every protected node. Protected nodes are those named by an interior doorway, a district landmark, an external incoming reference or the city gate, plus the anchor; with no reference index, every existing node is protected. Unknown, duplicate or missing bindings SHALL be refused with no write. A bound node SHALL keep its identifier, key and description, with its position, roads and directions taken from the plan.
+A replace operation SHALL require a binding for every protected node. Protected nodes are those named by an interior doorway, a district landmark, or an external incoming reference, plus the anchor; with no reference index, every existing node is protected. Unknown, duplicate or missing bindings SHALL be refused with no write. A bound node SHALL keep its identifier, key and description, with its position, roads and directions taken from the plan.
 
 #### Scenario: Missing binding
 - **WHEN** a synthetic replace omits the binding for a node that an interior doorway names
@@ -14,7 +14,7 @@ A replace operation SHALL require a binding for every protected node. Protected 
 
 #### Scenario: Bound identities survive
 - **WHEN** a synthetic replace binds every protected node
-- **THEN** each bound node keeps its identifier, key and description. The interior doorway, district landmark and city gate still resolve to it, the anchor binding stays the anchor, and the written map passes the terrain-fit lint with no error.
+- **THEN** each bound node keeps its identifier, key and description. The interior doorway and district landmark still resolve to it, the anchor binding stays the anchor, and the written map passes the terrain-fit lint with no error.
 
 #### Scenario: Refused bindings
 - **WHEN** a replace binds the existing anchor to a non-anchor slot, binds two nodes to one slot, or names a node or slot that does not exist
