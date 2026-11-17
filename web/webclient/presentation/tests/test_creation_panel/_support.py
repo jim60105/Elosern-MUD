@@ -142,7 +142,7 @@ def _valid_payload(draft=None, custom=None, presets=None, proposal=None):
     )
     from web.webclient.presentation.creation import _serialize
 
-    payload = _serialize(view)
+    payload = _serialize(view, actor_identity="1")
     if proposal is not None:
         # The wire dict rides directly for validation tests; the presenter
         # path serializes the snapshot itself.

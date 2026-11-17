@@ -1,4 +1,4 @@
-"""Exact schema-version-5 ``creation`` panel and presenter (webclient-character-creation-ui).
+"""Exact schema-version-7 ``creation`` panel and presenter (webclient-character-creation-ui).
 
 The presenter serializes the frozen no-mutation creation view owned by
 ``world.rules.creation_wizard`` and validates its own output against the exact
@@ -14,7 +14,9 @@ or import-only field is ever exposed. Version 3 widened the transient
 server-labelled ``custom.sex`` option list and the required draft ``sex``
 member (namegen-creation-ui); version 5 renames the ``custom.adult``
 descriptor block to ``custom.age`` and drops the advertised minimums to 0
-(age-range-0-10000).
+(age-range-0-10000); version 6 adds canonical race display names; version 7
+adds each preset card's canonical ``artwork`` descriptor and the custom
+form's ``silhouettes`` lookup table (creation-panel-artwork).
 
 The payload shape and the exact shared bounds are mirrored by the client
 validator in ``web/static/webclient/js/elosern/protocol.js`` and guarded by a
@@ -23,6 +25,7 @@ dual-direction parity test.
 
 from typing import Any
 
+from web.webclient.presentation.artwork import validate_artwork
 from web.webclient.presentation.context import PresentationContext, ProposalSnapshot
 from web.webclient.presentation.protocol import (
     MAX_CANONICAL_JSON_BYTES,
@@ -40,6 +43,13 @@ from web.webclient.presentation.protocol_validation import (
     validate_background,
 )
 from web.webclient.presentation.registry import PanelUnavailableError
+from world.art import descriptors
+from world.art.presenter import (
+    CREATION_PRESET_SUBJECT_PREFIX,
+    CREATION_SILHOUETTE_SUBJECT_PREFIX,
+    preset_artwork,
+    silhouette_table,
+)
 from world.lore.elements import ELEMENT_REGISTRY
 from world.lore.sex import SEX_VALUES
 from world.rules.character_creation import (
@@ -64,13 +74,13 @@ from world.rules.creation_wizard import (
     read_creation_view,
 )
 
-# Bumped to 5 for the age-bounds custom descriptor (age-range-0-10000): the
-# descriptor block renames ``custom.adult`` -> ``custom.age``, the advertised
-# minimums drop to 0, and the mirrored JS validator moves together; a stale
-# v4/v5 panel or draft is rejected by the exact-schema gate on both ends.
 # v6 adds canonical race display_name_zh to custom.races options and requires
 # preset cards to resolve to custom.races (webclient-creation-display-labels).
-CREATION_SCHEMA_VERSION = 6
+# v7 adds each preset card's canonical ``artwork`` descriptor and the custom
+# form's ``silhouettes`` lookup table (creation-panel-artwork); the mirrored
+# JS validator moves together, so a stale v6 panel is rejected by the
+# exact-schema gate on both ends.
+CREATION_SCHEMA_VERSION = 7
 
 # Exact shared bounds (design D2) -- must stay equal in the JS validator and to
 # the creation-wizard view-builder caps (webclient-character-creation-ui D2).
@@ -94,6 +104,9 @@ MAX_SUBRACE_KEY_CODE_POINTS = 64
 MAX_SPECIALTY_CODE_POINTS = 256
 MAX_LABEL_CODE_POINTS = 128
 MAX_EXPLANATION_CODE_POINTS = 256
+# The silhouette lookup table is bounded structurally; the advertised sex
+# vocabulary and the three built-in bands keep a real table well under it.
+MAX_SILHOUETTES = 16
 # The sex option list mirrors ``SEX_VALUES`` exactly (at most one entry per
 # member); the ceiling is a structural bound that must never bind real data.
 MAX_SEX_OPTIONS = 8
@@ -125,11 +138,75 @@ def _validate_key(value: Any, field: str, maximum: int) -> str:
     return validated
 
 
+def _validate_preview_artwork_semantics(artwork: dict[str, Any], field: str) -> None:
+    """Enforce a preview descriptor's closed non-generation facts.
+
+    A creation preview is not a generated subject and carries no backend
+    retention authorization, so both claims stay explicitly empty. The
+    terminal is the built-in alpha mask, never a scene image.
+    """
+    if (
+        artwork["generation_subject"] is not None
+        or artwork["generation_state"] is not None
+    ):
+        raise ProtocolValidationError(f"{field} must claim no generation")
+    if artwork["retention_sources"]:
+        raise ProtocolValidationError(f"{field} must carry no retention")
+    terminal = artwork["terminal"]
+    if terminal is None or terminal["kind"] != descriptors.TERMINAL_ALPHA_MASK:
+        raise ProtocolValidationError(f"{field} must carry an alpha terminal")
+    resource = terminal["resource"]
+    if (
+        resource["origin"] != descriptors.ORIGIN_SILHOUETTE
+        or not resource["url"].startswith("/art/defaults/")
+    ):
+        raise ProtocolValidationError(
+            f"{field} terminal must name the built-in silhouette route"
+        )
+
+
+def _validate_preset_artwork(value: Any, preset_key: str) -> dict[str, Any]:
+    """Validate one preset card's canonical artwork descriptor.
+
+    Exactly the canonical seven-key descriptor whose stable subject id names
+    the card it belongs to, carrying at most the card's own catalog default as
+    an ``official`` image attempt and never a fault: an unadmitted preview
+    default is normal absence, not a broken source.
+    """
+    artwork = validate_artwork(value)
+    if artwork["subject_id"] != f"{CREATION_PRESET_SUBJECT_PREFIX}{preset_key}":
+        raise ProtocolValidationError("preset artwork subject_id does not match the card")
+    _validate_preview_artwork_semantics(artwork, "preset artwork")
+    images = [attempt for attempt in artwork["attempts"] if attempt["type"] == "image"]
+    if len(images) != len(artwork["attempts"]) or len(images) > 1:
+        raise ProtocolValidationError(
+            "preset artwork must carry at most one image attempt and no fault"
+        )
+    if images:
+        resource = images[0]["resource"]
+        if resource["origin"] != descriptors.ORIGIN_OFFICIAL:
+            raise ProtocolValidationError("preset artwork attempt must be official")
+        if not resource["url"].startswith("/art/official/"):
+            raise ProtocolValidationError(
+                "preset artwork attempt must name the official art route"
+            )
+    return artwork
+
+
 def _validate_preset_card(value: Any) -> dict[str, Any]:
     _require_exact_fields(
         value,
         "preset card",
-        {"key", "display_name", "race", "race_description", "subrace", "emphasis", "background"},
+        {
+            "key",
+            "display_name",
+            "race",
+            "race_description",
+            "subrace",
+            "emphasis",
+            "background",
+            "artwork",
+        },
         {},
     )
     key = _validate_key(value["key"], "preset key", MAX_PRESET_KEY_CODE_POINTS)
@@ -153,6 +230,7 @@ def _validate_preset_card(value: Any) -> dict[str, Any]:
     background = _require_str(value, "background", maximum=MAX_BACKGROUND_CODE_POINTS)
     if not background.strip():
         raise ProtocolValidationError("preset background must be non-empty")
+    artwork = _validate_preset_artwork(value["artwork"], key)
     return {
         "key": key,
         "display_name": display_name,
@@ -161,6 +239,7 @@ def _validate_preset_card(value: Any) -> dict[str, Any]:
         "subrace": subrace,
         "emphasis": emphasis,
         "background": background,
+        "artwork": artwork,
     }
 
 
@@ -321,11 +400,126 @@ def _validate_profile(value: Any) -> dict[str, Any]:
     return {"race": race, "subrace": subrace, "budget": budget, "axes": normalized_axes}
 
 
+def _validate_silhouette_artwork(
+    value: Any, sex: str, minimum: int, maximum: int
+) -> dict[str, Any]:
+    """Validate one silhouette entry's canonical alpha-only descriptor.
+
+    Its stable subject id names the pending character position and the entry's
+    own sex/interval, and the descriptor carries no attempt, no generation and
+    no retention: the built-in alpha terminal is the only artwork it names.
+    The actor segment is position-stable but not bound here: the panel payload
+    carries no actor identity, so only its non-emptiness is checkable on the
+    wire (the presenter computes it from the pending actor's pk).
+    """
+    artwork = validate_artwork(value)
+    prefix = CREATION_SILHOUETTE_SUBJECT_PREFIX
+    suffix = f":{sex}:{minimum}:{maximum}"
+    subject_id = artwork["subject_id"]
+    if not subject_id.startswith(prefix) or not subject_id.endswith(suffix):
+        raise ProtocolValidationError(
+            "silhouette artwork subject_id does not match the entry"
+        )
+    if not subject_id[len(prefix) : -len(suffix)]:
+        raise ProtocolValidationError("silhouette artwork subject_id is empty")
+    _validate_preview_artwork_semantics(artwork, "silhouette artwork")
+    if artwork["attempts"]:
+        raise ProtocolValidationError("silhouette artwork must carry no attempt")
+    return artwork
+
+
+def _validate_silhouettes(
+    value: Any, sex_keys: list[str], age: dict[str, Any]
+) -> list[dict[str, Any]]:
+    """Validate the custom form's silhouette lookup table exactly.
+
+    Every advertised sex carries a complete, gap-free partition of the
+    advertised apparent-age range; an unknown sex, a gap, an overlap, an
+    out-of-range or non-integer endpoint, and a malformed descriptor all
+    reject the whole panel. Entries are returned grouped in the advertised sex
+    order (each sex ordered by its interval) so the payload is deterministic.
+    """
+    if not isinstance(value, list) or not 1 <= len(value) <= MAX_SILHOUETTES:
+        raise ProtocolValidationError(
+            f"silhouettes must be a non-empty list of at most {MAX_SILHOUETTES} entries"
+        )
+    advertised = set(sex_keys)
+    apparent_minimum = age["apparent_age_minimum"]
+    apparent_maximum = age["apparent_age_maximum"]
+    by_sex: dict[str, list[tuple[int, int, dict[str, Any]]]] = {}
+    for entry in value:
+        _require_exact_fields(
+            entry,
+            "silhouette entry",
+            {"sex", "apparent_age_minimum", "apparent_age_maximum", "artwork"},
+            {},
+        )
+        sex = _validate_key(entry["sex"], "silhouette sex", MAX_SUBRACE_KEY_CODE_POINTS)
+        if sex not in advertised:
+            raise ProtocolValidationError(
+                f"silhouette sex {sex!r} is not an advertised sex option"
+            )
+        minimum = _require_int(
+            entry,
+            "apparent_age_minimum",
+            minimum=apparent_minimum,
+            maximum=apparent_maximum,
+        )
+        maximum = _require_int(
+            entry,
+            "apparent_age_maximum",
+            minimum=apparent_minimum,
+            maximum=apparent_maximum,
+        )
+        if minimum > maximum:
+            raise ProtocolValidationError(
+                "silhouette interval minimum must not exceed maximum"
+            )
+        artwork = _validate_silhouette_artwork(entry["artwork"], sex, minimum, maximum)
+        by_sex.setdefault(sex, []).append((minimum, maximum, artwork))
+    if set(by_sex) != advertised:
+        raise ProtocolValidationError(
+            "silhouettes must cover every advertised sex exactly once"
+        )
+    normalized: list[dict[str, Any]] = []
+    for sex in sex_keys:
+        intervals = sorted(by_sex[sex], key=lambda item: item[0])
+        expected = apparent_minimum
+        for minimum, maximum, artwork in intervals:
+            if minimum != expected:
+                raise ProtocolValidationError(
+                    "silhouette intervals must be contiguous without gaps or overlaps"
+                )
+            expected = maximum + 1
+            normalized.append(
+                {
+                    "sex": sex,
+                    "apparent_age_minimum": minimum,
+                    "apparent_age_maximum": maximum,
+                    "artwork": artwork,
+                }
+            )
+        if expected != apparent_maximum + 1:
+            raise ProtocolValidationError(
+                "silhouette intervals must cover the advertised apparent-age range"
+            )
+    return normalized
+
+
 def _validate_custom(value: Any) -> dict[str, Any]:
     _require_exact_fields(
         value,
         "custom",
-        {"name", "age", "races", "subraces", "profiles", "affinity", "sex"},
+        {
+            "name",
+            "age",
+            "races",
+            "subraces",
+            "profiles",
+            "affinity",
+            "sex",
+            "silhouettes",
+        },
         {},
     )
     name = _validate_name(value["name"])
@@ -347,6 +541,9 @@ def _validate_custom(value: Any) -> dict[str, Any]:
     profiles = [_validate_profile(entry) for entry in profiles]
     affinity = _validate_affinity(value["affinity"])
     sex = _validate_sex_options(value["sex"])
+    silhouettes = _validate_silhouettes(
+        value["silhouettes"], [option["key"] for option in sex], age
+    )
     return {
         "name": name,
         "age": age,
@@ -355,6 +552,7 @@ def _validate_custom(value: Any) -> dict[str, Any]:
         "profiles": profiles,
         "affinity": affinity,
         "sex": sex,
+        "silhouettes": silhouettes,
     }
 
 
@@ -714,6 +912,7 @@ def _serialize_preset_card(card: PresetCardView) -> dict[str, Any]:
         "subrace": card.subrace,
         "emphasis": card.emphasis,
         "background": card.background,
+        "artwork": preset_artwork(card.key),
     }
 
 
@@ -793,7 +992,7 @@ def _serialize_sex_option(option: SexOptionView) -> dict[str, Any]:
     return {"key": option.key, "label": option.label}
 
 
-def _serialize_custom(custom: CustomFormView) -> dict[str, Any]:
+def _serialize_custom(custom: CustomFormView, actor_identity: str) -> dict[str, Any]:
     return {
         "name": _serialize_name(custom.name),
         "age": _serialize_age(custom.age),
@@ -802,6 +1001,12 @@ def _serialize_custom(custom: CustomFormView) -> dict[str, Any]:
         "profiles": [_serialize_profile(profile) for profile in custom.profiles],
         "affinity": _serialize_affinity(custom.affinity),
         "sex": [_serialize_sex_option(option) for option in custom.sex],
+        "silhouettes": silhouette_table(
+            actor_identity,
+            tuple(option.key for option in custom.sex),
+            custom.age.apparent_age_minimum,
+            custom.age.apparent_age_maximum,
+        ),
     }
 
 
@@ -842,7 +1047,10 @@ def _serialize_proposal(proposal: ProposalSnapshot | None) -> dict[str, Any] | N
 
 
 def _serialize(
-    view: CreationView, proposal: ProposalSnapshot | None = None
+    view: CreationView,
+    proposal: ProposalSnapshot | None = None,
+    *,
+    actor_identity: str,
 ) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "schema_version": CREATION_SCHEMA_VERSION,
@@ -850,7 +1058,7 @@ def _serialize(
         "kind": "creation",
         "draft": _serialize_draft(view.draft),
         "presets": [_serialize_preset_card(card) for card in view.presets],
-        "custom": _serialize_custom(view.custom),
+        "custom": _serialize_custom(view.custom, actor_identity),
     }
     if proposal is not None:
         # The proposal key ships only while the session slot holds a snapshot
@@ -870,7 +1078,9 @@ def creation_presenter(context: PresentationContext) -> dict[str, Any]:
     if is_in_active_session(actor):
         raise PanelUnavailableError
     view = read_creation_view(actor)
-    return validate_creation(_serialize(view, context.proposal))
+    return validate_creation(
+        _serialize(view, context.proposal, actor_identity=str(actor.pk))
+    )
 
 
 __all__ = [
@@ -899,6 +1109,7 @@ __all__ = [
     "MAX_RACE_KEY_CODE_POINTS",
     "MAX_SEX_OPTIONS",
     "MAX_SPECIALTY_CODE_POINTS",
+    "MAX_SILHOUETTES",
     "MAX_SUBRACES",
     "MAX_SUBRACE_KEY_CODE_POINTS",
     "MIN_NAME_LENGTH",

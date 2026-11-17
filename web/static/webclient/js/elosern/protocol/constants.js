@@ -361,6 +361,10 @@ var CREATION_SEX_DEFAULT = "other";
 // Structural ceiling for the option list (mirror of MAX_SEX_OPTIONS); the
 // vocabulary itself is pinned exactly, the bound must never bind real data.
 var CREATION_MAX_SEX_OPTIONS = 8;
+// Structural ceiling for the custom silhouette lookup table (mirror of
+// MAX_SILHOUETTES); the advertised sex vocabulary and three built-in age
+// bands keep a real table well under it.
+var CREATION_MAX_SILHOUETTES = 16;
 // The creation panel schema version (mirror of CREATION_SCHEMA_VERSION):
 // v3 widens the optional transient concept proposal slot with the five
 // optional transient-fill keys (bump-creation-panel-proposal-v3), on top of
@@ -372,7 +376,9 @@ var CREATION_MAX_SEX_OPTIONS = 8;
 // the advertised minimums to 0 (age-range-0-10000).
 // v6 adds required display_name_zh to custom.races options and requires preset
 // cards to resolve to custom.races (webclient-creation-display-labels).
-var CREATION_SCHEMA_VERSION = 6;
+// v7 adds each preset card's canonical artwork descriptor and the custom
+// form's silhouettes lookup table (creation-panel-artwork).
+var CREATION_SCHEMA_VERSION = 7;
 // Affinity picker bounds (mirror of web.webclient.presentation.creation and
 // the deterministic max_affinity_elements mapping). The race maxima are
 // 2/1/0 for human/beastfolk/elf; the element set is exactly the eight lore
@@ -589,7 +595,7 @@ var PANEL_ALLOWLIST = {
   item_holdings: ITEM_HOLDINGS_SCHEMA_VERSION,
   objectives: 1,
   services: SERVICES_SCHEMA_VERSION,
-  creation: 6,
+  creation: 7,
   exploration: 7,
   character: 9,
   lineage: 2,
@@ -800,6 +806,7 @@ module.exports = {
   CREATION_SEX_VALUES: CREATION_SEX_VALUES,
   CREATION_SEX_DEFAULT: CREATION_SEX_DEFAULT,
   CREATION_MAX_SEX_OPTIONS: CREATION_MAX_SEX_OPTIONS,
+  CREATION_MAX_SILHOUETTES: CREATION_MAX_SILHOUETTES,
   CREATION_SCHEMA_VERSION: CREATION_SCHEMA_VERSION,
   CREATION_MAX_AFFINITY_ELEMENTS: CREATION_MAX_AFFINITY_ELEMENTS,
   CREATION_AFFINITY_ELEMENTS: CREATION_AFFINITY_ELEMENTS,

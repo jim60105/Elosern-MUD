@@ -74,11 +74,69 @@ describe("H1 preserved DOM contract (design D6)", () => {
     ];
   }
 
-  // A minimal valid `creation` panel (the exact schema v5 shape the
+  const CREATION_DIGEST = "a".repeat(64);
+
+  function creationAlphaArtwork(subjectId, key) {
+    return {
+      subject_id: subjectId,
+      revision: CREATION_DIGEST,
+      generation_subject: null,
+      generation_state: null,
+      attempts: [],
+      terminal: {
+        kind: "alpha_mask",
+        source_id: "portrait.alpha:" + key,
+        rank: 100,
+        resource: {
+          resource_id: "defaults/" + key + ".webp",
+          version: CREATION_DIGEST,
+          url: "/art/defaults/" + key + ".webp",
+          origin: "silhouette",
+          geometry: {
+            image_size: null,
+            face_rect: { x: 0.35, y: 0.02, w: 0.28, h: 0.16 },
+            stage: null,
+            aspect_ratio: "3:4",
+          },
+        },
+      },
+      retention_sources: [],
+    };
+  }
+
+  function creationSilhouettes() {
+    const bands = [
+      [0, 12],
+      [13, 59],
+      [60, 10000],
+    ];
+    const keys = {
+      female: ["girl", "woman", "elder"],
+      male: ["boy", "man", "elder"],
+      other: ["woman", "man", "elder"],
+    };
+    const table = [];
+    ["female", "male", "other"].forEach((sex) => {
+      bands.forEach((band, index) => {
+        table.push({
+          sex,
+          apparent_age_minimum: band[0],
+          apparent_age_maximum: band[1],
+          artwork: creationAlphaArtwork(
+            `creation:silhouette:1:${sex}:${band[0]}:${band[1]}`,
+            keys[sex][index]
+          ),
+        });
+      });
+    });
+    return table;
+  }
+
+  // A minimal valid `creation` panel (the exact schema v7 shape the
   // protocol validator accepts — a slotless panel carries no proposal key).
   function creationPanel() {
     return {
-      schema_version: 6,
+      schema_version: 7,
       available: true,
       kind: "creation",
       draft: null,
@@ -91,6 +149,7 @@ describe("H1 preserved DOM contract (design D6)", () => {
           subrace: null,
           emphasis: "均衡",
           background: "出身霧骨渡口的旅人",
+          artwork: creationAlphaArtwork("creation:preset:traveler", "woman"),
         },
       ],
       custom: {
@@ -137,6 +196,7 @@ describe("H1 preserved DOM contract (design D6)", () => {
           { key: "male", label: "男性" },
           { key: "other", label: "其他" },
         ],
+        silhouettes: creationSilhouettes(),
       },
     };
   }
