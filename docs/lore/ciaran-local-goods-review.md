@@ -41,7 +41,7 @@ The world source makes 暗影谷村 the Ciaran branch's underground village on t
 ### The Making Villages
 
 - Canon: silk and the white dress belong to 幽月谷村's silk grove and its keeper 奈拉拉‧弗羅斯特威洛 at 蛛絲林; the dew veil belongs to 翠綠森林村's canopy weavers, 伊斯爾林‧斯塔爾威維爾 at 樹冠吊橋; the candied blossom belongs to 翠綠森林村's 花蕊蜜園. The 防具店與裁縫坊 passage already assigns the white silk robe to the Eolas branch and the black kimono to the Ciaran branch.
-- How the change reads it: when a Ciaran host is asked about a removed good, she names the making village and its maker as a neighbour's fact, never as a refusal. 瓦爾溫 says spider silk belongs to 幽月谷村 and names 奈拉拉; 維特希爾 places the white silk robe in 幽月谷村 and the dew veil with 伊斯爾林 in 翠綠森林村. Both add that the branches visit one another. No Ciaran host claims to make or keep any of the four goods.
+- How the change reads it: when a Ciaran host is asked about a removed good, she names the making village and its maker as a neighbour's fact, never as a refusal. 瓦爾溫 says spider silk belongs to 幽月谷村 and names 奈拉拉; 維特希爾 places the white silk robe in 幽月谷村 and the dew veil with 伊斯爾林 in 翠綠森林村. Both add that the branches visit one another. No Ciaran host claims to make or keep any of the four goods, and no Ciaran scene presents 瓦爾溫 as the silk gatherer any more.
 
 ### Body, Dress and Demeanour
 
@@ -70,7 +70,7 @@ Every offer in `world/rules/rulebook/commerce/ciaran.yaml` sits inside its item'
 
 ## 4. Per-Host Review
 
-Every rewritten scene opens with a complete actor utterance, holds six lines and carries at least one host line. Scenes whose lines changed declare `revision: r3`; untouched scenes and the familiar-visitor variant stay at `r2`. No topic gains, loses or renames an ID, and no topic declares a new condition.
+Every rewritten scene opens with a complete actor utterance, holds five to seven lines and carries at least one host line. Scenes whose lines changed declare `revision: r3`; untouched scenes and the familiar-visitor variant stay at `r2`. No topic gains, loses or renames an ID, and no topic declares a new condition.
 
 ### A. `ciaran_lareneth_home` (拉瑞內斯‧妮特布倫)
 
@@ -122,7 +122,9 @@ Every rewritten scene opens with a complete actor utterance, holds six lines and
 
 ## 6. Documentation Corrections and Working Notes
 
-`docs/lore/items.md` gains the five rows and keeps one row per existing good. The four borrowed goods now name the village that makes them in their 產地／文化 cell, with 精靈蛛絲 and 精靈傳統服飾 pointing to 幽月谷村（伊歐拉斯族） and 精靈森林輕紗 and 精靈蜜漬花蕊 to 翠綠森林村（斐歐恩族）. The two running counts of usable potions and landed potion effects moved from four to five, and the tincture joined the design-reference list, because the registry now has five and the old text would contradict it.
+`docs/lore/items.md` gains the five rows and keeps one row per existing good. The four borrowed goods now name the village that makes them in their 產地／文化 cell, with 精靈蛛絲 and 精靈傳統服飾 pointing to 幽月谷村（伊歐拉斯族） and 精靈森林輕紗 and 精靈蜜漬花蕊 to 翠綠森林村（斐歐恩族）. The sixth-layer list of potion magnitudes now names the five potions it covers, and the potion section points at that list without claiming a total; neither sentence claims the registry holds only five usable items.
+
+One line outside the design's four tables had to follow the change. `ciaran_gwenaera.yaml` `topic_03` called 瓦爾溫 「採集蛛絲的瓦爾溫」, which 瓦爾溫's new card and dialogue falsify. The line now calls her 「壓藍染的瓦爾溫」, that scene moves to `revision: r3`, and the `ciaran_gwenaera_home` ledger row is refreshed. This is the only dialogue edit outside the four hosts the design names, and it exists because the old sentence was true before this change and false after it.
 
 `docs/lore/settlement-locations.md` grep hits, each read and dispositioned:
 
@@ -180,7 +182,7 @@ The 鍊金坊與藥舖 聚落差異 paragraph (line 262), which describes 妮瑞
 | 精靈傳統服飾 | Item (`elven_traditional_robe`) | `world/lore/items/data_named_equipment.py`, `world/lore/settlements/assortments.py` (`eolas_silkwork`) |
 | 精靈森林輕紗 | Item (`elven_forest_veil`) | `world/lore/items/data_regional_equipment.py`, `world/lore/settlements/assortments.py` (`fionnen_attire`) |
 
-Short forms in the prose (白的蛛絲袍, 晨霧一樣的輕紗, 花釀, 蕈串, 染塊, 晶砂, 草露, 藥水) resolve to the rows above and name nothing else. The white robe and the dew veil appear only in the sentence that places them in the neighbour villages, and 精靈蛛絲 only in the sentence that gives it to 幽月谷村.
+Short forms in the prose (白的蛛絲袍, 晨霧一樣的輕紗, 花釀, 蕈串, 染塊, 晶砂, 草露, 藥水) resolve to the rows above and name nothing else. The white robe and the dew veil appear only in the question that asks about them and in the answer that places them in the neighbour villages, and 精靈蛛絲 only in the question about it and the answer that gives it to 幽月谷村.
 
 ---
 
@@ -190,7 +192,7 @@ Short forms in the prose (白的蛛絲袍, 晨霧一樣的輕紗, 花釀, 蕈串
 - **Traditional Chinese**: full-width punctuation throughout, no 您, no sentence-final 的 before a comma or a full stop, no half-width punctuation beside Chinese characters.
 - **No wuxia vocabulary**: no 江湖, 客官, 過招, 劍招, 招式, 祕技, 拜師, 功夫 or 掌門.
 - **No proprietor vocabulary**: none of 老闆, 店主, 本店, 營業時間, 營業, 庫存, 存貨, 存量, 售價, 光臨, 開店, 開門 or 打烊 appears in a village table.
-- **Scene shapes**: every rewritten scene opens with an actor speech line, holds six lines, carries at least one host line and declares `revision: r3`; untouched scenes and the familiar-visitor variant stay at `r2`.
+- **Scene shapes**: every rewritten scene opens with an actor speech line, holds five to seven lines, carries at least one host line and declares `revision: r3`; untouched scenes and the familiar-visitor variant stay at `r2`.
 - **Stable IDs**: every topic ID and scene ID is unchanged; only the 蛛絲 keyword and label became 藍染, as the design directs, and the topic ID stayed.
 - **No mechanics**: no line promises a skill, a stat, a status or a command. The tincture's effect lives in the rulebook, not in the prose.
 - **Consent is structural**: no actor line grants consent, initiates an act or promises one; every request is a question, and no scene stages a sexual act.
