@@ -348,7 +348,7 @@ class RaceRegistryTests(unittest.TestCase):
         expected = {
             "fionnen": "翠綠森林村的森林精靈。親和光屬性魔法，弓術與光魔法並修，從容而精準。",
             "ciaran": "暗影谷村的黑暗精靈。親和火與暗屬性魔法，刀術造詣尤深，攻勢凌厲。",
-            "eolas": "幽月谷村的幻童精靈。外表永駐二十歲，親和所有屬性魔法，並擅長神之秘法。",
+            "eolas": "幽月谷村的幻童精靈。外表永駐童年，親和所有屬性魔法，並擅長神之秘法。",
         }
         for key, specialty in expected.items():
             self.assertEqual(SUBRACE_REGISTRY[key].specialty, specialty)

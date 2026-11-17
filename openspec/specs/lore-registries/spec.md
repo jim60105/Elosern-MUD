@@ -184,7 +184,7 @@ Defines the typed, immutable world-lore registries used as the code-side source 
 - **THEN** they are exactly, verbatim:
   斐歐恩族 → 「翠綠森林村的森林精靈。親和光屬性魔法，弓術與光法並修，從容而精準。」;
   基亞蘭族 → 「暗影谷村的黑暗精靈。親和火與暗屬性魔法，刀術造詣尤深，攻勢凌厲。」;
-  伊歐拉斯族 → 「幽月谷村的幻童精靈。外表永駐二十歲，親和所有屬性魔法，並擅長神之秘法。」 ; 
+  伊歐拉斯族 → 「幽月谷村的幻童精靈。外表永駐童年，親和所有屬性魔法，並擅長神之秘法。」 ; 
   each naming the branch's own village, affinity, and signature art from `world_info.md`'s 三分支
   block, with no occupational determinism
 

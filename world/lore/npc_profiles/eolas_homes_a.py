@@ -62,7 +62,7 @@ ROWS: tuple[NpcProfile, ...] = (
             ),
         ),
         age=610,
-        apparent_age=20,
+        apparent_age=10,
         voice=NpcVoiceLines(
             misunderstood=(
                 "「你是來看絲，還是來看那件白衣？」"
@@ -109,7 +109,7 @@ ROWS: tuple[NpcProfile, ...] = (
             ),
         ),
         age=720,
-        apparent_age=20,
+        apparent_age=10,
         voice=NpcVoiceLines(
             misunderstood=(
                 "「你要一支杖，還是想看我把這道法術試完？」"
@@ -156,7 +156,7 @@ ROWS: tuple[NpcProfile, ...] = (
             ),
         ),
         age=540,
-        apparent_age=20,
+        apparent_age=10,
         voice=NpcVoiceLines(
             misunderstood=(
                 "「是琉璃的事，還是燈的事？」"

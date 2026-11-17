@@ -58,7 +58,7 @@ ROWS: tuple[NpcProfile, ...] = (
             ),
         ),
         age=660,
-        apparent_age=20,
+        apparent_age=10,
         voice=NpcVoiceLines(
             misunderstood=(
                 "「你是累，還是傷？說明白，我才好替你挑。」"
@@ -101,7 +101,7 @@ ROWS: tuple[NpcProfile, ...] = (
             ),
         ),
         age=380,
-        apparent_age=20,
+        apparent_age=10,
         voice=NpcVoiceLines(
             misunderstood=(
                 "「先吃一口，邊吃邊說。你是餓了，還是有事要問？」"
@@ -143,7 +143,7 @@ ROWS: tuple[NpcProfile, ...] = (
             ),
         ),
         age=1040,
-        apparent_age=20,
+        apparent_age=10,
         voice=NpcVoiceLines(
             misunderstood=(
                 "「我沒聽明白。不急，你從頭說一次就好。」"

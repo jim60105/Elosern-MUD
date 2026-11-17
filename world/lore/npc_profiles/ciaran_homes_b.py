@@ -154,7 +154,7 @@ ROWS: tuple[NpcProfile, ...] = (
             ),
         ),
         age=370,
-        apparent_age=20,
+        apparent_age=10,
         voice=NpcVoiceLines(
             misunderstood=(
                 "「哎？你剛才說什麼？我又想到別的事去了，再說一次吧。」"
