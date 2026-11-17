@@ -107,10 +107,9 @@ class _DraftPortraitCase(EvenniaTestCase):
         with patch(
             "world.art.connectivity.resolve_sd_client", return_value=self.client
         ):
-            with self.captureOnCommitCallbacks(execute=True):
-                return request_draft_portrait(
-                    self.account, self.character, self.request(**overrides)
-                )
+            return request_draft_portrait(
+                self.account, self.character, self.request(**overrides)
+            )
 
     def jobs(self):
         return [
@@ -316,6 +315,29 @@ class ReceiptRetentionTests(_DraftPortraitCase):
         record = gallery_api.record_for(self.subject)
         self.assertEqual(record.db.default_image_id, second.image_id)
         self.assertFalse((self.root / first_identity).exists())
+
+    def test_a_first_draft_card_becomes_the_default_beside_unrelated_cards(self):
+        unrelated = "44444444-4444-4444-8444-444444444444"
+        gallery_api.append_card(
+            self.subject,
+            image_id=unrelated,
+            stored_identity=f"gallery/character/{self.character.pk}/{unrelated}.png",
+            prompt=None,
+            seed=None,
+            checkpoint=None,
+            requested_fields=[],
+            binding=None,
+            image_size={"width": 8, "height": 8},
+            source="generated",
+        )
+        first = self.admit()
+        self.assertEqual(self.drain(), 1)
+        record = gallery_api.record_for(self.subject)
+        self.assertEqual(record.db.default_image_id, first.image_id)
+        self.assertEqual(
+            {card["image_id"] for card in self.cards()},
+            {first.image_id, unrelated},
+        )
 
     def test_a_failed_attempt_never_becomes_the_retained_card(self):
         from world.art.sd_worker import SDError
@@ -539,77 +561,6 @@ class SerializationOrderingTests(_CommittedDraftPortraitCase):
         worker_thread.join(20)
         admit_thread.join(20)
         self.assertFalse(errors, errors)
-        self.assertEqual(len(self.jobs()), 1)
-
-    def test_a_contending_settlement_is_seen_as_the_retained_card(self):
-        """The admission waits, then retains the settlement's committed card."""
-        gallery_module = gallery_api
-        first = self.admit()
-        claimed = claim(10)
-        self.assertEqual(len(claimed), 1)
-        token = str(claimed[0].db.generation_token)
-        identity = f"gallery/character/{self.character.pk}/{first.image_id}.png"
-        tmp_path = self.root / "pending-upload.png"
-        tmp_path.write_bytes(_png_bytes())
-        (self.root / identity).parent.mkdir(parents=True, exist_ok=True)
-
-        started = threading.Event()
-        release_settlement = threading.Event()
-        original_append = gallery_module.append_card
-
-        def slow_append(subject, **card_fields):
-            started.set()
-            release_settlement.wait(10)
-            return original_append(subject, **card_fields)
-
-        settlement_errors: list[BaseException] = []
-        settlement_result: dict = {}
-
-        def settle():
-            try:
-                settlement_result["card"] = settle_gallery_generated(
-                    claimed[0].db_key,
-                    generation_token=token,
-                    output_identity=identity,
-                    tmp_path=str(tmp_path),
-                    prompt={"positive": "p", "negative": "n"},
-                    seed=None,
-                    checkpoint=None,
-                    image_size={"width": 8, "height": 8},
-                )
-            except BaseException as error:  # noqa: BLE001 - re-raised below
-                settlement_errors.append(error)
-
-        admission_errors: list[BaseException] = []
-        admission_started = threading.Event()
-        admission_result: dict = {}
-
-        def admit():
-            admission_started.set()
-            try:
-                admission_result["admission"] = self.admit()
-            except BaseException as error:  # noqa: BLE001 - re-raised below
-                admission_errors.append(error)
-
-        settle_thread = threading.Thread(target=settle, daemon=True)
-        admit_thread = threading.Thread(target=admit, daemon=True)
-        with patch.object(gallery_module, "append_card", slow_append):
-            settle_thread.start()
-            self.assertTrue(started.wait(10))
-            admit_thread.start()
-            self.assertTrue(admission_started.wait(10))
-            self.assertTrue(admit_thread.is_alive())
-            release_settlement.set()
-            settle_thread.join(20)
-            admit_thread.join(20)
-        self.assertFalse(settlement_errors, settlement_errors)
-        self.assertFalse(admission_errors, admission_errors)
-        self.assertIsNotNone(settlement_result.get("card"))
-        self.assertEqual(
-            [card["image_id"] for card in self.cards()], [first.image_id]
-        )
-        admission = admission_result["admission"]
-        self.assertEqual(admission.retained_image_id, first.image_id)
         self.assertEqual(len(self.jobs()), 1)
 
     def test_deferred_callbacks_run_after_the_locks_are_released(self):

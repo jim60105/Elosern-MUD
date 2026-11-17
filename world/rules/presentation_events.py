@@ -108,23 +108,47 @@ _active: contextvars.ContextVar[_Binding | None] = contextvars.ContextVar(
 
 
 class DeferredPublicationCallbacks:
-    """The collector one outer :func:`defer_publication_callbacks` scope owns.
+    """The collector one outermost :func:`defer_publication_callbacks` scope owns.
 
-    ``callbacks`` preserves registration order and each entry already carries
-    its captured publication group (the wrapper :func:`on_publication_commit`
-    builds). ``discard`` empties it, so a rolled-back mutation runs nothing.
+    Each entered scope owns one FRAME. A frame keeps registration order and
+    holds the already group-bound wrappers :func:`on_publication_commit`
+    builds. A nested scope that fails drops only its own frame, so it can never
+    discard callbacks an enclosing scope collected; the outermost scope's
+    ``discard`` clears the frame it owns.
     """
 
-    __slots__ = ("callbacks",)
+    __slots__ = ("frames",)
 
     def __init__(self) -> None:
-        self.callbacks: list[Callable[[], None]] = []
+        self.frames: list[list[Callable[[], None]]] = [[]]
+
+    def enter(self) -> list[Callable[[], None]]:
+        frame: list[Callable[[], None]] = []
+        self.frames.append(frame)
+        return frame
+
+    def leave(self, frame: list[Callable[[], None]]) -> None:
+        try:
+            self.frames.remove(frame)
+        except ValueError:  # observability: ignore R2: an already-dropped frame is a no-op
+            pass
 
     def add(self, callback: Callable[[], None]) -> None:
-        self.callbacks.append(callback)
+        self.frames[-1].append(callback)
 
     def discard(self) -> None:
-        self.callbacks.clear()
+        """Drop the CURRENT scope's frame (the outermost one at its own level)."""
+        self.frames[-1].clear()
+
+    def discard_all(self) -> None:
+        for frame in self.frames:
+            frame.clear()
+
+    def pop_next(self) -> Callable[[], None] | None:
+        for frame in list(self.frames):
+            if frame:
+                return frame.pop(0)
+        return None
 
 
 _active_deferral: contextvars.ContextVar[DeferredPublicationCallbacks | None] = (
@@ -146,8 +170,7 @@ def _drain_deferred_callbacks(collector: DeferredPublicationCallbacks) -> None:
     token = _active_deferral.set(collector)
     first_error: BaseException | None = None
     try:
-        while collector.callbacks:
-            callback = collector.callbacks.pop(0)
+        while (callback := collector.pop_next()) is not None:
             try:
                 callback()
             except BaseException as error:  # observability: ignore R2: the first failure is re-raised after the remaining callbacks run (Django's run_on_commit contract)
@@ -164,16 +187,22 @@ def defer_publication_callbacks() -> Iterator[DeferredPublicationCallbacks]:
     """Collect publication callbacks and drain them after this scope exits.
 
     Registered callbacks are eligible only on a real successful commit: the
-    drain is registered with Django's ``transaction.on_commit`` at scope exit,
-    so an outer rollback runs none, and a successful inner savepoint does not
-    qualify before the outer transaction commits. Nesting reuses the outer
-    collector, so only the outermost scope registers a drain. A body exception
-    discards the collected callbacks: the mutation that raised them did not
-    commit, and its presentation effects must not escape.
+    drain is registered with Django's ``transaction.on_commit`` at the OUTER
+    scope's exit, so an outer rollback runs none, and a successful inner
+    savepoint does not qualify before the outer transaction commits. Nesting
+    reuses the outer collector and adds one frame; a nested failure drops only
+    its own frame. A body exception outside any enclosing scope discards
+    everything. A caller that catches an inner rollback it owns must call
+    ``discard()`` for its own frame: the collector is not a transaction hook.
     """
     outer = _active_deferral.get()
     if outer is not None:
-        yield outer
+        frame = outer.enter()
+        try:
+            yield outer
+        except BaseException:
+            outer.leave(frame)
+            raise
         return
     collector = DeferredPublicationCallbacks()
     token = _active_deferral.set(collector)
@@ -181,7 +210,7 @@ def defer_publication_callbacks() -> Iterator[DeferredPublicationCallbacks]:
         yield collector
     except BaseException:
         _active_deferral.reset(token)
-        collector.discard()
+        collector.discard_all()
         raise
     _active_deferral.reset(token)
     from django.db import transaction

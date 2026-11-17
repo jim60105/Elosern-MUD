@@ -186,8 +186,12 @@ def serialized_gallery_mutation(subject: ArtSubject) -> Iterator[GalleryMutation
 
     The same character may nest: an inner entry for the same subject on the
     same thread reuses the active unit (the lock is not reentrant). A foreign
-    subject or another thread is rejected before any wait. The lock is released
-    on every exit path; a token used afterwards is rejected.
+    subject or another thread is rejected before any wait. Every production
+    caller enters from autocommit, so the admission's transaction commits while
+    the lock is still held; the commit-callback deferral registers at the
+    ambient transaction level, so an enclosing transaction still runs the
+    publication only after ITS commit (never before the lock release). The lock
+    is released on every exit path; a token used afterwards is rejected.
     """
     active = _active_mutation.get()
     if active is not None:
@@ -725,6 +729,7 @@ def request_gallery_image(
     mutation_token=None,
     replacement_image_id=None,
 ) -> str:
+    creation_draft = draft_values is not None
     """Validate, mint, and enqueue exactly one gallery image request.
 
     The ONLY gameplay-reachable entry point for gallery generation
@@ -903,6 +908,7 @@ def request_gallery_image(
             face_rect=face_rect,
             requested_fields=list(selected),
             replacement_image_id=replacement_image_id,
+            creation_draft=creation_draft,
         )
     else:
         enqueue_gallery_job(

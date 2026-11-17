@@ -1096,6 +1096,12 @@ class RollbackSilenceTests(EvenniaTest):
         self.assertIsNone(current_publication_group())
 
 
+def _active_deferral_scope():
+    from world.rules import presentation_events
+
+    return presentation_events._active_deferral.get()
+
+
 class DeferredPublicationCallbackTests(EvenniaTest):
     """The one deferral scope: real commits drain, rollbacks run nothing."""
 
@@ -1120,6 +1126,18 @@ class DeferredPublicationCallbackTests(EvenniaTest):
                 with transaction.atomic():
                     on_publication_commit(lambda: observed.append("outer"))
         self.assertEqual(observed, ["inner", "outer"])
+
+    def test_a_failing_nested_scope_keeps_the_outer_scopes_callbacks(self):
+        observed: list[str] = []
+        with self.captureOnCommitCallbacks(execute=True):
+            with defer_publication_callbacks() as outer:
+                on_publication_commit(lambda: observed.append("outer"))
+                with self.assertRaises(RuntimeError):
+                    with defer_publication_callbacks():
+                        on_publication_commit(lambda: observed.append("inner"))
+                        raise RuntimeError("nested unit failed")
+                self.assertIs(_active_deferral_scope(), outer)
+        self.assertEqual(observed, ["outer"])
 
     def test_the_scope_owner_discards_collected_callbacks(self):
         # The collector is the mutation owner's compensation for a rolled-back

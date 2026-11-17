@@ -283,9 +283,10 @@ class GalleryReplacementSettlementTests(EvenniaTestCase):
         )
         return identity
 
-    def _claim(self, subject, image_id, *, replacement=None):
+    def _claim(self, subject, image_id, *, replacement=None, creation_draft=True):
         job = _enqueue_gallery(subject, image_id)
         job.db.gallery_replacement_image_id = replacement
+        job.db.gallery_creation_draft = creation_draft
         claimed = claim(10)[0]
         return job, str(claimed.db.generation_token)
 

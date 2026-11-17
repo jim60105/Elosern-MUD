@@ -220,6 +220,7 @@ def _enqueue_gallery_job_locked(
     face_rect: dict | None,
     requested_fields: list,
     replacement_image_id: str | None = None,
+    creation_draft: bool = False,
 ) -> GalleryJobRecord:
     """Create one per-image job without lock acquisition (already-serialized caller).
 
@@ -244,6 +245,7 @@ def _enqueue_gallery_job_locked(
     record.db.gallery_face_rect = face_rect
     record.db.gallery_requested_fields = list(requested_fields)
     record.db.gallery_replacement_image_id = replacement_image_id
+    record.db.gallery_creation_draft = creation_draft
     record.db.source_description = description
     record.db.source_hash = digest
     record.db.prompt_digest = _prompt_digest_or_empty(subject, description)
@@ -386,7 +388,7 @@ def settle_gallery_generated(
 
     A gallery job with no replacement metadata deletes NO prior file: a capped
     gallery's own append handles its displaced unreferenced file. Lock order is
-    ``queue_lock -> gallery_lock -> database transaction`` (the only allowed
+    ``queue_lock -> database transaction -> gallery_lock`` (the only allowed
     order; ``gallery.py`` never acquires ``queue_lock``).
 
     Returns the stored card dict, or ``None`` for a stale claim (the
@@ -454,11 +456,16 @@ def settle_gallery_generated(
                 gallery_api.validate_face_rect(face_rect, image_size=image_size)
             card_fields["face_rect"] = face_rect
         replacement_image_id = record.db.gallery_replacement_image_id
+        creation_draft = bool(record.db.gallery_creation_draft)
         card_snapshot = gallery_api.card_state_snapshot(subject)
         job_status_before = record.db.status
         try:
             with transaction.atomic():
-                if replacement_image_id:
+                if creation_draft:
+                    # A creation-draft settlement ALWAYS takes default
+                    # ownership, even with no previous creation card, so an
+                    # unrelated gallery default can never keep presenting over
+                    # the portrait the player just requested.
                     stored, removed_identities = gallery_api.append_replacement_card(
                         subject,
                         replaced_image_id=replacement_image_id,
