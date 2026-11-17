@@ -27,6 +27,8 @@
       "eolas_wandcraft",
       "fionnen_attire",
       "fionnen_bowcraft",
+      "fionnen_fare",
+      "fionnen_remedies",
       "fionnen_trinkets",
       "general_sundries",
       "sanctum_wares",
@@ -174,8 +176,12 @@
       "eolas_sirelwen",
       "eolas_taelith",
       "fionnen_corith",
+      "fionnen_elunwen",
+      "fionnen_firwen",
       "fionnen_gwynnel",
-      "fionnen_ithrlin"
+      "fionnen_ithrlin",
+      "fionnen_lumeth",
+      "fionnen_sylara"
     ],
     "settlements": [
       "capital_altoria",
@@ -204,7 +210,9 @@
       "eolas_taelith_home",
       "fionnen_corith_home",
       "fionnen_gwynnel_home",
-      "fionnen_ithrlin_home"
+      "fionnen_ithrlin_home",
+      "fionnen_lumeth_home",
+      "fionnen_sylara_home"
     ],
     "subraces": [
       "bearkin",
@@ -247,7 +255,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "d915e8461038a2e1a33b488e7e40eb4b898b0b286f87270d396047163789539c",
+  "fingerprint": "e6a9dba3636d4b1e39e1cd711a01d9aec688861973a493448af68e39a60496b3",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -1134,6 +1142,54 @@
         }
       }
     ],
+    "interior_room:fionnen_elunwen_home:fionnen_elunwen_home": [
+      {
+        "source": "place:fionnen_elunwen_home",
+        "source_domain": "places",
+        "source_file": "world/lore/settlements/places_fionnen.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "fionnen_elunwen_home",
+          "object_id": "fionnen_elunwen_home"
+        }
+      },
+      {
+        "source": "service_host:fionnen_elunwen",
+        "source_domain": "service_hosts",
+        "source_file": "world/rules/guild_config/_hosts.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "fionnen_elunwen_home",
+          "object_id": "fionnen_elunwen_home"
+        }
+      }
+    ],
+    "interior_room:fionnen_firwen_home:fionnen_firwen_home": [
+      {
+        "source": "place:fionnen_firwen_home",
+        "source_domain": "places",
+        "source_file": "world/lore/settlements/places_fionnen.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "fionnen_firwen_home",
+          "object_id": "fionnen_firwen_home"
+        }
+      },
+      {
+        "source": "service_host:fionnen_firwen",
+        "source_domain": "service_hosts",
+        "source_file": "world/rules/guild_config/_hosts.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "fionnen_firwen_home",
+          "object_id": "fionnen_firwen_home"
+        }
+      }
+    ],
     "interior_room:fionnen_gwynnel_home:fionnen_gwynnel_home": [
       {
         "source": "place:fionnen_gwynnel_home",
@@ -1182,6 +1238,30 @@
         }
       }
     ],
+    "interior_room:fionnen_lumeth_home:fionnen_lumeth_home": [
+      {
+        "source": "place:fionnen_lumeth_home",
+        "source_domain": "places",
+        "source_file": "world/lore/settlements/places_fionnen.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "fionnen_lumeth_home",
+          "object_id": "fionnen_lumeth_home"
+        }
+      },
+      {
+        "source": "service_host:fionnen_lumeth",
+        "source_domain": "service_hosts",
+        "source_file": "world/rules/guild_config/_hosts.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "fionnen_lumeth_home",
+          "object_id": "fionnen_lumeth_home"
+        }
+      }
+    ],
     "interior_room:fionnen_silverfeather:fionnen_silverfeather": [
       {
         "source": "place:fionnen_silverfeather",
@@ -1192,6 +1272,30 @@
           "domain": "interior_room",
           "map_id": "fionnen_silverfeather",
           "object_id": "fionnen_silverfeather"
+        }
+      }
+    ],
+    "interior_room:fionnen_sylara_home:fionnen_sylara_home": [
+      {
+        "source": "place:fionnen_sylara_home",
+        "source_domain": "places",
+        "source_file": "world/lore/settlements/places_fionnen.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "fionnen_sylara_home",
+          "object_id": "fionnen_sylara_home"
+        }
+      },
+      {
+        "source": "service_host:fionnen_sylara",
+        "source_domain": "service_hosts",
+        "source_file": "world/rules/guild_config/_hosts.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "fionnen_sylara_home",
+          "object_id": "fionnen_sylara_home"
         }
       }
     ]
@@ -16384,7 +16488,7 @@
     "world/lore/nations.py": "43f7f423802ecd56ade274588a789dd3673dae7811c8e87ea34af45208506802",
     "world/lore/npc_card.py": "dfcfdd19ccbe3e92f7a3a7a8a561e423ba8710b14b7172cefb5f1c4fb9713dbd",
     "world/lore/npc_editorial_review.py": "9344e2b199fb4c2d83e2d18742aaa124b6eeb9a5585fa5afcc60fc0e8ecc3fdb",
-    "world/lore/npc_profiles/__init__.py": "17d3e2cb1cf28718fd5877d3c919a4e9bf6eebf524d5c91bc0de5b5ac0724ed4",
+    "world/lore/npc_profiles/__init__.py": "11fd39fc753e51807a6a62e59b845c14f08d8817dc97c5b55836e1f67351fc4c",
     "world/lore/npc_profiles/altoria_guild.py": "cf14a2a86fe4614fe68dffa1ecfcebb0de66fa4c9f0a0175421f155bd8bcd14e",
     "world/lore/npc_profiles/altoria_lower.py": "744b069ab74a9380f882a8db319132548dbd7517e6b85555e3cf2a54a74829de",
     "world/lore/npc_profiles/altoria_trade.py": "0f877088fb1ba44264dff809e172ac87b1828d465da830133e8da489fe36c888",
@@ -16394,7 +16498,8 @@
     "world/lore/npc_profiles/eolas_homes_a.py": "21fde12d4a8556b1a1d3cd91a11f43d5d327dbc1359969b9e793060c7838721d",
     "world/lore/npc_profiles/eolas_homes_b.py": "00c72527e56b125bc26c7fd3a66fddc0499bc4eae4d5b181a34439aaa0efe04e",
     "world/lore/npc_profiles/fionnen_homes_a.py": "253586ec682f298022ec05da07414a5be595eed20cbde353443e4cf4ec36f6a1",
-    "world/lore/npc_profiles/inventory.py": "fdab9078b4d7f1e84fac5eecc39db820d91826bc3b75f8051806071e4c3017cd",
+    "world/lore/npc_profiles/fionnen_homes_b.py": "a2eeeaf34c62304127aef3f485a2d22a03bb26a927045f20bb2955fc1c43dc39",
+    "world/lore/npc_profiles/inventory.py": "47624e0e9ac49db999f3b882a02d391e3d9593691710dbab8537b611475aacad",
     "world/lore/npc_profiles/shape.py": "988fc9dea7ad2f706bef99f8d6df265e423802af79a76880b6099cd2ba2be4fa",
     "world/lore/npc_tiers.py": "ef6a82a681f9212ab71295771986769e6f7285538367f72297bad6dddb66fd48",
     "world/lore/player_presets/__init__.py": "7640ad1e9fcdee37be50038eb956441baf7ed9f347b4ffc0f748b695c887fee0",
@@ -16413,7 +16518,7 @@
     "world/lore/scenes.py": "ba525c31108b5abcd3c487df9578d6e38e5dc2504b6cf4cf5711313e2dd97898",
     "world/lore/settlements/__init__.py": "13b916e302018d28878942694d5e9ba6457b7eb8818ac8272504cbb002fd8f7c",
     "world/lore/settlements/_prose_lang.py": "7cf3638af425039e2568341c9f4159385225b07c5b6fb688bb73eda0aeb66692",
-    "world/lore/settlements/assortments.py": "f3dd2a6d0eefef6fffb8f05461c26c24fa476a11e8fe6ca92335bd8b62729f46",
+    "world/lore/settlements/assortments.py": "355c541cea69dfe8a672fa1fd8a7ae8c6ea640b4120fd008e97aee6d7d23cf8b",
     "world/lore/settlements/capability_declarations.py": "190fc2ce62a335fe7906968e0e10f86ce9fedadf5873476b3b1742fd552c5861",
     "world/lore/settlements/places.py": "1a5d6031664d15ccdc95b5129f60b2893e30cce52d41cefa6b3faf0c44532247",
     "world/lore/settlements/places_altoria_lower.py": "e1502c9c0d8346c2c69b52d75a877f30d5e6d66a9f1f13a228f97595c6cb03b2",
@@ -16421,7 +16526,7 @@
     "world/lore/settlements/places_altoria_upper.py": "278fb7af1e89be3df25543547fbd3fad3f59ffd36830304af1a9b67627a540eb",
     "world/lore/settlements/places_ciaran.py": "c076e49271811a95d306856ae43b76f62f2fe1c8b23df97059726673e3b5adc8",
     "world/lore/settlements/places_eolas.py": "8794ae89c0e815f36cc93673d737d1b24bd114d9b926a08d9ff93ecb3de7e0e7",
-    "world/lore/settlements/places_fionnen.py": "0574ee477ed6599f8ab2ed404dfd10b187e19b56b95280e3bf140b31f721b21e",
+    "world/lore/settlements/places_fionnen.py": "f90d7087ce77801dd448506842ec8fddae45940bf5668006640f778a8c506dd5",
     "world/lore/settlements/settlements.py": "4176d2a10150142f6159d8adbd35db6611ff28b225a5ca7710e6ed040ad01117",
     "world/lore/settlements/shops.py": "940f04d7c6db2dbcef7e3a14cd2716cde8b753dcd0e73aafffb9b8433854ab1d",
     "world/lore/sex.py": "41636022009a201f954611dbea378438a0469ca166eff54034a87489c5c2cda4",
@@ -16665,7 +16770,7 @@
     "world/rules/rulebook/commerce/altoria.yaml": "9e35ac5f6387314550f1087bbd181b559e31f46934c14480331bb708751b7065",
     "world/rules/rulebook/commerce/ciaran.yaml": "8d6045b117f1190e682b957e4e495745a53d8248f5666e68ee86656882ac262c",
     "world/rules/rulebook/commerce/eolas.yaml": "05b61a96e3fd02b3740c3eb91f2e896d769e84e70cf6150fd25e9fc3becf273c",
-    "world/rules/rulebook/commerce/fionnen.yaml": "958983217eb766b538e740098d1a8c4efb88fd74bee82d5c6aa0576c634f6848",
+    "world/rules/rulebook/commerce/fionnen.yaml": "4fcb7a891c086242325060fd9f2eea8c22d14e33b440c899f11a57fa783d2916",
     "world/rules/rulebook/commerce/scales.yaml": "8e60e539d43578ff8f707e0c7e14e0bd5b2d979acb5bec48551473366bc2499e",
     "world/rules/rulebook/cross_lineage_unlock.yaml": "ba8592ff747c2497e4bc5ae6f0caafc592c843043fa25ca9cdd19e319eee6ba3",
     "world/rules/rulebook/defeat_aftermath.yaml": "10d969d9ca9320effade9978df535bcc7867be5445331ff156e5631592ee853a",
