@@ -363,6 +363,7 @@ class CreationPanelValidationTests(unittest.TestCase):
                 self.assertEqual((axis["minimum"], axis["maximum"]), (0, bound[1] - bound[0]))
 
 
+    @covers_requirement("webclient-character-creation-ui::preset-cards-carry-a-server-built-artwork-descriptor")
     def test_preset_cards_carry_a_canonical_alpha_only_artwork_descriptor(self):
         payload = validate_creation(_valid_payload())
         for card in payload["presets"]:
@@ -389,6 +390,7 @@ class CreationPanelValidationTests(unittest.TestCase):
             )
 
 
+    @covers_requirement("webclient-character-creation-ui::preset-cards-carry-a-server-built-artwork-descriptor")
     def test_preset_artwork_rejects_every_malformed_case(self):
         def official_attempt(url="/art/official/abc", origin="official"):
             return {
@@ -489,6 +491,7 @@ class CreationPanelValidationTests(unittest.TestCase):
                     validate_creation(mutated(mutate))
 
 
+    @covers_requirement("webclient-character-creation-ui::the-custom-descriptor-carries-the-silhouette-table")
     def test_silhouette_table_covers_every_advertised_sex_exactly(self):
         payload = validate_creation(_valid_payload())
         table = payload["custom"]["silhouettes"]
@@ -539,6 +542,7 @@ class CreationPanelValidationTests(unittest.TestCase):
         self.assertLessEqual(len(SEX_VALUES) * 3, MAX_SILHOUETTES)
 
 
+    @covers_requirement("webclient-character-creation-ui::the-custom-descriptor-carries-the-silhouette-table")
     def test_silhouette_table_rejects_every_malformed_case(self):
         base = _valid_payload()
 
@@ -611,6 +615,7 @@ class CreationPanelValidationTests(unittest.TestCase):
                 with self.assertRaises(ProtocolValidationError):
                     validate_creation(mutated(mutate))
 
+    @covers_requirement("webclient-character-creation-ui::preset-cards-carry-a-server-built-artwork-descriptor")
     def test_a_full_descriptor_payload_fits_the_envelope(self):
         # Descriptor additions must not push a structurally full panel past the
         # canonical byte gate: the bound stays as it was and a realistic

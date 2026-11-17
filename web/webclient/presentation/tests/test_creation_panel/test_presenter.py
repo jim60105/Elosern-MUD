@@ -450,6 +450,7 @@ class CreationPanelPresenterTests(EvenniaTest):
         return next(card for card in payload["presets"] if card["key"] == key)
 
 
+    @covers_requirement("webclient-character-creation-ui::preset-cards-carry-a-server-built-artwork-descriptor")
     def test_a_preset_with_official_artwork_offers_only_its_own_default(self):
         identity = f"preset/{_T_PRESET}/hero.png"
         other_identity = "preset/t_ash_finch/other.png"
@@ -489,6 +490,7 @@ class CreationPanelPresenterTests(EvenniaTest):
         self.assertEqual(self._write_state(), before)
 
 
+    @covers_requirement("webclient-character-creation-ui::preset-cards-carry-a-server-built-artwork-descriptor")
     def test_a_preset_without_official_artwork_resolves_the_builtin_figure(self):
         before = self._write_state()
         with patch.object(official, "_CATALOG", OfficialCatalog({}, {})):
@@ -506,6 +508,7 @@ class CreationPanelPresenterTests(EvenniaTest):
         self.assertEqual(self._write_state(), before)
 
 
+    @covers_requirement("art-gallery-fallback::a-fallback-key-resolves-by-declaration-then-band-then-deterministic-hash")
     def test_a_declared_preset_fallback_key_wins_over_the_band_rule(self):
         registry = _live("world.lore.player_presets", "PLAYER_PRESET_REGISTRY")
         preset = registry[_T_PRESET]
@@ -524,6 +527,7 @@ class CreationPanelPresenterTests(EvenniaTest):
         )
 
 
+    @covers_requirement("webclient-character-creation-ui::the-custom-descriptor-carries-the-silhouette-table")
     def test_silhouette_table_is_actor_specific_and_matches_later_resolution(self):
         payload = self._render()
         table = payload["custom"]["silhouettes"]

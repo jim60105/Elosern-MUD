@@ -85,6 +85,15 @@ function of the subject key and the stored sex and apparent age.
 - **WHEN** a non-monster subject's stored sex or apparent-age value is missing or malformed
 - **THEN** resolution SHALL fail closed to the adult band rather than raising
 
+#### Scenario: Creation previews resolve draft values without an entity write
+- **WHEN** a pending character’s custom silhouette table is built for each advertised sex and apparent-age interval
+- **THEN** the same band resolver consumes explicit sex/age values and the full identity `portrait:character:<pending character pk>`, so each row, including a sex outside the female/male pair, equals later undeclared resolution for that character at those values
+- **AND** this read neither establishes a portrait policy nor changes stored identity, and the table is rebuilt for each pending character rather than shared between characters
+
+#### Scenario: Preset previews resolve their own registry declaration
+- **WHEN** a synthetic preset is previewed with no character subject
+- **THEN** its declared fallback wins; otherwise its declared sex and apparent age select the ordinary band using `preset:<preset key>` as the full stable preview hash input, with no registry write
+
 ### Requirement: The built-in fallback images carry a transparent background
 Each committed built-in fallback image SHALL be produced from the project art prompt library
 through the same background-removal and encoding stages the portrait worker applies to generated
