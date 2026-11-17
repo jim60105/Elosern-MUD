@@ -15,14 +15,15 @@ Each harness instance uses fresh dynamic loopback ports and temporary roots,
 so ``web/tests/browser/`` can be collected repeatedly by the full Evennia
 suite and the explicit browser entry point without shared process state, port
 collision, or a stale server. The release-then-bind window between dynamic
-port allocation and the launcher binding them is closed two ways: every
-runtime's ports are allocated, and then booted to the point the portal holds
-them, under a runner-local ``flock`` startup lock, so concurrent harness
-processes (the packed browser shards run two per machine) can never
-interleave allocation-to-bind; and a boot that answers ``already running`` --
-impossible for a freshly cleared runtime unless the launcher joined a foreign
-portal on a released AMP port -- is failed fast and retried with a fresh
-runtime.
+port allocation and the launcher binding them is closed three ways: the ports
+are drawn below the kernel's ephemeral range (``fixtures.allocate_ports``), so
+no socket can be handed one automatically in that window; every runtime's
+ports are allocated, and then booted to the point the portal holds them, under
+a runner-local ``flock`` startup lock, so concurrent harness processes (the
+packed browser shards run two per machine) can never interleave
+allocation-to-bind; and a boot that answers ``already running`` -- impossible
+for a freshly cleared runtime unless the launcher joined a foreign portal on a
+released AMP port -- is failed fast and retried with a fresh runtime.
 """
 
 from __future__ import annotations
@@ -47,10 +48,12 @@ DEFAULT_BOOT_TIMEOUT = 600
 DEFAULT_READY_TIMEOUT = 240
 DEFAULT_STOP_TIMEOUT = 60
 
-# Ephemeral-port races between concurrent harness processes on one runner.
-# ``allocate_ports`` releases its sockets before Evennia binds those exact
-# ports, so a sibling process may grab a released port; the portal then fails
-# with one of these markers. Retrying with a fresh runtime is the resolution.
+# Residual port-conflict races. ``allocate_ports`` releases its verifying
+# sockets before Evennia binds those exact ports, so an explicit binder (a
+# sibling harness process, a leftover server) can still take one; the portal
+# or server then fails with one of these markers. Allocation itself never
+# draws a port the kernel would issue automatically, so a fresh retry gets a
+# genuinely uncontended set. Retrying with a fresh runtime is the resolution.
 _PORT_CONFLICT_MARKERS = ("CannotListenError", "Address already in use")
 MAX_PORT_CONFLICT_RETRIES = 2
 

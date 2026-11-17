@@ -13,6 +13,7 @@ that can discover these tests.
 from __future__ import annotations
 
 import os
+import random
 import shutil
 import socket
 import subprocess
@@ -36,6 +37,18 @@ SEED_SETTINGS_DOTPATH = "web.tests.browser.browser_settings"
 PORT_COUNT = 5
 TELNET_PORT, HTTP_PORT, INTERNAL_PORT, WS_PORT, AMP_PORT = range(PORT_COUNT)
 
+# The window every allocated port is drawn from. It sits BELOW the kernel's
+# ephemeral range (``net.ipv4.ip_local_port_range`` defaults to 32768-60999;
+# macOS starts at 49152), so the kernel never issues one of these ports to an
+# unrelated socket: ``allocate_ports`` closes its verifying sockets before the
+# launcher binds, and a port in the ephemeral range can be handed straight to
+# an outgoing connection or a ``bind(..., 0)`` listener in that window. On a
+# packed runner that cost the browser runtimes their late-binding internal
+# server port (the server process starts after the portal), which no retry can
+# recover from. ``PORT_ALLOCATION_FLOOR`` stays well above privileged ports.
+PORT_ALLOCATION_FLOOR = 20000
+PORT_ALLOCATION_CEILING = 32000
+
 _READY_TIMEOUT_SECONDS = 180
 _READY_POLL_SECONDS = 1.0
 
@@ -44,11 +57,12 @@ _READY_POLL_SECONDS = 1.0
 class BrowserRuntime:
     """One isolated runtime: temporary roots, (deferred) dynamic ports, env.
 
-    Port allocation is deliberately deferred: dynamic ports are released by
-    the allocator and rebound by the Evennia launcher, and a sibling harness
-    process can grab a port inside that window. The harness therefore
-    allocates ports only inside its runner-local startup lock (``allocate``
-    below), never at construction time.
+    Port allocation is deliberately deferred: the allocated ports are released
+    by the allocator and rebound by the Evennia launcher, and a sibling harness
+    process can bind one inside that window. The harness therefore allocates
+    ports only inside its runner-local startup lock (``allocate`` below), never
+    at construction time, and draws them from below the kernel's ephemeral
+    range so no unrelated socket can be handed one automatically.
     """
 
     root_dir: Path
@@ -85,7 +99,8 @@ class BrowserRuntime:
 
         Idempotent. MUST be called while the harness startup lock is held so
         the release-then-bind window never overlaps a sibling harness
-        process's own allocation or boot.
+        process's own allocation or boot. The ports themselves come from below
+        the kernel's ephemeral range (see :func:`allocate_ports`).
         """
         if self.ports is not None:
             return
@@ -97,36 +112,72 @@ class BrowserRuntime:
         shutil.rmtree(self.root_dir, ignore_errors=True)
 
 
-#: Every port this process has handed out. The kernel may re-issue a port as
-#: soon as its socket closes (``SO_REUSEADDR`` makes that likelier), so two
-#: runtimes in one process must never be allowed to draw it a second time.
+#: Every port this process has handed out; two runtimes in one process must
+#: never draw the same port, including across a port-conflict retry.
 _ISSUED_PORTS: set[int] = set()
 
 
+def _ephemeral_port_floor() -> int:
+    """The lowest port the kernel issues automatically.
+
+    Read from ``/proc`` on Linux, where the range is configurable; otherwise
+    the documented platform default (32768 on Linux, 49152 on macOS) is the
+    safe assumption. Either way the allocation window stays below it.
+    """
+    try:
+        first = (
+            Path("/proc/sys/net/ipv4/ip_local_port_range")
+            .read_text(encoding="ascii")
+            .split()[0]
+        )
+        return int(first)
+    except (OSError, ValueError, IndexError):
+        return 32768
+
+
 def allocate_ports(count: int = PORT_COUNT) -> list[int]:
-    """Bind ``count`` loopback sockets to port 0 and return their ports.
+    """Bind ``count`` free loopback ports from below the ephemeral range.
 
     All sockets are bound before any is released, so the returned ports are
     distinct within one call, and a port this process already handed out is
     never returned again, so successive runtimes in one process cannot
     collide either. Across processes the harness startup lock serializes
-    allocation; the release-then-bind window for an unrelated process remains
-    the usual ephemeral-port race.
+    allocation.
+
+    The window sits below the kernel's ephemeral range on purpose. A port the
+    kernel issues automatically (an outgoing connection's source port, a
+    listener created with port 0) can be handed to any socket the moment the
+    verifying socket closes, and the launcher binds these ports seconds later
+    -- the server process binds the internal webserver port only after the
+    portal is up. Ports below the ephemeral floor are never issued
+    automatically, so only an explicit binder can still contend, and the
+    harness's port-conflict retry covers that residual case.
     """
-    sockets = []
-    ports = []
+    ceiling = min(PORT_ALLOCATION_CEILING, _ephemeral_port_floor())
+    span = ceiling - PORT_ALLOCATION_FLOOR
+    if span < count:
+        raise RuntimeError(
+            f"{count} ports do not fit below the ephemeral range at {ceiling}"
+        )
+    # A random starting point keeps repeated runs and sibling processes from
+    # scanning the window in the same order.
+    offset = random.randrange(span)
+    sockets: list[socket.socket] = []
+    ports: list[int] = []
     try:
-        # A retry only happens when the kernel re-offers a port already in
-        # ``_ISSUED_PORTS``; the loop is bounded so a pathological exhaustion
+        # The scan is bounded by the window itself, so an exhausted window
         # fails loudly instead of returning a duplicate.
-        for _ in range(count * 50):
+        for step in range(span):
             if len(ports) == count:
                 break
+            port = PORT_ALLOCATION_FLOOR + (offset + step) % span
+            if port in _ISSUED_PORTS:
+                continue
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            sock.bind(("127.0.0.1", 0))
-            port = sock.getsockname()[1]
-            if port in _ISSUED_PORTS:
+            try:
+                sock.bind(("127.0.0.1", port))
+            except OSError:
                 sock.close()
                 continue
             _ISSUED_PORTS.add(port)
@@ -134,7 +185,7 @@ def allocate_ports(count: int = PORT_COUNT) -> list[int]:
             ports.append(port)
         if len(ports) != count:
             raise RuntimeError(
-                f"could not allocate {count} fresh loopback ports"
+                f"could not allocate {count} free loopback ports below {ceiling}"
             )
         return ports
     finally:

@@ -12,6 +12,7 @@ from __future__ import annotations
 import subprocess
 import fcntl
 import os
+import socket
 import tempfile
 import time
 from pathlib import Path
@@ -392,6 +393,45 @@ class PortAllocationTests(unittest.TestCase):
         self.assertEqual(len(set(a)), 5)
         self.assertEqual(len(set(b)), 5)
         self.assertFalse(set(a) & set(b), "two allocations share a port")
+
+    def test_allocated_ports_stay_outside_the_kernel_ephemeral_range(self):
+        """A port the kernel issues automatically can be stolen before bind.
+
+        ``allocate_ports`` releases its verifying sockets before the launcher
+        binds, and the server process binds the internal webserver port only
+        after the portal is up. Below the ephemeral floor no other socket can
+        be handed these ports automatically in that window.
+        """
+        floor = fixtures._ephemeral_port_floor()
+        ports = fixtures.allocate_ports(fixtures.PORT_COUNT)
+        for port in ports:
+            self.assertLess(port, floor)
+            self.assertGreaterEqual(port, fixtures.PORT_ALLOCATION_FLOOR)
+
+    def test_an_occupied_candidate_is_skipped_inside_the_window(self):
+        """A candidate another process holds is passed over, never above the floor."""
+        span = fixtures.PORT_COUNT + 1
+        floor = fixtures.PORT_ALLOCATION_FLOOR + span
+        issued = set(fixtures._ISSUED_PORTS)
+        fixtures._ISSUED_PORTS.clear()
+        try:
+            occupied = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            occupied.bind(("127.0.0.1", fixtures.PORT_ALLOCATION_FLOOR))
+            self.addCleanup(occupied.close)
+            with (
+                mock.patch.object(
+                    fixtures, "_ephemeral_port_floor", return_value=floor
+                ),
+                mock.patch.object(fixtures.random, "randrange", return_value=0),
+            ):
+                ports = fixtures.allocate_ports(fixtures.PORT_COUNT)
+            self.assertEqual(
+                ports,
+                list(range(fixtures.PORT_ALLOCATION_FLOOR + 1, floor)),
+            )
+        finally:
+            fixtures._ISSUED_PORTS.clear()
+            fixtures._ISSUED_PORTS.update(issued)
 
     def test_repeated_runtimes_are_fully_isolated(self):
         first = fixtures.create_runtime(prefix="elosern-iso1-")
