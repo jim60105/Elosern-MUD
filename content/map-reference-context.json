@@ -238,7 +238,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "e99100245dbcbcf129e187e4a65345379713a69791336c080b1ff3db4fae8678",
+  "fingerprint": "7b6331be29eb807141ef72314fdcf7b9e2db64f031ab1bba25d1529ac2a47d1b",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -16311,7 +16311,7 @@
     "world/lore/npc_profiles/ciaran_homes_a.py": "c82e5c6a858a8df432a33fe3763283b608be82589adc75a5ae84c4326a42fb1a",
     "world/lore/npc_profiles/ciaran_homes_b.py": "b0de829a2d3b36bf3a3d59b3c3610189746117b8d9129dcf4afa0ced9085a461",
     "world/lore/npc_profiles/eolas_homes_a.py": "2cacc4ed57ac915014bd3cde2ea1356affa0a37a5c164d1648cbb9951e4dc334",
-    "world/lore/npc_profiles/eolas_homes_b.py": "2024e8569aba03ea014e5810eb137d9fe13f33c7663a7ae3192175712606d8cc",
+    "world/lore/npc_profiles/eolas_homes_b.py": "7075b5758d3fb5fd083257d398fcb41a036d391e08e5c61f046362b5898224d4",
     "world/lore/npc_profiles/inventory.py": "5c6e881998c928eab7902462d27ffc88902a983806e0cf1edb24e71916452ac1",
     "world/lore/npc_profiles/shape.py": "988fc9dea7ad2f706bef99f8d6df265e423802af79a76880b6099cd2ba2be4fa",
     "world/lore/npc_tiers.py": "ef6a82a681f9212ab71295771986769e6f7285538367f72297bad6dddb66fd48",
