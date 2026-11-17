@@ -180,6 +180,8 @@ Where a scene tells a guest where a removed good can be found, it names the maki
 | | `topic_02` 重傷, `topic_03` 魔力 | Leave unchanged. |
 | | `topic_04` 藥草 | Rewrite: the antidote herb grows in her own garden and becomes 暗影谷解毒草露; keep that she uses only her own plants and takes back sealed jars. |
 
+One line outside these four tables also follows the change: `ciaran_gwenaera.yaml` `topic_03` called 瓦爾溫 the silk gatherer. It now calls her the dye-presser and the scene moves to `r3`.
+
 Each of the four files keeps exactly four topics.
 
 ### Decision 8: documents

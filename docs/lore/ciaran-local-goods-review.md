@@ -122,7 +122,7 @@ Every rewritten scene opens with a complete actor utterance, holds five to seven
 
 ## 6. Documentation Corrections and Working Notes
 
-`docs/lore/items.md` gains the five rows and keeps one row per existing good. The four borrowed goods now name the village that makes them in their 產地／文化 cell, with 精靈蛛絲 and 精靈傳統服飾 pointing to 幽月谷村（伊歐拉斯族） and 精靈森林輕紗 and 精靈蜜漬花蕊 to 翠綠森林村（斐歐恩族）. The sixth-layer list of potion magnitudes now names the five potions it covers, and the potion section points at that list without claiming a total; neither sentence claims the registry holds only five usable items.
+`docs/lore/items.md` gains the five rows and keeps one row per existing good. The four borrowed goods now name the village that makes them in their 產地／文化 cell, with 精靈蛛絲 and 精靈傳統服飾 pointing to 幽月谷村（伊歐拉斯族） and 精靈森林輕紗 and 精靈蜜漬花蕊 to 翠綠森林村（斐歐恩族）. The sixth-layer list calls itself a selection of principal potions rather than a total, and the potion section points at the sixth-layer explanation for the goods that carry a use mechanic; neither sentence claims the registry holds only five usable items.
 
 One line outside the design's four tables had to follow the change. `ciaran_gwenaera.yaml` `topic_03` called 瓦爾溫 「採集蛛絲的瓦爾溫」, which 瓦爾溫's new card and dialogue falsify. The line now calls her 「壓藍染的瓦爾溫」, that scene moves to `revision: r3`, and the `ciaran_gwenaera_home` ledger row is refreshed. This is the only dialogue edit outside the four hosts the design names, and it exists because the old sentence was true before this change and false after it.
 

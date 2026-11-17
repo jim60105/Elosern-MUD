@@ -94,7 +94,7 @@
 
 群體範圍的一次使用只消耗一件物品：結算在單一交易內為「每個有效效果×每個有效目標」各規劃一個步驟，事件日誌每個實際寫入的步驟各列一條 `item_used`；回滾日記按被觸及的每個實體各自捕獲計量條、狀態與性狀態，復原時逐實體走過同一條快取丟棄路徑。
 
-目前列出的五件藥劑的設計參考量級：治療藥水 `healing_potion` `hp +40`、強效治療藥水 `greater_healing_potion` `hp +120`、魔力藥水 `mana_potion` `mp +40`、暗影谷解毒草露 `remove_status: poisoned`、受洗聖水 `baptismal_holy_water` `remove_status: negative`。
+幾件主要藥劑的設計參考量級如下：治療藥水 `healing_potion` `hp +40`、強效治療藥水 `greater_healing_potion` `hp +120`、魔力藥水 `mana_potion` `mp +40`、暗影谷解毒草露 `remove_status: poisoned`、受洗聖水 `baptismal_holy_water` `remove_status: negative`。
 
 過去掛號的「解毒」「回體（`sp`）」「持續回春」「催情（`pleasure`）」如今都是單純的規則表資料。計量條調整（含負值與快感）、施加具體狀態（如既有狀態鍵 `item_regen_light`）、移除狀態（含 `negative` 選擇器）全是現成動詞，新增不再需要效果鍵列舉擴充；以一個假想解毒補劑為例：
 
@@ -180,7 +180,7 @@ items:
 
 ## 藥劑與丹方
 
-藥劑與〔性玩具〕可用型是目前僅有的兩個掛載 `use_mechanics` 的分類。效果不住在物品清單，而由使用效果規則表依物品 `key` 宣告；上表各藥劑的效果條目與量級見第六層說明，受洗聖水的淨化（`remove_status: negative`）與暗影谷解毒草露的解毒（`remove_status: poisoned`）都不帶量級。價格帶以 `potion`（50～500 銅）為主；單價遠超一般藥劑的高階藥引改掛開放定價的 `material`。
+藥劑與〔性玩具〕可用型是目前僅有的兩個掛載 `use_mechanics` 的分類。效果不住在物品清單，而由使用效果規則表依物品 `key` 宣告；下表所列藥劑中，掛載使用機制的品項，其效果條目與量級見第六層說明，受洗聖水的淨化（`remove_status: negative`）與暗影谷解毒草露的解毒（`remove_status: poisoned`）都不帶量級。價格帶以 `potion`（50～500 銅）為主；單價遠超一般藥劑的高階藥引改掛開放定價的 `material`。
 
 | 名稱 | 稀有度 | 產地／文化 | 規則表效果（依 `key`） | 消耗品 | 戰鬥中可用 | 價格帶 | 參考買價／賣價（銅） | 簡介 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
