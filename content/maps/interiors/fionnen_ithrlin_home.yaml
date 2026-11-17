@@ -1,0 +1,21 @@
+# Permanent interior authored source (schema version 1).
+# The sole authority for the room's identity, name, prose, scene metadata and
+# its one exterior entrance relationship. The room id is the stable place key
+# a service record joins to, so a service record declares no geometry.
+version: 1
+kind: interior
+id: fionnen_ithrlin_home
+rooms:
+  fionnen_ithrlin_home:
+    name_zh: 伊斯爾林的家
+    desc_zh: 平台搭在樹冠之間，離枝葉只有幾步，風從板縫穿過時腳下跟著晃。織機擺在光落下來的地方，幾幅輕紗掛在樑下，衣箱上疊著一件摺好的獵衣。
+    scene_archetype: tavern_interior
+connections: []
+exterior:
+  settlement: elven_village_fionnen
+  node: canopy_walk
+  room: fionnen_ithrlin_home
+  doorway_key: 伊斯爾林的家
+  doorway_aliases:
+  - ithrlin
+  - ithrlin's home

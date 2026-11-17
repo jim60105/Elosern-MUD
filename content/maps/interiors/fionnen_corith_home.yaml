@@ -1,0 +1,21 @@
+# Permanent interior authored source (schema version 1).
+# The sole authority for the room's identity, name, prose, scene metadata and
+# its one exterior entrance relationship. The room id is the stable place key
+# a service record joins to, so a service record declares no geometry.
+version: 1
+kind: interior
+id: fionnen_corith_home
+rooms:
+  fionnen_corith_home:
+    name_zh: 科瑞斯的家
+    desc_zh: 板根之間圍出一間低矮的屋子，屋頂順著樹幹斜下。窗邊一張木凳上擺著刻刀和半成品的木環，布上攤著幾枚乳白晶石；牆根一排陶盆，藤蔓自盆裡攀上樹皮，無風也會動。
+    scene_archetype: tavern_interior
+connections: []
+exterior:
+  settlement: elven_village_fionnen
+  node: root_dwellings
+  room: fionnen_corith_home
+  doorway_key: 科瑞斯的家
+  doorway_aliases:
+  - corith
+  - corith's home

@@ -1,0 +1,111 @@
+schema_version: 1
+greeting: 科瑞斯‧蒙希斯佩爾坐在窗邊的木凳上，把一枚乳白晶石貼在小臂內側，低頭聽它細微的震動。她抬眼看見有人進來，笑了：「喲，你自己找上門來啦。今天想看哪一種玩意？護腕、晶石，還是牆邊那盆藤？」
+topics:
+- topic_id: fionnen_corith_home.topic_01
+  keyword: 護腕
+  label: 護腕
+  fallback:
+    scene_id: fionnen_corith_home.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「聽說你雕的護腕讓弓手綁在持弓的那隻手，它對拉弓有幫助嗎？」
+    - kind: narration
+      text: 科瑞斯‧蒙希斯佩爾從木凳邊揀起一個雕到一半的護腕，套上自己的手臂，抬手做了個拉弦的姿勢。
+    - kind: speech
+      speaker: host
+      text: 「森林射手護腕照手臂的形狀削出來，缺口那一面貼著腕骨，拉滿弓的時候手腕不吃力。」
+    - kind: speech
+      speaker: host
+      text: 「臂上穩了，箭自然也跟著穩。村裡的弓手用舊了，就來找我削新的弓。」
+    - kind: speech
+      speaker: actor
+      text: 「木頭綁在手腕上，磨久了不會咬人嗎？」
+    - kind: speech
+      speaker: host
+      text: 「內面我用細砂磨到摸不出稜角，再上一層蜂蠟。你摸這圈邊，順著手腕的弧走，不會咬人啦。」
+- topic_id: fionnen_corith_home.topic_02
+  keyword: 恆振晶
+  label: 恆振晶
+  fallback:
+    scene_id: fionnen_corith_home.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你胸前那枚乳白的晶石，剛才貼在手臂上聽，是在調它嗎？」
+    - kind: narration
+      text: 她把晶石從頸繩上取下，放在掌心，指尖按著石面上讀不出來的細紋。
+    - kind: speech
+      speaker: host
+      text: 「這叫恆振晶。裡頭刻著極細的振術，我調整它的節奏；太快會刺，太慢就散。」
+    - kind: speech
+      speaker: host
+      text: 「調好了貼身藏著，它一整日震著最敏感的那一處，走路、說話、做什麼都在裡頭響。」
+    - kind: speech
+      speaker: host
+      text: 「我自己先戴了一整天。夜裡躺下來，那點震動還在，睡不太著，可也捨不得解下。」
+    - kind: speech
+      speaker: actor
+      text: 「人類的學者讀不懂上面的術式，是真的嗎？」
+    - kind: speech
+      speaker: host
+      text: 「他們拿放大鏡看了又看，只看出一圈刻痕。這套法子我自己摸出來，別人抄不走。」
+    - kind: speech
+      speaker: host
+      text: 「想要就開口，我從布上揀給你嘛。貼著皮膚戴，別擱在衣服外頭，那就浪費了。」
+- topic_id: fionnen_corith_home.topic_03
+  keyword: 魔藤
+  label: 魔藤
+  fallback:
+    scene_id: fionnen_corith_home.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「牆邊那幾盆藤，葉子剛才動了一下，屋裡沒有風。那也是你做出來的嗎？」
+    - kind: narration
+      text: 科瑞斯‧蒙希斯佩爾伸手在陶盆邊上敲了兩下，藤蔓從盆裡抬起一段，繞上她的手腕。
+    - kind: speech
+      speaker: host
+      text: 「纏枝魔藤。平日在窗邊曬光，土乾了澆水，不去吵它，它自己就長。」
+    - kind: speech
+      speaker: host
+      text: 「澆透了水，它會醒過來，順著人的身體一路爬，一處一處纏上去，把每一處敏感的地方都磨到，力道剛好停在不會勒傷人的地方。」
+    - kind: speech
+      speaker: host
+      text: 「折騰夠了，它自己縮回盆裡睡；等下一次澆水，再醒一遍。」
+    - kind: speech
+      speaker: actor
+      text: 「養一盆要花很多心思嗎？」
+    - kind: speech
+      speaker: host
+      text: 「不費什麼。土別讓它乾透，光別斷，冬天搬進屋裡。村裡半數人家的窗台上都有一盆，都是從我這幾盆分出去的枝。」
+- topic_id: fionnen_corith_home.topic_04
+  keyword: 收回
+  label: 收回
+  fallback:
+    scene_id: fionnen_corith_home.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「要是護腕戴裂了，或是晶石忽然不震了，能拿回來給你嗎？」
+    - kind: speech
+      speaker: host
+      text: 「我削的東西、我調的東西、我養的藤，都拿回來。留著用不上，就拿回來，我看過成色算銅幣給你；木料、晶石與盆裡的藤我都留著，還能再用。」
+    - kind: speech
+      speaker: host
+      text: 「東西我做得出來，就不想它爛在抽屜裡。」
+    - kind: speech
+      speaker: actor
+      text: 「那從山外買來的晶石或護腕呢？也能請你看一看嗎？」
+    - kind: narration
+      text: 她把手上那枚恆振晶收回頸繩，搖了搖頭。
+    - kind: speech
+      speaker: host
+      text: 「外頭的東西我不碰。刻法不是我這一路，手一按下去就散了，賠不起嘛。」
+    - kind: speech
+      speaker: host
+      text: 「你自己的留著用，或帶回山外找人。這屋裡的活只認我自己的手。」

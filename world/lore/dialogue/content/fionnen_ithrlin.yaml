@@ -1,0 +1,111 @@
+schema_version: 1
+greeting: 伊斯爾林‧斯塔爾威維爾讓木梭停在經線之間，轉過身來。她身上的輕紗隨著動作滑開，她也沒去攏，只把手上一截線繞上指節：「進來呀。先說給我聽，你喜歡什麼樣的布貼在皮膚上？」
+topics:
+- topic_id: fionnen_ithrlin_home.topic_01
+  keyword: 獵衣
+  label: 獵衣
+  fallback:
+    scene_id: fionnen_ithrlin_home.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「衣箱上那件摺好的衣裳，料子看起來很輕，那是獵衣嗎？」
+    - kind: narration
+      text: 她把獵衣從箱上取下來，抖開，讓布面在窗光裡透了一透。
+    - kind: speech
+      speaker: host
+      text: 「森林葉織獵衣。線裡絞了林子的韌草，織得疏，跑起來不綁身子。」
+    - kind: speech
+      speaker: host
+      text: 「巨木之間的枝椏低，衣服太厚會勾住。這件貼著身體走，手一抬就過去了。」
+    - kind: speech
+      speaker: actor
+      text: 「穿得這麼薄，林子裡的風不冷嗎？」
+    - kind: speech
+      speaker: host
+      text: 「跑起來就暖了。停下來覺得冷，再披一件外衣，獵隊都這樣。」
+    - kind: speech
+      speaker: host
+      text: 「你伸手摸腋下那一段，我留了活動的餘地，拉弓、攀枝都不扯。」
+- topic_id: fionnen_ithrlin_home.topic_02
+  keyword: 輕紗
+  label: 輕紗
+  fallback:
+    scene_id: fionnen_ithrlin_home.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你身上這件紗，薄得幾乎看不見，也是你自己織的嗎？」
+    - kind: narration
+      text: 伊斯爾林‧斯塔爾威維爾捏起一角紗，讓它從指間滑下去，紗落回身上。
+    - kind: speech
+      speaker: host
+      text: 「精靈森林輕紗。線趁天剛亮、露水還沒乾的時候收下來，這個時節才有。」
+    - kind: speech
+      speaker: host
+      text: 「露水凝成的線細，捻起來費工，可穿上身幾乎沒有重量，風一來就貼著皮膚走。」
+    - kind: speech
+      speaker: actor
+      text: 「過了季節，就織不出來了？」
+    - kind: speech
+      speaker: host
+      text: 「過了就沒有那樣的線。所以一個季節織不了多少，織完就等下一次露水。」
+    - kind: speech
+      speaker: host
+      text: 「你要試就伸手，摸過再決定。隔著一段距離看，看不出它好在哪裡喔。」
+- topic_id: fionnen_ithrlin_home.topic_03
+  keyword: 白衣
+  label: 白衣
+  fallback:
+    scene_id: fionnen_ithrlin_home.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「架子最上層那件白色的精靈傳統服飾，跟其他衣服放在一起，是特別的日子穿的嗎？」
+    - kind: narration
+      text: 她把白衣取下，披在自己身前比了比，紗下的身形透得清楚。
+    - kind: speech
+      speaker: host
+      text: 「平常也穿。這件白衣村裡誰都穿，織得薄，皮膚透得到風，也看得見人。」
+    - kind: speech
+      speaker: host
+      text: 「我們不覺得身體有哪裡需要遮。屋裡屋外都一樣，熱了就把衣服解開，想要的時候就靠在一起，像吃飯、像睡覺。」
+    - kind: speech
+      speaker: host
+      text: 「外頭來的人一開始不敢看，眼睛往旁邊躲。看久了就曉得，這裡沒有人會笑他。」
+    - kind: speech
+      speaker: actor
+      text: 「穿成這樣，是為了讓自己舒服嗎？」
+    - kind: speech
+      speaker: host
+      text: 「是為了自己舒服。你要穿也可以，不穿也可以，這屋裡隨你。」
+- topic_id: fionnen_ithrlin_home.topic_04
+  keyword: 收回
+  label: 收回
+  fallback:
+    scene_id: fionnen_ithrlin_home.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「衣裳穿舊了，或是不合身了，能帶回樹冠上給你嗎？」
+    - kind: speech
+      speaker: host
+      text: 「我織的衣裳，帶回來。線我挑開，洗淨了再紡，還能用。」
+    - kind: speech
+      speaker: host
+      text: 「成色好的我算銅幣給你，破得厲害的我也收，線拆下來當經線。」
+    - kind: speech
+      speaker: actor
+      text: 「外頭買來的衣服呢？料子若是不錯，你也拆嗎？」
+    - kind: narration
+      text: 她把指上的線繞回線軸，搖了搖頭。
+    - kind: speech
+      speaker: host
+      text: 「外頭的布我不拆。撚法、染法都不同，混進我的線裡，整匹布就毀了。」
+    - kind: speech
+      speaker: host
+      text: 「留著自己穿，或帶回山外。樹冠上的線只認這片林子。」

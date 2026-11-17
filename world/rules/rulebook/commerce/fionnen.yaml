@@ -1,0 +1,68 @@
+# 翠綠森林村 commerce slice (commerce-rulebook-slices).
+# Assortment offer rules bind exact integer buy/sell copper, max/initial stock and
+# restock quantity to the immutable item sets in world/lore/settlements/assortments.py;
+# the shops section carries the village homes' opening/restock hours. Joined by the
+# catalog loader in world/rules/guild_config.py with every other rulebook/commerce/*.yaml.
+assortments:
+  - key: fionnen_trinkets
+    offers:
+      - item_key: fionnen_archer_bracer
+        buy_copper: 110
+        sell_copper: 55
+        max_stock: 3
+        initial_stock: 1
+        restock_quantity: 1
+      - item_key: tremor_crystal
+        buy_copper: 150
+        sell_copper: 75
+        max_stock: 3
+        initial_stock: 1
+        restock_quantity: 1
+      - item_key: embracing_vine
+        buy_copper: 60
+        sell_copper: 30
+        max_stock: 5
+        initial_stock: 2
+        restock_quantity: 1
+  - key: fionnen_bowcraft
+    offers:
+      - item_key: elven_longbow
+        buy_copper: 100
+        sell_copper: 50
+        max_stock: 3
+        initial_stock: 1
+        restock_quantity: 1
+  - key: fionnen_attire
+    offers:
+      - item_key: fionnen_leafweave_garb
+        buy_copper: 100
+        sell_copper: 50
+        max_stock: 3
+        initial_stock: 1
+        restock_quantity: 1
+      - item_key: elven_forest_veil
+        buy_copper: 150
+        sell_copper: 75
+        max_stock: 3
+        initial_stock: 1
+        restock_quantity: 1
+      - item_key: elven_traditional_robe
+        buy_copper: 120
+        sell_copper: 60
+        max_stock: 3
+        initial_stock: 1
+        restock_quantity: 1
+
+shops:
+  - shop_key: fionnen_corith_home
+    open_hour: 7
+    close_hour: 19
+    restock_hour: 6
+  - shop_key: fionnen_gwynnel_home
+    open_hour: 7
+    close_hour: 19
+    restock_hour: 6
+  - shop_key: fionnen_ithrlin_home
+    open_hour: 7
+    close_hour: 19
+    restock_hour: 6
