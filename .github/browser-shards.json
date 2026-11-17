@@ -885,7 +885,11 @@
       ],
       "files_b": [
         "web.tests.browser.test_browser_services_guild.GuildQuestJourneys.test_quest_vanishes_book_drops_row_drawer_stays_open",
-        "web.tests.browser.test_harness.RealServerBootTest.test_real_server_boots_and_cleans_up"
+        "web.tests.browser.test_harness.RealServerBootTest.test_real_server_boots_and_cleans_up",
+        "web.tests.browser.test_harness.InternalPortWaitTests.test_the_wait_returns_once_the_internal_port_listens",
+        "web.tests.browser.test_harness.InternalPortWaitTests.test_an_unbound_internal_port_is_reported_with_its_number",
+        "web.tests.browser.test_harness.InternalPortWaitTests.test_the_wait_runs_inside_the_startup_lock",
+        "web.tests.browser.test_harness.InternalPortWaitTests.test_a_failed_bind_wait_still_stops_the_recorded_process"
       ]
     },
     {

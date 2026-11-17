@@ -32,6 +32,7 @@ import atexit
 import fcntl
 import os
 import signal
+import socket
 import subprocess
 import tempfile
 import time
@@ -46,6 +47,13 @@ PORTAL_PIDFILE = fixtures.PROJECT_ROOT / "server" / "portal.pid"
 
 DEFAULT_BOOT_TIMEOUT = 600
 DEFAULT_READY_TIMEOUT = 240
+#: How long the startup lock waits for the server to bind the one port it binds
+#: after the launcher returns. Deliberately shorter than ``DEFAULT_READY_TIMEOUT``:
+#: a bind that misses it is a broken runtime the port-conflict retry must
+#: replace, and holding the runner-wide lock is only useful while a healthy boot
+#: is still in progress.
+INTERNAL_PORT_BIND_TIMEOUT = 60.0
+INTERNAL_PORT_BIND_POLL = 0.2
 DEFAULT_STOP_TIMEOUT = 60
 
 # Residual port-conflict races. ``allocate_ports`` releases its verifying
@@ -273,6 +281,11 @@ class ManagedServer:
             self._clear_pidfiles()
             self._run_boot()
             self._raise_if_joined_foreign_portal()
+            # Record the launched processes BEFORE the bind wait, so a launch
+            # that dies inside it is still killed by ``stop()``, and again
+            # afterwards for a server pid the launcher wrote during the wait.
+            self._record_pids()
+            self._await_internal_webserver_port()
             self._record_pids()
         at = mark("boot", at)
         self.ready = fixtures.webclient_ready(
@@ -339,6 +352,36 @@ class ManagedServer:
                 "evennia start joined a foreign portal instead of booting "
                 "this runtime\n" + self._diagnostics()
             )
+
+    def _await_internal_webserver_port(self) -> None:
+        """Wait, still holding the startup lock, for the server's own bind.
+
+        ``evennia start`` returns once the portal answers, and the server
+        process binds its internal webserver port only afterwards: that one port
+        is still inside the lock's release-to-bind window when the launcher
+        returns, so a sibling harness allocating ports in that instant takes it
+        and this runtime's server dies on ``Address already in use`` for the
+        whole readiness budget. Waiting for the port to accept a connection
+        under the lock keeps a cooperating sibling from allocating it until the
+        kernel owns it.
+
+        A bare connect is all this needs: the port is the portal's proxy target,
+        not an HTTP route, and the readiness poll still decides whether the
+        server answers.
+        """
+        port = self.runtime.ports[fixtures.INTERNAL_PORT]
+        deadline = time.monotonic() + INTERNAL_PORT_BIND_TIMEOUT
+        while True:
+            try:
+                with socket.create_connection(("127.0.0.1", port), timeout=0.5):
+                    return
+            except OSError:
+                if time.monotonic() >= deadline:
+                    raise HarnessError(
+                        "the managed server never bound its internal webserver "
+                        f"port {port}\n" + self._diagnostics()
+                    ) from None
+                time.sleep(INTERNAL_PORT_BIND_POLL)
 
     def stop(self) -> None:
         """Shut down owned processes and remove temporary state.

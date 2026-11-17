@@ -62,6 +62,13 @@ class ManagedServerFastTests(unittest.TestCase):
         self.runtime = fixtures.create_runtime(prefix="elosern-fast-")
         self.addCleanup(self.runtime.cleanup)
         self.fake = FakeRunner()
+        # The fake runner starts no server, so no internal port ever listens.
+        # The bind wait's own behavior is covered by InternalPortWaitTests.
+        bind_wait = mock.patch.object(
+            ManagedServer, "_await_internal_webserver_port", return_value=None
+        )
+        bind_wait.start()
+        self.addCleanup(bind_wait.stop)
         self.server = ManagedServer(runtime=self.runtime, runner=self.fake)
 
     def _patch_steps(self, ready: bool = True):
@@ -383,6 +390,117 @@ class ManagedServerFastTests(unittest.TestCase):
         self.assertEqual(SERVER_PIDFILE.read_text(encoding="utf-8"), "15\n")
 
 
+class InternalPortWaitTests(unittest.TestCase):
+    """The server's late bind must happen inside the startup lock's span."""
+
+    def setUp(self):
+        self.runtime = fixtures.create_runtime(prefix="elosern-bind-")
+        self.addCleanup(self.runtime.cleanup)
+        self.server = ManagedServer(runtime=self.runtime, runner=FakeRunner())
+        self.addCleanup(self.server.stop)
+        self.runtime.allocate_ports()
+        self.port = self.runtime.ports[fixtures.INTERNAL_PORT]
+
+    def _patch_offline_tail(self):
+        for target, result in (
+            ("run_migrate", _ok_result("migrate")),
+            ("run_seed", _ok_result("seed")),
+        ):
+            patcher = mock.patch(
+                f"web.tests.browser.harness.fixtures.{target}",
+                return_value=result,
+            )
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        for target, value in (
+            ("webclient_ready", True),
+            ("world_bootstrapped", True),
+            ("web_server_settled", True),
+        ):
+            patcher = mock.patch(
+                f"web.tests.browser.harness.fixtures.{target}",
+                return_value=value,
+            )
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+    def test_the_wait_returns_once_the_internal_port_listens(self):
+        """A listener on the allocated port ends the wait immediately."""
+        listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.addCleanup(listener.close)
+        listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        listener.bind(("127.0.0.1", self.port))
+        listener.listen(1)
+        self.server._await_internal_webserver_port()
+
+    def test_an_unbound_internal_port_is_reported_with_its_number(self):
+        """A server that never binds fails with the port, not a bare timeout."""
+        with (
+            mock.patch("web.tests.browser.harness.INTERNAL_PORT_BIND_TIMEOUT", 0.3),
+            mock.patch("web.tests.browser.harness.INTERNAL_PORT_BIND_POLL", 0.05),
+        ):
+            with self.assertRaises(HarnessError) as caught:
+                self.server._await_internal_webserver_port()
+        self.assertIn(
+            f"never bound its internal webserver port {self.port}",
+            str(caught.exception),
+        )
+
+    def test_the_wait_runs_inside_the_startup_lock(self):
+        """The bind wait is what closes the sibling-allocation window."""
+        lock = _RecordingLock()
+        observed: dict[str, bool] = {}
+
+        def record() -> None:
+            observed["held"] = lock.held
+
+        self._patch_offline_tail()
+        with (
+            mock.patch("web.tests.browser.harness._startup_lock", return_value=lock),
+            mock.patch.object(
+                ManagedServer, "_await_internal_webserver_port", side_effect=record
+            ),
+        ):
+            self.server.start()
+        self.assertTrue(
+            observed.get("held"), "the bind wait ran outside the startup lock"
+        )
+
+    def test_a_failed_bind_wait_still_stops_the_recorded_process(self):
+        """A launch that dies in the wait is stopped, never leaked.
+
+        The wait runs before ``_record_pids`` used to be called, so a failure
+        there left a live portal behind a deleted runtime. Recording first keeps
+        the failure path's cleanup complete.
+        """
+        owned = subprocess.Popen(["sleep", "30"])
+        self.addCleanup(lambda: owned.poll() is None and owned.kill())
+        self._patch_offline_tail()
+        self.addCleanup(lambda: SERVER_PIDFILE.unlink(missing_ok=True))
+
+        class PidfileWritingRunner(FakeRunner):
+            def __call__(self, runtime, *args, **kwargs):
+                if args and args[0] == "start":
+                    SERVER_PIDFILE.write_text(f"{owned.pid}\n", encoding="utf-8")
+                return super().__call__(runtime, *args, **kwargs)
+
+        self.server.runner = PidfileWritingRunner()
+        with mock.patch.object(
+            ManagedServer,
+            "_await_internal_webserver_port",
+            side_effect=HarnessError("the managed server never bound its port"),
+        ):
+            with self.assertRaises(HarnessError):
+                self.server.start()
+        deadline = time.monotonic() + 5
+        while owned.poll() is None and time.monotonic() < deadline:
+            time.sleep(0.05)
+        self.assertIsNotNone(
+            owned.poll(), "a launch that failed the bind wait must still be stopped"
+        )
+        self.assertFalse(self.runtime.root_dir.exists())
+
+
 class PortAllocationTests(unittest.TestCase):
     """Repeated dynamic-port discovery must never collide."""
 
@@ -568,6 +686,15 @@ class _RecordingLock:
 
 class StartupSerializationTests(unittest.TestCase):
     """The port-critical startup section must run under the startup lock."""
+
+    def setUp(self):
+        # Fake runners start no server, so nothing ever listens on the internal
+        # port; InternalPortWaitTests owns that behavior.
+        bind_wait = mock.patch.object(
+            ManagedServer, "_await_internal_webserver_port", return_value=None
+        )
+        bind_wait.start()
+        self.addCleanup(bind_wait.stop)
 
     def _patch_offline_steps(self):
         for target, result in (
