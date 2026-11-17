@@ -108,7 +108,7 @@ class StableKeyContractTests(unittest.TestCase):
                 self.assertEqual(parse_subject(subject.full()), subject)
 
     @covers_requirement("art-stable-key-contract::stable-keys-share-one-producer-contract")
-    def test_utf8_byte_bound_keeps_worker_identities_within_name_max(self):
+    def test_utf8_byte_bound_keeps_gallery_identity_components_within_name_max(self):
         # 64 four-byte characters are legal code points but 256 UTF-8 bytes;
         # the byte bound must reject them and keep the worst accepted key
         # inside the 255-byte filesystem name limit for every kind.
@@ -118,20 +118,27 @@ class StableKeyContractTests(unittest.TestCase):
         boundary = "😀" * (MAX_SUBJECT_KEY_BYTES // 4)
         self.assertEqual(len(boundary.encode("utf-8")), MAX_SUBJECT_KEY_BYTES)
         from world.art import gallery_kinds
+        from world.art.formats import STORE_EXTENSIONS
 
         image_id = "aaaaaaaa-1111-4111-8111-111111111111"
 
         for kind in ArtSubjectKind:
-            with self.subTest(kind=kind):
-                subject = ArtSubject(kind, boundary)
-                identity = (
-                    f"gallery/{gallery_kinds.store_directory_for(kind.value)}/"
-                    f"{subject.key}/{image_id}.png"
-                )
-                self.assertLessEqual(
-                    len(identity.encode("utf-8")), 255, identity
-                )
-                self.assertEqual(parse_subject(subject.full()), subject)
+            for suffix in sorted(STORE_EXTENSIONS):
+                with self.subTest(kind=kind, suffix=suffix):
+                    subject = ArtSubject(kind, boundary)
+                    identity = (
+                        f"gallery/{gallery_kinds.store_directory_for(kind.value)}/"
+                        f"{subject.key}/{image_id}{suffix}"
+                    )
+                    # NAME_MAX bounds one path component, never the whole
+                    # relative identity: the worst accepted key is a directory
+                    # component of its own, and every other component is fixed
+                    # width (store directory, image uuid, store suffix).
+                    for component in identity.split("/"):
+                        self.assertLessEqual(
+                            len(component.encode("utf-8")), 255, identity
+                        )
+                    self.assertEqual(parse_subject(subject.full()), subject)
 
     @covers_requirement("art-stable-key-contract::stable-keys-share-one-producer-contract")
     def test_full_wire_subject_key_always_fits_the_wire_bound(self):

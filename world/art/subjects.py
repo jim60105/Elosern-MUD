@@ -41,10 +41,13 @@ from world.art.gallery_prompt import (
 #
 # Two independent length bounds: at most ``MAX_SUBJECT_KEY_LENGTH`` code
 # points (the wire bound counts code points) and at most
-# ``MAX_SUBJECT_KEY_BYTES`` UTF-8 bytes, so even 4-byte characters keep the
-# worker output identity (``portrait/character/<key>.png`` = 23 bytes plus
-# the key) and the queue record key (``art:<full key>``) within the 255-byte
-# filesystem ``NAME_MAX`` and Evennia varchar bounds, with margin.
+# ``MAX_SUBJECT_KEY_BYTES`` UTF-8 bytes, so even 4-byte characters keep every
+# gallery store identity component
+# (``gallery/character/<key>/<image-uuid>.webp``: the key is a directory
+# component of its own) and the per-image job key
+# (``art:<full subject>:gen:<image-id>``, counted in characters) within the
+# 255-byte filesystem ``NAME_MAX`` and Evennia varchar bounds, with margin.
+# ``NAME_MAX`` bounds one component, not the whole relative identity.
 MAX_SUBJECT_KEY_LENGTH = 64
 MAX_SUBJECT_KEY_BYTES = 200
 FORBIDDEN_SUBJECT_KEY_CHARACTERS = frozenset("|/:{}")
