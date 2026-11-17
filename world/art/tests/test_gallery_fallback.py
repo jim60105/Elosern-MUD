@@ -431,6 +431,7 @@ class BandRuleTests(unittest.TestCase):
                         band_key_for(identity, "other", apparent_age),
                     )
 
+    @covers_requirement("art-gallery-fallback::a-fallback-key-resolves-by-declaration-then-band-then-deterministic-hash")
     def test_the_seam_takes_values_and_writes_no_entity_state(self):
         # The preview seam is a pure value function: it receives no entity, so
         # it cannot install a portrait policy or mutate a stored identity.
