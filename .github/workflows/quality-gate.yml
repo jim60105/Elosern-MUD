@@ -191,7 +191,18 @@ jobs:
 
       - name: Install locked pnpm toolchain
         run: |
+          # npm ships pnpm's native binary as an OPTIONAL dependency and still
+          # exits 0 when that fetch fails, leaving a wrapper that resolves a
+          # binary on first use. That degraded toolchain cost four browser
+          # shards a SIGSEGV inside `pnpm install`. Resolve the binary here,
+          # where a stalled registry is a named failure this retry can repair.
           npm install --global pnpm@12.5.1
+          for attempt in 1 2 3; do
+            pnpm --version && break
+            echo "pnpm resolved no runnable binary (attempt ${attempt})" >&2
+            npm install --global --force pnpm@12.5.1
+          done
+          pnpm --version
           pnpm install --frozen-lockfile
 
       - name: Prepare Evennia runtime directories
@@ -291,7 +302,15 @@ jobs:
       # alongside it (gm-portal-s1-foundation).
       - name: Build Vue dist in browser workspaces
         run: |
+          # See "Install locked pnpm toolchain": a silently degraded pnpm
+          # install must fail here, not crash a later build.
           npm install --global pnpm@12.5.1
+          for attempt in 1 2 3; do
+            pnpm --version && break
+            echo "pnpm resolved no runnable binary (attempt ${attempt})" >&2
+            npm install --global --force pnpm@12.5.1
+          done
+          pnpm --version
           (cd w-a && pnpm install --frozen-lockfile && pnpm run build && pnpm run build:gm)
           (cd w-b && pnpm install --frozen-lockfile && pnpm run build && pnpm run build:gm)
           # The standalone map editor frontend has its own pnpm workspace/lock;
@@ -407,7 +426,15 @@ jobs:
 
       - name: Install locked pnpm toolchain
         run: |
+          # See the evennia shard job: resolve pnpm's optional native binary at
+          # install time instead of leaving a wrapper that fetches it later.
           npm install --global pnpm@12.5.1
+          for attempt in 1 2 3; do
+            pnpm --version && break
+            echo "pnpm resolved no runnable binary (attempt ${attempt})" >&2
+            npm install --global --force pnpm@12.5.1
+          done
+          pnpm --version
           pnpm install --frozen-lockfile
 
       - name: Build Vue application with Vite
@@ -475,7 +502,16 @@ jobs:
           package-manager-cache: false
 
       - name: Install locked pnpm toolchain
-        run: npm install --global pnpm@12.5.1
+        run: |
+          # See the evennia shard job: resolve pnpm's optional native binary at
+          # install time instead of leaving a wrapper that fetches it later.
+          npm install --global pnpm@12.5.1
+          for attempt in 1 2 3; do
+            pnpm --version && break
+            echo "pnpm resolved no runnable binary (attempt ${attempt})" >&2
+            npm install --global --force pnpm@12.5.1
+          done
+          pnpm --version
 
       - name: Install uv
         uses: astral-sh/setup-uv@v10.2.0

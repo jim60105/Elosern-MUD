@@ -56,7 +56,9 @@ ARG TARGETVARIANT
 WORKDIR /build
 
 # Pinned to match packageManager in tools/map-editor/frontend/package.json.
-RUN npm install --global pnpm@12.5.1
+# `--version` resolves pnpm's native binary, which npm installs as an optional
+# dependency and silently drops on a failed fetch.
+RUN npm install --global pnpm@12.5.1 && pnpm --version
 
 # Manifests first, so a source-only change reuses the locked dependency layer.
 COPY --link tools/map-editor/frontend/package.json tools/map-editor/frontend/pnpm-lock.yaml \

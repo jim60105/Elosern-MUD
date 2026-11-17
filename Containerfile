@@ -96,8 +96,10 @@ WORKDIR /build
 # Install pnpm directly, pinned to match packageManager in package.json.
 # Avoids corepack fetching the older pnpm release pinned by default; pnpm
 # still self-manages to the packageManager pin on invocation regardless of
-# install method, so the pin above is the actual source of truth.
-RUN npm install --global pnpm@12.5.1
+# install method, so the pin above is the actual source of truth. `--version`
+# resolves pnpm's native binary, which npm installs as an optional dependency
+# and silently drops on a failed fetch, so a degraded install fails here.
+RUN npm install --global pnpm@12.5.1 && pnpm --version
 
 COPY --chown=root:0 package.json pnpm-lock.yaml pnpm-workspace.yaml vite.config.js vite.gm.config.js ./
 # The local workspace package (map-view-shared-foundations): its manifest must

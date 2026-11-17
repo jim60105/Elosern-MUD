@@ -77,6 +77,9 @@ class ContainerContractTests(unittest.TestCase):
         self.assertRegex(builder, r"id=uv-\$TARGETARCH\$TARGETVARIANT")
         self.assertRegex(builder, r"COPY[^\n]*pyproject\.toml uv\.lock")
         self.assertRegex(vue_dist, r"RUN\s+npm\s+install\s+--global\s+pnpm@12\.5\.1")
+        # The native binary is an optional npm dependency that a failed fetch
+        # drops silently; resolving it makes the image build fail instead.
+        self.assertRegex(vue_dist, r"pnpm@12\.5\.1\s+&&\s+pnpm\s+--version")
         self.assertRegex(vue_dist, r"COPY[^\n]*package\.json pnpm-lock\.yaml")
         self.assertRegex(
             vue_dist,

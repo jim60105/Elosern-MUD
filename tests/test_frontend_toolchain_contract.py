@@ -186,6 +186,11 @@ class VueComponentGateTests(unittest.TestCase):
 
         pnpm_step = steps["Install locked pnpm toolchain"]["run"]
         self.assertIn(f"npm install --global {pinned_pnpm}", pnpm_step)
+        # npm installs pnpm's native binary as an optional dependency and exits
+        # 0 when that fetch fails, leaving a wrapper that resolves a binary on
+        # first use; resolving it here is what keeps a degraded install from
+        # reaching the build as a crash.
+        self.assertIn("pnpm --version", pnpm_step)
         self.assertIn("pnpm install --frozen-lockfile", pnpm_step)
         self.assertIn("pnpm run build", steps["Build Vue application with Vite"]["run"])
         self.assertIn("pnpm test", steps["Run Vue component tests with Vitest"]["run"])
@@ -213,6 +218,7 @@ class VueComponentGateTests(unittest.TestCase):
         browser_steps = {step["name"]: step for step in jobs["browser"]["steps"]}
         dist_build = browser_steps["Build Vue dist in browser workspaces"]["run"]
         self.assertIn(f"npm install --global {pinned_pnpm}", dist_build)
+        self.assertIn("pnpm --version", dist_build)
         self.assertIn(
             "(cd w-a && pnpm install --frozen-lockfile && pnpm run build && pnpm run build:gm)",
             dist_build,
@@ -238,6 +244,7 @@ class VueComponentGateTests(unittest.TestCase):
         )
         evennia_pnpm_step = evennia_steps["Install locked pnpm toolchain"]["run"]
         self.assertIn(f"npm install --global {pinned_pnpm}", evennia_pnpm_step)
+        self.assertIn("pnpm --version", evennia_pnpm_step)
         self.assertIn("pnpm install --frozen-lockfile", evennia_pnpm_step)
 
 
