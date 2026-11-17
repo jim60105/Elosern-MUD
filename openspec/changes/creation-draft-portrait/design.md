@@ -24,11 +24,11 @@ Pass a small view-model projection, not a second gallery state: `{capabilities: 
 
 ### Request ownership and lifecycle
 
-Add `composables/use-creation-portrait.js`, composed by `useCreationOverlay` after existing form state. It holds only local `drawerOpen`, admitted request id and request presentation epoch/generation, rejected state and focus opener. On submit read current `race`, `subrace`, `sex`, `apparentAge` refs at that instant and the drawer’s own prompt; do not reuse persisted draft values or concept text. Call the existing return-bearing dispatch prop once with `creation.portrait.generate`. For standalone event-based stories use the existing event seam, with explicit simulated correlated results rather than pretending server success.
+Add `composables/use-creation-portrait.js`, composed by `useCreationOverlay` after existing form state. It holds only local `drawerOpen`, admitted request id and the panel slice's explicit `presentationContext` epoch/generation prop, rejected state and focus opener. `AppClient` passes this prop from `store.view.epoch`/`store.view.generation`; passive components never import the store. On submit read current `race`, `subrace`, `sex`, `apparentAge` refs at that instant and the drawer's own prompt; do not reuse persisted draft values or concept text. Call the existing return-bearing dispatch prop once with `creation.portrait.generate`. For standalone event-based stories use the existing event seam, with explicit simulated correlated results rather than pretending server success.
 
 If dispatch returns null, keep the drawer/input open and editable with rejection feedback; do not enter pending. An admitted dispatch disables submit until its matching result and declared revision settle. Keep input on matching rejection; close drawer on matching success after its pending publication is committed, then return focus to the slot. A foreign/stale-session result never settles it. A synchronous transport send failure/gate release clears local submitting state without resending. Disconnect/epoch or actor change closes the local drawer and forgets only its pending UI; reconnect reads server state and does not retry. Mode/step changes preserve unsent form fields; leaving creation tears down the local handler/focus state.
 
-The committed panel is the sole source for pending/ready/failed; local submit loading must not fabricate a portrait state. Portrait-only publications never reset local step, name, concept revision or other unsent values. Generation does not save a custom draft or open activation confirmation. Reusing the existing drawer trap gives Escape priority and restores focus; wall/dock capture must ignore the nested drawer.
+The committed panel is the sole source for pending/ready/failed; local submit loading must not fabricate a portrait state. Rely on P's content-guarded `use-creation-form` synchronization, not merely the store navigation signature: freshly decoded equal saved drafts must not overwrite unsent values. Portrait-only publications never reset local step, name, concept revision or other unsent values. Generation does not save a custom draft or open activation confirmation. Reusing the existing drawer trap gives Escape priority and restores focus; wall/dock capture must ignore the nested drawer.
 
 ### Real-component evidence and human review
 
@@ -56,7 +56,7 @@ Abbreviations: A artwork, W wall, S steps, R request, P panel, C cleanup, I inte
 | W/C | parallel code after R; overlay tests shared |
 | W/I | same overlay/stories/focus; W before I |
 | S/R | parallel substantive code after prerequisites |
-| S/P | fixture/docs/store integration; no same requirement replacement |
+| S/P | same overlay/form/stories and mounted-step regression; S before P |
 | S/C | parallel code; shared overlay tests |
 | S/I | same slot/overlay/composable/stories; S before I |
 | R/P | receipt/read model and publication result; R before P |
@@ -72,7 +72,7 @@ Abbreviations: A artwork, W wall, S steps, R request, P panel, C cleanup, I inte
 | fionnen-village-craft-homes | none in product files/specs; only CI manifests if new tests are registered |
 | fionnen-village-fare-homes | none in product files/specs; only CI manifests if new tests are registered |
 
-Dependency DAG: A → W → S; A → R → P → C; S and C → I. A safe single-engineer delivery order is A, W, S, R, P, C, I. No child Git repo is needed.
+Dependency DAG: A → W → S; A → R; R and S → P → C; S and C → I. A safe single-engineer delivery order is A, W, S, R, P, C, I. P explicitly depends on S because its mounted-form preservation regression must exercise real steps. No child Git repo is needed.
 
 ## Design resolutions and preserved predecessor decisions
 
@@ -85,6 +85,8 @@ Two schema-shape cutovers mean versions 7 then 8, rather than an increment in ev
 Connectivity is the one behavioral deviation from approved §7.3: preserve the authoritative handoff and existing diagnostic-only contract, not the design's offline pre-disable/rejection sentence. Creation never probes connectivity or gates on its cache; a valid offline request reaches the worker and reports its real failure with explicit retry. `unavailable` is reserved for structural receipt/authorization failure, not a cached network verdict. No extra connectivity surface or continue-anyway probe is added.
 
 Strict validation requires existing scenario titles to survive MODIFIED replacement. Keep the historical numeric “Schema version ships as the integer 6” title while its outcome asserts the new version, and keep “Preset lacks artwork” while its body describes absent official art. These are scenario-identity mechanics, not compatibility behavior.
+
+The blocking review additionally moved the overlong finite-controls body's unchanged field obligations into a scenario and corrected stale copied action scenarios to use `ALLOCATABLE_AXES`, required nullable custom fields and the new portrait service route. The two predecessor ADDED blocks remain verbatim. Required atomicity uses queue-before-database serialization and post-unlock commit callbacks; complete failure publication requires a bounded per-image signal cutover. These are code-grounded mechanics, not additional player-facing behavior or new workers.
 
 ## Acceptance and documentation
 
