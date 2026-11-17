@@ -102,8 +102,12 @@ class PlaceRegistryTests(unittest.TestCase):
         from world.lore.settlements.places_altoria_upper import ROWS as upper
         from world.lore.settlements.places_ciaran import ROWS as village
         from world.lore.settlements.places_eolas import ROWS as eolas_rows
+        from world.lore.settlements.places_fionnen import ROWS as fionnen_rows
 
-        slice_keys = [row.key for row in (*lower, *middle, *upper, *village, *eolas_rows)]
+        slice_keys = [
+            row.key
+            for row in (*lower, *middle, *upper, *village, *eolas_rows, *fionnen_rows)
+        ]
         keys = list(PLACE_REGISTRY)
         self.assertEqual(keys[: len(slice_keys)], slice_keys)
         trailing = keys[len(slice_keys):]
