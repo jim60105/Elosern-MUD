@@ -1,0 +1,105 @@
+schema_version: 1
+greeting: 菲爾溫‧埃文斯塔爾坐在平台邊，望著樹梢之間的光，聽見腳步也沒急著回頭。她轉過身來，朝屋裡一塊被光落到的板面抬了抬下巴，「坐這裡。光等一下就會移過來，正好照在背上。」
+topics:
+- topic_id: fionnen_firwen_home.topic_01
+  keyword: 森林
+  label: 森林
+  fallback:
+    scene_id: fionnen_firwen_home.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「這座村子是怎麼在樹上過日子的？」
+    - kind: speech
+      speaker: host
+      text: 「樹下住人，樹上也住人，兩層之間靠吊橋與繩梯往來。溪水從上頭流下來，我們在溪邊汲水，林間菜圃種菜，花蕊蜜園養蜂。」
+    - kind: speech
+      speaker: host
+      text: 「洗身的地方是林泉浴場，就在溪水匯成的那一池。村裡的人在那裡洗身、洗衣、說話，誰也不避誰，孩子在水裡玩到天黑。」
+    - kind: speech
+      speaker: actor
+      text: 「外來的客人到了池邊，會不會不知道該怎麼辦？」
+    - kind: speech
+      speaker: host
+      text: 「不知道就看著。你脫不脫，沒有人會問；坐在石頭上和人說話，也一樣是村子裡的下午。」
+    - kind: speech
+      speaker: host
+      text: 「我們對身體沒有什麼好遮。夜裡誰和誰在一起，也跟白天誰在誰家吃飯一樣，不需要藏起來。」
+- topic_id: fionnen_firwen_home.topic_02
+  keyword: 光庭
+  label: 光庭
+  fallback:
+    scene_id: fionnen_firwen_home.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「林間光庭是個什麼樣的地方？」
+    - kind: speech
+      speaker: host
+      text: 「樹冠在那裡讓開一片天光，整片陽光落到地上。村裡有事要說，就在那片光裡聚攏。」
+    - kind: speech
+      speaker: host
+      text: 「活計在那裡分派，消息也在那裡換。孩子追著光斑跑，跑累了就躺在光裡睡。」
+    - kind: speech
+      speaker: actor
+      text: 「重要的事也在那裡決定嗎？」
+    - kind: speech
+      speaker: host
+      text: 「很少有重要的事。多半是誰家的屋頂該補了，哪一畦菜該收了，說幾句就散了。」
+    - kind: speech
+      speaker: host
+      text: 「光移開以後，那片地就空著。你要找人的話，傍晚再去，那時候人最多。」
+- topic_id: fionnen_firwen_home.topic_03
+  keyword: 外人
+  label: 外人
+  fallback:
+    scene_id: fionnen_firwen_home.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「山外來的人，村裡是怎麼看的？」
+    - kind: speech
+      speaker: host
+      text: 「不看緊，也不特別歡迎。你走進來，就當你是走進來了。」
+    - kind: speech
+      speaker: host
+      text: 「葉隱小徑就那一道缺口，枝葉垂著，外頭看只是一片林子。沒有人刻意去藏，是沒有人想到要指給誰看。」
+    - kind: speech
+      speaker: actor
+      text: 「所以外頭的人多半找不到這裡？」
+    - kind: speech
+      speaker: host
+      text: 「找不到的人多。找得到路的人，多半是跟著風向或水聲走進來，像你一樣。」
+    - kind: speech
+      speaker: host
+      text: 「進來了就隨意走。想看什麼就問，不想說也沒有人逼你。」
+- topic_id: fionnen_firwen_home.topic_04
+  keyword: 往事
+  label: 往事
+  predecessors:
+  - fionnen_firwen_home.topic_01
+  disclosure: pure_chain
+  fallback:
+    scene_id: fionnen_firwen_home.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你剛才說樹下樹上都住人，那樹冠還沒讓開的時候，村子是什麼樣子？」
+    - kind: speech
+      speaker: host
+      text: 「那時候整片樹冠密合在一起，白天也暗得像傍晚。村裡的人都在樹根邊過日子，抬頭看不見天。」
+    - kind: narration
+      text: 她伸手指向平台外，光從葉隙間落下來，在她手背上停了一會。
+    - kind: speech
+      speaker: host
+      text: 「有一年風大，最老的那棵樹折了一根粗枝，折出來的口子後來說什麼也長不回去。光從那個口子照進來，大家才發現樹上也能住人。」
+    - kind: speech
+      speaker: actor
+      text: 「所以光庭是那時候留下來的？」
+    - kind: speech
+      speaker: host
+      text: 「是。孩子，你現在坐的地方，從前連一隻鳥都飛不進來。」

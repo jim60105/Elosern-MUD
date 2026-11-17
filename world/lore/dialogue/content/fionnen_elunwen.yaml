@@ -1,0 +1,99 @@
+schema_version: 1
+greeting: 箭離弦，釘在靶心邊上。埃倫溫‧斯威夫塔羅放下弓，先看過你的站姿，才朝門邊那排空著的弓點了點頭，「來了就自己挑一把。站到線後面，射幾支讓我看。」
+topics:
+- topic_id: fionnen_elunwen_home.topic_01
+  keyword: 箭術
+  label: 箭術
+  fallback:
+    scene_id: fionnen_elunwen_home.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「這把弓拿在手裡，第一件要學的是什麼？」
+    - kind: narration
+      text: 她把自己的弓靠到靶架邊，走到你側面，低頭看你的腳。
+    - kind: speech
+      speaker: host
+      text: 「先學會站。腳踩穩了，氣息才沉得下去；氣息沉不住，手再穩也沒有用。」
+    - kind: speech
+      speaker: host
+      text: 「弓拉滿的時候不要憋氣。吐到一半再放箭，箭才不會被你自己的抖帶走。」
+    - kind: speech
+      speaker: actor
+      text: 「所以要練到不必再想它，對嗎？」
+    - kind: speech
+      speaker: host
+      text: 「對。射到不必再想它，手就知道該怎麼做了。」
+- topic_id: fionnen_elunwen_home.topic_02
+  keyword: 靶道
+  label: 靶道
+  fallback:
+    scene_id: fionnen_elunwen_home.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「這條道上的靶，是怎麼排的？」
+    - kind: narration
+      text: 她抬手往林子裡指，最遠的那幾片木牌在枝葉間晃。
+    - kind: speech
+      speaker: host
+      text: 「近的釘在樹幹上，給剛學的人用；遠處那幾片木牌掛在繩上，風一吹就晃，要射中得先算它什麼時候擺過來。」
+    - kind: speech
+      speaker: host
+      text: 「這條道日夜都開著，誰想射就來，箭自己帶。靶皮磨損了，我換。」
+    - kind: speech
+      speaker: actor
+      text: 「木牌也是你掛的嗎？」
+    - kind: speech
+      speaker: host
+      text: 「每天早上走一趟，把歪掉的重新繫正。風大過一夜，總有幾片要重掛。」
+- topic_id: fionnen_elunwen_home.topic_03
+  keyword: 光法
+  label: 光法
+  fallback:
+    scene_id: fionnen_elunwen_home.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「聽說靶道上不只練箭，還練光魔法？」
+    - kind: narration
+      text: 她伸出空著的那隻手，掌心浮起一小團白光，照在最近那片靶上。
+    - kind: speech
+      speaker: host
+      text: 「同一條道。箭要練準，光也要練準；打偏了都一樣，只是箭釘在木頭上，光散了就沒有痕跡。」
+    - kind: speech
+      speaker: host
+      text: 「村裡親和光的人多，孩子先在這裡把光收到掌心，再學怎麼把它送到遠處。」
+    - kind: speech
+      speaker: actor
+      text: 「兩種一起練，不會互相妨礙嗎？」
+    - kind: speech
+      speaker: host
+      text: 「不會。眼睛看靶，呼吸顧箭，光在手裡，三件事其實是同一件事。」
+- topic_id: fionnen_elunwen_home.topic_04
+  keyword: 比試
+  label: 比試
+  fallback:
+    scene_id: fionnen_elunwen_home.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「要不要跟我比一場？射十支，看誰中得多。」
+    - kind: narration
+      text: 她把剛放下的弓重新靠回靶架，搖了搖頭。
+    - kind: speech
+      speaker: host
+      text: 「不比。這條道上，每個人只管自己的準頭。」
+    - kind: speech
+      speaker: host
+      text: 「要比就比昨天那五支。你昨天中了幾支，今天多一支，就是贏了。」
+    - kind: speech
+      speaker: actor
+      text: 「那總該有個對手吧？」
+    - kind: speech
+      speaker: host
+      text: 「靶就在那裡。它不會讓，也不會輸。你射得夠久，就會曉得這比跟人比難得多。」
