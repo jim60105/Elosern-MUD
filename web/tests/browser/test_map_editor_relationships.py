@@ -8,10 +8,9 @@ changed, that a two-way meaning is one record, that navigation keeps its
 return context and that removing a reference and deleting its target are
 separate operations. Shipped copy is never asserted.
 
-The synthetic settlement ``synthetic_town`` has nodes ``gate`` and ``yard``,
-one wilderness gate ``n`` and the starting-room entry onto ``gate``; the
-interior ``synthetic_hall`` (rooms ``front``, ``back``) opens ``front`` onto
-``yard`` through its exterior.
+The synthetic settlement ``synthetic_town`` has nodes ``gate`` and ``yard``
+and one wilderness gate ``n`` onto ``gate``; the interior ``synthetic_hall``
+(rooms ``front``, ``back``) opens ``front`` onto ``yard`` through its exterior.
 """
 
 from __future__ import annotations

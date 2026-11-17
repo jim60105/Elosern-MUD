@@ -171,7 +171,3 @@ wilderness_entry:
   gates:
     - return_direction: s
       destination_node: forest_trail
-city_gate:
-  node: forest_trail
-  exit_key: 深林獸徑
-  exit_aliases: []

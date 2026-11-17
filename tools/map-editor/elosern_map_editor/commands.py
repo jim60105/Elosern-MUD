@@ -33,8 +33,8 @@ geometry, locations, districts and the settlement-owned footprint live in
 prototypes, roads and bends in :mod:`elosern_map_editor.settlements`;
 interior documents, rooms, connections and the multi-room layout
 arrangement in :mod:`elosern_map_editor.interiors`; the entrance
-relationships (wilderness gates, the starting-room entry, interior exteriors
-and interior links) in :mod:`elosern_map_editor.relationships`.
+relationships (wilderness gates, interior exteriors and interior links) in
+:mod:`elosern_map_editor.relationships`.
 
 ``undo`` and ``redo`` (``arguments: {}``) apply the inverse/forward effect of
 the current segment's top history entry through the same path.
@@ -438,7 +438,6 @@ COMMANDS = frozenset(HANDLERS) | frozenset(HISTORY_COMMANDS)
 #: Authored fields that hold one entrance relationship, and its kind.
 _RELATIONSHIP_FIELDS = (
     ("wilderness_entry.gates", "wilderness_gate"),
-    ("city_gate", "city_gate"),
     ("exterior", "exterior"),
     ("interior_links", "interior_link"),
 )

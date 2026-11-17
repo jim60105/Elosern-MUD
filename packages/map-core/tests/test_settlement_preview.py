@@ -46,7 +46,6 @@ def _settlement(nodes: dict, roads: list) -> object:
             "nodes": nodes,
             "roads": roads,
             "wilderness_entry": None,
-            "city_gate": None,
         },
     )
 

@@ -90,7 +90,6 @@ function interiorWorld() {
         nodes: [{ id: "yard", qualified_ref: "settlement_node:town:yard", key: "Yard", local_m: [0, 0] }],
         roads: [],
         wilderness_entry: null,
-        city_gate: null,
       },
     ],
   };
@@ -99,7 +98,6 @@ function interiorWorld() {
 function settlement() {
   return settlementScene({
     id: "town",
-    city_gate: { node: "gate" },
     wilderness_entry: null,
     nodes: [
       { id: "gate", qualified_ref: "settlement_node:town:gate", key: "Gate", local_m: [0, 0] },

@@ -113,7 +113,7 @@ function world(cellKm = 1) {
     ],
     districts: [],
     settlements: [
-      { id: "town", relative_path: "content/maps/settlements/town.yaml", location_ref: "place", nodes: [], roads: [], city_gate: null, wilderness_entry: null },
+      { id: "town", relative_path: "content/maps/settlements/town.yaml", location_ref: "place", nodes: [], roads: [], wilderness_entry: null },
     ],
     interiors: [{ id: "hall", relative_path: "content/maps/interiors/hall.yaml", rooms: [], connections: [], exterior: null }],
   };

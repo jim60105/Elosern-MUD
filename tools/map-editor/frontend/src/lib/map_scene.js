@@ -30,7 +30,7 @@ import {
 import { bendRef, compassLabel, parseSettlementRef, roadLabel, roadRef } from "./settlement.js";
 import { connectionLabels, connectionRef, reverseOf, roomName } from "./interior.js";
 import { exteriorCardPosition, exteriorRef, relationshipView } from "./relationships.js";
-import { cityGateRef, gateRef, linkRef } from "./relationship_refs.js";
+import { gateRef, linkRef } from "./relationship_refs.js";
 import { monsterMarks, monsterShapes } from "./monster_spawns.js";
 
 export { INTERIOR_COLUMNS } from "./layout_edit.js";
@@ -245,7 +245,6 @@ export function featureLabel(featureRef) {
 export function settlementScene(settlement, selection = []) {
   const nodes = new Map(settlement.nodes.map((node) => [node.id, node]));
   const gates = new Set();
-  if (settlement.city_gate) gates.add(settlement.city_gate.node);
   for (const gate of settlement.wilderness_entry?.gates ?? []) gates.add(gate.destination_node);
   const chosen = new Set(selection);
   const activeRoads = new Set(
@@ -304,9 +303,6 @@ export function settlementScene(settlement, selection = []) {
       id: gateRef(settlement.id, gate.return_direction),
       label: `野外入口 ${compassLabel(gate.return_direction)} → ${settlement.nodes.find((node) => node.id === gate.destination_node)?.key ?? gate.destination_node}`,
     })),
-    ...(settlement.city_gate
-      ? [{ id: cityGateRef(settlement.id), label: `起始房間入口 → ${settlement.nodes.find((node) => node.id === settlement.city_gate.node)?.key ?? settlement.city_gate.node}` }]
-      : []),
   ];
   const drawn = [...marks, ...links.flatMap((link) => link.points)];
   const bounds = boundsOfPoints(drawn.length ? drawn : [{ x: 0, y: 0 }]);

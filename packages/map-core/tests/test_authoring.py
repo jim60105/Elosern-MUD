@@ -116,7 +116,6 @@ def test_empty_world_is_saveable_but_runtime_rejected():
         "cell": {"cell_x": 5, "cell_y": 5},
     }
     settlement = fixtures.settlement_data(nodes={}, roads=[], entry=False)
-    settlement["city_gate"] = None
     world = load_authoring_world(
         fixtures.custom_sources(settlement=settlement, districts=districts)
     )
@@ -404,10 +403,6 @@ def _bad_settlement(mutator) -> dict:
         ),
         (
             lambda data: data["roads"][0].__setitem__("destination", "nowhere"),
-            "unknown_node",
-        ),
-        (
-            lambda data: data["city_gate"].__setitem__("node", "nowhere"),
             "unknown_node",
         ),
         (
@@ -842,7 +837,6 @@ def test_unknown_kind_is_rejected_by_the_schema():
 def test_diagnostics_are_deterministically_ordered():
     data = fixtures.settlement_data()
     data["location_ref"] = "nowhere"
-    data["city_gate"]["node"] = "nowhere"
     with pytest.raises(AuthoringError) as captured:
         load_authoring_world(fixtures.custom_sources(settlement=data))
     diagnostics = captured.value.diagnostics

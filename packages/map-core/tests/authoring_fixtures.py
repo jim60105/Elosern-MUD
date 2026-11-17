@@ -188,7 +188,6 @@ def settlement_data(
         "nodes": nodes,
         "roads": roads,
         "wilderness_entry": entry,
-        "city_gate": {"node": "gate", "exit_key": "Gate", "exit_aliases": ["gate"]},
     }
 
 

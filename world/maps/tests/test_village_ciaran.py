@@ -199,7 +199,7 @@ class VillageCiaranMapTests(EvenniaTestCase):
     )
     def test_the_entrance_does_not_read_as_a_gate(self):
         entrance = self.document.nodes[
-            self.document.city_gate.node
+            self.document.wilderness_entry.gates[0].destination_node
         ]
         text = f"{entrance.key} {entrance.desc}".lower()
         for forbidden in ("wall", "gate", "guard", "城牆", "城門", "衛兵"):

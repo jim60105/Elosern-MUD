@@ -10,7 +10,7 @@
 // The service and the core schema decide validity.
 
 import { FRAME_LOCAL_M, nextId } from "./continent.js";
-import { cityGateRef, exteriorRef, gateRef } from "./relationship_refs.js";
+import { exteriorRef, gateRef } from "./relationship_refs.js";
 
 export { FRAME_LOCAL_M, nextId };
 // One Shift+arrow press moves the selected nodes by this many metres.
@@ -188,9 +188,6 @@ export function nodeBlockers(world, refs) {
     if (ids.has(gate.destination_node)) {
       rows.push({ kind: "野外入口", label: `${compassLabel(gate.return_direction)} → ${nodeName(settlement, gate.destination_node)}`, ref: gateRef(settlement.id, gate.return_direction), source: path, external: false });
     }
-  }
-  if (settlement.city_gate && ids.has(settlement.city_gate.node)) {
-    rows.push({ kind: "城門", label: nodeName(settlement, settlement.city_gate.node), ref: cityGateRef(settlement.id), source: path, external: false });
   }
   for (const interior of world.interiors ?? []) {
     const exterior = interior.exterior;

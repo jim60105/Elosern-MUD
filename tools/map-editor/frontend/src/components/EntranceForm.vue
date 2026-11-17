@@ -1,7 +1,7 @@
 <script setup>
 // The entrance creation form of the 入口 E / 外部入口 E tools (frontend design
 // §4.2, §4.3, §4.4). On a settlement: a wilderness gate onto the picked node
-// (with its return direction) or the one-way entry from the starting room.
+// (with its return direction).
 // In an interior: the exterior doorway of the picked room onto a settlement
 // node, or a special link to a room of any interior (two-way in the same
 // record with a return name). Endpoints on another map are chosen with the
@@ -15,7 +15,6 @@ import ObjectSelector from "./ObjectSelector.vue";
 import { COMPASS, findSettlement } from "../lib/settlement.js";
 import { findInterior } from "../lib/interior.js";
 import {
-  cityGateRef,
   createGate,
   createLink,
   exteriorRef,
@@ -23,7 +22,6 @@ import {
   linkRef,
   nodeRef,
   roomRef,
-  setCityGate,
   setExterior,
 } from "../lib/relationships.js";
 
@@ -66,12 +64,9 @@ const error = computed(() => {
   const trimmed = (value) => String(value ?? "").trim();
   if (props.domain === "settlement") {
     if (!nodeOptions.value.some((option) => option.value === form.node)) return "請選擇這個據點的節點。";
-    if (form.kind === "gate") {
-      if (!form.direction) return "請選擇回程方向（不會依位置推斷）。";
-      if (takenDirections.value.has(form.direction)) return "這個方向已有野外入口。";
-      return null;
-    }
-    return trimmed(form.exit_key) ? null : "請輸入出口名稱。";
+    if (!form.direction) return "請選擇回程方向（不會依位置推斷）。";
+    if (takenDirections.value.has(form.direction)) return "這個方向已有野外入口。";
+    return null;
   }
   if (!roomOptions.value.some((option) => option.value === form.room)) return "請選擇這個室內的房間。";
   if (form.kind === "exterior") {
@@ -91,11 +86,7 @@ function submit() {
   const trimmed = (value) => String(value ?? "").trim();
   if (props.domain === "settlement") {
     const id = settlement.value.id;
-    if (form.kind === "gate") {
-      emit("create", createGate(id, form.direction, form.node), gateRef(id, form.direction));
-    } else {
-      emit("create", setCityGate(id, { node: form.node, exit_key: trimmed(form.exit_key), exit_aliases: lines(form.exit_aliases) }), cityGateRef(id));
-    }
+    emit("create", createGate(id, form.direction, form.node), gateRef(id, form.direction));
     return;
   }
   const id = interior.value.id;
@@ -144,7 +135,6 @@ function onKey(event) {
       <legend class="draft-field__label">種類</legend>
       <template v-if="domain === 'settlement'">
         <label class="check"><input v-model="form.kind" type="radio" value="gate" data-creation-field="kind-gate" /> 野外入口（雙向）</label>
-        <label class="check"><input v-model="form.kind" type="radio" value="city_gate" data-creation-field="kind-city_gate" /> 起始房間入口（單向）</label>
       </template>
       <template v-else>
         <label class="check"><input v-model="form.kind" type="radio" value="exterior" data-creation-field="kind-exterior" /> 據點外部入口（雙向）</label>
@@ -169,17 +159,6 @@ function onKey(event) {
           </select>
         </label>
         <p class="inspector__muted">一次操作寫入這份據點文件；{{ settlement?.wilderness_entry ? "加入現有的野外入口。" : "沒有野外入口時會在錨點格建立單格入口，可再用大陸的佔地工具擴大。" }}</p>
-      </template>
-      <template v-else>
-        <label class="draft-field">
-          <span class="draft-field__label">出口名稱</span>
-          <input v-model="form.exit_key" class="draft-field__input" data-creation-field="exit_key" />
-        </label>
-        <label class="draft-field">
-          <span class="draft-field__label">別名（一行一個）</span>
-          <textarea v-model="form.exit_aliases" class="draft-field__input" rows="2" data-creation-field="exit_aliases" />
-        </label>
-        <p class="inspector__muted">起始房間入口固定為單向。{{ settlement?.city_gate ? "會取代這個據點目前的起始房間入口。" : "" }}</p>
       </template>
     </template>
 

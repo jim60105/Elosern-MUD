@@ -6,9 +6,8 @@ Every assertion inspects the files on disk or the service's history:
 
 - editing an exterior or a two-way interior link writes exactly its owning
   document, which records both meanings in one relationship;
-- the starting-room entry never gains a return, and an absent, malformed or
-  wrong-domain target is refused unwritten, naming the relationship and the
-  field;
+- an absent, malformed or wrong-domain target is refused unwritten, naming the
+  relationship and the field, and no starting-room entry command exists;
 - a referenced room refuses deletion and locates the declaring link; removing
   the link and then deleting the room are separate operations and nothing
   cascades;
@@ -135,13 +134,9 @@ class RelationshipProcessTests(unittest.TestCase):
         self.assertEqual([row for row in state["diagnostics"] if row["category"] == "structure"], [])
 
     @covers_requirement("map-editor-relationships::cross-layer-relationships-edit-one-owner-and-expose-both-meanings")
-    def test_the_start_entry_stays_one_way_and_invalid_targets_name_their_field(self):
+    def test_invalid_targets_name_their_field_and_save_nothing(self):
         editor = self.start()
         before = synthetic.tree_digest(self.workspace)
-        status, body = self.send(editor, "set_city_gate", SETTLEMENT, {"settlement_id": TOWN, "value": {
-            "node": YARD, "exit_key": "Gate", "exit_aliases": [], "return_label": "back"}})
-        self.assertEqual(status, 400)
-        self.assertIn("return_label", body["error"]["message"])
         cases = [
             ("set_exterior", INTERIOR, {"interior_id": HALL, "value": {
                 "room": FRONT, "node": f"settlement_node:{TOWN}:missing", "doorway_key": "d", "doorway_aliases": []}},
@@ -149,9 +144,6 @@ class RelationshipProcessTests(unittest.TestCase):
             ("set_exterior", INTERIOR, {"interior_id": HALL, "value": {
                 "room": FRONT, "node": BACK, "doorway_key": "d", "doorway_aliases": []}},
              "wrong_domain", "arguments.value.node", "exterior"),
-            ("set_city_gate", SETTLEMENT, {"settlement_id": TOWN, "value": {
-                "node": "Yard", "exit_key": "Gate", "exit_aliases": []}},
-             "invalid_endpoint", "arguments.value.node", "city_gate"),
         ]
         for name, document, arguments, code, field, relationship in cases:
             status, body = self.send(editor, name, document, arguments)
@@ -160,7 +152,17 @@ class RelationshipProcessTests(unittest.TestCase):
             self.assertEqual((row["code"], row["field_path"], row["relationship"], row["owner"]),
                              (code, field, relationship, document))
         self.assertEqual(self.changed(before), set())
-        self.assertEqual(self.data(SETTLEMENT)["city_gate"], synthetic.settlement_data()["city_gate"])
+
+    @covers_requirement("map-editor-relationships::cross-layer-relationships-edit-one-owner-and-expose-both-meanings")
+    def test_the_starting_room_entry_command_is_gone(self):
+        editor = self.start()
+        before = synthetic.tree_digest(self.workspace)
+        status, body = self.send(editor, "set_city_gate", SETTLEMENT, {
+            "settlement_id": TOWN, "value": {"node": YARD, "exit_key": "Gate", "exit_aliases": []}})
+        self.assertEqual(status, 404, body)
+        self.assertEqual(body["error"]["code"], "unknown_command")
+        self.assertIn("set_city_gate", body["error"]["message"])
+        self.assertEqual(self.changed(before), set())
 
     @covers_requirement("map-editor-relationships::deletion-requires-established-absence-of-incoming-static-references")
     def test_a_referenced_room_locates_its_link_which_is_removed_before_the_room(self):

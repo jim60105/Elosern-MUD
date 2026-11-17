@@ -29,7 +29,7 @@ Each discovered settlement document SHALL own its graph and location reference, 
 - **THEN** the absolute origin is `(9,22)`, its midpoint is `(10,23)`, its north-return approach is `(10,21)` and its west-return approach is `(12,23)`; replacing the mask with a single hash retains point-entry semantics with no obstacle cells
 
 #### Scenario: PLACE-SCHEMA removed duplicate authorities
-- **WHEN** a settlement supplies binding, wilderness_entry.origin, a non-integer offset or an offset with unknown keys
+- **WHEN** a settlement supplies binding, wilderness_entry.origin, a `city_gate` block, a non-integer offset or an offset with unknown keys
 - **THEN** schema validation rejects the candidate without coercion or legacy fallback; offset dx/dy accept signed integer cell deltas under the core integer bounds
 
 ### Requirement: A one-cell mask may declare a physical footprint

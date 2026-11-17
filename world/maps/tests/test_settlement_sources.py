@@ -81,10 +81,6 @@ wilderness_entry:
   gates:
     - return_direction: n
       destination_node: plaza
-city_gate:
-  node: plaza
-  exit_key: 廣場
-  exit_aliases: [幽月谷]
 """.lstrip()
 
 _THIRD_PATH = "content/maps/settlements/t_third.yaml"
@@ -312,6 +308,22 @@ class SettlementCandidateRejectionTests(unittest.TestCase):
         with self.assertRaises(AuthoringError) as caught:
             _build([_document(absolute_origin)])
         self.assertIn("unknown_field", {item.code for item in caught.exception.diagnostics})
+
+    @covers_requirement(
+        "map-settlement-sources::settlement-documents-own-complete-local-map-declarations"
+    )
+    def test_a_retired_city_gate_block_is_refused(self):
+        retired = _THIRD.replace(
+            "wilderness_entry:", "city_gate: null\nwilderness_entry:", 1
+        )
+        with self.assertRaises(AuthoringError) as caught:
+            _build([_document(retired)])
+        [row] = [
+            item
+            for item in caught.exception.diagnostics
+            if item.code == "unknown_field"
+        ]
+        self.assertEqual(row.field_path, "city_gate")
 
     def test_an_unregistered_scene_archetype_is_refused(self):
         self._rejected(

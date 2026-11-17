@@ -115,7 +115,7 @@ the district's canonical visited identity without editing this document.
 
 `location_ref`, optional `options{map_visual_range, map_mode}`, optional
 `exit_prototype` (`prototype_parent: xyz_exit`, `typeclass`), `nodes{}`,
-`roads[]`, optional `wilderness_entry`, optional `city_gate`.
+`roads[]`, optional `wilderness_entry`.
 
 A settlement document authors **no geographic coordinate and no world frame**.
 `location_ref` names the location that owns the cell, the unique `anchor_room`
@@ -155,7 +155,6 @@ untouched node by the negative local delta; the mask and the location stay put.
   approach cell. A flagged one-`#` mask is a physical footprint: the cell is an
   obstacle and each gate is taken from the neighbouring approach cell. The
   field on any other mask is a semantic diagnostic and has no effect.
-- `city_gate`: `node`, `exit_key`, `exit_aliases[]`.
 
 ### interior
 

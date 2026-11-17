@@ -91,8 +91,8 @@ def test_wrong_domain_names_the_domain_the_identity_is_authored_under():
 
 
 def test_unknown_domain_is_rejected_before_lookup():
-    error = _rejected(UNKNOWN_DOMAIN, QualifiedRef(domain="city_gate", object_id="x"))
-    assert "domain 'city_gate'" in str(error)
+    error = _rejected(UNKNOWN_DOMAIN, QualifiedRef(domain="unregistered", object_id="x"))
+    assert "domain 'unregistered'" in str(error)
     assert UNKNOWN_DOMAIN in str(error.code)
 
 

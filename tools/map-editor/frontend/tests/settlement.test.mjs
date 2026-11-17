@@ -59,7 +59,6 @@ function world() {
         id: "town",
         relative_path: S,
         location_ref: "place",
-        city_gate: { node: "a" },
         wilderness_entry: { gates: [{ return_direction: "n", destination_node: "a" }] },
         nodes: [node("a", 0, 0), node("b", 300, 400), node("c", 300, 0), node("lone", 900, 900)],
         roads: [
@@ -67,7 +66,7 @@ function world() {
           { id: "b>a", source: "b", destination: "a", direction: "s", bends: [[300, 0]], length_m: 700 },
         ],
       },
-      { id: "other", relative_path: "content/maps/settlements/other.yaml", location_ref: "place", city_gate: null, wilderness_entry: null, nodes: [node("x", 0, 0, { qualified_ref: "settlement_node:other:x" })], roads: [] },
+      { id: "other", relative_path: "content/maps/settlements/other.yaml", location_ref: "place", wilderness_entry: null, nodes: [node("x", 0, 0, { qualified_ref: "settlement_node:other:x" })], roads: [] },
     ],
     interiors: [
       { id: "hall", relative_path: "content/maps/interiors/hall.yaml", rooms: [], connections: [], exterior: { settlement: "town", node: "b", room: "front" } },
@@ -184,11 +183,11 @@ test("the selected road shows its bend handles and chevrons; nodes are draggable
   assert.equal(settlementScene(settlement, [bendRef(road, 0)]).marks.filter((mark) => mark.kind === "handle").length, 1);
   // The object list holds nodes, then roads, then the settlement's entrances.
   assert.deepEqual(chosen.items.map((item) => item.id).filter((id) => id.startsWith("road:")), [roadRef("town", "a", "b"), road]);
-  assert.deepEqual(chosen.items.map((item) => item.id).slice(-2), ["gate:town:n", "city_gate:town"]);
+  assert.deepEqual(chosen.items.map((item) => item.id).slice(-1), ["gate:town:n"]);
 });
 
 test("an empty new map draws nothing and fabricates nothing", () => {
-  const empty = { id: "camp", relative_path: "content/maps/settlements/camp.yaml", city_gate: null, wilderness_entry: null, nodes: [], roads: [] };
+  const empty = { id: "camp", relative_path: "content/maps/settlements/camp.yaml", wilderness_entry: null, nodes: [], roads: [] };
   const scene = settlementScene(empty);
   assert.deepEqual([scene.marks, scene.links, scene.items], [[], [], []]);
   assert.ok(Number.isFinite(scene.bounds.minX));
@@ -209,11 +208,11 @@ test("roads and bends are catalogued under their settlement document", () => {
 test("a node with map references lists every blocker and refuses deletion", () => {
   const data = world();
   const rows = (refs) => nodeBlockers(data, refs);
-  // a: both roads, the wilderness gate and the city gate, each linked to the
-  // declaration that is removed separately.
+  // a: both roads and the wilderness gate, each linked to the declaration
+  // that is removed separately.
   const forA = rows(["settlement_node:town:a"]);
-  assert.equal(forA.length, 4);
-  assert.deepEqual(forA.map((row) => row.ref), [roadRef("town", "a", "b"), roadRef("town", "b", "a"), "gate:town:n", "city_gate:town"]);
+  assert.equal(forA.length, 3);
+  assert.deepEqual(forA.map((row) => row.ref), [roadRef("town", "a", "b"), roadRef("town", "b", "a"), "gate:town:n"]);
   assert.ok(forA.every((row) => row.source === S && row.external === false));
   // b: two roads and the interior exterior, declared by the interior.
   const forB = rows(["settlement_node:town:b"]);
@@ -228,7 +227,7 @@ test("a node with map references lists every blocker and refuses deletion", () =
     internalBlocks: true,
   });
   assert.equal(refusal.key, REFERENCED);
-  assert.equal(refusal.count, 4);
+  assert.equal(refusal.count, 3);
 });
 
 test("road and bend removals are their own settlement commands", () => {

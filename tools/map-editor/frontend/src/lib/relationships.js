@@ -12,21 +12,19 @@
 import { compassLabel, findSettlement, settlementDocument } from "./settlement.js";
 import { findInterior, interiorDocument, roomName } from "./interior.js";
 import { footprintRef } from "./continent.js";
-import { cityGateRef, exteriorRef, gateRef, linkRef } from "./relationship_refs.js";
+import { exteriorRef, gateRef, linkRef } from "./relationship_refs.js";
 
 const ID = "[a-z][a-z0-9_]*";
 const GATE = new RegExp(`^gate:(${ID}):(${ID})$`);
-const CITY_GATE = new RegExp(`^city_gate:(${ID})$`);
 const EXTERIOR = new RegExp(`^exterior:(${ID})$`);
 const LINK = new RegExp(`^interior_link:(${ID}):(${ID})>(${ID}):(${ID})/(.+)$`);
 
-export { cityGateRef, exteriorRef, gateRef, linkRef };
+export { exteriorRef, gateRef, linkRef };
 export const nodeRef = (settlementId, nodeId) => `settlement_node:${settlementId}:${nodeId}`;
 export const roomRef = (interiorId, roomId) => `interior_room:${interiorId}:${roomId}`;
 
 export const KINDS = Object.freeze({
   gate: "野外入口",
-  city_gate: "起始房間入口",
   exterior: "外部入口",
   interior_link: "室內連結",
 });
@@ -36,8 +34,6 @@ export function parseRelationshipRef(ref) {
   const text = ref ?? "";
   let match = GATE.exec(text);
   if (match) return { kind: "gate", settlementId: match[1], direction: match[2] };
-  match = CITY_GATE.exec(text);
-  if (match) return { kind: "city_gate", settlementId: match[1] };
   match = EXTERIOR.exec(text);
   if (match) return { kind: "exterior", interiorId: match[1] };
   match = LINK.exec(text);
@@ -97,58 +93,34 @@ function roomEnd(interior, interiorId, roomId, label) {
 export function relationshipView(world, ref) {
   const parsed = parseRelationshipRef(ref);
   if (!world || !parsed) return null;
-  if (parsed.kind === "gate" || parsed.kind === "city_gate") {
+  if (parsed.kind === "gate") {
     const settlement = findSettlement(world, parsed.settlementId);
     if (!settlement) return null;
     const base = { ref, kind: parsed.kind, kindLabel: KINDS[parsed.kind], ownerId: settlement.id, ownerPath: settlement.relative_path };
-    if (parsed.kind === "gate") {
-      const gate = (settlement.wilderness_entry?.gates ?? []).find((row) => row.return_direction === parsed.direction);
-      if (!gate) return null;
-      const cell = gate.approach_cell;
-      const wild = {
-        role: "wilderness",
-        domain: "continent",
-        domainLabel: "野外",
-        // The wilderness end is a computed cell, not an object: it is
-        // reached through the settlement's footprint on the continent.
-        ref: settlement.footprint ? footprintRef(settlement.id) : null,
-        mapId: null,
-        name: cell ? `野外格 (${cell[0]}, ${cell[1]})` : "野外格（無法計算）",
-        present: Boolean(cell),
-        label: `往 ${compassLabel(gate.return_direction)} 進入據點`,
-        position: cell ? `格 (${cell[0]}, ${cell[1]})（1 km 格；核心依佔地與方向計算，唯讀）` : null,
-      };
-      const node = nodeEnd(settlement, gate.destination_node, `往 ${compassLabel(outward(gate.return_direction))} 回到野外`);
-      return {
-        ...base,
-        title: `野外 ⇄ ${node.name}`,
-        twoWay: true,
-        oneWayFixed: false,
-        values: { direction: gate.return_direction, node: node.ref },
-        endpoints: [wild, node],
-      };
-    }
-    const gate = settlement.city_gate;
+    const gate = (settlement.wilderness_entry?.gates ?? []).find((row) => row.return_direction === parsed.direction);
     if (!gate) return null;
-    const start = {
-      role: "start",
-      domain: null,
-      domainLabel: "起始房間",
-      ref: null,
+    const cell = gate.approach_cell;
+    const wild = {
+      role: "wilderness",
+      domain: "continent",
+      domainLabel: "野外",
+      // The wilderness end is a computed cell, not an object: it is
+      // reached through the settlement's footprint on the continent.
+      ref: settlement.footprint ? footprintRef(settlement.id) : null,
       mapId: null,
-      name: "起始房間",
-      present: true,
-      label: `出口「${gate.exit_key}」${aliasText(gate.exit_aliases)}`,
-      position: null,
+      name: cell ? `野外格 (${cell[0]}, ${cell[1]})` : "野外格（無法計算）",
+      present: Boolean(cell),
+      label: `往 ${compassLabel(gate.return_direction)} 進入據點`,
+      position: cell ? `格 (${cell[0]}, ${cell[1]})（1 km 格；核心依佔地與方向計算，唯讀）` : null,
     };
-    const node = nodeEnd(settlement, gate.node, "沒有回程（單向）");
+    const node = nodeEnd(settlement, gate.destination_node, `往 ${compassLabel(outward(gate.return_direction))} 回到野外`);
     return {
       ...base,
-      title: `起始房間 → ${node.name}`,
-      twoWay: false,
-      oneWayFixed: true,
-      values: { node: node.ref, exit_key: gate.exit_key, exit_aliases: [...(gate.exit_aliases ?? [])] },
-      endpoints: [start, node],
+      title: `野外 ⇄ ${node.name}`,
+      twoWay: true,
+      oneWayFixed: false,
+      values: { direction: gate.return_direction, node: node.ref },
+      endpoints: [wild, node],
     };
   }
   const interior = findInterior(world, parsed.interiorId);
@@ -207,7 +179,6 @@ export function relationshipRefs(world) {
   const refs = [];
   for (const settlement of world?.settlements ?? []) {
     for (const gate of settlement.wilderness_entry?.gates ?? []) refs.push(gateRef(settlement.id, gate.return_direction));
-    if (settlement.city_gate) refs.push(cityGateRef(settlement.id));
   }
   for (const interior of world?.interiors ?? []) {
     if (interior.exterior) refs.push(exteriorRef(interior.id));
@@ -242,7 +213,7 @@ export function otherEnd(view, { domain, mapId }) {
 // The ends whose endpoint can be changed (更換端點…), by role.
 export function editableRoles(view) {
   if (!view) return [];
-  if (view.kind === "gate" || view.kind === "city_gate") return ["node"];
+  if (view.kind === "gate") return ["node"];
   if (view.kind === "exterior") return ["node", "room"];
   return ["source", "target"];
 }
@@ -251,7 +222,7 @@ export function editableRoles(view) {
 // relationship requires it, the one map the end must be on.
 export function endpointRule(view, role) {
   if (!view) return null;
-  if (view.kind === "gate" || view.kind === "city_gate") return { kind: "node", mapId: view.ownerId };
+  if (view.kind === "gate") return { kind: "node", mapId: view.ownerId };
   if (view.kind === "exterior") return role === "room" ? { kind: "room", mapId: view.ownerId } : { kind: "node", mapId: null };
   if (role === "source") return { kind: "room", mapId: view.ownerId };
   return { kind: "room", mapId: null };
@@ -302,7 +273,6 @@ export const setGate = (settlementId, direction, value) =>
 export const deleteGate = (settlementId, direction) =>
   settlementCommand("delete_wilderness_gate", settlementId, { return_direction: direction });
 export const removeWildernessEntry = (settlementId) => settlementCommand("remove_wilderness_entry", settlementId, {});
-export const setCityGate = (settlementId, value) => settlementCommand("set_city_gate", settlementId, { value });
 export const setExterior = (interiorId, value) => interiorCommand("set_exterior", interiorId, { value });
 export const createLink = (interiorId, source, target, label, returnLabel = null) =>
   interiorCommand("create_interior_link", interiorId, { source, target, label, return_label: returnLabel });
@@ -320,10 +290,6 @@ export function editCommand(view, patch) {
       descriptor: setGate(view.ownerId, view.values.direction, { return_direction: values.direction, node: values.node }),
       ref: gateRef(view.ownerId, values.direction),
     };
-  }
-  if (view.kind === "city_gate") {
-    const value = { node: values.node, exit_key: values.exit_key, exit_aliases: values.exit_aliases };
-    return { descriptor: setCityGate(view.ownerId, value), ref: view.ref };
   }
   if (view.kind === "exterior") {
     const value = { room: values.room, node: values.node, doorway_key: values.doorway_key, doorway_aliases: values.doorway_aliases };
@@ -344,7 +310,6 @@ export function relationshipRemoval(world, ref) {
   const view = relationshipView(world, ref);
   if (!view) return null;
   if (view.kind === "gate") return deleteGate(view.ownerId, view.values.direction);
-  if (view.kind === "city_gate") return setCityGate(view.ownerId, null);
   if (view.kind === "exterior") return setExterior(view.ownerId, null);
   return deleteLink(view.ownerId, view.values);
 }
@@ -359,7 +324,7 @@ export function exteriorCardPosition(roomPosition) {
 // (settlement) or room (interior); typed values live on in its defaults.
 export function entranceRequest(mapId, objectId, domain = "interior") {
   if (domain === "settlement") {
-    return { type: "entrance", defaults: { kind: "gate", node: nodeRef(mapId, objectId), direction: "", exit_key: "", exit_aliases: "" } };
+    return { type: "entrance", defaults: { kind: "gate", node: nodeRef(mapId, objectId), direction: "" } };
   }
   return {
     type: "entrance",

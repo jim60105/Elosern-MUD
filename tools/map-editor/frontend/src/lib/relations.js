@@ -9,7 +9,7 @@
 //        source (workspace-relative declaring document), external }
 
 import { compassLabel } from "./settlement.js";
-import { cityGateRef, exteriorRef, gateRef, linkRef } from "./relationship_refs.js";
+import { exteriorRef, gateRef, linkRef } from "./relationship_refs.js";
 
 function roomName(interior, roomId) {
   return interior.rooms.find((room) => room.id === roomId)?.name_zh ?? roomId;
@@ -78,9 +78,6 @@ function nodeRelations(world, settlement, node) {
         external: false,
       });
     }
-  }
-  if (settlement.city_gate?.node === node.id) {
-    incoming.push({ kind: "城門", label: settlement.city_gate.exit_key ?? node.key, ref: cityGateRef(settlement.id), source: path, external: false });
   }
   for (const gate of settlement.wilderness_entry?.gates ?? []) {
     if (gate.destination_node === node.id) {

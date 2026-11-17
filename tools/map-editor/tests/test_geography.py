@@ -350,7 +350,6 @@ def test_the_fresh_baseline_guard_refuses_an_anchor_the_snapshot_has_not_seen(wo
     outpost["location_ref"] = fixture.BARE_LOCATION_ID
     outpost["nodes"]["gate"]["anchor_key"] = fixture.BARE_LOCATION_ID
     outpost["wilderness_entry"] = None
-    outpost["city_gate"] = None
     (workspace / "content/maps/settlements/synthetic_outpost.yaml").write_text(
         fixture.yaml_text(outpost), encoding="utf-8"
     )

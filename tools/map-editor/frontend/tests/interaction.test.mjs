@@ -55,7 +55,6 @@ function fixture() {
         id: "town",
         relative_path: S,
         location_ref: "place",
-        city_gate: { node: "gate", exit_key: "Gate" },
         wilderness_entry: { gates: [{ return_direction: "n", destination_node: "gate" }] },
         nodes: [
           { id: "gate", qualified_ref: "settlement_node:town:gate", key: "Gate", anchor_key: "place", local_m: [0, 0], world_m: [1500, 1500] },

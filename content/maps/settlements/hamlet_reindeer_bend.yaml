@@ -44,4 +44,3 @@ wilderness_entry:
   gates:
   - return_direction: w
     destination_node: crossing
-city_gate:

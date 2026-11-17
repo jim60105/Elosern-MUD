@@ -184,7 +184,3 @@ wilderness_entry:
   gates:
     - return_direction: n
       destination_node: hidden_path
-city_gate:
-  node: hidden_path
-  exit_key: 隱密小徑
-  exit_aliases: [祕徑, 幽徑]

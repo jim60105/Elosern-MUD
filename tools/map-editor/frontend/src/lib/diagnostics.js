@@ -16,7 +16,7 @@
 
 import { DISCONNECTED } from "./workspace_client.js";
 import { REFERENCE_CONTEXT_PATH } from "./paths.js";
-import { cityGateRef, exteriorRef } from "./relationship_refs.js";
+import { exteriorRef } from "./relationship_refs.js";
 
 export const CLASSES = Object.freeze([
   { key: "structure", label: "結構錯誤", glyph: "✕", tone: "seal" },
@@ -51,7 +51,6 @@ function objectTarget(catalog, ref) {
 // Entrance fields whose diagnostic locates one relationship object (a
 // field naming a list of several, such as the gates or links, keeps its map).
 const RELATIONSHIP_FIELDS = Object.freeze([
-  { prefix: "city_gate", owner: "settlement", ref: (id) => cityGateRef(id) },
   { prefix: "exterior", owner: "interior", ref: (id) => exteriorRef(id) },
 ]);
 

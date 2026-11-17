@@ -183,7 +183,6 @@ def settlement_data() -> dict:
             "offset": {"dx": 0, "dy": 0},
             "gates": [{"return_direction": "n", "destination_node": "gate"}],
         },
-        "city_gate": {"node": "gate", "exit_key": "Gate", "exit_aliases": ["gate"]},
     }
 
 

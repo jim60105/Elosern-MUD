@@ -268,7 +268,7 @@ class CreateSettlement:
         options = _options(arguments["options"], "options")
         if options is not None:
             data["options"] = options
-        data.update({"nodes": {}, "roads": [], "wilderness_entry": None, "city_gate": None})
+        data.update({"nodes": {}, "roads": [], "wilderness_entry": None})
         try:
             text = serialize_document(document_from_data(envelope.document_id, data), None)
         except AuthoringError as error:
@@ -407,7 +407,7 @@ class MoveNodes(_Settlement):
 
 
 def same_document_references(data: dict[str, Any], node_ids: set[str], relative_path: str) -> list[dict[str, Any]]:
-    """Roads, gates and the city gate of one settlement that name the nodes."""
+    """Roads and gates of one settlement that name the nodes."""
 
     settlement_id = data["id"]
     rows: list[dict[str, Any]] = []
@@ -432,9 +432,6 @@ def same_document_references(data: dict[str, Any], node_ids: set[str], relative_
         if gate["destination_node"] in node_ids:
             row(gate["destination_node"], "wilderness_gate", gate["return_direction"],
                 f"wilderness_entry.gates[{index}].destination_node")
-    city_gate = data.get("city_gate")
-    if city_gate and city_gate["node"] in node_ids:
-        row(city_gate["node"], "city_gate", city_gate["node"], "city_gate.node")
     return rows
 
 

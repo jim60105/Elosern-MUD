@@ -67,9 +67,6 @@ wilderness_entry:
   gates:
     - return_direction: n
       destination_node: plaza
-city_gate:
-  node: plaza
-  exit_key: 廣場
 """.lstrip()
 
 #: The same map with the ``gate`` node moved 300 m further east.

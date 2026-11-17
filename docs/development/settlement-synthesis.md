@@ -252,8 +252,8 @@ the map and the object that contradicts its terrain.
 `generate` produces the coarse fit only: a footprint, the role nodes, gates and
 the directed roads between them. Bridges, district shape and appearance are
 finished by a person in the map editor. Node `key`s are role labels in zh-TW,
-`desc` stays empty for the prose pass, and `city_gate` is always empty. The
-output goes through the map-core codec, so it matches the editor's bytes.
+`desc` stays empty for the prose pass. The output goes through the map-core
+codec, so it matches the editor's bytes.
 
 Generation is deterministic and seeded by the location id: the seed is the first
 eight bytes of `sha256("settlement:<id>:v1")`, one `random.Random` is created per
@@ -432,7 +432,6 @@ source names:
 - a district landmark with `domain: settlement_node` and this `map_id`;
 - an incoming external reference keyed `settlement_node:<map>:<node>` in
   `content/map-reference-context.json`;
-- the map's `city_gate.node`;
 - the anchor node.
 
 When the reference index is absent, every existing node is protected, because
@@ -459,9 +458,9 @@ from the plan, and every road and wilderness gate that named it follows the
 keep. An unbound slot keeps its generated id; when that id collides with a
 final id it takes the first free `_2`, `_3`, … suffix, recorded in
 `renamed_slots`. An existing node that is neither bound nor protected is
-dropped and listed in `dropped`. `options`, `exit_prototype` and `city_gate`
-come from the existing document; nodes and roads follow plan order. The write
-uses the parsed retained tree, so the file's header comments survive.
+dropped and listed in `dropped`. `options` and `exit_prototype` come from the
+existing document; nodes and roads follow plan order. The write uses the
+parsed retained tree, so the file's header comments survive.
 
 **Worked synthetic example.** The test workspace has `synthetic_town` bound to
 `synthetic_place`, with the anchor `gate`, the node `yard`, an interior doorway

@@ -609,7 +609,7 @@ saved work in progress with its diagnostic.
 - **Identity.** Established IDs are read-only; new nodes need new IDs.
   `duplicate_node` copies the ordinary values (name, description, scene,
   typeclass, prototype) under a new ID and copies no relationship: no road,
-  gate, city gate, interior exterior or landmark. An `anchor_room` copy
+  gate, interior exterior or landmark. An `anchor_room` copy
   becomes a `grid_room` without an anchor key, because the anchor binds the
   one room of its location.
 - **Moves** keep the node ID, every authored road direction and every
@@ -622,8 +622,8 @@ saved work in progress with its diagnostic.
   and no road length.
 - **Deletion never cascades.** `delete_nodes` is refused (409
   `deletion_refused`, guard `internal`) while a road in either direction, a
-  wilderness gate, the city gate, an interior exterior or a district
-  landmark names one of the nodes, also for a road between two deleted
+  wilderness gate, an interior exterior or a district landmark names one of
+  the nodes, also for a road between two deleted
   nodes; remove those first. The shared internal guard on the fresh disk
   baseline also reports interior exteriors for any object-removing effect,
   including an undo. Then the execution-time external reference check
@@ -756,7 +756,6 @@ operation. Editing one relationship writes only its owner.
 | `set_wilderness_gate` | settlement | `settlement_id`, `return_direction` of an existing gate, `value` `{return_direction, node}` |
 | `delete_wilderness_gate` | settlement | `settlement_id`, `return_direction`. The last gate is refused (`last_gate`): an entry keeps at least one gate |
 | `remove_wilderness_entry` | settlement | `settlement_id`: the explicit removal of the whole entry, its footprint mask included (undoable) |
-| `set_city_gate` | settlement | `settlement_id`, `value` `{node, exit_key, exit_aliases}` or `null` |
 | `set_exterior` | interior | `interior_id`, `value` `{room, node, doorway_key, doorway_aliases}` or `null` |
 | `create_interior_link` | interior | `interior_id`, `source`, `target`, `label`, `return_label` (a name makes the link two-way in the same record, `null` one-way) |
 | `set_interior_link` | interior | `interior_id`, `source`, `target`, `label` of an existing link and `value` `{source, target, label, return_label}` |
@@ -764,21 +763,17 @@ operation. Editing one relationship writes only its owner.
 
 - **Endpoints are qualified IDs** (`settlement_node:<map>:<node>`,
   `interior_room:<map>:<room>`), never a display name or an unlabelled
-  coordinate. Gates and the start entry land on a node of their own
-  settlement. An exterior joins a room of its own interior to any settlement
+  coordinate. Gates land on a node of their own settlement. An exterior joins
+  a room of its own interior to any settlement
   node. A link joins a room of its own interior to any interior's room, never
   the same room. Each of the following answers 422 with nothing written: a
   refused endpoint (`invalid_endpoint`, `wrong_domain`, `wrong_map`,
   `unknown_target`, `self_loop`), a duplicate gate direction or link, and the
   last gate. The diagnostic names the `relationship` (`wilderness_gate`,
-  `city_gate`, `exterior`, `interior_link`), its `owner` document and the
-  argument `field_path`. An authoring-gate failure on an entrance field gets
+  `exterior`, `interior_link`), its `owner` document and the argument
+  `field_path`. An authoring-gate failure on an entrance field gets
   the same attribution, for example a target that disappeared from disk
   after the page loaded.
-- **The start entry is one-way.** The starting room is not a map object, so
-  its entry has no return field. A value that names one (`return_label`,
-  `return`, ...) is refused with 400, naming the key. The inspector states
-  that the entry cannot become two-way.
 - **Doorway names.** The game refuses two interiors that open onto the same
   settlement node under one doorway name (aliases are not compared) and the
   shared core authoring gate reports `duplicate_doorway` for such a candidate
@@ -798,7 +793,6 @@ return direction. It is read-only, and the browser derives no geometry.
 On the page, relationships use editor-local references:
 
 - `gate:<settlement>:<return_direction>`
-- `city_gate:<settlement>`
 - `exterior:<interior>`
 - `interior_link:<interior>:<source>><target_interior>:<target_room>/<percent-encoded label>`
 
@@ -806,23 +800,22 @@ They are catalogued on their owner's map. Search, the object list,
 selection preservation by identity and the OMP context therefore include
 them. Search matches a relationship by ID; searching a node or room name
 finds the object itself. The interior draws its exterior as a fixed, dashed
-card one layout column left of its room. The settlement lists its gates and
-start entry in the object list.
+card one layout column left of its room. The settlement lists its gates in the
+object list.
 
 - **Tools.** 入口 E (settlement) and 外部入口 E (interior) wait for a node or a
   room on the canvas or in the object list. Picking one selects it and opens
   the entrance form.
-  - On a settlement, the form offers a wilderness gate or the one-way start
-    entry. The gate's return direction is chosen, never inferred. The start
-    entry takes an exit name and aliases.
+  - On a settlement, the form offers a wilderness gate. Its return direction
+    is chosen, never inferred.
   - In an interior, the form offers the exterior doorway or an interior
     link. The doorway takes a node chosen with the qualified-object selector,
     a doorway name and aliases. The link takes a target chosen with the
     selector, a name, and, with 建立雙向, a return name.
   - The node and room inspectors open the same form through ⌂ 新入口.
 - **Relationship inspector.** The heading names both ends. The record rows
-  give the owner document as the one record and the direction: 雙向, 單向,
-  or a fixed 單向 for the start entry. Each endpoint shows:
+  give the owner document as the one record and the direction: 雙向 or 單向.
+  Each endpoint shows:
   - its domain;
   - its qualified ID as a link;
   - the end's name and directional label;
@@ -847,7 +840,7 @@ start entry in the object list.
   entrance from either side and link to the relationship: an interior's
   exterior appears on its node, and a link on both of its rooms. A refused
   node or room deletion links each entrance that must go first. Core
-  diagnostics on `city_gate` and `exterior` fields locate the relationship.
+  diagnostics on `exterior` fields locate the relationship.
 
 ### 3.12 Partition jobs
 

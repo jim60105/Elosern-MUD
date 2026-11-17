@@ -141,4 +141,3 @@ wilderness_entry:
     destination_node: northeast_gate
   - return_direction: n
     destination_node: south_gate
-city_gate:

@@ -1042,17 +1042,6 @@ def _structural_diagnostics(
                         object_id=settlement_id,
                     )
                 )
-        if settlement.city_gate is not None and settlement.city_gate.node not in node_ids:
-            diagnostics.append(
-                _diagnostic(
-                    "unknown_node",
-                    STRUCTURE,
-                    f"city_gate.node {settlement.city_gate.node!r} is not an authored node",
-                    document=settlement,
-                    field_path="city_gate.node",
-                    object_id=settlement_id,
-                )
-            )
         entry = settlement.wilderness_entry
         if entry is not None:
             seen_directions: set[str] = set()
