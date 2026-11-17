@@ -19,6 +19,10 @@ from world.rules.guild_config import (
     validate_price_scales,
     validate_shop_configs,
 )
+from world.tests.geography_fixture import publish_shipped_map_world
+
+
+publish_shipped_map_world()
 
 _SHIPPED_DIR = Path(__file__).resolve().parents[3] / "rules" / "rulebook" / "commerce"
 

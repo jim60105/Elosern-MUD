@@ -35,6 +35,10 @@ from world.rules.dialogue import (
     select_authored_topic,
 )
 from world.rules.dialogue_context import resolve_dialogue_context
+from world.tests.geography_fixture import publish_shipped_map_world
+
+
+publish_shipped_map_world()
 
 
 class AuthoredDialogueRuntimeTests(EvenniaTest):

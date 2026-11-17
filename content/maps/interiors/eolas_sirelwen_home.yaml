@@ -1,0 +1,21 @@
+# Permanent interior authored source (schema version 1).
+# The sole authority for the room's identity, name, prose, scene metadata and
+# its one exterior entrance relationship. The room id is the stable place key
+# a service record joins to, so a service record declares no geometry.
+version: 1
+kind: interior
+id: eolas_sirelwen_home
+rooms:
+  eolas_sirelwen_home:
+    name_zh: 希瑞爾溫的家
+    desc_zh: 石室開在試法坪邊上，牆上釘著幾塊寫滿字跡的石板，木架上晾著削好的杖坯。門邊的地面留著一道燒焦的痕跡，屋裡仍帶著火燎過的氣味。
+    scene_archetype: tavern_interior
+connections: []
+exterior:
+  settlement: elven_village_eolas
+  node: proving_ground
+  room: eolas_sirelwen_home
+  doorway_key: 希瑞爾溫的家
+  doorway_aliases:
+  - sirelwen
+  - sirelwen's home

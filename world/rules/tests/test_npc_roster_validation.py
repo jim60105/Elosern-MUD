@@ -32,6 +32,10 @@ from world.rules.npc_roster_validation import (
     validate_npc_roster,
 )
 from evennia.utils.test_resources import EvenniaTest
+from world.tests.geography_fixture import publish_shipped_map_world
+
+
+publish_shipped_map_world()
 
 
 def _make_valid_synthetic_universe(tmp_dir: Path):

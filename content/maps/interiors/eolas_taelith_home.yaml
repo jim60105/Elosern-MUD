@@ -1,0 +1,21 @@
+# Permanent interior authored source (schema version 1).
+# The sole authority for the room's identity, name, prose, scene metadata and
+# its one exterior entrance relationship. The room id is the stable place key
+# a service record joins to, so a service record declares no geometry.
+version: 1
+kind: interior
+id: eolas_taelith_home
+rooms:
+  eolas_taelith_home:
+    name_zh: 泰莉斯的家
+    desc_zh: 石室正對著窯場，架上排著燒好的碗與琉璃，木架上的墜子迎著光。窯火的暖氣從門口漫進來，屋裡待著比外頭舒服。
+    scene_archetype: tavern_interior
+connections: []
+exterior:
+  settlement: elven_village_eolas
+  node: kiln_yard
+  room: eolas_taelith_home
+  doorway_key: 泰莉斯的家
+  doorway_aliases:
+  - taelith
+  - taelith's home

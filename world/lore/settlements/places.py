@@ -435,12 +435,14 @@ def validate_place_registry(
 # dict, and sync_service_content processes roster rows in this order. The
 # capital's own slices run in terrace order — lower, middle, upper — because
 # the terraces are how the city is described and a place's terrace is the
-# first thing that locates it; the village slice stays last so every capital
-# row keeps its place ahead of the village homes' in the derived registries.
+# first thing that locates it; the village slices follow, 暗影谷村 then
+# 幽月谷村, so every capital row keeps its place ahead of the village homes' in
+# the derived registries.
 from world.lore.settlements.places_altoria_lower import ROWS as ALTORIA_LOWER_ROWS  # noqa: E402
 from world.lore.settlements.places_altoria_middle import ROWS as ALTORIA_MIDDLE_ROWS  # noqa: E402
 from world.lore.settlements.places_altoria_upper import ROWS as ALTORIA_UPPER_ROWS  # noqa: E402
 from world.lore.settlements.places_ciaran import ROWS as CIARAN_ROWS  # noqa: E402
+from world.lore.settlements.places_eolas import ROWS as EOLAS_ROWS  # noqa: E402
 
 PLACE_REGISTRY: dict[str, PlaceDefinition] = {
     definition.key: definition
@@ -449,6 +451,7 @@ PLACE_REGISTRY: dict[str, PlaceDefinition] = {
         *ALTORIA_MIDDLE_ROWS,
         *ALTORIA_UPPER_ROWS,
         *CIARAN_ROWS,
+        *EOLAS_ROWS,
         PlaceDefinition(
             key="altoria_silverfeather",
             settlement_key="capital_altoria",

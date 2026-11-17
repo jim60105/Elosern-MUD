@@ -38,6 +38,10 @@ from ._support import (
     _shipped_scales,
     raw_commerce,
 )
+from world.tests.geography_fixture import publish_shipped_map_world
+
+
+publish_shipped_map_world()
 
 
 class AssortmentRuleTests(unittest.TestCase):

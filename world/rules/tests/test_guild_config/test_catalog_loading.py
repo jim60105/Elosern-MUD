@@ -25,6 +25,10 @@ from ._support import (
     raw_commerce,
     raw_rulebook,
 )
+from world.tests.geography_fixture import publish_shipped_map_world
+
+
+publish_shipped_map_world()
 
 
 class CatalogLoadingTests(CatalogRegistryIsolation):

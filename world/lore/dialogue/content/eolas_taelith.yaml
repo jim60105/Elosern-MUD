@@ -1,0 +1,93 @@
+schema_version: 1
+greeting: 泰莉斯‧恩貝爾莉夫把手上的窯灰在圍布上抹掉，從坯架邊拿起一枚剛涼下來的琉璃墜，湊到門口的光裡：「你看，這顆的顏色燒出來了喔。進來坐，窯邊最暖。你是來看琉璃，還是來看燈？」她把墜子遞過來，指尖還帶著窯火的熱。
+topics:
+- topic_id: eolas_taelith_home.topic_01
+  keyword: 窯火
+  label: 窯火
+  fallback:
+    scene_id: eolas_taelith_home.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「這座窯是全村共用的嗎？平日都燒些什麼？」
+    - kind: speech
+      speaker: host
+      text: 「共用啊，誰有坯誰來排。碗、盤、琉璃墜、燈罩，村裡要用的東西大半從這座窯出來啦。」
+    - kind: speech
+      speaker: host
+      text: 「火不能一直猛，要看坯的厚薄。厚的多等一會，薄的快進快出，不然就裂。」
+    - kind: speech
+      speaker: actor
+      text: 「燒窯的時候，你就一直守在這裡？」
+    - kind: speech
+      speaker: host
+      text: 「守著。火候跑掉一次，一整架的坯就白做了。守到出窯，我才回去睡。」
+- topic_id: eolas_taelith_home.topic_02
+  keyword: 琉璃墜
+  label: 琉璃墜
+  fallback:
+    scene_id: eolas_taelith_home.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你頸上那枚幽月琉璃墜是自己燒的嗎？戴著它有什麼用？」
+    - kind: speech
+      speaker: host
+      text: 「自己燒的喔。琉璃在火裡定形，戴在身上，施法的時候心比較定，魔力也走得穩。」
+    - kind: narration
+      text: 她把墜子從頸間取下，放在掌心，琉璃裡的光隨著手勢移動。
+    - kind: speech
+      speaker: actor
+      text: 「所以這不是護符，是讓你自己靜下來的東西？」
+    - kind: speech
+      speaker: host
+      text: 「差不多啦。它不替我擋什麼，也不替我施法。我只是喜歡它貼在皮膚上的感覺。」
+    - kind: speech
+      speaker: host
+      text: 「夏天流汗的時候，它跟著滑來滑去，很舒服喔。」
+- topic_id: eolas_taelith_home.topic_03
+  keyword: 魔法燈
+  label: 魔法燈
+  fallback:
+    scene_id: eolas_taelith_home.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「架上的魔法燈，燈罩是這裡燒的？拿到深林裡真的管用嗎？」
+    - kind: speech
+      speaker: host
+      text: 「罩子由這裡吹成，玻璃薄，光透得遠。深林獸徑再往北走，樹密得看不見路，沒有燈會迷路啦。」
+    - kind: speech
+      speaker: host
+      text: 「裡頭的光由別人點，我只管外面這一層。罩子沒裂，光就散得開。」
+    - kind: speech
+      speaker: actor
+      text: 「燒壞的罩子多嗎？」
+    - kind: speech
+      speaker: host
+      text: 「多的喔。玻璃在火裡脆，一急就破。破的我不留，摔碎了再揉進新的坯裡。」
+- topic_id: eolas_taelith_home.topic_04
+  keyword: 收回
+  label: 收回
+  fallback:
+    scene_id: eolas_taelith_home.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「琉璃或燈用久了，能拿回來給你嗎？」
+    - kind: speech
+      speaker: host
+      text: 「我燒的琉璃，沒有裂的都可以拿回來，我算銅幣給你。燈也一樣，罩子完好我才收。」
+    - kind: speech
+      speaker: host
+      text: 「別處帶來的玻璃和燈我不收喔。火候不一樣，混進我的窯裡只會壞一爐。」
+    - kind: speech
+      speaker: actor
+      text: 「裂了一點的小痕，也不能收？」
+    - kind: speech
+      speaker: host
+      text: 「裂了就不行啦。你留著當擺設，或帶回山外。我這裡只收自己燒出來的東西。」
