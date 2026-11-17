@@ -27,6 +27,7 @@ from ._support import (
     _open_t_creation_scope,
     custom_payload,
 )
+from tools.spec_traceability import covers_requirement
 
 
 class CreationPayloadValidationTests(unittest.TestCase):
@@ -191,6 +192,63 @@ class RollNamePayloadValidationTests(unittest.TestCase):
             with self.subTest(payload=bad):
                 with self.assertRaises(CreationActionError):
                     validate_creation_roll_name_payload(bad)
+
+
+class PortraitPayloadValidationTests(unittest.TestCase):
+    """Structural gate for the exact ``creation.portrait.generate`` payload."""
+
+    _VALID = {
+        "race": _T_RACE,
+        "subrace": _T_SUBRACE,
+        "sex": "female",
+        "apparent_age": 24,
+        "custom_prompt": "  紅髮  ",
+    }
+
+    @covers_requirement(
+        "webclient-character-creation-ui::pending-characters-request-portraits-from-exact-draft-values"
+    )
+    def test_the_exact_payload_normalizes_its_prompt(self):
+        from web.webclient.actions.creation_actions import (
+            validate_creation_portrait_payload,
+        )
+
+        checked = validate_creation_portrait_payload(dict(self._VALID))
+        self.assertEqual(checked["custom_prompt"], "紅髮")
+        self.assertEqual(set(checked), set(self._VALID))
+        blank = validate_creation_portrait_payload(
+            {**self._VALID, "custom_prompt": "   "}
+        )
+        self.assertEqual(blank["custom_prompt"], "")
+
+    @covers_requirement(
+        "webclient-character-creation-ui::pending-characters-request-portraits-from-exact-draft-values"
+    )
+    def test_malformed_payloads_raise(self):
+        from web.webclient.actions.creation_actions import (
+            CreationActionError,
+            validate_creation_portrait_payload,
+        )
+
+        bad_payloads = (
+            {},
+            {**self._VALID, "actor": 1},
+            {key: self._VALID[key] for key in ("race", "subrace", "sex", "apparent_age")},
+            {**self._VALID, "race": ""},
+            {**self._VALID, "race": "r" * 65},
+            {**self._VALID, "subrace": 5},
+            {**self._VALID, "sex": "unknown"},
+            {**self._VALID, "apparent_age": True},
+            {**self._VALID, "apparent_age": 10001},
+            {**self._VALID, "custom_prompt": 7},
+            {**self._VALID, "custom_prompt": "bad\x07text"},
+            "not-a-dict",
+        )
+        for bad in bad_payloads:
+            with self.subTest(payload=bad):
+                with self.assertRaises(CreationActionError):
+                    validate_creation_portrait_payload(bad)
+
 
 if __name__ == "__main__":
     unittest.main()

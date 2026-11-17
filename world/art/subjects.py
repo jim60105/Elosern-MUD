@@ -11,7 +11,7 @@ on the character), never inferred from display-name uniqueness, quest role,
 database key shape, or LLM authorship (design D2, focused design §3.3).
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 from collections.abc import Mapping
 from types import SimpleNamespace
@@ -22,9 +22,13 @@ from world.lore.monster_visuals import (
     get_monster_visual_registry,
     is_registered_monster_visual_key,
 )
-from world.lore.races import RACE_REGISTRY, SUBRACE_REGISTRY
 from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY
 from world.prompts.loader import PromptUnavailableError, render_prompt
+from world.rules.creation_identity import (
+    DraftIdentity,
+    race_display_label,
+    resolve_draft_identity,
+)
 from world.rules.persona import _FIELD_LABELS, PersonaStore
 from world.art.gallery_prompt import (
     equipment_fragment,
@@ -253,6 +257,19 @@ def character_subject_for(entity) -> ArtSubject | None:
     raise ArtSubjectError(f"unknown portrait policy mode {mode!r}")
 
 
+def named_character_subject(entity) -> ArtSubject:
+    """The character's own named portrait subject, derived from its primary key.
+
+    Reading the policy would make the pending-character draft path depend on a
+    write it has not committed yet; the named stable key is defined as
+    ``str(pk)`` by both policy writers, so the identity is derivable without
+    any attribute read. This producer only validates the key contract.
+    """
+    stable_key = str(entity.pk)
+    _validate_subject_key(stable_key)
+    return ArtSubject(ArtSubjectKind.CHARACTER, stable_key)
+
+
 def _race_label(entity) -> str:
     """The prompt-facing RACE label, never the project-invented subrace name.
 
@@ -261,17 +278,7 @@ def _race_label(entity) -> str:
     bare race key resolves directly; an unregistered key falls back to the
     stored string exactly as before.
     """
-    subrace_key = entity.db.subrace
-    if subrace_key:
-        subrace = SUBRACE_REGISTRY.get(subrace_key)
-        if subrace is not None:
-            profile = RACE_REGISTRY.get(subrace.race_key)
-            if profile is not None:
-                return profile.display_name_zh
-    profile = RACE_REGISTRY.get(str(entity.db.race))
-    if profile is not None:
-        return profile.display_name_zh
-    return str(entity.db.race or "unknown race")
+    return race_display_label(entity.db.race, entity.db.subrace)
 
 
 # The persona appearance sub-keys that carry renderable visual truth: style
@@ -334,6 +341,104 @@ def _appearance_fragment(entity) -> str:
     return "\n" + "\n".join(lines)
 
 
+_PROPAGATE_UNAVAILABLE = object()
+
+
+def _render_character_description(
+    *,
+    race: str,
+    apparent_age: int,
+    appearance: str = "",
+    equipment: str = "",
+    custom: str = "",
+    fallback: str | None | object = _PROPAGATE_UNAVAILABLE,
+) -> str:
+    """Render the one shared character-description template.
+
+    Both the activated-character composition and the pending draft composition
+    go through this helper, so the template key, the placeholder set, and the
+    registry-driven prompt-unavailable fallback can never drift between them.
+    ``fallback`` lets the second (composed) render degrade to the first render's
+    already-successful base text instead of the bare registry sentence; the
+    base render passes the propagate sentinel so its caller can return BEFORE
+    any persona or equipment read (a broken library must never stoke a data
+    read the degraded path promises not to make).
+    """
+    try:
+        return render_prompt(
+            "art.character_description",
+            race=race,
+            age=str(apparent_age),
+            appearance=appearance,
+            equipment=equipment,
+            custom=custom,
+        )
+    except PromptUnavailableError:
+        if fallback is _PROPAGATE_UNAVAILABLE:
+            raise
+        return fallback if fallback is not None else f"{race}（{apparent_age} 歲）"
+
+
+@dataclass(frozen=True)
+class DraftPortraitValues:
+    """The validated draft identity snapshot one pending portrait renders from.
+
+    The frozen, self-validating input the pending-character request carries
+    into the common gallery seam: registry membership, race/subrace
+    compatibility, the race-permitted sex member, and the apparent-age bounds
+    are revalidated at construction through ``world.rules.creation_identity``,
+    so no service entry can enqueue a description from unchecked values. The
+    snapshot never reads or writes canonical character identity.
+    """
+
+    race: str
+    subrace: str
+    sex: str
+    apparent_age: int
+    #: The validated resolution of the four inputs (never caller-supplied).
+    identity: DraftIdentity = field(init=False, repr=False, compare=False)
+
+    def __post_init__(self) -> None:
+        identity = resolve_draft_identity(
+            self.race, self.subrace, self.sex, self.apparent_age
+        )
+        object.__setattr__(self, "identity", identity)
+
+    @classmethod
+    def from_identity(cls, identity: DraftIdentity) -> "DraftPortraitValues":
+        """Build the snapshot from an already-resolved identity."""
+        return cls(
+            race=identity.race,
+            subrace=identity.subrace,
+            sex=identity.sex,
+            apparent_age=identity.apparent_age,
+        )
+
+
+def draft_character_description(
+    values: DraftPortraitValues, custom_prompt: str = ""
+) -> str:
+    """One deterministic description for a pending-character portrait draft.
+
+    Composed EXCLUSIVELY from the validated request values: the registry
+    parent-race display label, the submitted apparent age, and the accepted
+    free text through the same ``art.character_description`` template the
+    activated path uses. No pending-shell identity, display name, persona,
+    equipment, concept text or canonical age is read, and the
+    appearance/equipment slots stay empty because creation has neither.
+    """
+    if not isinstance(values, DraftPortraitValues):
+        raise ArtSubjectError(
+            "a draft character description requires validated draft portrait values"
+        )
+    custom = validate_custom_prompt(custom_prompt)
+    return _render_character_description(
+        race=values.identity.race_label,
+        apparent_age=values.identity.apparent_age,
+        custom="\n" + custom if custom else "",
+    )
+
+
 def character_description(entity, apparent_age: int, *, fields, custom_prompt: str = "") -> str:
     """One deterministic description for a character portrait.
 
@@ -367,13 +472,8 @@ def character_description(entity, apparent_age: int, *, fields, custom_prompt: s
     custom_prompt = validate_custom_prompt(custom_prompt)
     race = _race_label(entity)
     try:
-        base = render_prompt(
-            "art.character_description",
-            race=race,
-            age=str(apparent_age),
-            appearance="",
-            equipment="",
-            custom="",
+        base = _render_character_description(
+            race=race, apparent_age=apparent_age, fallback=_PROPAGATE_UNAVAILABLE
         )
     except PromptUnavailableError:
         return f"{race}（{apparent_age} 歲）"
@@ -382,21 +482,18 @@ def character_description(entity, apparent_age: int, *, fields, custom_prompt: s
     custom = "\n" + custom_prompt if custom_prompt else ""
     if not (appearance or equipment or custom):
         return base
-    try:
-        return render_prompt(
-            "art.character_description",
-            race=race,
-            age=str(apparent_age),
-            appearance=appearance,
-            equipment=equipment,
-            custom=custom,
-        )
-    except PromptUnavailableError:
-        # observability: ignore R2: the library is frozen after the startup
-        # load, so a key can only turn unavailable between the two renders
-        # when a test swaps it; the appearance-free base is a valid
-        # deterministic description and must never lose the portrait.
-        return base
+    # observability: ignore R2: the library is frozen after the startup load,
+    # so a key can only turn unavailable between the two renders when a test
+    # swaps it; the appearance-free base is a valid deterministic description
+    # and must never lose the portrait.
+    return _render_character_description(
+        race=race,
+        apparent_age=apparent_age,
+        appearance=appearance,
+        equipment=equipment,
+        custom=custom,
+        fallback=base,
+    )
 
 
 def scene_description(subject: ArtSubject) -> str:

@@ -82,9 +82,9 @@ def build_production_action_registry() -> ActionRegistry:
     (``guild.register``, ``guild.quest_accept``, ``guild.quest_abandon``,
     ``guild.quest_turnin``, ``guild.quest_track``, ``guild.exam_request``,
     ``shop.buy``, ``shop.sell``),
-    the six creation adapters (``creation.preset``, ``creation.custom``,
+    the seven creation adapters (``creation.preset``, ``creation.custom``,
     ``creation.concept``, ``creation.roll_name``, ``creation.activate``,
-    ``creation.reset``), and the
+    ``creation.reset``, ``creation.portrait.generate``), and the
     fifteen exploration adapters (``explore.move``, ``explore.look``,
     ``explore.talk_open``, ``explore.talk_scripted``, ``explore.talk_freeform``,
     ``explore.dialogue_complete``, ``explore.dialogue_leave``, ``explore.party_invite``,
@@ -134,12 +134,14 @@ def build_production_action_registry() -> ActionRegistry:
         _creation_activate_adapter,
         _creation_concept_adapter,
         _creation_custom_adapter,
+        _creation_portrait_adapter,
         _creation_preset_adapter,
         _creation_reset_adapter,
         _creation_roll_name_adapter,
         validate_creation_activate_payload,
         validate_creation_concept_payload,
         validate_creation_custom_payload,
+        validate_creation_portrait_payload,
         validate_creation_preset_payload,
         validate_creation_reset_payload,
         validate_creation_roll_name_payload,
@@ -477,6 +479,17 @@ def build_production_action_registry() -> ActionRegistry:
             action_id="creation.reset",
             validate_payload=validate_creation_reset_payload,
             adapter=_creation_reset_adapter,
+            affected_panels=("creation",),
+        )
+    )
+    registry.register(
+        ActionSpec(
+            action_id="creation.portrait.generate",
+            validate_payload=validate_creation_portrait_payload,
+            adapter=_creation_portrait_adapter,
+            # A request changes only the creation panel's portrait availability
+            # facts (and, on refusal, its published reason); the async job
+            # completion publishes its own result later.
             affected_panels=("creation",),
         )
     )

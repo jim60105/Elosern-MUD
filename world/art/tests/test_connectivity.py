@@ -21,6 +21,7 @@ from tools.spec_traceability import covers_requirement
 
 from world.art import connectivity
 from world.art.connectivity import ProbeResult, probe
+from world.art.connectivity import read_cached_probe
 from world.art.fake_sd_client import FakeSDWebUIClient
 from world.art import gallery as gallery_api
 from world.art.queue import enqueue_gallery_job
@@ -132,6 +133,55 @@ class ProbeTests(unittest.TestCase):
         with _clock(), override_settings(ART_SD_PROBE_TIMEOUT_MS=2_000):
             self._probe()
         self.assertEqual(self.client.probe_calls, [2.0])
+
+    @covers_requirement("art-service-connectivity-surface::connectivity-state-never-gates-generation")
+    def test_read_cached_probe_is_null_without_a_verdict_and_never_probes(self):
+        with _clock():
+            self.assertIsNone(read_cached_probe())
+        self.assertEqual(self.client.probe_calls, [])
+
+    @covers_requirement("art-service-connectivity-surface::connectivity-state-never-gates-generation")
+    def test_read_cached_probe_returns_a_current_verdict_without_a_request(self):
+        with _clock() as clock:
+            self._probe()
+            clock.advance(30)
+            cached = read_cached_probe()
+        self.assertIsNotNone(cached)
+        self.assertTrue(cached.ok)
+        self.assertTrue(cached.from_cache)
+        self.assertEqual(cached.age_seconds, 30)
+        self.assertEqual(self.client.probe_calls, [5.0])
+
+    @covers_requirement("art-service-connectivity-surface::connectivity-state-never-gates-generation")
+    def test_read_cached_probe_never_extends_the_cache_life(self):
+        with _clock() as clock:
+            self._probe()
+            clock.advance(299)
+            self.assertIsNotNone(read_cached_probe())
+            clock.advance(2)
+            self.assertIsNone(read_cached_probe())
+            self._probe()
+        self.assertEqual(len(self.client.probe_calls), 2)
+
+    @covers_requirement("art-service-connectivity-surface::connectivity-state-never-gates-generation")
+    def test_read_cached_probe_misses_a_changed_configuration_without_probing(self):
+        with _clock():
+            self._probe()
+            with override_settings(ART_SD_BASE_URL="http://127.0.0.1:7861"):
+                self.assertIsNone(read_cached_probe())
+        self.assertEqual(self.client.probe_calls, [5.0])
+
+    @covers_requirement("art-service-connectivity-surface::connectivity-state-never-gates-generation")
+    def test_read_cached_probe_reports_a_resolution_failure_without_caching(self):
+        with patch(
+            "world.art.connectivity._settings_snapshot",
+            side_effect=RuntimeError("unreadable settings"),
+        ):
+            verdict = read_cached_probe()
+        self.assertFalse(verdict.ok)
+        self.assertEqual(verdict.code, "sd_internal_error")
+        self.assertEqual(verdict.host, connectivity.UNKNOWN_HOST)
+        self.assertIsNone(connectivity._cache_slot)
 
     @covers_requirement("art-service-connectivity-surface::connectivity-probing-is-bounded-cached-by-effective-configuration-and-never-raises")
     def test_userinfo_url_leaks_nothing_into_verdict_or_cache(self):

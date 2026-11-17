@@ -39,7 +39,7 @@ One validated service seam SHALL enqueue every gallery-bearing kind through type
 - **THEN** a typed error is raised naming the undeclared capability, no record is created, and no prompt is rendered
 
 #### Scenario: An ineligible subject is rejected deterministically
-- **WHEN** a gallery image is requested for a character whose `age` or `apparent_age` is missing or non-integer, or for an entity carrying no portrait subject
+- **WHEN** a gallery image is requested for an activated character whose `age` or `apparent_age` is missing or non-integer, for a pending character without a validated draft-portrait input, or for an entity carrying no portrait subject
 - **THEN** a typed error is raised, no record is created, and no prompt content is produced
 
 #### Scenario: A kind declaring no gallery is refused at the seam
@@ -49,7 +49,7 @@ One validated service seam SHALL enqueue every gallery-bearing kind through type
 #### Scenario: Preconditions are read from the capability declaration
 - **WHEN** the seam enforces any precondition
 - **THEN** it SHALL be read from the subject kind's capability declaration rather than from a comparison against a particular kind
-- **AND** it SHALL re-check the canonical age pair through the canonical-age validator for a kind that declares the age precondition, and SHALL NOT read age attributes for a kind that does not
+- **AND** it SHALL re-check the canonical age pair through the canonical-age validator for a kind that declares the age precondition, except an owned pending-character request carrying the exact validated draft-portrait input checks its submitted apparent age instead, and SHALL NOT read age attributes for a kind that does not
 - **AND** it SHALL validate a supplied field selection against the catalog for a kind that declares field-selection support, and SHALL reject a non-empty selection with a typed error for a kind that does not
 - **AND** it SHALL accept free-form prompt text for a kind that declares free-text support, and SHALL reject non-empty text with a typed error for a kind that does not
 - **AND** it SHALL validate a supplied binding for a kind that declares binding support, and SHALL reject a non-`None` binding with a typed error for a kind that does not
@@ -84,6 +84,14 @@ One validated service seam SHALL enqueue every gallery-bearing kind through type
 #### Scenario: Manual generation bypasses official suppression
 - **WHEN** a subject presents a valid official default and the user requests generation
 - **THEN** one job is queued and settles a runtime card; official bytes remain unchanged, and a stored explicit official choice still wins
+
+#### Scenario: A pending-character request uses validated draft values
+- **WHEN** the rules owner supplies a pending character’s validated race/subrace/sex/apparent-age input and free text through the common generation seam
+- **THEN** the request queues one unbound image with empty requested fields and no supplied face rectangle; no canonical identity attribute is read as the draft identity or temporarily assigned
+
+#### Scenario: Draft regeneration replaces only its previous creation image
+- **WHEN** a subsequent draft request settles successfully while a previous creation-owned card exists
+- **THEN** the new card becomes the subject default and the previous creation-owned card is removed; unrelated cards and official preferences are unchanged, and failure preserves the previous card
 
 ### Requirement: Generation while the image server is unreachable is a reported failure, never a gate
 `request_gallery_image` SHALL NOT consult the connectivity probe and SHALL NOT import

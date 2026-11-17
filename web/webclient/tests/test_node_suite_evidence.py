@@ -241,6 +241,38 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         self.assertIn("pass", result.stdout)
 
     @covers_requirement(
+        "webclient-input-narrative::creation-portrait-requests-echo-a-bounded-action-label"
+    )
+    def test_creation_portrait_echo_evidence_passes(self):
+        # The draft portrait request's one echo line
+        # (creation-draft-portrait-request): the catalog resolves the
+        # activating control's bounded label (with its literal fallback), the
+        # prompt text and every draft identity value stay out of the line, and
+        # the per-surface store table proves one admitted dispatch appends
+        # exactly that line while local drawer/dock interactions append none.
+        result = subprocess.run(
+            [
+                "node",
+                "--test",
+                str(REPO_ROOT / "web/static/webclient/js/tests/command_echo.test.js"),
+            ],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            "command-echo Node suite failed:\n" + result.stdout + result.stderr,
+        )
+        self.assertIn("pass", result.stdout)
+        self._run_single_vitest_file(
+            "web/webclient-app/tests/store/command_echo_surfaces.test.js",
+            "creation portrait echo surface",
+        )
+
+    @covers_requirement(
         "webclient-pointer-activation::every-action-dock-surface-renders-exactly-the-keyboard-router-s-current-menu-frame",
         "webclient-pointer-activation::the-action-dock-is-a-single-composite-widget-that-cannot-double-activate",
     )

@@ -195,6 +195,62 @@ def probe(*, force: bool = False) -> ProbeResult:
         )
 
 
+def _current_entry(
+    entry: tuple[str, ProbeResult, float] | None,
+    *,
+    fingerprint: str,
+    now: float,
+    ttl_seconds: float,
+) -> ProbeResult | None:
+    """The cached verdict when it is current for this configuration, else ``None``.
+
+    The ONE validity rule every reader shares with :func:`probe`: same
+    configuration fingerprint and an age inside ``0 <= age < ttl``. A clock
+    that never advanced (negative age) and an unknown entry are both invalid.
+    """
+    if entry is None:
+        return None
+    stored_fingerprint, stored_result, stored_ts = entry
+    if stored_fingerprint != fingerprint:
+        return None
+    age = now - stored_ts
+    if not 0 <= age < ttl_seconds:
+        return None
+    return replace(stored_result, age_seconds=age, from_cache=True)
+
+
+def read_cached_probe() -> ProbeResult | None:
+    """A pure snapshot of the current cached verdict, or ``None``.
+
+    Read-only by contract: it constructs no client, performs NO probe, writes
+    no cache entry and never extends an entry's life. An absent, expired or
+    configuration-mismatched entry yields ``None``; an effective configuration
+    that cannot even be resolved yields the same safe ``sd_internal_error``
+    verdict :func:`probe` would produce (without caching it). It shares the
+    one cache slot and the one validity rule with :func:`probe`, so the two
+    readers can never disagree about whether a verdict is current.
+    """
+    try:
+        snapshot = _settings_snapshot()
+        fingerprint = _fingerprint(snapshot)
+        with _cache_lock:
+            return _current_entry(
+                _cache_slot,
+                fingerprint=fingerprint,
+                now=_now(),
+                ttl_seconds=snapshot[4],
+            )
+    except Exception:  # noqa: BLE001 - a verdict, never an exception
+        return ProbeResult(
+            ok=False,
+            code="sd_internal_error",
+            host=UNKNOWN_HOST,
+            checked_at=_FALLBACK_CHECKED_AT,
+            age_seconds=0.0,
+            from_cache=False,
+        )
+
+
 def _probe_locked(*, force: bool) -> ProbeResult:
     """Cache check + probe + slot write under one lock (design D1c).
 
@@ -217,11 +273,15 @@ def _probe_locked(*, force: bool) -> ProbeResult:
             ttl_seconds = snapshot[4]
             now = _now()
             fingerprint = _fingerprint(snapshot)
-            if not force and _cache_slot is not None:
-                stored_fp, stored_result, stored_ts = _cache_slot
-                age = now - stored_ts
-                if 0 <= age < ttl_seconds and stored_fp == fingerprint:
-                    return replace(stored_result, age_seconds=age, from_cache=True)
+            if not force:
+                current = _current_entry(
+                    _cache_slot,
+                    fingerprint=fingerprint,
+                    now=now,
+                    ttl_seconds=ttl_seconds,
+                )
+                if current is not None:
+                    return current
             host = _target_host(snapshot[0])
             result, entry_fingerprint = _run_seam(snapshot, host)
         except Exception:  # noqa: BLE001 - verdict, not exception; may still

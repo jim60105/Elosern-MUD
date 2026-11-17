@@ -1,8 +1,9 @@
 """Exact creation action payload validators and narrow adapters.
 
-The six production creation actions are ``creation.preset``,
+The seven production creation actions are ``creation.preset``,
 ``creation.custom``, ``creation.concept``, ``creation.roll_name``,
-``creation.activate``, and ``creation.reset``. Each validator enforces an
+``creation.activate``, ``creation.reset``, and ``creation.portrait.generate``.
+Each validator enforces an
 exact bounded payload shape;
 each adapter re-resolves the owning account from the authenticated session's
 puppet, verifies that the puppet is an owned ``PlayerCharacter`` still pending
@@ -16,6 +17,12 @@ onto the creation panel (retool-concept-transient-fill D1). No adapter assigns
 ``.db`` attributes, traits, identity attributes, ``creation_pending``, or the
 draft directly, and no payload accepts an actor, account, session, host, skill,
 equipment, magic-level, or calculated-stat field.
+
+``creation.portrait.generate`` is the one admission that writes anything at
+all during creation, and it writes only through the rules owner
+(``world.rules.creation_portrait``): a bounded portrait policy, one gallery
+job, and the bounded receipt. It never touches canonical identity, the saved
+draft, the transient proposal, or the activation confirmation.
 """
 
 from random import Random
@@ -24,6 +31,7 @@ from typing import Any
 from twisted.internet.defer import Deferred
 
 from typeclasses.characters import PlayerCharacter
+from world.art.gallery_prompt import GalleryPromptError, validate_custom_prompt
 from world.lore.races import RACE_REGISTRY, SUBRACE_REGISTRY
 from world.lore.sex import SEX_VALUES
 from world.rules.character_creation import (
@@ -36,6 +44,11 @@ from world.rules.character_creation import (
     resolve_starting_profile,
 )
 from world.rules.creation_messages import rejection_code, rejection_message
+from world.rules.creation_portrait import (
+    DraftPortraitRequest,
+    PortraitServiceUnavailable,
+    request_draft_portrait,
+)
 from world.rules.creation_wizard import (
     activate_draft,
     clear_draft,
@@ -293,6 +306,54 @@ def validate_creation_roll_name_payload(payload: dict[str, Any]) -> dict[str, An
                 value, field, MAX_KEY_CODE_POINTS
             )
     return checked
+
+
+def validate_creation_portrait_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """Validate the exact ``creation.portrait.generate`` payload.
+
+    Structural and vocabulary layer only (matching the roll-name precedent):
+    exactly ``race``, ``subrace``, ``sex``, ``apparent_age`` and
+    ``custom_prompt``. Race/subrace are bounded non-empty identifiers; sex is a
+    concrete member of the shared sex vocabulary (whether the chosen race
+    permits it is the service's semantic check); the apparent age is the exact
+    creation range excluding booleans; and the prompt runs through the shared
+    gallery prompt validator, so an over-bound or control-bearing text is
+    rejected here and an empty/whitespace-only value normalizes to the legal
+    no-op. No subject, actor, age, binding, field selection, face rectangle or
+    calculated stat is accepted.
+    """
+    if not isinstance(payload, dict):
+        raise CreationActionError("creation.portrait.generate payload must be an object")
+    keys = {"race", "subrace", "sex", "apparent_age", "custom_prompt"}
+    if set(payload) != keys:
+        raise CreationActionError(
+            "creation.portrait.generate requires exactly race, subrace, sex, "
+            "apparent_age, and custom_prompt"
+        )
+    race = _require_non_empty_string(payload["race"], "race", MAX_KEY_CODE_POINTS)
+    subrace = _require_non_empty_string(
+        payload["subrace"], "subrace", MAX_KEY_CODE_POINTS
+    )
+    sex = payload["sex"]
+    if not isinstance(sex, str) or sex not in SEX_VALUES:
+        raise CreationActionError("sex must be one of: " + ", ".join(SEX_VALUES))
+    apparent_age = _require_int_in_range(
+        payload["apparent_age"],
+        "apparent_age",
+        APPARENT_AGE_MINIMUM,
+        APPARENT_AGE_MAXIMUM,
+    )
+    try:
+        custom_prompt = validate_custom_prompt(payload["custom_prompt"])
+    except GalleryPromptError as error:
+        raise CreationActionError(str(error)) from error
+    return {
+        "race": race,
+        "subrace": subrace,
+        "sex": sex,
+        "apparent_age": apparent_age,
+        "custom_prompt": custom_prompt,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -659,6 +720,43 @@ def _creation_reset_adapter(actor: Any, payload: dict[str, Any], session: Any = 
     return _success("draft_cleared", message, AFFECTED_CREATION)
 
 
+def _creation_portrait_adapter(
+    actor: Any, payload: dict[str, Any], session: Any = None
+) -> dict[str, Any]:
+    """Request one portrait for the pending character from its draft values.
+
+    The account comes from the authenticated session puppet (the rules owner
+    rechecks ownership and pending state inside its serialized unit). Nothing
+    here touches the saved draft, the transient proposal, or the activation
+    confirmation: a portrait request can neither satisfy nor invalidate the
+    activation gate. A known-unavailable service rejects with the bounded
+    retryable reason and declares the ``creation`` panel so the coordinator
+    publishes the changed availability BEFORE this correlated result.
+    """
+    del session
+    account = _pending_owner(actor)
+    if account is None:
+        return _rejected("ownership_rejected")
+    if not bool(getattr(actor, "creation_pending", False)):
+        return _rejected("already_complete")
+    request = DraftPortraitRequest(
+        race=payload["race"],
+        subrace=payload["subrace"],
+        sex=payload["sex"],
+        apparent_age=payload["apparent_age"],
+        custom_prompt=payload["custom_prompt"],
+    )
+    try:
+        request_draft_portrait(account, actor, request)
+    except (CharacterCreationError, GalleryPromptError) as error:
+        result = _rejected(error)
+        if isinstance(error, PortraitServiceUnavailable):
+            result["affected_panels"] = AFFECTED_CREATION
+        return result
+    message = "已送出肖像繪製要求，完成後會自動更新。"
+    return _success("portrait_requested", message, AFFECTED_CREATION)
+
+
 __all__ = [
     "AGE_MAXIMUM",
     "AGE_MINIMUM",
@@ -673,6 +771,7 @@ __all__ = [
     "validate_creation_activate_payload",
     "validate_creation_concept_payload",
     "validate_creation_custom_payload",
+    "validate_creation_portrait_payload",
     "validate_creation_preset_payload",
     "validate_creation_reset_payload",
     "validate_creation_roll_name_payload",

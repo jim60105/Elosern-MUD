@@ -798,6 +798,70 @@ def _delete_stored_file(subject: ArtSubject, identity: object) -> None:
             log_warn("gallery_card_file_delete_failed", context=context, exc=exc)
 
 
+def _append_card_locked(subject: ArtSubject, card_fields: dict) -> tuple[dict, list]:
+    """Append one validated card under an ALREADY-HELD ``gallery_lock``.
+
+    Returns the stored card plus the stored identities the append displaced
+    (only a capped kind displaces anything); the caller unlinks them after it
+    releases the lock and the surrounding serialization. The append rules are
+    exactly the public wrapper's.
+    """
+    record = _consolidate(subject)
+    existing_ids = _raw_image_ids(record) if record is not None else frozenset()
+    capability = gallery_kinds.capabilities_for(subject.kind.value)
+    if (
+        capability.has_gallery
+        and not capability.supports_bindings
+        and card_fields.get("binding") is not None
+    ):
+        raise GalleryRecordError("monster cards must be unbound")
+    # Provenance honesty (``gallery-monster-generation``): card
+    # ``requested_fields`` claims which data blocks produced the image, so
+    # the write boundary refuses a non-empty provenance for a kind whose
+    # declaration supports no field selection — a stored claim the kind
+    # could never have requested would make the card lie.
+    if (
+        capability.has_gallery
+        and not capability.supports_field_selection
+        and list(card_fields.get("requested_fields") or [])
+    ):
+        raise GalleryRecordError(
+            f"kind {capability.kind_value!r} supports no field selection; "
+            "a card's requested_fields must be empty"
+        )
+    stored = validate_card(card_fields, subject, existing_ids=existing_ids)
+    if record is None:
+        record = record_for(subject, create=True)
+    previous: list = list(record.db.cards or [])
+    stale: list = []
+    if capability.max_cards is not None:
+        record.db.cards = [stored]
+        record.db.default_image_id = stored["image_id"]
+        log_info(
+            "gallery_card_replaced",
+            context={"subject": subject.full(), "image_id": stored["image_id"]},
+        )
+        stale = [
+            entry.get("stored_identity") if isinstance(entry, Mapping) else None
+            for entry in previous
+        ]
+    else:
+        record.db.cards = [*previous, stored]
+        if not previous:
+            # The FIRST card of an empty record becomes its default
+            # automatically. That is not an explicit default SET, so it
+            # leaves a personal official selection alone (change
+            # ``official-art-personalization``): the chain still presents
+            # the selection, and a settled generation can never silently
+            # discard a choice the player made.
+            record.db.default_image_id = stored["image_id"]
+        log_info(
+            "gallery_card_appended",
+            context={"subject": subject.full(), "image_id": stored["image_id"]},
+        )
+    return dict(stored), stale
+
+
 def append_card(subject: ArtSubject, **card_fields) -> dict:
     """Validate and append one card, returning the stored form.
 
@@ -812,65 +876,101 @@ def append_card(subject: ArtSubject, **card_fields) -> dict:
     unlink takes the art publication gate, which is never acquired while
     holding ``gallery_lock`` (``world.art.publication`` lock order).
     """
-    stale: list = []
     with gallery_lock:
-        record = _consolidate(subject)
-        existing_ids = _raw_image_ids(record) if record is not None else frozenset()
-        capability = gallery_kinds.capabilities_for(subject.kind.value)
-        if (
-            capability.has_gallery
-            and not capability.supports_bindings
-            and card_fields.get("binding") is not None
-        ):
-            raise GalleryRecordError("monster cards must be unbound")
-        # Provenance honesty (``gallery-monster-generation``): card
-        # ``requested_fields`` claims which data blocks produced the image, so
-        # the write boundary refuses a non-empty provenance for a kind whose
-        # declaration supports no field selection — a stored claim the kind
-        # could never have requested would make the card lie.
-        if (
-            capability.has_gallery
-            and not capability.supports_field_selection
-            and list(card_fields.get("requested_fields") or [])
-        ):
-            raise GalleryRecordError(
-                f"kind {capability.kind_value!r} supports no field selection; "
-                "a card's requested_fields must be empty"
-            )
-        stored = validate_card(
-            card_fields, subject, existing_ids=existing_ids
-        )
-        if record is None:
-            record = record_for(subject, create=True)
-        previous: list = list(record.db.cards or [])
-        if capability.max_cards is not None:
-            record.db.cards = [stored]
-            record.db.default_image_id = stored["image_id"]
-            log_info(
-                "gallery_card_replaced",
-                context={"subject": subject.full(), "image_id": stored["image_id"]},
-            )
-            stale = [
-                entry.get("stored_identity") if isinstance(entry, Mapping) else None
-                for entry in previous
-            ]
-        else:
-            record.db.cards = [*previous, stored]
-            if not previous:
-                # The FIRST card of an empty record becomes its default
-                # automatically. That is not an explicit default SET, so it
-                # leaves a personal official selection alone (change
-                # ``official-art-personalization``): the chain still presents
-                # the selection, and a settled generation can never silently
-                # discard a choice the player made.
-                record.db.default_image_id = stored["image_id"]
-            log_info(
-                "gallery_card_appended",
-                context={"subject": subject.full(), "image_id": stored["image_id"]},
-            )
+        stored, stale = _append_card_locked(subject, card_fields)
     for identity in stale:
         _delete_stored_file(subject, identity)
-    return dict(stored)
+    return stored
+
+
+def append_replacement_card(
+    subject: ArtSubject, *, replaced_image_id: str | None, **card_fields
+) -> tuple[dict, list]:
+    """Append one card, make it the default, and drop one named previous card.
+
+    The one server-authorized replacement helper (change
+    ``creation-draft-portrait-request``). A pending character's draft portrait
+    replaces exactly its own previous creation image: the new card becomes the
+    record default WITHOUT clearing a personal official selection (unlike the
+    explicit ``set_default`` control, which is the player deliberately choosing
+    a runtime default), and only the card named by ``replaced_image_id`` is
+    removed. Unrelated cards and official preferences are untouched. A missing
+    previous card is not an error — the new card still becomes the default.
+
+    All record changes commit under ONE ``gallery_lock`` scope. The returned
+    identities are the files to unlink, and the caller must do that only after
+    the surrounding transaction committed AND both the gallery and queue
+    serialization were released (``world.art.publication`` lock order).
+    """
+    with gallery_lock:
+        stored, stale = _append_card_locked(subject, card_fields)
+        record = _consolidate(subject)
+        if record is None:  # pragma: no cover - the append above created it
+            raise GalleryRecordError("this subject has no gallery record")
+        entries = list(record.db.cards or [])
+        kept: list = []
+        for entry in entries:
+            if (
+                replaced_image_id
+                and isinstance(entry, Mapping)
+                and entry.get("image_id") == replaced_image_id
+            ):
+                identity = entry.get("stored_identity")
+                if identity:
+                    stale.append(identity)
+                log_info(
+                    "gallery_card_replaced",
+                    context={
+                        "subject": subject.full(),
+                        "image_id": replaced_image_id,
+                        "replacement": stored["image_id"],
+                    },
+                )
+                continue
+            kept.append(entry)
+        record.db.cards = kept
+        record.db.default_image_id = stored["image_id"]
+    return stored, [identity for identity in stale if identity]
+
+
+def unlink_stored_file(subject: ArtSubject, identity: object) -> None:
+    """Unlink one already-removed card file under confinement (never raises).
+
+    The committed-removal half of a replacement: the caller has already
+    dropped the card inside its own transaction and releases its locks before
+    calling this. Delegates to the one confined deletion path, so an
+    unresolvable, missing, or snapshot-blocked file stays a bounded event.
+    """
+    _delete_stored_file(subject, identity)
+
+
+def card_state_snapshot(subject: ArtSubject):
+    """Snapshot the record's in-process card state before a transaction opens.
+
+    Django restores the durable rows on rollback, but the idmapped Attribute
+    ``db_value`` the write already replaced stays readable in process (the
+    documented ``fix-clock-rollback-cache-sync`` hazard). A caller that owns a
+    transaction around a card mutation takes this snapshot first and calls
+    :func:`restore_card_state` when the transaction did NOT commit, so no
+    rolled-back card or default remains readable. Returns ``None`` when the
+    subject has no record yet.
+    """
+    from world.rules.surfaces import snapshot_attributes
+
+    record = _consolidate(subject)
+    if record is None:
+        return None
+    return record, snapshot_attributes(record, ("cards", "default_image_id"))
+
+
+def restore_card_state(snapshot) -> None:
+    """Write a :func:`card_state_snapshot` back after a rolled-back mutation."""
+    if snapshot is None:
+        return
+    from world.rules.surfaces import restore_attributes
+
+    record, values = snapshot
+    restore_attributes(record, values)
 
 
 def remove_card(subject: ArtSubject, image_id: str) -> None:

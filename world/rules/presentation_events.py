@@ -20,6 +20,11 @@ publication token across a pending ``Deferred``:
   ``transaction.on_commit`` while capturing the group that was active at
   registration time; the callback rebinds exactly that group for its own
   synchronous execution. A rolled-back transaction runs nothing.
+- :func:`defer_publication_callbacks` collects those callbacks for one outer
+  scope and registers their drain only when the scope exits normally, so a
+  mutation that must not run lock-taking callbacks beneath its own
+  serialization can commit first, release, and only then publish. A nested
+  scope joins the outer collector; an exception discards everything.
 - :func:`emit_alignment_fact` delivers a committed checkpoint fact to every
   registered observer. Observers are the presentation layer's fan-out; M/S own
   the actual fact producers.
@@ -49,6 +54,7 @@ __all__ = [
     "PublicationGroup",
     "clear_alignment_observers",
     "current_publication_group",
+    "defer_publication_callbacks",
     "emit_alignment_fact",
     "new_publication_group",
     "on_publication_commit",
@@ -99,6 +105,117 @@ class _Binding:
 _active: contextvars.ContextVar[_Binding | None] = contextvars.ContextVar(
     "elosern_publication_group", default=None
 )
+
+
+class DeferredPublicationCallbacks:
+    """The collector one outermost :func:`defer_publication_callbacks` scope owns.
+
+    Each entered scope owns one FRAME. A frame keeps registration order and
+    holds the already group-bound wrappers :func:`on_publication_commit`
+    builds. A nested scope that fails drops only its own frame, so it can never
+    discard callbacks an enclosing scope collected; the outermost scope's
+    ``discard`` clears the frame it owns.
+    """
+
+    __slots__ = ("frames",)
+
+    def __init__(self) -> None:
+        self.frames: list[list[Callable[[], None]]] = [[]]
+
+    def enter(self) -> list[Callable[[], None]]:
+        frame: list[Callable[[], None]] = []
+        self.frames.append(frame)
+        return frame
+
+    def leave(self, frame: list[Callable[[], None]]) -> None:
+        try:
+            self.frames.remove(frame)
+        except ValueError:  # observability: ignore R2: an already-dropped frame is a no-op
+            pass
+
+    def add(self, callback: Callable[[], None]) -> None:
+        self.frames[-1].append(callback)
+
+    def discard(self) -> None:
+        """Drop the CURRENT scope's frame (the outermost one at its own level)."""
+        self.frames[-1].clear()
+
+    def discard_all(self) -> None:
+        for frame in self.frames:
+            frame.clear()
+
+    def pop_next(self) -> Callable[[], None] | None:
+        for frame in list(self.frames):
+            if frame:
+                return frame.pop(0)
+        return None
+
+
+_active_deferral: contextvars.ContextVar[DeferredPublicationCallbacks | None] = (
+    contextvars.ContextVar("elosern_deferred_publication_callbacks", default=None)
+)
+
+
+def _drain_deferred_callbacks(collector: DeferredPublicationCallbacks) -> None:
+    """Run every collected callback once, in registration order.
+
+    The collector stays active for the whole drain so a callback that registers
+    another publication callback joins this same drain instead of escaping to a
+    later transaction boundary. Every callback runs even when one raises
+    (Django's own ``run_on_commit`` contract); the first failure is re-raised
+    after the rest are delivered. The drain runs OUTSIDE the mutation's
+    transaction and locks, so a publication failure can never roll back or
+    reinterpret committed state.
+    """
+    token = _active_deferral.set(collector)
+    first_error: BaseException | None = None
+    try:
+        while (callback := collector.pop_next()) is not None:
+            try:
+                callback()
+            except BaseException as error:  # observability: ignore R2: the first failure is re-raised after the remaining callbacks run (Django's run_on_commit contract)
+                if first_error is None:
+                    first_error = error
+    finally:
+        _active_deferral.reset(token)
+    if first_error is not None:
+        raise first_error
+
+
+@contextmanager
+def defer_publication_callbacks() -> Iterator[DeferredPublicationCallbacks]:
+    """Collect publication callbacks and drain them after this scope exits.
+
+    Registered callbacks are eligible only on a real successful commit: the
+    drain is registered with Django's ``transaction.on_commit`` at the OUTER
+    scope's exit, so an outer rollback runs none, and a successful inner
+    savepoint does not qualify before the outer transaction commits. Nesting
+    reuses the outer collector and adds one frame; a nested failure drops only
+    its own frame. A body exception outside any enclosing scope discards
+    everything. A caller that catches an inner rollback it owns must call
+    ``discard()`` for its own frame: the collector is not a transaction hook.
+    """
+    outer = _active_deferral.get()
+    if outer is not None:
+        frame = outer.enter()
+        try:
+            yield outer
+        except BaseException:
+            outer.leave(frame)
+            raise
+        return
+    collector = DeferredPublicationCallbacks()
+    token = _active_deferral.set(collector)
+    try:
+        yield collector
+    except BaseException:
+        _active_deferral.reset(token)
+        collector.discard_all()
+        raise
+    _active_deferral.reset(token)
+    from django.db import transaction
+
+    transaction.on_commit(lambda: _drain_deferred_callbacks(collector))
 
 
 def new_publication_group() -> PublicationGroup:
@@ -170,6 +287,12 @@ def on_publication_commit(
     causal group of the transaction it belongs to. Django owns the commit and
     rollback behaviour: a rolled-back transaction runs nothing, and an exception
     raised by the callback keeps propagating exactly as before.
+
+    Inside an active :func:`defer_publication_callbacks` scope the wrapped
+    callback joins that scope's collector instead: it is still eligible only on
+    a real successful commit (the collector itself is drained from a single
+    ``transaction.on_commit`` registration), but it runs after the scope has
+    released its own locks and serialization.
     """
     from django.db import transaction
 
@@ -184,6 +307,10 @@ def on_publication_commit(
         with _exact_publication_group(captured):
             callback()
 
+    collector = _active_deferral.get()
+    if collector is not None:
+        collector.add(_committed)
+        return
     transaction.on_commit(_committed, using=using)
 
 

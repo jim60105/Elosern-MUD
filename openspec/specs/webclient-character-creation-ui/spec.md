@@ -258,10 +258,10 @@ The deterministic core SHALL provide a creation-wizard draft service that is the
   draft remain unchanged
 
 ### Requirement: Creation actions are exact, allowlisted, and server-authoritative
-The production action registry SHALL register exactly `creation.preset`, `creation.custom`, `creation.concept`, `creation.roll_name`, `creation.activate`, and `creation.reset` for this delivery unit in addition to the three combat and seven service adapters and no unrelated gameplay adapter. No adapter SHALL assign `.db`, traits, identity attributes, or `creation_pending` directly, and no action SHALL route an action ID or payload through the text command parser.
+The production action registry SHALL register exactly `creation.preset`, `creation.custom`, `creation.concept`, `creation.roll_name`, `creation.activate`, `creation.reset`, and `creation.portrait.generate` for the creation surface. No adapter SHALL assign `.db`, traits, identity attributes, or `creation_pending` directly, and no action SHALL route an action ID or payload through the text command parser.
 
 #### Scenario: Preset selection reaches the deterministic registry
-- **WHEN** a pending character submits `creation.preset` with a shipped preset key
+- **WHEN** a pending character submits `creation.preset` with a registered synthetic preset key
 - **THEN** the adapter validates the key against the immutable preset registry, saves the `preset_selected` draft, and refreshes the `creation` panel
 
 #### Scenario: Preset selection is a two-step confirmation in the browser
@@ -310,7 +310,7 @@ The production action registry SHALL register exactly `creation.preset`, `creati
 
 #### Scenario: An unselected race falls back only to the rule-layer bound packs
 - **WHEN** `creation.roll_name` is submitted with `race` and `subrace` both null (the player never chose a race)
-- **THEN** the adapter calls `roll_name_for_race(None, ...)` and the result's `data.display_name` is drawn exclusively from the packs bound in `NAME_PACK_BY_RACE` (`fantasy-human`／`fantasy-elf`／`fantasy-orc`), never from `fantasy-dwarf` or `fantasy-halfling`
+- **THEN** the adapter calls `roll_name_for_race(None, ...)` and the result's `data.display_name` is drawn exclusively from the packs bound in `NAME_PACK_BY_RACE` as configured by the rule layer, never from an unbound pack
 
 #### Scenario: A mismatched subrace pair is rejected before the roller
 - **WHEN** `creation.roll_name` is submitted with a `subrace` whose registry `race_key` differs from the submitted `race`, a `subrace` absent from `SUBRACE_REGISTRY`, or a non-null `subrace` beside a null `race`
@@ -333,7 +333,7 @@ The production action registry SHALL register exactly `creation.preset`, `creati
 - **THEN** the adapter rejects before `activate_player_character`, the character remains pending, and no trait or identity is written
 
 #### Scenario: An over-bound affinity set on an elf is rejected
-- **WHEN** a client submits `creation.custom` with `race == "elf"` and a non-empty `affinity_elements`
+- **WHEN** a client submits `creation.custom` with a synthetic race permitting no player-selected affinity and a non-empty `affinity_elements`
 - **THEN** the deterministic service rejects the request before persistence and no draft or identity value changes
 
 #### Scenario: The preset payload accepts exactly a registry key
@@ -347,16 +347,14 @@ The production action registry SHALL register exactly `creation.preset`, `creati
   (integers in 0..10000 excluding booleans; the deterministic creation service independently
   enforces the 0..10000 age range on every submission), `race` (a 1..64-character registry key),
   `subrace` (a 1..64-character registry key belonging to the race; the deterministic service
-  rejects a missing or incompatible subrace), and `allocations` (an object containing exactly
-  `hp`, `mp`, `sp`, `atk_phys`, `agility`, and `defense`, each an integer in 0..10000 excluding
-  booleans)
+  rejects a missing or incompatible subrace), `allocations` (an object whose exact keys match
+  `ALLOCATABLE_AXES`, each an integer in 0..10000 excluding booleans), and the required nullable
+  `background`, `affinity_elements`, and `persona` keys; only `sex` is optional
 
 #### Scenario: The custom optional fields carry their exact bounds and defaults
-- **WHEN** `creation.custom` validates its optional fields
-- **THEN** `affinity_elements` is an array of at most 8 lowercase element keys, each a lore
-  element (the deterministic creation service enforces the race-dependent maximum and rejects a
-  player-supplied set on an elf), `background` is a string of at most the declared persona-field
-  bound (a missing value is treated as an empty background), and `sex` is null or a `SEX_VALUES`
+- **WHEN** `creation.custom` validates its required nullable fields and optional sex
+- **THEN** `affinity_elements` is null or an array of at most the schema-bound number of lowercase element keys, each a registered element (the deterministic creation service enforces each race's declared maximum), `background` is null or a string of at most the declared persona-field
+  bound (blank normalizes to null), and `sex` is null or a `SEX_VALUES`
   member (a missing value is treated as `DEFAULT_SEX` by the deterministic service)
 - **AND** the required `persona` is null or an object containing exactly `personality`,
   `life_story`, and `habit`, each a non-empty string of at most the declared persona-field bound
@@ -397,8 +395,9 @@ The production action registry SHALL register exactly `creation.preset`, `creati
 #### Scenario: Adapters validate through the deterministic service
 - **WHEN** any creation adapter processes an admitted payload
 - **THEN** it validates through the existing deterministic creation service
-  (`preflight_character_creation`, `activate_player_character`, and the creation-wizard draft
-  service) except the read-only `creation.roll_name` roller call
+  (`preflight_character_creation`, `activate_player_character`, the creation-wizard draft
+  service, or `request_draft_portrait`); `creation.roll_name` uses its read-only roller and
+  `creation.concept` uses the guarded transient generative layer followed by proposal validation
 
 ### Requirement: Creation actions reject stale, duplicate, and tampered input without mutation
 Every creation action SHALL pass the existing dispatcher's epoch, base revision, in-flight, and request-ID checks before adapter invocation; a `presentation_epoch` or `base_revision` that does not equal the newest values issued for the live session SHALL return the dispatcher's `stale` outcome with a fresh full snapshot and SHALL invoke no adapter.
@@ -802,3 +801,37 @@ The preset wall SHALL keep expanded-card state separate from the saved draft. Po
 #### Scenario: Accessible opening and motion
 - **WHEN** a keyboard user browses cards or changes motion preference
 - **THEN** collapsed cards are named native buttons, the expanded card exposes aria-current and visible focus, and reduced/off motion switches without interpolating the card transition
+### Requirement: Pending characters request portraits from exact draft values
+`creation.portrait.generate` SHALL accept exactly `race`, `subrace`, `sex`, `apparent_age` and `custom_prompt` for the authenticated account's pending character. Invalid input, in-flight work or known service unavailability SHALL reject before policy, receipt or queue writes. Admission SHALL preserve canonical identity, draft, proposal and activation confirmation while requesting one image on that character's named subject.
+
+#### Scenario: A valid draft request needs no saved form
+- **WHEN** an owned pending character submits registered compatible race/subrace, a race-permitted sex, integer apparent age in 0..10000 excluding booleans and an accepted prompt with a successful server connectivity verdict
+- **THEN** one fresh image job is enqueued on `portrait:character:<character pk>`, with no canonical identity, trait, wizard-draft or concept-proposal write and no activation
+
+#### Scenario: Admission serializes receipt discovery through commit
+- **WHEN** a draft request contends with settlement of its preceding image
+- **THEN** queue serialization precedes database writes and covers receipt/card discovery through policy/job/receipt commit; admission either rejects the in-flight request or retains the committed preceding card, and callbacks that reacquire locks run only after release
+
+#### Scenario: Known-unavailable service refuses retryably before mutation
+- **WHEN** an otherwise valid creation portrait request receives a failed server connectivity verdict, even if the browser's displayed state was stale or bypassed
+- **THEN** it returns `portrait_service_unavailable` and publishes the safe unavailable reason without a policy, portrait receipt/state, draft, confirmation or queue write; existing art survives, and a later valid successful verdict permits explicit retry
+
+#### Scenario: Offline portrait does not block creation or play
+- **WHEN** art and LLM services are unavailable
+- **THEN** preset and custom creation, activation and deterministic gameplay remain available; no connectivity gate is added to gallery, ensure/autogen, queue or worker paths
+
+#### Scenario: Exact payload rejects before mutation
+- **WHEN** any required key is missing, an extra field names a subject, actor, age, binding, fields or calculated stat, a key is blank/overlong/unknown, subrace is incompatible, sex is forbidden, or apparent age is malformed/out of range
+- **THEN** the request is rejected with a stable reason and no policy, receipt, gallery job, card or file changes
+
+#### Scenario: Free text uses the gallery contract
+- **WHEN** the prompt is empty, whitespace-only, over its declared bound, non-text or control-bearing
+- **THEN** empty and whitespace-only normalize to the legal no-op; the other values reject through the same gallery prompt validator before any render or write
+
+#### Scenario: The subject cannot be changed by a caller
+- **WHEN** an unowned, non-player or no-longer-pending character requests a draft portrait, or two sessions request one while its subject has an in-flight job
+- **THEN** ownership/pending or in-flight validation rejects and no second job or replacement policy is written
+
+#### Scenario: Portrait requests do not authorize activation
+- **WHEN** a portrait request succeeds or rejects while a saved-draft confirmation exists
+- **THEN** its fingerprint and the saved draft are unchanged, and the existing activation gate remains authoritative

@@ -16,9 +16,11 @@ from world.art.subjects import (
     ArtSubject,
     ArtSubjectError,
     ArtSubjectKind,
+    DraftPortraitValues,
     character_description,
     character_subject_for,
     description_for,
+    draft_character_description,
     is_reserved_player_stable_key,
     monster_description,
     monster_subject_for,
@@ -27,6 +29,7 @@ from world.art.subjects import (
     scene_subject_for,
 )
 from world.lore.monster_visuals import get_monster_visual_registry
+from world.art.gallery_prompt import GalleryPromptError
 from world.prompts.loader import PromptUnavailableError
 
 from tools.spec_traceability import covers_requirement
@@ -638,6 +641,75 @@ class MonsterDescriptionSeamTests(PromptFixture):
             monster_description(monster_subject_for(_SYNTH_SPECIES)),
             row.display_label,
         )
+
+
+@synthetic_registries("races", "subraces")
+class DraftDescriptionTests(PromptFixture):
+    """The pending draft description reads only the submitted request values."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.write_file("art.yaml", _TEST_ART_YAML)
+        self.load()
+        race_key = SYNTH_SUBRACES[_SYNTH_SUBRACE].race_key
+        scope = synthetic_registries("races", "subraces")
+        scope.__enter__()
+        self.addCleanup(scope.__exit__, None, None, None)
+        self.values = DraftPortraitValues(
+            race=race_key,
+            subrace=_SYNTH_SUBRACE,
+            sex="female",
+            apparent_age=23,
+        )
+
+    @covers_requirement(
+        "art-subject-model::draft-portrait-descriptions-use-only-validated-request-values"
+    )
+    def test_stored_identity_cannot_override_the_draft(self):
+        # A shell whose stored identity, persona, equipment and name all
+        # disagree with the submitted values: none of it may reach the render.
+        shell = Mock()
+        shell.db.race = "t_other_race"
+        shell.db.subrace = None
+        shell.db.display_name = "別的名字"
+        shell.db.persona = {"appearance": {"style": "stored clothing"}}
+        shell.key = "別的名字"
+        text = draft_character_description(self.values, "紅色長髮")
+        self.assertIn(_SYNTH_RACE_LABEL, text)
+        self.assertIn("23", text)
+        self.assertIn("紅色長髮", text)
+        for forbidden in ("別的名字", "stored clothing", "t_other_race"):
+            self.assertNotIn(forbidden, text)
+
+    @covers_requirement(
+        "art-subject-model::draft-portrait-descriptions-use-only-validated-request-values"
+    )
+    def test_existing_composition_remains_equivalent(self):
+        entity = Mock()
+        entity.db.race = self.values.race
+        entity.db.subrace = self.values.subrace
+        entity.db.display_name = "同名"
+        entity.key = "同名"
+        self.assertEqual(
+            draft_character_description(self.values, ""),
+            character_description(entity, self.values.apparent_age, fields=()),
+        )
+
+    @covers_requirement(
+        "art-subject-model::draft-portrait-descriptions-use-only-validated-request-values"
+    )
+    def test_description_validation_precedes_rendering(self):
+        with self.assertRaises(ArtSubjectError):
+            draft_character_description(object(), "")
+        with self.assertRaises(GalleryPromptError):
+            draft_character_description(self.values, "bad\x07prompt")
+        with self.assertRaises(Exception):
+            DraftPortraitValues(
+                race="t_unregistered_race",
+                subrace=self.values.subrace,
+                sex="female",
+                apparent_age=23,
+            )
 
 
 if __name__ == "__main__":

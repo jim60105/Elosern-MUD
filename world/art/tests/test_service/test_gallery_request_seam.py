@@ -30,11 +30,14 @@ from world.art.subjects import (
 from world.art.service import (
     art_sync_all,
     ensure_scene_asset,
+    GalleryMutationError,
     request_gallery_image,
     schedule_portrait_ensure,
+    serialized_gallery_mutation,
 )
 from world.art.store import ArtAssetStatus, GalleryJobRecord
 from world.art.subjects import ArtSubject, ArtSubjectKind
+from world.art.subjects import DraftPortraitValues, named_character_subject
 from tools.spec_traceability import covers_requirement
 from world.tests.synthetic_data import (
     SYNTH_ARCHETYPES,
@@ -51,6 +54,127 @@ from ._support import (
     _SYNTH_TRINKET,
     _valid_binding,
 )
+
+_DRAFT_RACE = "t_duskmari"
+_DRAFT_SUBRACE = "t_duskmari_evensong"
+
+
+class DraftPortraitRequestSeamTests(EvenniaTestCase):
+    """The one typed draft-value branch of the common gallery seam."""
+
+    def setUp(self):
+        open_synthetic_scope(self, "races", "subraces")
+        super().setUp()
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tempdir.cleanup)
+        self.art_settings = override_settings(
+            ART_STORE_ROOT=str(Path(self.tempdir.name)),
+            ART_SD_CLIENT="world.art.fake_sd_client.FakeSDWebUIClient",
+        )
+        self.art_settings.enable()
+        self.addCleanup(self.art_settings.disable)
+        self.pending = create_object(PlayerCharacter, key="seam-pending")
+        self.pending.creation_pending = True
+        self.activated = create_object(PlayerCharacter, key="seam-activated")
+        self.activated.age = 30
+        self.activated.apparent_age = 25
+        self.activated.creation_pending = False
+        self.values = DraftPortraitValues(
+            race=_DRAFT_RACE,
+            subrace=_DRAFT_SUBRACE,
+            sex="female",
+            apparent_age=23,
+        )
+
+    def _jobs(self):
+        return [
+            record
+            for record in GalleryJobRecord.objects.all()
+            if str(record.db.gallery_image_id or "")
+        ]
+
+    def test_a_pending_draft_request_queues_one_unbound_job(self):
+        subject = named_character_subject(self.pending)
+        with serialized_gallery_mutation(subject) as token:
+            with transaction.atomic():
+                image_id = request_gallery_image(
+                    self.pending,
+                    custom_prompt="  紅髮  ",
+                    draft_values=self.values,
+                    mutation_token=token,
+                )
+        jobs = self._jobs()
+        self.assertEqual(len(jobs), 1)
+        self.assertEqual(jobs[0].db_key.split(":gen:")[1], image_id)
+        self.assertIsNone(jobs[0].db.gallery_binding)
+        self.assertIsNone(jobs[0].db.gallery_face_rect)
+        self.assertEqual(list(jobs[0].db.gallery_requested_fields), [])
+        text = jobs[0].db.source_description
+        self.assertIn("23", text)
+        self.assertIn("紅髮", text)
+        # No canonical age attribute was read or written.
+        self.assertIsNone(self.pending.db.apparent_age)
+        self.assertIsNone(self.pending.db.portrait_policy)
+
+    def test_a_draft_request_requires_its_serialized_scope(self):
+        with self.assertRaises(GalleryMutationError):
+            request_gallery_image(self.pending, draft_values=self.values)
+        self.assertEqual(self._jobs(), [])
+
+    def test_a_draft_request_carries_no_field_binding_or_rectangle(self):
+        subject = named_character_subject(self.pending)
+        with serialized_gallery_mutation(subject) as token:
+            for kwargs in (
+                {"fields": ("appearance",)},
+                {"binding": _valid_binding()},
+                {"face_rect": {"x": 0.1, "y": 0.1, "w": 0.4, "h": 0.4}},
+            ):
+                with self.subTest(kwargs=sorted(kwargs)):
+                    with self.assertRaises(ArtSubjectError):
+                        request_gallery_image(
+                            self.pending,
+                            draft_values=self.values,
+                            mutation_token=token,
+                            **kwargs,
+                        )
+        self.assertEqual(self._jobs(), [])
+
+    def test_an_activated_character_cannot_use_draft_values(self):
+        subject = named_character_subject(self.activated)
+        with serialized_gallery_mutation(subject) as token:
+            with self.assertRaises(ArtSubjectError):
+                request_gallery_image(
+                    self.activated,
+                    draft_values=self.values,
+                    mutation_token=token,
+                )
+        self.assertEqual(self._jobs(), [])
+
+    def test_a_pending_character_without_draft_values_is_refused(self):
+        self.pending.db.portrait_policy = {
+            "mode": "named",
+            "stable_key": str(self.pending.pk),
+        }
+        with self.assertRaises(ArtSubjectError):
+            request_gallery_image(self.pending)
+        self.assertEqual(self._jobs(), [])
+
+    def test_an_activated_request_still_reads_the_canonical_age(self):
+        self.activated.db.portrait_policy = {
+            "mode": "named",
+            "stable_key": str(self.activated.pk),
+        }
+        request_gallery_image(self.activated)
+        self.assertEqual(len(self._jobs()), 1)
+
+    def test_a_foreign_token_is_rejected(self):
+        other = named_character_subject(self.activated)
+        with serialized_gallery_mutation(other) as token:
+            with self.assertRaises(GalleryMutationError):
+                request_gallery_image(
+                    self.pending, draft_values=self.values, mutation_token=token
+                )
+        self.assertEqual(self._jobs(), [])
 
 class GalleryRequestSeamTests(EvenniaTestCase):
     """request_gallery_image validates before any write and never gates."""

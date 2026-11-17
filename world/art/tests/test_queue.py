@@ -7,6 +7,7 @@ from evennia.utils.create import create_script
 from evennia.utils.test_resources import EvenniaTestCase
 
 from world.art import gallery as gallery_api
+from world.art import queue as queue_api
 from world.art import gallery_kinds
 from world.art.gallery import GalleryRecordError
 from world.art.queue import (
@@ -243,6 +244,190 @@ class GalleryJobQueueTests(EvenniaTestCase):
         well_formed.db.gallery_image_id = "t_image"
         self.assertTrue(is_gallery_job(well_formed))
         self.assertEqual(record_key(_scene("t_synth_ok")), "art:scene:t_synth_ok")
+
+
+class GalleryReplacementSettlementTests(EvenniaTestCase):
+    """The draft-portrait replacement metadata settles as one atomic swap."""
+
+    def setUp(self):
+        import tempfile
+        from pathlib import Path
+
+        from django.test import override_settings
+
+        super().setUp()
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tempdir.cleanup)
+        self.root = Path(self.tempdir.name)
+        self.overrides = override_settings(ART_STORE_ROOT=str(self.root))
+        self.overrides.enable()
+        self.addCleanup(self.overrides.disable)
+
+    # -- harness ----------------------------------------------------------
+    def _seed_card(self, subject, image_id):
+        identity = f"gallery/character/{subject.key}/{image_id}.png"
+        target = self.root / identity
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b"old-card")
+        gallery_api.append_card(
+            subject,
+            image_id=image_id,
+            stored_identity=identity,
+            prompt=None,
+            seed=None,
+            checkpoint=None,
+            requested_fields=[],
+            binding=None,
+            image_size={"width": 8, "height": 8},
+            source="generated",
+        )
+        return identity
+
+    def _claim(self, subject, image_id, *, replacement=None, creation_draft=True):
+        job = _enqueue_gallery(subject, image_id)
+        job.db.gallery_replacement_image_id = replacement
+        job.db.gallery_creation_draft = creation_draft
+        claimed = claim(10)[0]
+        return job, str(claimed.db.generation_token)
+
+    def _settle(self, job, token, image_id, *, image_size=None):
+        from world.art.worker import _write_temp
+
+        identity = f"gallery/character/{job.db.subject_key}/{image_id}.png"
+        tmp_path = _write_temp(identity, b"not-an-image")
+        return queue_api.settle_gallery_generated(
+            job.db_key,
+            generation_token=token,
+            output_identity=identity,
+            tmp_path=tmp_path,
+            prompt={"positive": "p", "negative": "n"},
+            seed=None,
+            checkpoint=None,
+            image_size=image_size or {"width": 8, "height": 8},
+        )
+
+    def test_replacement_appends_one_default_and_removes_only_the_named_card(self):
+        subject = _character("77")
+        old_identity = self._seed_card(
+            subject, "11111111-1111-4111-8111-111111111111"
+        )
+        unrelated_identity = self._seed_card(
+            subject, "33333333-3333-4333-8333-333333333333"
+        )
+        job, token = self._claim(
+            subject,
+            "22222222-2222-4222-8222-222222222222",
+            replacement="11111111-1111-4111-8111-111111111111",
+        )
+        stored = self._settle(
+            job, token, "22222222-2222-4222-8222-222222222222"
+        )
+        self.assertIsNotNone(stored)
+        cards = gallery_api.cards_for(subject)
+        self.assertEqual(
+            {card["image_id"] for card in cards},
+            {"22222222-2222-4222-8222-222222222222", "33333333-3333-4333-8333-333333333333"},
+        )
+        record = gallery_api.record_for(subject)
+        self.assertEqual(
+            record.db.default_image_id, "22222222-2222-4222-8222-222222222222"
+        )
+        self.assertFalse((self.root / old_identity).exists())
+        self.assertTrue((self.root / unrelated_identity).exists())
+
+    def test_replacement_preserves_an_official_preference(self):
+        subject = _character("78")
+        self._seed_card(subject, "11111111-1111-4111-8111-111111111111")
+        record = gallery_api.record_for(subject)
+        record.db.official_selection = "scene/t_synth/one.png"
+        job, token = self._claim(
+            subject,
+            "22222222-2222-4222-8222-222222222222",
+            replacement="11111111-1111-4111-8111-111111111111",
+        )
+        self._settle(job, token, "22222222-2222-4222-8222-222222222222")
+        refreshed = gallery_api.record_for(subject)
+        self.assertEqual(refreshed.db.official_selection, "scene/t_synth/one.png")
+
+    def test_a_failed_generation_retains_the_previous_card_and_default(self):
+        subject = _character("79")
+        self._seed_card(subject, "11111111-1111-4111-8111-111111111111")
+        job, token = self._claim(
+            subject,
+            "22222222-2222-4222-8222-222222222222",
+            replacement="11111111-1111-4111-8111-111111111111",
+        )
+        self.assertIsNotNone(
+            queue_api.settle_gallery_failed(
+                job.db_key, generation_token=token, error="sd_connection_error"
+            )
+        )
+        self.assertEqual(
+            [card["image_id"] for card in gallery_api.cards_for(subject)],
+            ["11111111-1111-4111-8111-111111111111"],
+        )
+        record = gallery_api.record_for(subject)
+        self.assertEqual(
+            record.db.default_image_id, "11111111-1111-4111-8111-111111111111"
+        )
+
+    def test_a_settlement_rollback_keeps_the_previous_card_and_unlinks_nothing(self):
+        subject = _character("80")
+        old_identity = self._seed_card(
+            subject, "11111111-1111-4111-8111-111111111111"
+        )
+        job, token = self._claim(
+            subject,
+            "22222222-2222-4222-8222-222222222222",
+            replacement="11111111-1111-4111-8111-111111111111",
+        )
+        unlinked: list = []
+        real_replace = gallery_api.append_replacement_card
+
+        def write_then_fail(subject_arg, **kwargs):
+            real_replace(subject_arg, **kwargs)
+            raise RuntimeError("commit boundary failed")
+
+        with (
+            patch.object(
+                gallery_api, "append_replacement_card", write_then_fail
+            ),
+            patch.object(
+                gallery_api,
+                "unlink_stored_file",
+                side_effect=lambda *args: unlinked.append(args),
+            ),
+        ):
+            with self.assertRaises(RuntimeError):
+                self._settle(job, token, "22222222-2222-4222-8222-222222222222")
+        self.assertEqual(unlinked, [])
+        self.assertEqual(
+            [card["image_id"] for card in gallery_api.cards_for(subject)],
+            ["11111111-1111-4111-8111-111111111111"],
+        )
+        record = gallery_api.record_for(subject)
+        self.assertEqual(
+            record.db.default_image_id, "11111111-1111-4111-8111-111111111111"
+        )
+        self.assertTrue((self.root / old_identity).exists())
+
+    def test_a_second_settlement_of_one_job_is_a_noop(self):
+        subject = _character("81")
+        self._seed_card(subject, "11111111-1111-4111-8111-111111111111")
+        job, token = self._claim(
+            subject,
+            "22222222-2222-4222-8222-222222222222",
+            replacement="11111111-1111-4111-8111-111111111111",
+        )
+        self.assertIsNotNone(
+            self._settle(job, token, "22222222-2222-4222-8222-222222222222")
+        )
+        self.assertIsNone(
+            self._settle(job, token, "22222222-2222-4222-8222-222222222222")
+        )
+        self.assertEqual(
+            len(gallery_api.cards_for(subject)), 1
+        )
 
 
 if __name__ == "__main__":

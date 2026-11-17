@@ -335,7 +335,8 @@
       "name": "rules-11",
       "workers": 4,
       "labels": [
-        "world.rules.tests.test_map_knowledge_integration.test_recording"
+        "world.rules.tests.test_map_knowledge_integration.test_recording",
+        "world.rules.tests.test_creation_portrait"
       ]
     },
     {
