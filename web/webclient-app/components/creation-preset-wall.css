@@ -137,7 +137,7 @@
   gap: var(--sp-2);
   box-sizing: border-box;
   min-width: 0;
-  max-width: calc(56.25cqh + 640px * var(--ui-scale));
+  max-width: calc(560px * var(--ui-scale));
   padding: var(--sp-6) var(--sp-6) var(--sp-6) var(--sp-4);
   animation: creation-wall-dossier var(--motion-base) var(--ease-enter) both;
 }
