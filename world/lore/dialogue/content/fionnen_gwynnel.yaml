@@ -1,0 +1,109 @@
+schema_version: 1
+greeting: 格威內爾‧斯威夫塔羅把手裡的削刀放下，抬眼打量進來的人，視線先落在手臂上。她從牆上的木釘取下一把未上弦的精靈長弓，橫在手裡：「來了。手臂伸出來，讓我量一量，弓要合手才好用。」
+topics:
+- topic_id: fionnen_gwynnel_home.topic_01
+  keyword: 製弓
+  label: 製弓
+  fallback:
+    scene_id: fionnen_gwynnel_home.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「屋樑上橫著的那幾根木頭，就是做弓的材料嗎？怎麼挑的？」
+    - kind: narration
+      text: 格威內爾‧斯威夫塔羅抬手朝樑上指了指，木料一頭還留著樹皮的顏色。
+    - kind: speech
+      speaker: host
+      text: 「木作空地那邊砍下來的枝，先看紋。紋要直，節要少，敲起來聲音沉而不悶，才留得下來。」
+    - kind: speech
+      speaker: host
+      text: 「留著的晾在樑上，急不得。晾到木頭自己願意彎，兩端一扳就順，那才下刀。」
+    - kind: speech
+      speaker: actor
+      text: 「晾著的時候，你就這麼放著不管？」
+    - kind: speech
+      speaker: host
+      text: 「隔幾天翻一次面，讓風走勻。太乾會脆，太濕彎了又彈回去，得看著。」
+    - kind: speech
+      speaker: host
+      text: 「削到最後，弓身要照著人的手臂走。別人的尺寸，我用不上。」
+- topic_id: fionnen_gwynnel_home.topic_02
+  keyword: 長弓
+  label: 長弓
+  fallback:
+    scene_id: fionnen_gwynnel_home.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你手裡那把精靈長弓，跟林子外頭的弓有什麼不一樣？」
+    - kind: narration
+      text: 她把長弓立在身前，一手扶著弓身，另一手在弦槽上抹了一下。
+    - kind: speech
+      speaker: host
+      text: 「弓身長，拉滿了箭走得更遠，也更容易穩住。代價是力氣，臂力不夠的人拉不到底。」
+    - kind: speech
+      speaker: host
+      text: 「它不替你瞄準。你手抖，它就把抖傳出去；你靜，它就一路直到底。」
+    - kind: speech
+      speaker: actor
+      text: 「新手拿得動嗎？」
+    - kind: speech
+      speaker: host
+      text: 「拿得動，用不好。先練到每一次拉滿都不歪，再談準頭。」
+    - kind: speech
+      speaker: host
+      text: 「弓不認人。它給什麼，全看你練到哪裡。」
+- topic_id: fionnen_gwynnel_home.topic_03
+  keyword: 弓棚
+  label: 弓棚
+  fallback:
+    scene_id: fionnen_gwynnel_home.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「聽說靶道旁邊有座弓棚，村裡的弓都放在那裡？」
+    - kind: speech
+      speaker: host
+      text: 「弓棚的門從來不關。誰的弓要換弦、要調，拿去棚裡，牆上有弦，自己動手。」
+    - kind: speech
+      speaker: host
+      text: 「村裡人取弓不問我。箭射壞了，靶道的樹幹上還留著痕。」
+    - kind: speech
+      speaker: actor
+      text: 「外頭來的人呢？也能從弓棚拿弓嗎？」
+    - kind: speech
+      speaker: host
+      text: 「外頭的人在我這裡換。棚裡的弓都出自我這雙手。你要帶走一把，銅幣放在我手上，弓你拿走。」
+    - kind: speech
+      speaker: host
+      text: 「棚子歸村裡，誰都能進。我只管做弓，不管棚門。」
+- topic_id: fionnen_gwynnel_home.topic_04
+  keyword: 收回
+  label: 收回
+  fallback:
+    scene_id: fionnen_gwynnel_home.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「用舊的弓，還能拿回來給你嗎？」
+    - kind: speech
+      speaker: host
+      text: 「我做的弓，沒斷的拿回來。我看過弦槽與弓身，還能用的算銅幣給你。」
+    - kind: speech
+      speaker: host
+      text: 「弓身上的木頭砍下來，還能拿去做別的東西，不必丟。」
+    - kind: speech
+      speaker: actor
+      text: 「別處買來的弓，你也願意看嗎？」
+    - kind: narration
+      text: 她把長弓掛回木釘，沒有伸手去接。
+    - kind: speech
+      speaker: host
+      text: 「外頭的弓我不接。木性不同，弦的繞法也不同，混進我的料裡只會壞事。」
+    - kind: speech
+      speaker: host
+      text: 「你留著用，或帶回山外。這屋裡只認我削出來的弓。」

@@ -115,6 +115,14 @@ NPC_SOURCE_INVENTORY: tuple[NpcSource, ...] = (
     NpcSource("dialogue_table", "eolas_raellin_home", "eolas_homes_b"),
     NpcSource("dialogue_table", "eolas_saelnel_home", "eolas_homes_b"),
 
+    # fionnen_homes_a: the three 翠綠森林村 craft homes and their tables.
+    NpcSource("place_host", "fionnen_corith", "fionnen_homes_a"),
+    NpcSource("place_host", "fionnen_gwynnel", "fionnen_homes_a"),
+    NpcSource("place_host", "fionnen_ithrlin", "fionnen_homes_a"),
+    NpcSource("dialogue_table", "fionnen_corith_home", "fionnen_homes_a"),
+    NpcSource("dialogue_table", "fionnen_gwynnel_home", "fionnen_homes_a"),
+    NpcSource("dialogue_table", "fionnen_ithrlin_home", "fionnen_homes_a"),
+
     # companions: the four starting-companion declarations.
     NpcSource("starting_companion", "violet_altoria:lidzia_rosenthal", "companions"),
     NpcSource("starting_companion", "lidzia_rosenthal:violet_altoria", "companions"),
