@@ -19,7 +19,7 @@ export const ART_PANEL = {
 const NAMED = { individual_name: "閉灣者", species_name: "吞潮鱷", variant_name: "守灣型" };
 const GUARD = { individual_name: null, species_name: "潮燈蟹", variant_name: "守礁型" };
 const WALKER = { individual_name: null, species_name: "潮燈蟹", variant_name: "灘行型" };
-const SLIME = { individual_name: null, species_name: "泥膜史萊姆", variant_name: "濕岸型" };
+const SLIME = { individual_name: null, species_name: "泥巴史萊姆", variant_name: "濕岸型" };
 
 export const monsterName = (identity) => identity.individual_name ?? identity.species_name;
 

@@ -245,7 +245,7 @@
   when: {buff_active: mane_misdirection}
   then: {accuracy: -5}
 
-# 魔物資源技能（monster-content-expansion §5）：泥膜收束的自身護膜，
+# 魔物資源技能（monster-content-expansion §5）：泥巴收束的自身護膜，
 # buff 列為 mount，+3 資料在此（ridge_brace_defense 的 defense 先例）。
 - id: mudfilm_shell_defense
   when: {buff_active: mudfilm_shell}

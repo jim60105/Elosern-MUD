@@ -12,12 +12,12 @@ forest species of the near-settlement programme's Wave 1. Sections from 霧泉�
 Sections from 滾土甲蟲 onward record the eastern plains and southeast coast species of the near-settlement programme's Wave 3.
 Sections from 負鹽蟻 onward record the southwest coast and western hills species of the near-settlement programme's Wave 4.
 
-## 泥膜史萊姆
+## 泥巴史萊姆
 
-The first delivered weak species of the batch is 泥膜史萊姆 (`mudfilm_slime`)
+The first delivered weak species of the batch is 泥巴史萊姆 (`mudfilm_slime`)
 with its ordinary default variant 濕岸型 (`mudbank_dweller`): a low-tier,
 grade-F, slow defensive individual whose only active is the self film guard
-泥膜收束 (`mudfilm_guard`).
+泥巴收束 (`mudfilm_guard`).
 
 ### Role constraints and the chosen literals
 

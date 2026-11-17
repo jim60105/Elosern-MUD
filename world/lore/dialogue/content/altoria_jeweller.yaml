@@ -84,8 +84,8 @@ topics:
       speaker: host
       text: 「那是滑翔斗篷，用中央山脈帶來的精靈蛛絲混紡編織。從迷宮高處或山崖跳下時，張開斗篷便能乘風滑行、平穩落腳。兩件都是難得的精細物件，價錢全寫在小木牌上，合心意再買。」
 - topic_id: altoria_jeweller.topic_04
-  keyword: 收飾
-  label: 收飾
+  keyword: 收購
+  label: 收購
   fallback:
     scene_id: altoria_jeweller.topic_04_scene
     revision: r2

@@ -78,7 +78,7 @@ This document records the line-by-line editorial and lore verification for the `
    - Fallback `altoria_jeweller.topic_02_fallback_scene`: Host explains claw setting principles using purified pendants (holy water silver), fearless brooches (chilled iron), and radiant holy emblems (smooth stone carving).
 4. `altoria_jeweller.topic_03` (keyword: 奇物):
    - Actor inquires about rare magical curios. Host introduces imperial spatial storage pouches and gliding cloaks woven with central mountain elven spider silk.
-5. `altoria_jeweller.topic_04` (keyword: 收飾):
+5. `altoria_jeweller.topic_04` (keyword: 收購):
    - Actor asks about selling old jewellery. Host confirms buy-back for items matching the shop's assortment, noting that heirloom items like apothecary beads or passion silk chokers require provenance inquiries.
 
 ### B. altoria_alchemist (希碧拉‧灰沼)
@@ -97,7 +97,7 @@ This document records the line-by-line editorial and lore verification for the `
 2. `altoria_merchant_hall.topic_01` (keyword: 商隊):
    - Variant `morning_caravan_dispatch` (`time_period`: `dawn` to `noon`, priority 10): Host notes the morning bustle of caravans preparing to exit `東門`, logging manifests without offering passenger escorts or cargo guarantees.
    - Fallback `altoria_merchant_hall.topic_01_fallback_scene`: Host explains quarterly chalk schedule management on the wall map, reiterating neutrality and refusal to broker private escorts.
-3. `altoria_merchant_hall.topic_02` (keyword: 商路):
+3. `altoria_merchant_hall.topic_02` (keyword: 貿易路線):
    - Actor asks about trade road divisions and gates. Host explains `東門` and `東市` trade distribution (grain, glass, foreign coins), workshop iron through `市場街`, and alchemy herbs through `東門`, referring route security inquiries to city guards.
 4. `altoria_merchant_hall.topic_03` (keyword: 委託):
    - Actor asks about caravan protection jobs. Host explains why the hall lacks escort commission boards. Actor asks the host 「你會推薦何處？」 in natural traveler register, and host redirects to the Adventurers' Guild hall at `公會前`.

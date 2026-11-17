@@ -50,8 +50,8 @@ topics:
       speaker: host
       text: 「每天早上走一趟，把歪掉的重新繫正。風大過一夜，總有幾片要重掛。」
 - topic_id: fionnen_elunwen_home.topic_03
-  keyword: 光法
-  label: 光法
+  keyword: 光魔法
+  label: 光魔法
   fallback:
     scene_id: fionnen_elunwen_home.topic_03_scene
     revision: r1

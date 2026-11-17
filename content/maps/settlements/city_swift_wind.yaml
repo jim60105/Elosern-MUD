@@ -95,7 +95,7 @@ nodes:
     y_m: 488
     prototype_parent: grid_room
     key: 公會前庭
-    desc: 公會前庭的告示板用四根木樁固定，上頭寫著草原與商路的消息。接任務的隊伍習慣先看風向，再決定往哪一頭走。
+    desc: 公會前庭的告示板用四根木樁固定，上頭寫著草原與貿易路線的消息。接任務的隊伍習慣先看風向，再決定往哪一頭走。
     anchor_key:
     typeclass:
     scene_archetype: city_street

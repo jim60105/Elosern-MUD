@@ -17,7 +17,7 @@
   - `altoria_eatery.topic_01` (餐點): Daily basic hot meat soup, fresh thick-cut rye bread, travel rations.
   - `altoria_eatery.topic_02` (招牌): Southeastern harbor lobster bisque recipe from an old boatman; genuine rare mention of elven candied blossoms as expensive luxury confections.
   - `altoria_eatery.topic_03` (乾糧): Wilderness travel advice, beastfolk smoked jerky and rye hardtack.
-  - `altoria_eatery.topic_04` (收食): Buying game and wild harvest with strict freshness standards.
+  - `altoria_eatery.topic_04` (收購): Buying game and wild harvest with strict freshness standards.
 - `altoria_tavern_keeper.yaml` (`revision: r2`):
   - `altoria_tavern.topic_01` (傳聞): Roots in guest conversations, listening etiquette. Includes variant for companion present (`var_companion_violet` with preset `violet_altoria`).
   - `altoria_tavern.topic_02` (同伴): Pure-chain continuation (`predecessors: [altoria_tavern.topic_01]`, `disclosure: pure_chain`). Candid reflections on travel companions and mutual trust.

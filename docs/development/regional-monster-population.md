@@ -198,7 +198,7 @@ Human reviewers should judge, in the declarations themselves:
 
 ### Content expansion habitats
 
-The three weak species of the content expansion (泥膜史萊姆, 膠掌小鬼 and
+The three weak species of the content expansion (泥巴史萊姆, 膠掌小鬼 and
 蠟囊鼠) are placed only through the bounded zones below. Each rectangle is land
 classified into its own parent region, and it stands clear of every published
 settlement, harbor and authored site, so the shared validity rule and the
@@ -208,7 +208,7 @@ count or timing is repeated here.
 
 | Zone keys | Dossier fact it serves | Terrain and scenario fit |
 | --- | --- | --- |
-| `eastern_mudbank_habitat`, `western_mudbank_habitat` | 泥膜史萊姆 keeps to damp banks, old irrigation side-channels and seepage mouths, and depends on standing film water. | Both patches sit in low plains and hill-valley ground that inland waterways cross, which is the damp, shaded low ground the dossier describes. |
+| `eastern_mudbank_habitat`, `western_mudbank_habitat` | 泥巴史萊姆 keeps to damp banks, old irrigation side-channels and seepage mouths, and depends on standing film water. | Both patches sit in low plains and hill-valley ground that inland waterways cross, which is the damp, shaded low ground the dossier describes. |
 | `western_quarry_habitat` | 膠掌小鬼 lives in hill scrub, disused quarry ground and under rock shelving. | Remote, dry, passable western hills, with no inland waterway cell inside the patch and no maintained settlement nearby. |
 | `eastern_cache_habitat`, `western_cache_habitat` | 蠟囊鼠 works plains field margins, disused grain stores and hill transport ground. | A plains field margin and a hill transport patch, both remote from settlements and working facilities, so the authored cache stays a field cache and never a working granary or canal. |
 
@@ -421,7 +421,7 @@ timing.
 
 **Species fit.** Field margins, irrigation side-channels and grain stores lie
 just outside every eastern town, so the sparrow (穗鳴雀), hare (築埂兔), slime
-(泥膜史萊姆) and rat (蠟囊鼠) fit the hinterland of a farming town. The slime's
+(泥巴史萊姆) and rat (蠟囊鼠) fit the hinterland of a farming town. The slime's
 damp-cell deviation, already recorded under "Content expansion habitats",
 applies here too: each zone uses a bounded rectangle rather than individually
 damp cells.
@@ -458,7 +458,7 @@ coordinate, density, count or timing.
 
 **Species fit.** The quarries, transport lanes and scrub around the hill towns
 suit the goblin (膠掌小鬼) and the rat (蠟囊鼠). The hare (築埂兔) and the slime
-(泥膜史萊姆) cover the valley fields and channels. The goat appears only on
+(泥巴史萊姆) cover the valley fields and channels. The goat appears only on
 remote hill roads, so the ground just outside every town stays low tier.
 
 **Tiers.** No stronger or high-tier variant joins an ordinary pool. Settlement

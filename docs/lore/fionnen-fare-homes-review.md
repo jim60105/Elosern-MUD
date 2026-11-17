@@ -53,7 +53,7 @@ The world source states that the Fionnen are the 森林精靈 of 翠綠森林村
 ### Religion
 
 - Canon: elves never proselytise, and outsiders do not know their faith or the truth of the three goddesses. No non-elf NPC explains 神之秘法.
-- Host handling: none of the four hosts teaches theology, names a goddess or explains a divine chain. 希拉拉's 光法 scene treats light magic as a villager's everyday craft and heals nobody in the scene.
+- Host handling: none of the four hosts teaches theology, names a goddess or explains a divine chain. 希拉拉's 光魔法 scene treats light magic as a villager's everyday craft and heals nobody in the scene.
 
 ---
 
@@ -81,7 +81,7 @@ Every scene declares `revision: r1`, opens with a complete actor utterance, hold
 1. **Opening greeting**: Elunwen lowers her bow after the shot lands, looks over the guest's stance and nods at the spare bows by the door. Source: 種族設定 › 斐歐恩族 特色 (擅長弓術); the 靶道 node.
 2. `fionnen_elunwen_home.topic_01` (`keyword`: 箭術, `label`: 箭術): stance comes before breath and breath before the hand, the full draw is released on a half-exhale, and the practice ends when the hand stops needing the thought. Source: 種族設定 › 精靈族 (ability comes from long practice); the 靶道 node.
 3. `fionnen_elunwen_home.topic_02` (`keyword`: 靶道, `label`: 靶道): targets are nailed to trunks for beginners, the far tags swing on ropes and must be timed, the lane never shuts, and she resets the tags every morning. Source: `content/maps/settlements/elven_village_fionnen.yaml` (`archery_lane`).
-4. `fionnen_elunwen_home.topic_03` (`keyword`: 光法, `label`: 光法): archery and light magic share one lane, accuracy is the same discipline in both, and the village's children first learn to hold light in the palm there. Source: 種族設定 › 斐歐恩族 特色 (親和光屬性魔法); the 靶道 node.
+4. `fionnen_elunwen_home.topic_03` (`keyword`: 光魔法, `label`: 光魔法): archery and light magic share one lane, accuracy is the same discipline in both, and the village's children first learn to hold light in the palm there. Source: 種族設定 › 斐歐恩族 特色 (親和光屬性魔法); the 靶道 node.
 5. `fionnen_elunwen_home.topic_04` (`keyword`: 比試, `label`: 比試): she declines a contest, measures the day against the last practice instead, and points at the target that neither yields nor loses and at the spare bows by the door. Source: the host's dialogue-only declaration; 種族設定 › 精靈族 (no fixed trades, nothing to sell).
 
 ### B. `fionnen_firwen_home` (菲爾溫‧埃文斯塔爾)
@@ -111,7 +111,7 @@ Every scene declares `revision: r1`, opens with a complete actor utterance, hold
 1. **Opening greeting**: Sylara comes in from the herb beds, looks the guest over for blood, wipes her hands and names what is ready. Source: 種族設定 › 精靈族 (免疫所有疾病, so her craft is for wounds and for guests); the `forest_plots` node.
 2. `fionnen_sylara_home.topic_01` (`keyword`: 藥草, `label`: 藥草): 止血藥草 grows in the shaded inner beds, is hung to dry out of the sun, and is rubbed onto a cut to close it. Source: the `forest_plots` node; the item registry row (`healing_herb`); the `fionnen_remedies` shelf.
 3. `fionnen_sylara_home.topic_02` (`keyword`: 蜂蠟膏, `label`: 蜂蠟膏): 森林蜂蠟膏 is hive wax from 盧梅斯 cooked slowly with herbs until it darkens, and it seals a cut against water and soil. Source: the item registry row (`fionnen_beeswax_salve`); the hives at 花蕊蜜園.
-4. `fionnen_sylara_home.topic_03` (`keyword`: 光法, `label`: 光法): the Fionnen affinity for light is an everyday fact, light closes a wound and takes down swelling, and bone and dirt still need hands. Source: 種族設定 › 斐歐恩族 特色 (親和光屬性魔法); 生活方式 › 性文化 (the body spoken of plainly).
+4. `fionnen_sylara_home.topic_03` (`keyword`: 光魔法, `label`: 光魔法): the Fionnen affinity for light is an everyday fact, light closes a wound and takes down swelling, and bone and dirt still need hands. Source: 種族設定 › 斐歐恩族 特色 (親和光屬性魔法); 生活方式 › 性文化 (the body spoken of plainly).
 5. `fionnen_sylara_home.topic_04` (`keyword`: 收回, `label`: 收回): she takes back the three goods on her own shelf and declines herbs she does not keep. Source: the home's `fionnen_remedies` service.
 
 ---

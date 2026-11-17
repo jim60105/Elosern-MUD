@@ -257,7 +257,7 @@ REGIONAL_SPECIES_HUNTS: tuple[QuestDefinition, ...] = (
 SITE_CLEAR_OUTS: tuple[QuestDefinition, ...] = (
     QuestDefinition(
         key="ridge_burrow_nest_clear_out",
-        display_name="清剿掘巢兔巢穴",
+        display_name="清剿築埂兔巢穴",
         quest_type=QuestType.DEFEAT,
         rank="E",
         stages=(

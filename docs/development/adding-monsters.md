@@ -133,7 +133,7 @@ uv run --locked python -c "from world.lore.monster_species import MONSTER_VARIAN
 
 ```python
 _skill(
-    "mudfilm_guard", "泥膜收束", "收緊泥膜護住身體。",
+    "mudfilm_guard", "泥巴收束", "收緊泥巴護住身體。",
     SkillKind.ACTIVE, TargetSpec.SELF,
     cost={"sp": 6},
     usable_out_of_combat=False,

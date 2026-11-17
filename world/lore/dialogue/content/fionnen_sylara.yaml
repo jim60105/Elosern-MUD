@@ -50,8 +50,8 @@ topics:
       speaker: host
       text: 「昨天才離火。你伸手，我替你抹一點在指節上，你就曉得它貼不貼皮膚。」
 - topic_id: fionnen_sylara_home.topic_03
-  keyword: 光法
-  label: 光法
+  keyword: 光魔法
+  label: 光魔法
   fallback:
     scene_id: fionnen_sylara_home.topic_03_scene
     revision: r1

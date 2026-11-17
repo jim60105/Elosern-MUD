@@ -26,7 +26,7 @@ World mysteries remain open. Private author fields record the preserved origin b
 
 | Species identity | Public name | New variant | Variant label | Tier and individual grade | Classification |
 | --- | --- | --- | --- | --- | --- |
-| `mudfilm_slime` | 泥膜史萊姆 | `mudbank_dweller` | 濕岸型 | Low, F | Ordinary species baseline |
+| `mudfilm_slime` | 泥巴史萊姆 | `mudbank_dweller` | 濕岸型 | Low, F | Ordinary species baseline |
 | `sticky_palm_goblin` | 膠掌小鬼 | `hanging_nest_forager` | 懸巢型 | Low, F | Ordinary species baseline |
 | `wax_pouch_rat` | 蠟囊鼠 | `wax_cache_forager` | 藏穀型 | Low, F | Ordinary species baseline |
 | Existing `tide_devouring_crocodile` | 吞潮鱷 | `reservoir_warden` | 蓄潮型 | High, A | Stronger variant of the existing species |
@@ -40,11 +40,11 @@ Individual nicknames are display facts, separate from species, variant, quest, s
 
 ## 4. Approved species and variant dossiers
 
-### 4.1 泥膜史萊姆
+### 4.1 泥巴史萊姆
 
 **Public description**
 
-> 泥膜史萊姆棲息於潮濕溝岸、舊灌溉支渠與滲水洞口，以水膜中的腐葉碎屑及微小生物為食。透明膠體外膜黏集細泥，收縮時將泥粒壓成薄韌護膜；移動時，泥紋沿著體表摺疊。
+> 泥巴史萊姆棲息於潮濕溝岸、舊灌溉支渠與滲水洞口，以水膜中的腐葉碎屑及微小生物為食。透明膠體外膜黏集細泥，收縮時將泥粒壓成薄韌護膜；移動時，泥紋沿著體表摺疊。
 
 **Public appearance**
 
@@ -52,7 +52,7 @@ Individual nicknames are display facts, separate from species, variant, quest, s
 
 **Public ecology and local relationship**
 
-> 牠通常獨自行動，濕潤處可見數隻分散覓食。靠近的腳步會使牠縮向陰濕處；遭到逼近時，牠收緊泥膜護住身體，再以短距離撞擊自衛。聚集的個體將細泥帶到狹窄分水口，農人會疏通渠口並處理反覆停留的個體。牠的活動集中於保有水膜的陰濕地帶，護膜則由體表已附著的細泥形成。
+> 牠通常獨自行動，濕潤處可見數隻分散覓食。靠近的腳步會使牠縮向陰濕處；遭到逼近時，牠收緊體表的泥巴護住身體，再以短距離撞擊自衛。聚集的個體將細泥帶到狹窄分水口，農人會疏通渠口並處理反覆停留的個體。牠的活動集中於保有水膜的陰濕地帶，護膜則由體表已附著的細泥形成。
 
 | Authoring face | Approved content |
 | --- | --- |
@@ -165,7 +165,7 @@ The entries below define executable behavior. Ecology observations such as nesti
 
 | Owner variant | Skill identity and label | Target and committed effect | Resource authority |
 | --- | --- | --- | --- |
-| `mudbank_dweller` | `mudfilm_guard`, 泥膜收束 | Self; short defense improvement, independent of a hit. Innate ordinary attack remains a contact impact. | Positive authored SP cost. |
+| `mudbank_dweller` | `mudfilm_guard`, 泥巴收束 | Self; short defense improvement, independent of a hit. Innate ordinary attack remains a contact impact. | Positive authored SP cost. |
 | `hanging_nest_forager` | `sticky_palm_grab`, 黏掌抓扯 | One enemy; ordinary elementless physical strike, with a brief negative agility modifier only on a landed hit. | Positive authored SP cost. |
 | `wax_cache_forager` | `wax_pouch_slip`, 滑蠟翻身 | Self; short positive agility modifier, independent of a hit. This action changes combat modifiers rather than location. | Positive authored SP cost. |
 | `reservoir_warden` | Existing `tide_devouring_bite`, 吞潮咬擊 | Existing near-contact damage and actual-loss MP transfer, with its current targeting, payment, and transfer rules. | Existing skill declaration. |
@@ -199,7 +199,7 @@ Each weak species receives only bounded authored ecology placement appropriate t
 
 | Species | Birth composition | Movement | Contact policy |
 | --- | --- | --- | --- |
-| 泥膜史萊姆 | One to three | Independent solitary units after birth | Passive |
+| 泥巴史萊姆 | One to three | Independent solitary units after birth | Passive |
 | 膠掌小鬼 | Two to four | Cohesive group in a bounded quarry/scrub activity area | Hostile in defended nest area; otherwise retreat-oriented |
 | 蠟囊鼠 | Two to five | Cohesive family in a bounded margin/cache activity area | Hostile in defended cache area; otherwise retreat-oriented |
 
@@ -280,7 +280,7 @@ Twelve OpenSpec changes implement this design under `openspec/changes/`. All twe
 | 2 | `owned-kit-decision-coverage` | 5, 6, 9 | Report any shipped variant whose owned support active its effective legacy mode can never select, without blocking rollback | none | 1 |
 | 3 | `affirmative-monster-prose-guidelines` | 2, 8 | Affirmative public-prose rule, third-batch approval scope and roster-free kit wording in the creation guide (docs only) | none | 1 |
 | 4 | `site-member-activity-bindings` | 3, 7.2, 7.3 | Per-row activity bindings, optional site override with precedence, designated single-individual display label | 1 | 2 |
-| 5 | `mudfilm-slime-species` | 3, 4.1, 5, 6, 8 | 泥膜史萊姆・濕岸型, self film guard, utility binding, bestiary and ledger, first support-only representative | 2, 3 | 2 |
+| 5 | `mudfilm-slime-species` | 3, 4.1, 5, 6, 8 | 泥巴史萊姆・濕岸型, self film guard, utility binding, bestiary and ledger, first support-only representative | 2, 3 | 2 |
 | 6 | `wax-pouch-rat-species` | 3, 4.3, 5, 6, 8 | 蠟囊鼠・藏穀型, self agility slip, utility binding, bestiary and ledger | 5 | 3 |
 | 7 | `sticky-palm-goblin-species` | 3, 4.2, 5, 6, 8 | 膠掌小鬼・懸巢型, elementless grab with landed-hit agility penalty, legacy binding, bestiary and ledger | 6 | 4 |
 | 8 | `reservoir-warden-variant` | 3, 4.4, 5, 6, 8 | 吞潮鱷・蓄潮型 high A, existing drain plus MP-funded self guard, utility binding, affirmative crocodile rewrite, new representative | 7, 2 | 5 |

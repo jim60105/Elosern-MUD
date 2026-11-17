@@ -1,5 +1,5 @@
 schema_version: 1
-greeting: 商會公所的尤斯汀‧柯德溫會長從稅率長桌後起身，向來客鄭重欠身：「歡迎來到商會公所。閣下若想了解東市商隊、各方商路或公所會務，本人樂意說明。但有一點請閣下先知悉，商會公所概不發放護衛委託。」
+greeting: 商會公所的尤斯汀‧柯德溫會長從稅率長桌後起身，向來客鄭重欠身：「歡迎來到商會公所。閣下若想了解東市商隊、各方貿易路線或公所會務，本人樂意說明。但有一點請閣下先知悉，商會公所概不發放護衛委託。」
 topics:
 - topic_id: altoria_merchant_hall.topic_01
   keyword: 商隊
@@ -45,15 +45,15 @@ topics:
       speaker: host
       text: 「本公所嚴守職責，不安排旁人搭車同行，亦不替任何行商擔保私運貨物。商隊與護衛間的私下約定概與公所無涉，這一點必須向閣下說明清楚。」
 - topic_id: altoria_merchant_hall.topic_02
-  keyword: 商路
-  label: 商路
+  keyword: 貿易路線
+  label: 貿易路線
   fallback:
     scene_id: altoria_merchant_hall.topic_02_scene
     revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 王都的各條對外商路是如何劃分的？大宗貨物通常從哪座城門出入？
+      text: 王都的各條對外貿易路線是如何劃分的？大宗貨物通常從哪座城門出入？
     - kind: narration
       text: 尤斯汀‧柯德溫會長走到懸掛的羊皮紙路線圖前，指尖沿著主幹商道緩步劃過。
     - kind: speech
@@ -64,7 +64,7 @@ topics:
       text: 如果想探聽東門外官道沿途的治安與岔路，公所能提供指引嗎？
     - kind: speech
       speaker: host
-      text: 「公所只核算關稅與商路通暢度，並不掌管沿線防務。閣下若欲詳詢城外哨所與路況，駐守城門的王國衛兵隊遠比本人清楚得多。」
+      text: 「公所只核算關稅與貿易路線通暢度，並不掌管沿線防務。閣下若欲詳詢城外哨所與路況，駐守城門的王國衛兵隊遠比本人清楚得多。」
 - topic_id: altoria_merchant_hall.topic_03
   keyword: 委託
   label: 委託

@@ -43,7 +43,7 @@ Review date: 2026-10-26.
 - Opening (`greeting`): Thorwald turns sharply from inspecting the south gate, chainmail gleaming, stating duties clearly: directions and security are answered; no commissions or bounties exist here.
 - `altoria_guardhouse.topic_01` (`進城`):
   - `fallback` (`scene_id: altoria_guardhouse.topic_01_scene`, `revision: r2`): 5 lines. Uses wall map and points out South Boulevard, Central Plaza, Guild Front, Market Street, and Holy Steps with firm spatial orientation.
-- `altoria_guardhouse.topic_02` (`找活`):
+- `altoria_guardhouse.topic_02` (`差事`):
   - `fallback` (`scene_id: altoria_guardhouse.topic_02_scene`, `revision: r2`): 5 lines. Guardhouse issues zero commissions; explains the civic principle of public defense vs. private mutual aid, directing work-seekers to guild hall boards.
 - `altoria_guardhouse.topic_03` (`治安`):
   - `fallback` (`scene_id: altoria_guardhouse.topic_03_scene`, `revision: r2`): 5 lines. Explains patrolling guards in blue tabards; clarifies guard jurisdiction (defense against theft, brawls, beasts) while disclaiming private merchant price disputes.

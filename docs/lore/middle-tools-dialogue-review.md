@@ -82,7 +82,7 @@ Aligned to the refined standard with enthusiastic conversational tone, attentive
 4. `altoria_tailor.topic_03` (keyword: 禮服):
    - Variant `noble_formalwear` (`SocialIdentityIs`: `noble`, priority 10): Host acknowledges noble patron and discusses banqueting attire and Grand Temple holy vestments.
    - Fallback `altoria_tailor.topic_03_fallback_scene`: Host discusses orders from north avenue nobles, church nuns' open holy robes, saintess vestments, and confidential custom lace intimate wear fitting.
-5. `altoria_tailor.topic_04` (keyword: 收衣):
+5. `altoria_tailor.topic_04` (keyword: 收購):
    - Actor asks about buy-back of old clothing. Host confirms buy-back for restitching and re-lining into fresh gear.
 
 ---

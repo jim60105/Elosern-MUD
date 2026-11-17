@@ -32,7 +32,7 @@ nodes:
     y_m: 386
     prototype_parent: grid_room
     key: 西北村口
-    desc: 西北村口接往銀嶺鎮的商路，樹蔭下歇著挑擔的果販。擔子兩頭還剩幾筐青橙，葉子沒摘，看著格外新鮮。
+    desc: 西北村口接往銀嶺鎮的貿易路線，樹蔭下歇著挑擔的果販。擔子兩頭還剩幾筐青橙，葉子沒摘，看著格外新鮮。
     anchor_key:
     typeclass:
     scene_archetype: city_street

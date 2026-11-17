@@ -255,7 +255,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "99d8c7cdf1d290ca5a039380847f1799f2536c4a42e366848743228ff3167c02",
+  "fingerprint": "29657d9c442b56f5062e66d4ebc9401f41cd1f00a452b9322a4abfb80f04283c",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -2620,7 +2620,7 @@
                 "maximum": 2,
                 "minimum": 1,
                 "species_key": "mudfilm_slime",
-                "species_name_zh": "泥膜史萊姆",
+                "species_name_zh": "泥巴史萊姆",
                 "variant_key": "mudbank_dweller",
                 "variant_name_zh": "濕岸型"
               }
@@ -2710,7 +2710,7 @@
                 "maximum": 2,
                 "minimum": 1,
                 "species_key": "mudfilm_slime",
-                "species_name_zh": "泥膜史萊姆",
+                "species_name_zh": "泥巴史萊姆",
                 "variant_key": "mudbank_dweller",
                 "variant_name_zh": "濕岸型"
               }
@@ -2814,7 +2814,7 @@
                 "maximum": 2,
                 "minimum": 1,
                 "species_key": "mudfilm_slime",
-                "species_name_zh": "泥膜史萊姆",
+                "species_name_zh": "泥巴史萊姆",
                 "variant_key": "mudbank_dweller",
                 "variant_name_zh": "濕岸型"
               }
@@ -2904,7 +2904,7 @@
                 "maximum": 2,
                 "minimum": 1,
                 "species_key": "mudfilm_slime",
-                "species_name_zh": "泥膜史萊姆",
+                "species_name_zh": "泥巴史萊姆",
                 "variant_key": "mudbank_dweller",
                 "variant_name_zh": "濕岸型"
               }
@@ -3270,7 +3270,7 @@
                 "maximum": 2,
                 "minimum": 1,
                 "species_key": "mudfilm_slime",
-                "species_name_zh": "泥膜史萊姆",
+                "species_name_zh": "泥巴史萊姆",
                 "variant_key": "mudbank_dweller",
                 "variant_name_zh": "濕岸型"
               }
@@ -3360,7 +3360,7 @@
                 "maximum": 2,
                 "minimum": 1,
                 "species_key": "mudfilm_slime",
-                "species_name_zh": "泥膜史萊姆",
+                "species_name_zh": "泥巴史萊姆",
                 "variant_key": "mudbank_dweller",
                 "variant_name_zh": "濕岸型"
               }
@@ -3450,7 +3450,7 @@
                 "maximum": 2,
                 "minimum": 1,
                 "species_key": "mudfilm_slime",
-                "species_name_zh": "泥膜史萊姆",
+                "species_name_zh": "泥巴史萊姆",
                 "variant_key": "mudbank_dweller",
                 "variant_name_zh": "濕岸型"
               }
@@ -3540,7 +3540,7 @@
                 "maximum": 2,
                 "minimum": 1,
                 "species_key": "mudfilm_slime",
-                "species_name_zh": "泥膜史萊姆",
+                "species_name_zh": "泥巴史萊姆",
                 "variant_key": "mudbank_dweller",
                 "variant_name_zh": "濕岸型"
               }
@@ -3630,7 +3630,7 @@
                 "maximum": 2,
                 "minimum": 1,
                 "species_key": "mudfilm_slime",
-                "species_name_zh": "泥膜史萊姆",
+                "species_name_zh": "泥巴史萊姆",
                 "variant_key": "mudbank_dweller",
                 "variant_name_zh": "濕岸型"
               }
@@ -3720,7 +3720,7 @@
                 "maximum": 2,
                 "minimum": 1,
                 "species_key": "mudfilm_slime",
-                "species_name_zh": "泥膜史萊姆",
+                "species_name_zh": "泥巴史萊姆",
                 "variant_key": "mudbank_dweller",
                 "variant_name_zh": "濕岸型"
               }
@@ -3934,7 +3934,7 @@
                 "maximum": 2,
                 "minimum": 1,
                 "species_key": "mudfilm_slime",
-                "species_name_zh": "泥膜史萊姆",
+                "species_name_zh": "泥巴史萊姆",
                 "variant_key": "mudbank_dweller",
                 "variant_name_zh": "濕岸型"
               }
@@ -4024,7 +4024,7 @@
                 "maximum": 2,
                 "minimum": 1,
                 "species_key": "mudfilm_slime",
-                "species_name_zh": "泥膜史萊姆",
+                "species_name_zh": "泥巴史萊姆",
                 "variant_key": "mudbank_dweller",
                 "variant_name_zh": "濕岸型"
               }
@@ -4252,7 +4252,7 @@
                 "maximum": 2,
                 "minimum": 1,
                 "species_key": "mudfilm_slime",
-                "species_name_zh": "泥膜史萊姆",
+                "species_name_zh": "泥巴史萊姆",
                 "variant_key": "mudbank_dweller",
                 "variant_name_zh": "濕岸型"
               }
@@ -4342,7 +4342,7 @@
                 "maximum": 2,
                 "minimum": 1,
                 "species_key": "mudfilm_slime",
-                "species_name_zh": "泥膜史萊姆",
+                "species_name_zh": "泥巴史萊姆",
                 "variant_key": "mudbank_dweller",
                 "variant_name_zh": "濕岸型"
               }
@@ -5176,7 +5176,7 @@
                 "maximum": 2,
                 "minimum": 1,
                 "species_key": "mudfilm_slime",
-                "species_name_zh": "泥膜史萊姆",
+                "species_name_zh": "泥巴史萊姆",
                 "variant_key": "mudbank_dweller",
                 "variant_name_zh": "濕岸型"
               }
@@ -5266,7 +5266,7 @@
                 "maximum": 2,
                 "minimum": 1,
                 "species_key": "mudfilm_slime",
-                "species_name_zh": "泥膜史萊姆",
+                "species_name_zh": "泥巴史萊姆",
                 "variant_key": "mudbank_dweller",
                 "variant_name_zh": "濕岸型"
               }
@@ -5356,7 +5356,7 @@
                 "maximum": 2,
                 "minimum": 1,
                 "species_key": "mudfilm_slime",
-                "species_name_zh": "泥膜史萊姆",
+                "species_name_zh": "泥巴史萊姆",
                 "variant_key": "mudbank_dweller",
                 "variant_name_zh": "濕岸型"
               }
@@ -5446,7 +5446,7 @@
                 "maximum": 2,
                 "minimum": 1,
                 "species_key": "mudfilm_slime",
-                "species_name_zh": "泥膜史萊姆",
+                "species_name_zh": "泥巴史萊姆",
                 "variant_key": "mudbank_dweller",
                 "variant_name_zh": "濕岸型"
               }
@@ -5784,7 +5784,7 @@
                 "maximum": 2,
                 "minimum": 1,
                 "species_key": "mudfilm_slime",
-                "species_name_zh": "泥膜史萊姆",
+                "species_name_zh": "泥巴史萊姆",
                 "variant_key": "mudbank_dweller",
                 "variant_name_zh": "濕岸型"
               }
@@ -5874,7 +5874,7 @@
                 "maximum": 2,
                 "minimum": 1,
                 "species_key": "mudfilm_slime",
-                "species_name_zh": "泥膜史萊姆",
+                "species_name_zh": "泥巴史萊姆",
                 "variant_key": "mudbank_dweller",
                 "variant_name_zh": "濕岸型"
               }
@@ -5964,7 +5964,7 @@
                 "maximum": 2,
                 "minimum": 1,
                 "species_key": "mudfilm_slime",
-                "species_name_zh": "泥膜史萊姆",
+                "species_name_zh": "泥巴史萊姆",
                 "variant_key": "mudbank_dweller",
                 "variant_name_zh": "濕岸型"
               }
@@ -6054,7 +6054,7 @@
                 "maximum": 2,
                 "minimum": 1,
                 "species_key": "mudfilm_slime",
-                "species_name_zh": "泥膜史萊姆",
+                "species_name_zh": "泥巴史萊姆",
                 "variant_key": "mudbank_dweller",
                 "variant_name_zh": "濕岸型"
               }
@@ -6940,7 +6940,7 @@
                 "maximum": 3,
                 "minimum": 1,
                 "species_key": "mudfilm_slime",
-                "species_name_zh": "泥膜史萊姆",
+                "species_name_zh": "泥巴史萊姆",
                 "variant_key": "mudbank_dweller",
                 "variant_name_zh": "濕岸型"
               }
@@ -7002,7 +7002,7 @@
                 "maximum": 2,
                 "minimum": 1,
                 "species_key": "mudfilm_slime",
-                "species_name_zh": "泥膜史萊姆",
+                "species_name_zh": "泥巴史萊姆",
                 "variant_key": "mudbank_dweller",
                 "variant_name_zh": "濕岸型"
               }
@@ -7120,7 +7120,7 @@
                 "maximum": 2,
                 "minimum": 1,
                 "species_key": "mudfilm_slime",
-                "species_name_zh": "泥膜史萊姆",
+                "species_name_zh": "泥巴史萊姆",
                 "variant_key": "mudbank_dweller",
                 "variant_name_zh": "濕岸型"
               }
@@ -7238,7 +7238,7 @@
                 "maximum": 2,
                 "minimum": 1,
                 "species_key": "mudfilm_slime",
-                "species_name_zh": "泥膜史萊姆",
+                "species_name_zh": "泥巴史萊姆",
                 "variant_key": "mudbank_dweller",
                 "variant_name_zh": "濕岸型"
               }
@@ -7356,7 +7356,7 @@
                 "maximum": 2,
                 "minimum": 1,
                 "species_key": "mudfilm_slime",
-                "species_name_zh": "泥膜史萊姆",
+                "species_name_zh": "泥巴史萊姆",
                 "variant_key": "mudbank_dweller",
                 "variant_name_zh": "濕岸型"
               }
@@ -7474,7 +7474,7 @@
                 "maximum": 2,
                 "minimum": 1,
                 "species_key": "mudfilm_slime",
-                "species_name_zh": "泥膜史萊姆",
+                "species_name_zh": "泥巴史萊姆",
                 "variant_key": "mudbank_dweller",
                 "variant_name_zh": "濕岸型"
               }
@@ -7592,7 +7592,7 @@
                 "maximum": 2,
                 "minimum": 1,
                 "species_key": "mudfilm_slime",
-                "species_name_zh": "泥膜史萊姆",
+                "species_name_zh": "泥巴史萊姆",
                 "variant_key": "mudbank_dweller",
                 "variant_name_zh": "濕岸型"
               }
@@ -7710,7 +7710,7 @@
                 "maximum": 2,
                 "minimum": 1,
                 "species_key": "mudfilm_slime",
-                "species_name_zh": "泥膜史萊姆",
+                "species_name_zh": "泥巴史萊姆",
                 "variant_key": "mudbank_dweller",
                 "variant_name_zh": "濕岸型"
               }
@@ -7828,7 +7828,7 @@
                 "maximum": 2,
                 "minimum": 1,
                 "species_key": "mudfilm_slime",
-                "species_name_zh": "泥膜史萊姆",
+                "species_name_zh": "泥巴史萊姆",
                 "variant_key": "mudbank_dweller",
                 "variant_name_zh": "濕岸型"
               }
@@ -7946,7 +7946,7 @@
                 "maximum": 2,
                 "minimum": 1,
                 "species_key": "mudfilm_slime",
-                "species_name_zh": "泥膜史萊姆",
+                "species_name_zh": "泥巴史萊姆",
                 "variant_key": "mudbank_dweller",
                 "variant_name_zh": "濕岸型"
               }
@@ -8064,7 +8064,7 @@
                 "maximum": 2,
                 "minimum": 1,
                 "species_key": "mudfilm_slime",
-                "species_name_zh": "泥膜史萊姆",
+                "species_name_zh": "泥巴史萊姆",
                 "variant_key": "mudbank_dweller",
                 "variant_name_zh": "濕岸型"
               }
@@ -8182,7 +8182,7 @@
                 "maximum": 2,
                 "minimum": 1,
                 "species_key": "mudfilm_slime",
-                "species_name_zh": "泥膜史萊姆",
+                "species_name_zh": "泥巴史萊姆",
                 "variant_key": "mudbank_dweller",
                 "variant_name_zh": "濕岸型"
               }
@@ -8300,7 +8300,7 @@
                 "maximum": 2,
                 "minimum": 1,
                 "species_key": "mudfilm_slime",
-                "species_name_zh": "泥膜史萊姆",
+                "species_name_zh": "泥巴史萊姆",
                 "variant_key": "mudbank_dweller",
                 "variant_name_zh": "濕岸型"
               }
@@ -10282,7 +10282,7 @@
                 "maximum": 2,
                 "minimum": 1,
                 "species_key": "mudfilm_slime",
-                "species_name_zh": "泥膜史萊姆",
+                "species_name_zh": "泥巴史萊姆",
                 "variant_key": "mudbank_dweller",
                 "variant_name_zh": "濕岸型"
               }
@@ -10628,7 +10628,7 @@
                 "maximum": 2,
                 "minimum": 1,
                 "species_key": "mudfilm_slime",
-                "species_name_zh": "泥膜史萊姆",
+                "species_name_zh": "泥巴史萊姆",
                 "variant_key": "mudbank_dweller",
                 "variant_name_zh": "濕岸型"
               }
@@ -10912,7 +10912,7 @@
                 "maximum": 2,
                 "minimum": 1,
                 "species_key": "mudfilm_slime",
-                "species_name_zh": "泥膜史萊姆",
+                "species_name_zh": "泥巴史萊姆",
                 "variant_key": "mudbank_dweller",
                 "variant_name_zh": "濕岸型"
               }
@@ -10988,7 +10988,7 @@
                 "maximum": 2,
                 "minimum": 1,
                 "species_key": "mudfilm_slime",
-                "species_name_zh": "泥膜史萊姆",
+                "species_name_zh": "泥巴史萊姆",
                 "variant_key": "mudbank_dweller",
                 "variant_name_zh": "濕岸型"
               }
@@ -11078,7 +11078,7 @@
                 "maximum": 2,
                 "minimum": 1,
                 "species_key": "mudfilm_slime",
-                "species_name_zh": "泥膜史萊姆",
+                "species_name_zh": "泥巴史萊姆",
                 "variant_key": "mudbank_dweller",
                 "variant_name_zh": "濕岸型"
               }
@@ -12846,7 +12846,7 @@
                 "maximum": 2,
                 "minimum": 1,
                 "species_key": "mudfilm_slime",
-                "species_name_zh": "泥膜史萊姆",
+                "species_name_zh": "泥巴史萊姆",
                 "variant_key": "mudbank_dweller",
                 "variant_name_zh": "濕岸型"
               }
@@ -12936,7 +12936,7 @@
                 "maximum": 2,
                 "minimum": 1,
                 "species_key": "mudfilm_slime",
-                "species_name_zh": "泥膜史萊姆",
+                "species_name_zh": "泥巴史萊姆",
                 "variant_key": "mudbank_dweller",
                 "variant_name_zh": "濕岸型"
               }
@@ -13012,7 +13012,7 @@
                 "maximum": 2,
                 "minimum": 1,
                 "species_key": "mudfilm_slime",
-                "species_name_zh": "泥膜史萊姆",
+                "species_name_zh": "泥巴史萊姆",
                 "variant_key": "mudbank_dweller",
                 "variant_name_zh": "濕岸型"
               }
@@ -13178,7 +13178,7 @@
                 "maximum": 2,
                 "minimum": 1,
                 "species_key": "mudfilm_slime",
-                "species_name_zh": "泥膜史萊姆",
+                "species_name_zh": "泥巴史萊姆",
                 "variant_key": "mudbank_dweller",
                 "variant_name_zh": "濕岸型"
               }
@@ -13268,7 +13268,7 @@
                 "maximum": 2,
                 "minimum": 1,
                 "species_key": "mudfilm_slime",
-                "species_name_zh": "泥膜史萊姆",
+                "species_name_zh": "泥巴史萊姆",
                 "variant_key": "mudbank_dweller",
                 "variant_name_zh": "濕岸型"
               }
@@ -13530,7 +13530,7 @@
                 "maximum": 2,
                 "minimum": 1,
                 "species_key": "mudfilm_slime",
-                "species_name_zh": "泥膜史萊姆",
+                "species_name_zh": "泥巴史萊姆",
                 "variant_key": "mudbank_dweller",
                 "variant_name_zh": "濕岸型"
               }
@@ -13634,7 +13634,7 @@
                 "maximum": 2,
                 "minimum": 1,
                 "species_key": "mudfilm_slime",
-                "species_name_zh": "泥膜史萊姆",
+                "species_name_zh": "泥巴史萊姆",
                 "variant_key": "mudbank_dweller",
                 "variant_name_zh": "濕岸型"
               }
@@ -13724,7 +13724,7 @@
                 "maximum": 2,
                 "minimum": 1,
                 "species_key": "mudfilm_slime",
-                "species_name_zh": "泥膜史萊姆",
+                "species_name_zh": "泥巴史萊姆",
                 "variant_key": "mudbank_dweller",
                 "variant_name_zh": "濕岸型"
               }
@@ -13876,7 +13876,7 @@
                 "maximum": 2,
                 "minimum": 1,
                 "species_key": "mudfilm_slime",
-                "species_name_zh": "泥膜史萊姆",
+                "species_name_zh": "泥巴史萊姆",
                 "variant_key": "mudbank_dweller",
                 "variant_name_zh": "濕岸型"
               }
@@ -14014,7 +14014,7 @@
                 "maximum": 2,
                 "minimum": 1,
                 "species_key": "mudfilm_slime",
-                "species_name_zh": "泥膜史萊姆",
+                "species_name_zh": "泥巴史萊姆",
                 "variant_key": "mudbank_dweller",
                 "variant_name_zh": "濕岸型"
               }
@@ -14104,7 +14104,7 @@
                 "maximum": 2,
                 "minimum": 1,
                 "species_key": "mudfilm_slime",
-                "species_name_zh": "泥膜史萊姆",
+                "species_name_zh": "泥巴史萊姆",
                 "variant_key": "mudbank_dweller",
                 "variant_name_zh": "濕岸型"
               }
@@ -14270,7 +14270,7 @@
                 "maximum": 2,
                 "minimum": 1,
                 "species_key": "mudfilm_slime",
-                "species_name_zh": "泥膜史萊姆",
+                "species_name_zh": "泥巴史萊姆",
                 "variant_key": "mudbank_dweller",
                 "variant_name_zh": "濕岸型"
               }
@@ -14422,7 +14422,7 @@
                 "maximum": 2,
                 "minimum": 1,
                 "species_key": "mudfilm_slime",
-                "species_name_zh": "泥膜史萊姆",
+                "species_name_zh": "泥巴史萊姆",
                 "variant_key": "mudbank_dweller",
                 "variant_name_zh": "濕岸型"
               }
@@ -14512,7 +14512,7 @@
                 "maximum": 2,
                 "minimum": 1,
                 "species_key": "mudfilm_slime",
-                "species_name_zh": "泥膜史萊姆",
+                "species_name_zh": "泥巴史萊姆",
                 "variant_key": "mudbank_dweller",
                 "variant_name_zh": "濕岸型"
               }
@@ -14602,7 +14602,7 @@
                 "maximum": 2,
                 "minimum": 1,
                 "species_key": "mudfilm_slime",
-                "species_name_zh": "泥膜史萊姆",
+                "species_name_zh": "泥巴史萊姆",
                 "variant_key": "mudbank_dweller",
                 "variant_name_zh": "濕岸型"
               }
@@ -14678,7 +14678,7 @@
                 "maximum": 2,
                 "minimum": 1,
                 "species_key": "mudfilm_slime",
-                "species_name_zh": "泥膜史萊姆",
+                "species_name_zh": "泥巴史萊姆",
                 "variant_key": "mudbank_dweller",
                 "variant_name_zh": "濕岸型"
               }
@@ -14768,7 +14768,7 @@
                 "maximum": 2,
                 "minimum": 1,
                 "species_key": "mudfilm_slime",
-                "species_name_zh": "泥膜史萊姆",
+                "species_name_zh": "泥巴史萊姆",
                 "variant_key": "mudbank_dweller",
                 "variant_name_zh": "濕岸型"
               }
@@ -15278,7 +15278,7 @@
                 "maximum": 3,
                 "minimum": 1,
                 "species_key": "mudfilm_slime",
-                "species_name_zh": "泥膜史萊姆",
+                "species_name_zh": "泥巴史萊姆",
                 "variant_key": "mudbank_dweller",
                 "variant_name_zh": "濕岸型"
               }
@@ -15540,7 +15540,7 @@
                 "maximum": 2,
                 "minimum": 1,
                 "species_key": "mudfilm_slime",
-                "species_name_zh": "泥膜史萊姆",
+                "species_name_zh": "泥巴史萊姆",
                 "variant_key": "mudbank_dweller",
                 "variant_name_zh": "濕岸型"
               }
@@ -16481,7 +16481,7 @@
     "world/lore/map_districts.py": "5a3e96fa284cf4ecaa3bb1590f4080405a13c98164b402c4a275336a88c71039",
     "world/lore/monster_activity.py": "36767fd6cf5d1a4fa88549a81e756fe79ad0ddba88dad9baa10b2a192e2d1272",
     "world/lore/monster_placement.py": "d8391232522e5e6c094564024f7eae61f63cd6c3eef6b6a4fb6ea352637a8920",
-    "world/lore/monster_species.py": "1e45f531ce40797d445b0c2749032e935e3fbb3fe3bbe28353cb140327dd40d1",
+    "world/lore/monster_species.py": "54cdef7394ada1b065a93a3e9a2ba9c8ce3c422986151c5052c6fab112ce491d",
     "world/lore/monster_visuals.py": "ce1fcebc3b787cce4cf249e49577a1b00ef5bdebd873167c114ae2a9138aaff6",
     "world/lore/monsters.py": "550abd3a3571da752b02bb75cf941dc2ab0fb89269ed32be8680cab5c9fc92bf",
     "world/lore/names.py": "6d0986df5b8cbe54153a7186faa617709049aa1bc2c6479a5b5ec2ea5ce2a1b9",
@@ -16489,7 +16489,7 @@
     "world/lore/npc_card.py": "dfcfdd19ccbe3e92f7a3a7a8a561e423ba8710b14b7172cefb5f1c4fb9713dbd",
     "world/lore/npc_editorial_review.py": "9344e2b199fb4c2d83e2d18742aaa124b6eeb9a5585fa5afcc60fc0e8ecc3fdb",
     "world/lore/npc_profiles/__init__.py": "11fd39fc753e51807a6a62e59b845c14f08d8817dc97c5b55836e1f67351fc4c",
-    "world/lore/npc_profiles/altoria_guild.py": "5ac6011e554ca43e0ffad9f91670da241b203272a389b41a6c3376bb169c95a4",
+    "world/lore/npc_profiles/altoria_guild.py": "c07fd162cdfcbbd4ecdc1a48d32b18a16fb4cd0a64c689e7ed9d25caeac5803f",
     "world/lore/npc_profiles/altoria_lower.py": "18f438c32952395df80e67f773fb99b6b7f483514cd28e5c14c62fd652f5cddb",
     "world/lore/npc_profiles/altoria_trade.py": "9368ef1a12d229766215dea01e32e515aba3b56d3458fd096317e8765be6921b",
     "world/lore/npc_profiles/altoria_upper.py": "7e56851af9c403a06bd172e3d74e1e2b16f72c7d0a1d1fbfaa5fc8184a7836ee",
@@ -16497,7 +16497,7 @@
     "world/lore/npc_profiles/ciaran_homes_b.py": "25706dd33bcbaabba3390a7f2bbccd8abf5dea6fbbd1dee86a667639536980b6",
     "world/lore/npc_profiles/eolas_homes_a.py": "a0855870d9653b3af134c9c4ec3e34b852b010978de59d9a4bc2270383e5cbfe",
     "world/lore/npc_profiles/eolas_homes_b.py": "e3dc7c29b813c3c9c04c6bda29722df3e80a184f57bba1ec51f7455a34c244b2",
-    "world/lore/npc_profiles/fionnen_homes_a.py": "253586ec682f298022ec05da07414a5be595eed20cbde353443e4cf4ec36f6a1",
+    "world/lore/npc_profiles/fionnen_homes_a.py": "55305abc600538a383b5068a983a04e1032837b87eedd12bbbd018e8ce1a5d00",
     "world/lore/npc_profiles/fionnen_homes_b.py": "34e16840fbf55f39e15fcac313bc72250c70c8dd589fbaf3c44e8eb5b36801ff",
     "world/lore/npc_profiles/inventory.py": "47624e0e9ac49db999f3b882a02d391e3d9593691710dbab8537b611475aacad",
     "world/lore/npc_profiles/shape.py": "988fc9dea7ad2f706bef99f8d6df265e423802af79a76880b6099cd2ba2be4fa",
@@ -16508,7 +16508,7 @@
     "world/lore/player_presets/data_story_cards.py": "5e32cc686b4bdbc2ab8674fd06ae8b963dbf61bbfc594294200d3bb4abe3ae5a",
     "world/lore/player_presets/validation.py": "51bad97af51ba44c701a2c07d67180293ab4b9f8999f392f492c54a55712e0d2",
     "world/lore/player_presets/vocab.py": "40b9f00671e848829cf0430aaaa9f49190af40c9a2359494ba254ab28c270c8e",
-    "world/lore/races.py": "584a36e0d26c966e769661d3c1a3a2e3bba1e813b04b3c3297dd60ef1e653345",
+    "world/lore/races.py": "a6e1f69f9f49b0a176e69a4920f460299ae7778a2de04b1bcf8dacd1de82162a",
     "world/lore/registry_index.py": "ec6c813f5313c9b840eb590ce499fd7ecff997cb6d117a35b4709cf2213cf096",
     "world/lore/registry_refs.py": "26bf919f94ae5cd7a451570d734c5d13bd2080137f55a111a26c4554d29646b8",
     "world/lore/rites/__init__.py": "167fddd4cd27b054638ab3ecb6def50bd16bdf5a85e7b4bb2850cbeca714cb65",
@@ -16518,7 +16518,7 @@
     "world/lore/scenes.py": "ba525c31108b5abcd3c487df9578d6e38e5dc2504b6cf4cf5711313e2dd97898",
     "world/lore/settlements/__init__.py": "1c7fd1552b8a65b120e123caecadb4db00fe0ad4e0a1d58adcf49aa94243288f",
     "world/lore/settlements/_prose_lang.py": "452e2e13b53f094b47a5dce29b0f108cfa3f78c93af25a026b523d3a62f057af",
-    "world/lore/settlements/assortments.py": "1b0334411d65c56be2e62b6c6e9611451a74ce90d7020e0c1780ad7a68475843",
+    "world/lore/settlements/assortments.py": "c2576802ace47f628b205b96fd1c414de158d8fda7bd3cce83128e7ad163423f",
     "world/lore/settlements/capability_declarations.py": "86725146d3a2230f53b1db68163bd84c4bd365c2b6f9bfe62a30f9d6b81a423d",
     "world/lore/settlements/places.py": "7b22491f1284e739157a1a0c3eb9c0f2d91611b0ed36c2838b9ee6b13568dfb9",
     "world/lore/settlements/places_altoria_lower.py": "df54efbc83397df741a804c40a936f02bed2f347f1a63584dad2960cf528c874",
@@ -16543,7 +16543,7 @@
     "world/quests/apps.py": "c8fd1d104d7bf2e270d1cd2504445dc667c2ba49d4da38f99d8e894c9bdeaeb5",
     "world/quests/binding.py": "4d50b7f94eb1ad272bf691ec1b9508c8475b2ca1d1139d5f6ab9be1847879c16",
     "world/quests/bootstrap.py": "d64a567757362d79a1162a9d9c4fbff9adcfefa3329f612093ea91a82d45e49b",
-    "world/quests/catalog.py": "b87308d7f7f0a218bc47b4969fe477522a7d85786a87ebb2351ebd9432486822",
+    "world/quests/catalog.py": "507365d97446f1a095c98a8c673eb25ce9b3370bd9d59e3a2f172aff7cb1c406",
     "world/quests/characterization.py": "0125ecad710e2d61683c4cad0137e5c61fb02de6fe2887cc134a7e6ea6eabcaf",
     "world/quests/compile/__init__.py": "e52ae929e45be519dbc5ad638c4a1db4e56e017201fe613a1dddb4e0623da4d7",
     "world/quests/compile/canonical.py": "b70508b66845c24019760d3ab77e7d598ae081744c1bc4442fb7cd1a75bac51d",
@@ -16762,11 +16762,11 @@
     "world/rules/quest_issuance.py": "8698b1c8f52cc8332fda539183ed54df2c67afa5f7a9ecfb156c69b0f9e7613f",
     "world/rules/rulebook/__init__.py": "9c6e9b3de3817bc32f9de33f76096e8e22c71184628871c295d643aa664ca1c1",
     "world/rules/rulebook/affinity.yaml": "2df4db4fefd5672c966d1cdb082a520a03f35fba14d8d20d866031432a8e2795",
-    "world/rules/rulebook/buffs.yaml": "fcf59c440e0c5e34d94dac8a0179465b97faff7afd2379a39486415961b6bddd",
+    "world/rules/rulebook/buffs.yaml": "3bf408f807c594050c2595d31d7dd82573086928a893c595098d7569368bb09f",
     "world/rules/rulebook/church.yaml": "a9831c5842acfd0d4d81f8342ecfec7f84d7df541ca5c23e7fb8e2d6a055b53e",
     "world/rules/rulebook/clock.yaml": "dc70d02e6394786f7e401f0bcef90d9703f746e9feda7a705fe821fa06011d64",
     "world/rules/rulebook/combat.yaml": "bb081b5a1b40b26487eb7c2e4da13cede4122db78771846472972e9645ef2528",
-    "world/rules/rulebook/combat_modifiers.yaml": "8d79781657c43e12d2aaabb4899f57b72110905e72fafb876ce7725e9937b685",
+    "world/rules/rulebook/combat_modifiers.yaml": "94e523c4d2ae841084314e49b96c363b0d572c665be3691ddf5222ada87f4c4c",
     "world/rules/rulebook/commerce/altoria.yaml": "9e35ac5f6387314550f1087bbd181b559e31f46934c14480331bb708751b7065",
     "world/rules/rulebook/commerce/ciaran.yaml": "48129781c6386745d1427e7349b3090e701391e6ed233c13bd691ffc9fc748da",
     "world/rules/rulebook/commerce/eolas.yaml": "05b61a96e3fd02b3740c3eb91f2e896d769e84e70cf6150fd25e9fc3becf273c",
@@ -16792,7 +16792,7 @@
     "world/rules/rulebook/sexual_resist.yaml": "a7146fe53b3e7e13e37691cdd5f2a47f0bc92ceb933beeff07d75b0a4da6237c",
     "world/rules/rulebook/sight.yaml": "51046c928d02681b8ce8ebd6471bfb8f646e4cb0c87c9a5449e42d779e824a21",
     "world/rules/rulebook/state_reactions.yaml": "49c0953d2fc03d60dcf065530c9b01d0127661018a4727379208a62f351667b1",
-    "world/rules/rulebook/status_display.yaml": "b1b0496bfd76b7724a5019fcc6840d576b47bab3e648c4c43cb40139376da758",
+    "world/rules/rulebook/status_display.yaml": "89769ab9486652298a8c03d10071071e0d0a457dc6973ad6095c811704dd1835",
     "world/rules/scene_visits.py": "1036e405aa9cb8fe3942c8c11e95d1d4635588eb4b385a81e0e99fa53ad8a28c",
     "world/rules/service_gate.py": "8c9584aa8ddbcff0d6a83c7cc461a2674035f4a464c5d3ef7ff1ffe66f56fdfb",
     "world/rules/service_messages.py": "0f79e5790c715c027ffe4bf0069698e5a5f82ee81a309507f8f1ea6fbfbb3192",

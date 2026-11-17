@@ -86,7 +86,7 @@ nodes:
     y_m: 243
     prototype_parent: grid_room
     key: 公會前庭
-    desc: 公會前庭貼著草場與商路的消息，往北的牧道中斷時這裡最先知道。接任務的隊伍在階前分派人手，順便確認回程的補給。
+    desc: 公會前庭貼著草場與貿易路線的消息，往北的牧道中斷時這裡最先知道。接任務的隊伍在階前分派人手，順便確認回程的補給。
     anchor_key:
     typeclass:
     scene_archetype: city_street

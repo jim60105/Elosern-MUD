@@ -68,8 +68,8 @@ topics:
       speaker: actor
       text: 「多謝老闆提醒，我這就照你說的挑幾份包好帶上。」
 - topic_id: altoria_eatery.topic_04
-  keyword: 收食
-  label: 收食
+  keyword: 收購
+  label: 收購
   fallback:
     scene_id: altoria_eatery.topic_04_scene
     revision: r2

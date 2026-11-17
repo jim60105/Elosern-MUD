@@ -80,8 +80,8 @@ topics:
       speaker: host
       text: 「至於聖女穿的聖袍，傳聞最早是精靈始祖女神親手留下來的式樣，我也只敢照著老圖紙描摹。要是想私下量身訂做貼身的蕾絲內衣，等鋪子裡沒別的客人，再悄悄跟我說一聲喲。」
 - topic_id: altoria_tailor.topic_04
-  keyword: 收衣
-  label: 收衣
+  keyword: 收購
+  label: 收購
   fallback:
     scene_id: altoria_tailor.topic_04_scene
     revision: r2

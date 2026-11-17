@@ -23,8 +23,8 @@ topics:
       speaker: host
       text: 「重要路口皆立有王國工坊精製的木質路牌。牢記這幾處核心地標，便絕不會在下城區走岔。」
 - topic_id: altoria_guardhouse.topic_02
-  keyword: 找活
-  label: 找活
+  keyword: 差事
+  label: 差事
   fallback:
     scene_id: altoria_guardhouse.topic_02_scene
     revision: r2

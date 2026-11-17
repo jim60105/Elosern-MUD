@@ -332,8 +332,8 @@ ROWS: tuple[SkillDef, ...] = (
     ),
     _skill(
         "mudfilm_guard",
-        "泥膜收束",
-        "收緊體表附著的泥膜，短暫提高自身防禦。",
+        "泥巴收束",
+        "收緊體表附著的泥巴，短暫提高自身防禦。",
         SkillKind.ACTIVE,
         TargetSpec.SELF,
         cost={"sp": 5},

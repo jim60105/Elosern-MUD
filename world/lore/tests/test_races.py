@@ -346,7 +346,7 @@ class RaceRegistryTests(unittest.TestCase):
     @covers_requirement("lore-registries::subrace-registry-covers-elf-branches-beastfolk-subspecies-and-human-bloodline-subraces-with-stat-modifiers")
     def test_elf_branch_specialty_prose_is_pinned_verbatim(self):
         expected = {
-            "fionnen": "翠綠森林村的森林精靈。親和光屬性魔法，弓術與光法並修，從容而精準。",
+            "fionnen": "翠綠森林村的森林精靈。親和光屬性魔法，弓術與光魔法並修，從容而精準。",
             "ciaran": "暗影谷村的黑暗精靈。親和火與暗屬性魔法，刀術造詣尤深，攻勢凌厲。",
             "eolas": "幽月谷村的幻童精靈。外表永駐二十歲，親和所有屬性魔法，並擅長神之秘法。",
         }

@@ -270,7 +270,7 @@ ASSORTMENT_REGISTRY: dict[str, AssortmentDefinition] = {
         ),
         AssortmentDefinition(
             key="eolas_wandcraft",
-            display_name_zh="幽月杖作",
+            display_name_zh="幽月杖器",
             allowed_item_kinds=frozenset({ItemKind.WEAPON}),
             allowed_equipment_slots=frozenset({EquipmentSlot.WEAPON_MAIN}),
             item_keys=(
@@ -279,7 +279,7 @@ ASSORTMENT_REGISTRY: dict[str, AssortmentDefinition] = {
         ),
         AssortmentDefinition(
             key="eolas_kilnware",
-            display_name_zh="幽月窯作",
+            display_name_zh="幽月陶器",
             allowed_item_kinds=frozenset({ItemKind.ACCESSORY, ItemKind.TOOL}),
             allowed_equipment_slots=frozenset({EquipmentSlot.ACCESSORY}),
             item_keys=(
@@ -311,7 +311,7 @@ ASSORTMENT_REGISTRY: dict[str, AssortmentDefinition] = {
         # white dress), never a storefront's stock.
         AssortmentDefinition(
             key="fionnen_trinkets",
-            display_name_zh="森林巧作",
+            display_name_zh="森林木作",
             allowed_item_kinds=frozenset({ItemKind.ACCESSORY, ItemKind.TOY}),
             allowed_equipment_slots=frozenset({EquipmentSlot.ACCESSORY}),
             item_keys=(
@@ -320,7 +320,7 @@ ASSORTMENT_REGISTRY: dict[str, AssortmentDefinition] = {
         ),
         AssortmentDefinition(
             key="fionnen_bowcraft",
-            display_name_zh="森林弓藝",
+            display_name_zh="森林弓器",
             allowed_item_kinds=frozenset({ItemKind.WEAPON}),
             allowed_equipment_slots=frozenset({EquipmentSlot.WEAPON_MAIN}),
             item_keys=(

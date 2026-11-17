@@ -86,7 +86,7 @@ nodes:
     y_m: 454
     prototype_parent: grid_room
     key: 公會前庭
-    desc: 公會前庭的布告牆貼滿往來商路的消息，河對岸的動靜也在上頭。接任務的隊伍會先在此核對貨單，再決定往哪一岸走。
+    desc: 公會前庭的布告牆貼滿往來貿易路線的消息，河對岸的動靜也在上頭。接任務的隊伍會先在此核對貨單，再決定往哪一岸走。
     anchor_key:
     typeclass:
     scene_archetype: city_street

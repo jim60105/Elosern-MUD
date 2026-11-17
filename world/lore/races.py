@@ -222,7 +222,7 @@ SUBRACE_REGISTRY: dict[str, Subrace] = {
     "fionnen": Subrace(
         "fionnen", "elf", "斐歐恩族", "森林精靈", 120, "elven_village_fionnen",
         ("light",),
-        "翠綠森林村的森林精靈。親和光屬性魔法，弓術與光法並修，從容而精準。",
+        "翠綠森林村的森林精靈。親和光屬性魔法，弓術與光魔法並修，從容而精準。",
         StatModifiers(),
     ),
     "ciaran": Subrace(
