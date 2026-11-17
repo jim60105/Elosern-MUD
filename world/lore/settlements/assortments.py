@@ -337,5 +337,25 @@ ASSORTMENT_REGISTRY: dict[str, AssortmentDefinition] = {
                 "fionnen_leafweave_garb", "elven_forest_veil", "elven_traditional_robe",
             ),
         ),
+        # fionnen-village-fare-homes: the 翠綠森林村 shelves of daily need.
+        # Each one is one villager's home — the honey keeper's jars and honeyed
+        # blossom, the herbalist's salve, herb and potion — never a
+        # storefront's stock.
+        AssortmentDefinition(
+            key="fionnen_fare",
+            display_name_zh="森林飯食",
+            allowed_item_kinds=frozenset({ItemKind.FOOD}),
+            item_keys=(
+                "fionnen_wildflower_honey", "elven_candied_blossom", "meal",
+            ),
+        ),
+        AssortmentDefinition(
+            key="fionnen_remedies",
+            display_name_zh="森林藥草",
+            allowed_item_kinds=frozenset({ItemKind.POTION, ItemKind.MATERIAL}),
+            item_keys=(
+                "fionnen_beeswax_salve", "healing_herb", "healing_potion",
+            ),
+        ),
     )
 }
