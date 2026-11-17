@@ -11,10 +11,11 @@ from evennia.utils.test_resources import EvenniaTest
 from typeclasses.exits import Exit, WildernessGateExit
 from typeclasses.rooms import GridRoom
 from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY
+from world.lore.settlements.places import PLACE_REGISTRY
 from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
 from world.maps.limbo import LIMBO_KEY
 from world.maps.map_data import SETTLEMENT_GRAPHS
-from world.maps.static_references import settlement_node_xyz
+from world.maps.static_references import place_exterior_xyz, settlement_node_xyz
 from world.maps.wilderness_provider import WILDERNESS_NAME
 from world.quests.tests._fixtures import RegistryIsolationMixin
 from world.rules.tests.combat_fixtures import BattlefieldIsolation
@@ -32,7 +33,34 @@ EAST_GATE_XYZ = settlement_node_xyz(_CAPITAL_ENTRY.gate_for("w").destination)
 #: Selector ids are settlement map ids, never entry anchor/location identities.
 CAPITAL_MAP_IDS = (_CAPITAL_ENTRY.gate_for("w").destination.map_id,)
 VILLAGE_MAP_IDS = (_VILLAGE_ENTRY.gate_for("n").destination.map_id,)
-CAPITAL_VILLAGE_MAP_IDS = tuple(sorted({*CAPITAL_MAP_IDS, *VILLAGE_MAP_IDS}))
+
+
+def _service_host_map_ids() -> tuple[str, ...]:
+    """Every settlement map that hosts a roster-declared service place.
+
+    ``sync_guild_economy`` at startup fail-closes unless every roster row's
+    spawn room resolves, so a real-startup test world must materialize the
+    settlement of every host, not only the capital/village pair a journey
+    happens to walk. The set is read from the roster itself (a row's spawn
+    room is its place key), so a new hosted settlement needs no edit here.
+    """
+    from world.rules.guild_config import validate_service_hosts
+
+    return tuple(
+        sorted(
+            {
+                place_exterior_xyz(PLACE_REGISTRY[row.spawn_room])[2]
+                for row in validate_service_hosts()
+            }
+        )
+    )
+
+
+#: Every settlement a real startup must contain: the capital/village pair the
+#: cross-settlement fixtures walk, plus every settlement a service host lives in.
+CAPITAL_VILLAGE_MAP_IDS = tuple(
+    sorted({*CAPITAL_MAP_IDS, *VILLAGE_MAP_IDS, *_service_host_map_ids()})
+)
 #: The destination maps of every registered wilderness gate.
 WILDERNESS_GATE_MAP_IDS = tuple(
     sorted(
