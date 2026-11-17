@@ -180,13 +180,6 @@ class WildernessEntryDeclaration:
 
 
 @dataclass(frozen=True, slots=True)
-class CityGateDeclaration:
-    node: str
-    exit_key: str
-    exit_aliases: tuple[str, ...] = ()
-
-
-@dataclass(frozen=True, slots=True)
 class RegionDeclaration:
     region_id: str
     display_name_zh: str
@@ -560,7 +553,6 @@ class SettlementDocument(AuthoringDocument):
     wilderness_entry: WildernessEntryDeclaration | None = field(
         init=False, repr=False
     )
-    city_gate: CityGateDeclaration | None = field(init=False, repr=False)
     options: Mapping[str, Any] = field(init=False, repr=False)
     exit_prototype: Mapping[str, Any] = field(init=False, repr=False)
 
@@ -584,16 +576,6 @@ class SettlementDocument(AuthoringDocument):
                     entry_data.get("single_cell_footprint", False)
                 ),
             )
-        gate_data = data.get("city_gate")
-        city_gate = None
-        if gate_data is not None:
-            city_gate = CityGateDeclaration(
-                node=str(gate_data["node"]),
-                exit_key=str(gate_data["exit_key"]),
-                exit_aliases=tuple(
-                    str(alias) for alias in gate_data.get("exit_aliases", ())
-                ),
-            )
         object.__setattr__(self, "location_ref", str(data["location_ref"]))
         object.__setattr__(
             self,
@@ -608,7 +590,6 @@ class SettlementDocument(AuthoringDocument):
             tuple(_road(value) for value in data["roads"]),
         )
         object.__setattr__(self, "wilderness_entry", entry)
-        object.__setattr__(self, "city_gate", city_gate)
         object.__setattr__(
             self,
             "options",
@@ -627,8 +608,6 @@ class SettlementDocument(AuthoringDocument):
         nodes: set[str] = set()
         if self.wilderness_entry is not None:
             nodes.update(gate.destination_node for gate in self.wilderness_entry.gates)
-        if self.city_gate is not None:
-            nodes.add(self.city_gate.node)
         return frozenset(nodes)
 
     @property
@@ -783,7 +762,6 @@ def build_document(
 __all__ = [
     "AuthoringDocument",
     "Bend",
-    "CityGateDeclaration",
     "ConnectionDeclaration",
     "ContinentDocument",
     "DistrictDeclaration",

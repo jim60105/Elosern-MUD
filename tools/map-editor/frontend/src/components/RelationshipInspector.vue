@@ -141,26 +141,6 @@ function chooseEndpoint(role, value) {
       />
       <p class="inspector__note">野外端的格位由核心依佔地與方向計算，唯讀；佔地在大陸的「佔地」工具中編輯。</p>
     </template>
-    <template v-else-if="view.kind === 'city_gate'">
-      <DraftField
-        :key="`${selected}-exit-key`"
-        label="出口名稱"
-        field-key="city-gate-exit_key"
-        :value="view.values.exit_key"
-        @confirm="edit({ exit_key: $event })"
-        @drafts="track('exit-key')($event)"
-      />
-      <DraftField
-        :key="`${selected}-exit-aliases`"
-        label="別名（一行一個）"
-        field-key="city-gate-exit_aliases"
-        type="lines"
-        :value="view.values.exit_aliases"
-        @confirm="edit({ exit_aliases: $event })"
-        @drafts="track('exit-aliases')($event)"
-      />
-      <p class="inspector__note" data-one-way-fixed>起始房間入口固定為單向：沒有回程欄位，也不能改為雙向。</p>
-    </template>
     <template v-else-if="view.kind === 'exterior'">
       <DraftField
         :key="`${selected}-doorway`"

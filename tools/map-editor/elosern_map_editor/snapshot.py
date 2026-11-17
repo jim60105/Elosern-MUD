@@ -501,7 +501,6 @@ def _project(world, layouts: Mapping[str, dict[str, Any]]) -> dict[str, Any]:
                 "roads": roads,
                 "wilderness_entry": _wilderness_entry(settlement, location_cell),
                 "footprint": _footprint(settlement, location_cell),
-                "city_gate": thaw(settlement.data.get("city_gate")),
                 "options": thaw(settlement.data.get("options")),
                 "exit_prototype": thaw(settlement.data.get("exit_prototype")),
                 "interiors": interiors_by_settlement.get(settlement_id, []),

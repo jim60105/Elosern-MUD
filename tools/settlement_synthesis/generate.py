@@ -1358,7 +1358,6 @@ def _document_data(
             },
             "gates": gates,
         },
-        "city_gate": None,
     }
 
 
@@ -1553,7 +1552,6 @@ def _single_cell_document_data(
                 for return_direction, destination in gates
             ],
         },
-        "city_gate": None,
     }
 
 

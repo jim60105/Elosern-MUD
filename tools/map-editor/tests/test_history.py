@@ -198,7 +198,6 @@ def test_settlement_creation_undo_is_an_object_removing_guarded_inverse(workspac
     data["nodes"]["gate"]["prototype_parent"] = "grid_room"
     data["nodes"]["gate"]["anchor_key"] = None
     data["wilderness_entry"] = None
-    data["city_gate"] = None
     path = "content/maps/settlements/synthetic_village.yaml"
     text = fixture.yaml_text(data)
     try:

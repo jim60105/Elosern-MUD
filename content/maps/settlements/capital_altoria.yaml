@@ -520,7 +520,3 @@ wilderness_entry:
     destination_node: northeast_gate
   - return_direction: s
     destination_node: north_gate
-city_gate:
-  node: south_gate
-  exit_key: 南門
-  exit_aliases: [王都, 城門]

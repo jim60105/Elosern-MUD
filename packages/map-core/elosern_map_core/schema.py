@@ -635,18 +635,6 @@ _DOCUMENT_KINDS: dict[str, dict[str, Any]] = {
                 ],
             ),
             "wilderness_entry": _nullable(_WILDERNESS_ENTRY),
-            "city_gate": _nullable(
-                _mapping(
-                    {
-                        "node": _str(
-                            pattern=IDENTIFIER_PATTERN,
-                            reference="settlement_nodes",
-                        ),
-                        "exit_key": _str(min_length=1),
-                        "exit_aliases": _list(_str(), required=False),
-                    }
-                )
-            ),
         },
         "rules": [],
         "document_rules": [

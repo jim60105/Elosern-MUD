@@ -9,8 +9,8 @@
 // commands (interior documents, rooms, named connections and editor-only
 // layouts; continental geometry, locations, districts, footprints and
 // bindings; local maps, settlement nodes, prototypes, directed roads and
-// bends; entrance relationships: wilderness gates, the starting-room entry,
-// interior exteriors and links) with undo/redo of the manual segment. Copying the OMP context only
+// bends; entrance relationships: wilderness gates, interior exteriors and
+// links) with undo/redo of the manual segment. Copying the OMP context only
 // writes plain text to the clipboard; it starts nothing.
 // Authored text is rendered with text interpolation only (never v-html).
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
@@ -651,7 +651,7 @@ watch(tool, (key) => {
   if (key !== "entrance" || !world.value || domain.value === "continent") return;
   toolHint.value =
     domain.value === "settlement"
-      ? "入口：選取一個節點（畫布或物件清單）建立野外入口或起始房間入口；Esc 取消。"
+      ? "入口：選取一個節點（畫布或物件清單）建立野外入口；Esc 取消。"
       : "外部入口：選取一個房間（畫布或物件清單）建立據點外部入口或室內連結；Esc 取消。";
   if (drawers.value) drawer.value = "inspector";
 });

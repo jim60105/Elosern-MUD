@@ -89,8 +89,6 @@ def protected_nodes(
         if key.startswith(prefix):
             protected.add(key[len(prefix):])
 
-    if document.city_gate is not None:
-        protected.add(document.city_gate.node)
     anchor = document.anchor_node
     if anchor is not None:
         protected.add(anchor.node_id)
@@ -276,16 +274,6 @@ def _rebuild_data(
             data[field] = copy.deepcopy(dict(existing.data[field]))
         else:
             data.pop(field, None)
-    gate = existing.city_gate
-    data["city_gate"] = (
-        None
-        if gate is None
-        else {
-            "node": gate.node,
-            "exit_key": gate.exit_key,
-            "exit_aliases": list(gate.exit_aliases),
-        }
-    )
     return data
 
 

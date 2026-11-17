@@ -74,4 +74,3 @@ wilderness_entry:
   gates:
   - return_direction: n
     destination_node: village_end_south
-city_gate:

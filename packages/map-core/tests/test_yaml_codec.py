@@ -143,6 +143,15 @@ def test_unknown_root_nested_and_prototype_fields_are_rejected():
         assert "unknown_field" in {item.code for item in captured.value.diagnostics}
 
 
+def test_a_retired_city_gate_block_is_rejected_as_an_unknown_field():
+    data = copy.deepcopy(fixtures.settlement_data())
+    data["city_gate"] = None
+    with pytest.raises(AuthoringError) as captured:
+        document_from_data(SETTLEMENT_PATH, data)
+    [row] = [item for item in captured.value.diagnostics if item.code == "unknown_field"]
+    assert row.field_path == "city_gate"
+
+
 def test_unknown_version_and_identity_mismatch_are_rejected():
     with pytest.raises(AuthoringError) as captured:
         document_from_data(
@@ -214,7 +223,6 @@ wilderness_entry:
   offset: {dx: 0, dy: 0}
   gates:
     - {return_direction: n, destination_node: gate}
-city_gate: {node: gate, exit_key: Gate, exit_aliases: [gate]}
 """
 
 

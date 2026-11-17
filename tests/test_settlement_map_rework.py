@@ -246,8 +246,6 @@ class ReplaceTests(_Workspace):
         self.assertEqual(report["bound"]["gate"], "central_plaza")
         yard_row = next(row for row in report["slots"] if row["id"] == "yard")
         self.assertIn(yard_row["role"], ("approach", "filler"))
-        self.assertIsNotNone(document.city_gate)
-        self.assertIn(document.city_gate.node, nodes)
 
         # The emitted node order is the plan order, not the old authored order.
         self.assertEqual(
@@ -460,7 +458,6 @@ class NearestBindingTests(_Workspace):
             self.assertIn(road["destination"], nodes)
         for gate in data["wilderness_entry"]["gates"]:
             self.assertIn(gate["destination_node"], nodes)
-        self.assertIn(data["city_gate"]["node"], nodes)
 
 
 class ProseTests(_Workspace):

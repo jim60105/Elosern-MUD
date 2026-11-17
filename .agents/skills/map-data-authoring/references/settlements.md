@@ -40,14 +40,10 @@ wilderness_entry:                     # nullable (write the key with an empty va
   gates:                              # ≥ 1
     - return_direction: n
       destination_node: hidden_path
-city_gate:                            # nullable: the one-way entry from the starting room
-  node: hidden_path
-  exit_key: 隱密小徑
-  exit_aliases: [祕徑, 幽徑]
 ```
 
-`wilderness_entry` and `city_gate` are nullable but **required keys**. Write
-`city_gate:` with an empty value when a map has none.
+`wilderness_entry` is nullable but a **required key**. Write
+`wilderness_entry:` with an empty value when a map has none.
 
 There is no `binding`. The world frame is derived from
 `locations[location_ref].cell` and the unique `anchor_room` node, so a location
@@ -191,13 +187,6 @@ The scale rule, the density assumption with its sources, the tier table and the
 human-review checklist are in
 [`docs/development/settlement-synthesis.md`](../../../../docs/development/settlement-synthesis.md).
 
-## City gate
-
-`city_gate` is the one-way entry from the character-creation starting room
-into this map. `exit_key` is the exit name and `exit_aliases` are synonyms.
-It has **no** return label, so do not add one. Only the maps that new players
-can start in need it.
-
 ## Creating a new local map
 
 For a national settlement, generate it:
@@ -220,7 +209,6 @@ the hand-authored path.
    - `roads`;
    - `wilderness_entry`, usually a point mask at offset `(0, 0)` (the location
      cell) with one gate to the anchor or a gate node;
-   - `city_gate:`, empty unless asked.
 3. A map with no nodes loads, but is diagnosed `empty_graph`. That is saveable
    work in progress and not playable.
 4. Run the check script, then regenerate the partition. Every settlement file
@@ -303,7 +291,7 @@ The editor provides these commands:
 - `create_road` (with an optional return entry), `set_road`, `delete_road`;
 - `insert_bend`, `move_bend`, `remove_bend`;
 - entrances: `create_wilderness_gate`, `set_wilderness_gate`,
-  `delete_wilderness_gate`, `remove_wilderness_entry`, `set_city_gate`;
+  `delete_wilderness_gate`, `remove_wilderness_entry`;
 - continent tools that write this file: `set_footprint_cell`.
 
 There is no `set_binding` command: it was removed with the duplicated

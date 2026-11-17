@@ -52,11 +52,10 @@ function world() {
         location_ref: "place",
         footprint: { shape: ["#"], origin: [5, 5], cells: [[5, 5]] },
         wilderness_entry: { shape: ["#"], origin: { cell_x: 5, cell_y: 5 }, gates: [{ return_direction: "w", destination_node: "gate", approach_cell: [5, 5] }] },
-        city_gate: { node: "gate", exit_key: "Gate", exit_aliases: ["in"] },
         nodes: [node("town", "gate", "Gate", [0, 0]), node("town", "yard", "Square", [300, 400])],
         roads: [],
       },
-      { id: "port", relative_path: T, location_ref: "place", footprint: null, wilderness_entry: null, city_gate: null, nodes: [node("port", "yard", "Square", [0, 0])], roads: [] },
+      { id: "port", relative_path: T, location_ref: "place", footprint: null, wilderness_entry: null, nodes: [node("port", "yard", "Square", [0, 0])], roads: [] },
     ],
     interiors: [
       {
@@ -77,14 +76,13 @@ const LINK = linkRef("hall", world().interiors[0].interior_links[0]);
 
 test("relationship references round-trip, labels with : > / included", () => {
   assert.deepEqual(parseRelationshipRef("gate:town:w"), { kind: "gate", settlementId: "town", direction: "w" });
-  assert.deepEqual(parseRelationshipRef("city_gate:town"), { kind: "city_gate", settlementId: "town" });
   assert.deepEqual(parseRelationshipRef("exterior:hall"), { kind: "exterior", interiorId: "hall" });
   assert.deepEqual(parseRelationshipRef(LINK), {
     kind: "interior_link", interiorId: "hall", source: "back", targetInterior: "annex", targetRoom: "lobby", label: LABEL,
   });
   assert.equal(parseRelationshipRef("settlement_node:town:gate"), null);
   assert.deepEqual(ownerMap(LINK), { domain: "interior", mapId: "hall" });
-  assert.deepEqual(relationshipRefs(world()), ["gate:town:w", "city_gate:town", "exterior:hall", LINK]);
+  assert.deepEqual(relationshipRefs(world()), ["gate:town:w", "exterior:hall", LINK]);
 });
 
 test("each view names one owner record, both endpoints and the direction meaning", () => {
@@ -96,10 +94,6 @@ test("each view names one owner record, both endpoints and the direction meaning
     ["node", "settlement_node:town:yard", "town"],
     ["room", "interior_room:hall:front", "hall"],
   ]);
-  const start = relationshipView(data, "city_gate:town");
-  assert.equal(start.twoWay, false);
-  assert.equal(start.oneWayFixed, true);
-  assert.equal(start.endpoints[0].ref, null);
   const gate = relationshipView(data, "gate:town:w");
   assert.equal(gate.ownerPath, S);
   // The wilderness end is the core's approach cell, reached via the footprint.
@@ -120,8 +114,6 @@ test("the other end is the far endpoint of the map on display, else the target",
   assert.equal(otherEnd(exterior, { domain: "settlement", mapId: "town" }).ref, "interior_room:hall:front");
   assert.equal(otherEnd(relationshipView(data, LINK), { domain: "interior", mapId: "hall" }).ref, "interior_room:annex:lobby");
   assert.equal(otherEnd(relationshipView(data, "gate:town:w"), { domain: "settlement", mapId: "town" }).ref, "footprint:town");
-  // The starting room is no map object: the start entry's only navigable end is its node.
-  assert.equal(otherEnd(relationshipView(data, "city_gate:town"), { domain: "settlement", mapId: "town" }).ref, "settlement_node:town:gate");
   data.settlements[0].footprint = null;
   assert.equal(otherEnd(relationshipView(data, "gate:town:w"), { domain: "settlement", mapId: "town" }).ref, "settlement_node:town:gate");
 });
@@ -162,17 +154,13 @@ test("every edit and removal is one command on the owning document with qualifie
   assert.equal(relabelled.descriptor.arguments.label, LABEL);
   assert.equal(relabelled.descriptor.arguments.value.return_label, null);
   assert.equal(parseRelationshipRef(relabelled.ref).label, "stair");
-  // The start entry's value never carries a return field.
-  const start = editCommand(relationshipView(data, "city_gate:town"), { exit_key: "Way" });
-  assert.deepEqual(Object.keys(start.descriptor.arguments.value).sort(), ["exit_aliases", "exit_key", "node"]);
   assert.deepEqual(
-    ["gate:town:w", "city_gate:town", "exterior:hall", LINK].map((ref) => {
+    ["gate:town:w", "exterior:hall", LINK].map((ref) => {
       const removal = relationshipRemoval(data, ref);
       return [removal.name, removal.documentId];
     }),
-    [["delete_wilderness_gate", S], ["set_city_gate", S], ["set_exterior", I], ["delete_interior_link", I]],
+    [["delete_wilderness_gate", S], ["set_exterior", I], ["delete_interior_link", I]],
   );
-  assert.equal(relationshipRemoval(data, "city_gate:town").arguments.value, null);
 });
 
 test("relationships are catalogued on their owner map, inspectable and searchable by ID only", () => {
@@ -200,12 +188,12 @@ test("the interior draws a fixed dashed exterior card; the settlement lists its 
   assert.ok(scene.links.some((link) => link.ref === "exterior:hall" && link.selected));
   assert.ok(scene.items.some((item) => item.id === LINK));
   assert.equal(interiorScene(data.interiors[1], [], data).marks.some((mark) => mark.kind === "exterior"), false);
-  assert.deepEqual(settlementScene(data.settlements[0]).items.slice(-2).map((item) => item.id), ["gate:town:w", "city_gate:town"]);
+  assert.deepEqual(settlementScene(data.settlements[0]).items.slice(-1).map((item) => item.id), ["gate:town:w"]);
 });
 
 test("delete blockers locate each relationship for its separate removal", () => {
   const data = world();
-  assert.deepEqual(nodeBlockers(data, ["settlement_node:town:gate"]).map((row) => row.ref), ["gate:town:w", "city_gate:town"]);
+  assert.deepEqual(nodeBlockers(data, ["settlement_node:town:gate"]).map((row) => row.ref), ["gate:town:w"]);
   assert.deepEqual(nodeBlockers(data, ["settlement_node:town:yard"]).map((row) => [row.ref, row.source]), [["exterior:hall", I]]);
   assert.deepEqual(roomBlockers(data, "interior_room:annex:lobby").map((row) => [row.ref, row.source]), [[LINK, I]]);
   assert.deepEqual(roomBlockers(data, "interior_room:hall:front").map((row) => row.ref), ["exterior:hall"]);
@@ -215,7 +203,6 @@ test("entrance diagnostics locate the relationship; the E tool is registered on 
   const data = world();
   const catalog = objectCatalog(data);
   assert.equal(diagnosticTarget(data, catalog, { relative_path: I, field_path: "exterior.node" }).ref, "exterior:hall");
-  assert.equal(diagnosticTarget(data, catalog, { relative_path: S, field_path: "city_gate.node" }).ref, "city_gate:town");
   assert.equal(diagnosticTarget(data, catalog, { relative_path: I, field_path: "connections" }).ref, null);
   assert.equal(toolKeys("settlement").e, "entrance");
   assert.equal(toolKeys("interior").e, "entrance");

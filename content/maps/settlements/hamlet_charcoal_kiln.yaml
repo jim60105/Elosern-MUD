@@ -46,4 +46,3 @@ wilderness_entry:
     destination_node: crossing
   - return_direction: se
     destination_node: homestead_front
-city_gate:

@@ -203,7 +203,3 @@ wilderness_entry:
   gates:
     - return_direction: w
       destination_node: leaf_veiled_path
-city_gate:
-  node: leaf_veiled_path
-  exit_key: 葉隱小徑
-  exit_aliases: []

@@ -145,7 +145,6 @@ def _document(
         "nodes": dict(nodes),
         "roads": [dict(road) for road in roads],
         "wilderness_entry": wilderness_entry,
-        "city_gate": None,
     }
     return document_from_data("content/maps/settlements/fit_case.yaml", data)
 

@@ -1,4 +1,4 @@
-"""Named entrance-relationship commands: gates, the start entry, exteriors and links.
+"""Named entrance-relationship commands: gates, exteriors and links.
 
 Every relationship is stored once, in its owning document, with both of its
 endpoints and every directional label it has; no command writes a mirrored
@@ -15,10 +15,6 @@ Settlement-owned (``content/maps/settlements/<settlement_id>.yaml``):
     The last gate is refused: an entry keeps at least one gate.
 ``remove_wilderness_entry`` ``{settlement_id}``
     The explicit removal of the whole entry, its footprint mask included.
-``set_city_gate`` ``{settlement_id, value: null | {node, exit_key, exit_aliases}}``
-    The one-way entry from the starting room. It has no return field: a
-    value naming one is refused, so it can never become two-way.
-
 Interior-owned (``content/maps/interiors/<interior_id>.yaml``):
 
 ``set_exterior`` ``{interior_id, value: null | {room, node, doorway_key, doorway_aliases}}``
@@ -61,7 +57,6 @@ _PATTERNS = {
 _PREFIX = re.compile(r"[a-z_]+:")
 
 WILDERNESS_GATE = "wilderness_gate"
-CITY_GATE = "city_gate"
 EXTERIOR = "exterior"
 INTERIOR_LINK = "interior_link"
 
@@ -266,43 +261,6 @@ class RemoveWildernessEntry(_SettlementEntrance):
         data["wilderness_entry"] = None
 
 
-class SetCityGate(_SettlementEntrance):
-    name = "set_city_gate"
-    keys = frozenset({"settlement_id", "value"})
-    relationship = CITY_GATE
-
-    def _value(self, value):
-        if value is None:
-            return None
-        value = _exact(
-            value, {"node", "exit_key", "exit_aliases"}, "value",
-            "; the starting-room entry is one-way and has no return field",
-        )
-        _label(value["exit_key"], "value.exit_key")
-        _aliases(value["exit_aliases"], "value.exit_aliases")
-        return value
-
-    def check_arguments(self, world, arguments):
-        value = self._value(arguments["value"])
-        if value is not None:
-            self.own_node(world, arguments, value["node"], "arguments.value.node")
-
-    def mutate(self, data, arguments):
-        value = self._value(arguments["value"])
-        if value is None:
-            data["city_gate"] = None
-            return
-        node_id = self.node_in(
-            data, arguments, self.own_node(None, arguments, value["node"], "arguments.value.node"),
-            "arguments.value.node",
-        )
-        data["city_gate"] = {
-            "node": node_id,
-            "exit_key": value["exit_key"],
-            "exit_aliases": list(value["exit_aliases"]),
-        }
-
-
 # -- interior-owned --------------------------------------------------------------
 class _InteriorEntrance(_Interior):
     relationship = EXTERIOR
@@ -502,7 +460,6 @@ RELATIONSHIP_HANDLERS = (
     SetWildernessGate(),
     DeleteWildernessGate(),
     RemoveWildernessEntry(),
-    SetCityGate(),
     SetExterior(),
     CreateInteriorLink(),
     SetInteriorLink(),
@@ -510,7 +467,6 @@ RELATIONSHIP_HANDLERS = (
 )
 
 __all__ = [
-    "CITY_GATE",
     "EXTERIOR",
     "INTERIOR_LINK",
     "MAX_ALIASES",

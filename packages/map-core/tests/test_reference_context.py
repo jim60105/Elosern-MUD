@@ -47,9 +47,9 @@ def _sample_document() -> ReferenceContextDocument:
     incoming = {
         "settlement_node:altoria_capital:north_gate": (
             IncomingReference(
-                source="city_gate:altoria_north",
-                source_file="world/maps/city_gates.py",
-                source_domain="city_gates",
+                source="place:altoria_north",
+                source_file="world/lore/settlements/places_altoria.py",
+                source_domain="places",
                 target=QualifiedRef(domain="settlement_node", map_id="altoria_capital", object_id="north_gate"),
             ),
         ),
@@ -98,8 +98,8 @@ def test_encode_and_decode_roundtrip():
     target_ref = QualifiedRef("settlement_node", "altoria_capital", "north_gate")
     incoming = decoded.incoming_references_for(target_ref)
     assert len(incoming) == 1
-    assert incoming[0].source == "city_gate:altoria_north"
-    assert incoming[0].source_domain == "city_gates"
+    assert incoming[0].source == "place:altoria_north"
+    assert incoming[0].source_domain == "places"
     assert incoming[0].target == target_ref
 
 
@@ -310,7 +310,7 @@ def test_deletion_safety_evaluations():
     assert not d2.allowed
     assert d2.status == DELETION_REFUSED_REFERENCED
     assert len(d2.incoming_references) == 1
-    assert "city_gate:altoria_north" in d2.reasons[0]
+    assert "place:altoria_north" in d2.reasons[0]
 
     # 3. Fresh context allows deletion of unreferenced object
     d3 = doc.check_deletion_safety(free_node, fresh)

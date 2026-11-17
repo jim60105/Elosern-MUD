@@ -183,7 +183,6 @@ def test_duplicating_creates_a_new_id_without_copying_relationships(workspace):
     assert (copy["prototype_parent"], copy["anchor_key"]) == ("grid_room", None)
     assert original["anchor_key"] == fixture.LOCATION_ID
     assert all("gate_copy" not in pair for pair in _roads(workspace))
-    assert data["city_gate"]["node"] == "gate"
     assert [gate["destination_node"] for gate in data["wilderness_entry"]["gates"]] == ["gate"]
     before = fixture.tree_digest(workspace)
     status, body = _send(editor, "duplicate_node", SETTLEMENT,
@@ -468,10 +467,10 @@ def test_deleting_a_referenced_node_is_refused_without_cascading(workspace):
     assert (status, body["error"]["code"], body["error"]["guard"]) == (409, "deletion_refused", "internal")
     kinds = {row["kind"] for row in body["error"]["internal_references"]}
     assert kinds == {"exterior", "landmark"}
-    # gate: only same-document references (roads, wilderness gate, city gate).
+    # gate: only same-document references (roads and the wilderness gate).
     status, body = _send(editor, "delete_nodes", SETTLEMENT, {"settlement_id": TOWN, "node_ids": ["gate"]})
     assert (status, body["error"]["guard"]) == (409, "internal")
-    assert {row["kind"] for row in body["error"]["internal_references"]} == {"road", "wilderness_gate", "city_gate"}
+    assert {row["kind"] for row in body["error"]["internal_references"]} == {"road", "wilderness_gate"}
     assert fixture.tree_digest(workspace) == before
 
 

@@ -2,7 +2,6 @@
 // settlement and interior helpers can link their rows to them).
 
 export const gateRef = (settlementId, direction) => `gate:${settlementId}:${direction}`;
-export const cityGateRef = (settlementId) => `city_gate:${settlementId}`;
 export const exteriorRef = (interiorId) => `exterior:${interiorId}`;
 // The label is free text: percent-encoding keeps `:`, `>` and `/` out of the
 // structure, so the link identity round-trips exactly.

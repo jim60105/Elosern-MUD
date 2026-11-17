@@ -2,14 +2,12 @@
 
 Every assertion inspects the disk: each command writes exactly its owning
 document, a two-way meaning is one record, a refusal names its relationship
-and field and leaves every byte unchanged, the starting-room entry never
-gains a return, and removing a reference then deleting its target are two
-separate operations with nothing cascading.
+and field and leaves every byte unchanged, and removing a reference then
+deleting its target are two separate operations with nothing cascading.
 
 The synthetic settlement ``synthetic_town`` has nodes ``gate`` and ``yard``,
-one wilderness gate ``n`` onto ``gate`` and a starting-room entry onto
-``gate``; the interior ``synthetic_hall`` (rooms ``front``, ``back``) opens
-``front`` onto ``yard``.
+one wilderness gate ``n`` onto ``gate``; the interior ``synthetic_hall``
+(rooms ``front``, ``back``) opens ``front`` onto ``yard``.
 """
 
 from __future__ import annotations
@@ -121,26 +119,6 @@ def test_a_duplicate_gate_direction_is_refused_unwritten(workspace):
     assert fixture.tree_digest(workspace) == before
 
 
-def test_the_starting_room_entry_stays_one_way(workspace):
-    editor = Editor(workspace)
-    before = fixture.tree_digest(workspace)
-    for extra in ({"return_label": "back"}, {"return": {"direction": "s"}}):
-        value = {"node": YARD, "exit_key": "Gate", "exit_aliases": [], **extra}
-        status, body = _send(editor, "set_city_gate", SETTLEMENT, {"settlement_id": TOWN, "value": value})
-        assert status == 400
-        assert next(iter(extra)) in body["error"]["message"]
-    assert fixture.tree_digest(workspace) == before
-    status, body = _send(editor, "set_city_gate", SETTLEMENT, {"settlement_id": TOWN, "value": {
-        "node": YARD, "exit_key": "Way in", "exit_aliases": ["in", "way"]}})
-    assert status == 200, body
-    assert _changed(before, workspace) == {SETTLEMENT}
-    assert _data(workspace, SETTLEMENT)["city_gate"] == {"node": "yard", "exit_key": "Way in",
-                                                         "exit_aliases": ["in", "way"]}
-    status, body = _send(editor, "set_city_gate", SETTLEMENT, {"settlement_id": TOWN, "value": None})
-    assert status == 200, body
-    assert _data(workspace, SETTLEMENT)["city_gate"] is None
-
-
 def test_invalid_settlement_endpoints_name_their_relationship_and_field(workspace):
     editor = Editor(workspace)
     before = fixture.tree_digest(workspace)
@@ -153,9 +131,6 @@ def test_invalid_settlement_endpoints_name_their_relationship_and_field(workspac
          "wrong_map", "arguments.node", "wilderness_gate"),
         ("create_wilderness_gate", {"settlement_id": TOWN, "return_direction": "e", "node": f"settlement_node:{TOWN}:nowhere"},
          "unknown_target", "arguments.node", "wilderness_gate"),
-        ("set_city_gate", {"settlement_id": TOWN, "value": {"node": "location:synthetic_place", "exit_key": "x",
-                                                            "exit_aliases": []}},
-         "wrong_domain", "arguments.value.node", "city_gate"),
     ]
     for name, arguments, code, field, relationship in cases:
         status, body = _send(editor, name, SETTLEMENT, arguments)
@@ -278,12 +253,11 @@ def test_unlink_then_delete_are_separate_operations_and_nothing_cascades(workspa
     status, body = _send(editor, "delete_nodes", SETTLEMENT, {"settlement_id": TOWN, "node_ids": ["gate"]})
     assert status == 409 and body["error"]["guard"] == "internal"
     kinds = {row["kind"] for row in body["error"]["internal_references"]}
-    assert {"wilderness_gate", "city_gate", "road"} <= kinds
+    assert {"wilderness_gate", "road"} <= kinds
     assert fixture.tree_digest(workspace) == before
     steps = [
         ("delete_road", SETTLEMENT, {"settlement_id": TOWN, "source": "gate", "destination": "yard"}),
         ("delete_road", SETTLEMENT, {"settlement_id": TOWN, "source": "yard", "destination": "gate"}),
-        ("set_city_gate", SETTLEMENT, {"settlement_id": TOWN, "value": None}),
         ("create_wilderness_gate", SETTLEMENT, {"settlement_id": TOWN, "return_direction": "e", "node": YARD}),
         ("delete_wilderness_gate", SETTLEMENT, {"settlement_id": TOWN, "return_direction": "n"}),
     ]

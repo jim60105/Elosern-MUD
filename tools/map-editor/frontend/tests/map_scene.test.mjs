@@ -9,8 +9,7 @@ import { DISCONNECTED, CONNECTED } from "../src/lib/workspace_client.js";
 const settlement = {
   id: "m",
   relative_path: "content/maps/settlements/m.yaml",
-  city_gate: { node: "a" },
-  wilderness_entry: null,
+  wilderness_entry: { gates: [{ return_direction: "n", destination_node: "a" }] },
   nodes: [
     { id: "a", qualified_ref: "settlement_node:m:a", key: "A", desc: "<b>x</b>", local_m: [0, 0], world_m: [10, 10], prototype_parent: "p", scene_archetype: null },
     { id: "b", qualified_ref: "settlement_node:m:b", key: "B", desc: "", local_m: [30, 40], world_m: [40, 50], prototype_parent: "p", scene_archetype: null },

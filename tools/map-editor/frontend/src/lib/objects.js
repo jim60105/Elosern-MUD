@@ -144,7 +144,6 @@ const tail = (ref) => String(ref ?? "").split(":").slice(1).join(":");
 function identityText(view) {
   const [a, b] = view.endpoints;
   if (view.kind === "gate") return `${view.ownerId} · ${view.values.direction} ⇄ ${tail(b.ref)}`;
-  if (view.kind === "city_gate") return `→ ${tail(b.ref)}`;
   if (view.kind === "exterior") return `${tail(a.ref)} ⇄ ${tail(b.ref)}`;
   return `${tail(a.ref)} ${view.twoWay ? "⇄" : "→"} ${tail(b.ref)}（${view.values.label}）`;
 }
