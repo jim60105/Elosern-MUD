@@ -47,7 +47,7 @@ The world source states that the Fionnen are the 森林精靈 of 翠綠森林村
 
 - Canon: elves have no concept of shame about nudity, the body or sex (`對裸露、性器官、性行為完全沒有羞恥概念`), treat sex as a natural need like breathing (`視性愛為如同呼吸般自然的生理需求`), and give it the greater part of their time. Elven sex between women is ordinary joy, and what they do with their bodies grows more intense over a long life. Other races look away out of awe rather than moral judgment.
 - How the change reads it: the ease sits in dress, bearing and how each host speaks of her own goods. 菲爾溫 wears one open mantle over nothing and says the village has nothing to hide, that washing, laundry and talk share the 林泉浴場, and that who lies with whom at night is no more hidden than who eats at whose house. 盧梅斯 feeds a guest honey from her own finger before saying anything else, 希拉拉 reads a body for blood before she asks a question, and 埃倫溫's card keeps the bracer-and-quiver dress of a woman who works in the open.
-- The scene stays in the village's public rooms: the body ease is talked about, never staged. No fare home becomes a sexual scene, and the 蜜漬房 scene explains that nobody pays there, which is what the lore says about the shared room.
+- The scenes stay in the hosts' homes: the body ease is talked about, never staged. No fare home becomes a sexual scene, and the 蜜漬房 scene explains that nobody pays there, which is what the lore says about the shared room.
 - The one limit is structural, not tonal: an actor line never grants consent, initiates or promises an act. The frankness rides in what a host says and does, never in a scene the player is written into.
 
 ### Religion
@@ -63,7 +63,7 @@ All four homes keep their authored place binding without alteration.
 
 - `fionnen_elunwen_home` declares only `scripted_dialogue`: no assortment, no shop row, nothing sold or bought.
 - `fionnen_firwen_home` declares only `scripted_dialogue`: no assortment, no shop row, nothing sold or bought.
-- `fionnen_lumeth_home` stocks `fionnen_fare` (森林百花蜜, 精靈蜜漬花蕊, 普通餐食). She keeps the hives, candies the blossom and packs the fare herself; buy-back names those three goods and declines anything else on her shelf.
+- `fionnen_lumeth_home` stocks `fionnen_fare` (森林百花蜜, 精靈蜜漬花蕊, 普通餐食). She keeps the hives, candies the blossom and packs the fare herself; buy-back names those three goods and declines goods outside her assortment.
 - `fionnen_sylara_home` stocks `fionnen_remedies` (森林蜂蠟膏, 止血藥草, 治療藥水). She grows and cuts the herb, cooks the salve and bottles the potion; buy-back names those three goods and declines other herbs.
 
 Every offer in `world/rules/rulebook/commerce/fionnen.yaml` sits inside its item's `PRICE_TABLE` band, `sell_copper` is half of `buy_copper` rounded up, and each good the capital also sells is cheaper here (`elven_candied_blossom` 20 against 60, `meal` 6 against 10, `healing_herb` 20 against 40, `healing_potion` 60 against 100). Shop hours match 暗影谷村: open 7, close 19, restock 6. No line of dialogue delivers a free remedy, a custom commission, a discount or a price figure. The scenes name goods by their registry display name and state no quantity.
@@ -82,7 +82,7 @@ Every scene declares `revision: r1`, opens with a complete actor utterance, hold
 2. `fionnen_elunwen_home.topic_01` (`keyword`: 箭術, `label`: 箭術): stance comes before breath and breath before the hand, the full draw is released on a half-exhale, and the practice ends when the hand stops needing the thought. Source: 種族設定 › 精靈族 (ability comes from long practice); the 靶道 node.
 3. `fionnen_elunwen_home.topic_02` (`keyword`: 靶道, `label`: 靶道): targets are nailed to trunks for beginners, the far tags swing on ropes and must be timed, the lane never shuts, and she resets the tags every morning. Source: `content/maps/settlements/elven_village_fionnen.yaml` (`archery_lane`).
 4. `fionnen_elunwen_home.topic_03` (`keyword`: 光法, `label`: 光法): archery and light magic share one lane, accuracy is the same discipline in both, and the village's children first learn to hold light in the palm there. Source: 種族設定 › 斐歐恩族 特色 (親和光屬性魔法); the 靶道 node.
-5. `fionnen_elunwen_home.topic_04` (`keyword`: 比試, `label`: 比試): she declines a contest, measures the day against yesterday's arrows instead, and points back at the target that neither yields nor loses. Source: the host's dialogue-only declaration; 種族設定 › 精靈族 (no fixed trades, nothing to sell).
+5. `fionnen_elunwen_home.topic_04` (`keyword`: 比試, `label`: 比試): she declines a contest, measures the day against the last practice instead, and points at the target that neither yields nor loses and at the spare bows by the door. Source: the host's dialogue-only declaration; 種族設定 › 精靈族 (no fixed trades, nothing to sell).
 
 ### B. `fionnen_firwen_home` (菲爾溫‧埃文斯塔爾)
 
@@ -102,7 +102,7 @@ Every scene declares `revision: r1`, opens with a complete actor utterance, hold
 2. `fionnen_lumeth_home.topic_01` (`keyword`: 養蜂, `label`: 養蜂): the hives stand at the edge of the flower beds and follow the bloom; 森林百花蜜 is gathered by the season and tastes of the flowers that opened. Source: the `blossom_garden` node; the item registry row (`fionnen_wildflower_honey`); the `fionnen_fare` shelf.
 3. `fionnen_lumeth_home.topic_02` (`keyword`: 蜜漬, `label`: 蜜漬): 精靈蜜漬花蕊 is petals washed, dried, cooked once with honey and taken off the fire before they soften, then sealed and cooled. Source: the `blossom_garden` node description (蜜與花瓣一起熬煮); the item registry row (`elven_candied_blossom`).
 4. `fionnen_lumeth_home.topic_03` (`keyword`: 蜜漬房, `label`: 蜜漬房): the shared 蜜漬房 holds the pots and the shelves of sweet food, nobody pays copper there, and a guest who wants a jar comes to her home. Source: `content/maps/interiors/fionnen_honey_house.yaml`; `docs/lore/settlement-locations.md` 精靈村落 (無掛牌商店，機能由個別精靈在家中承擔).
-5. `fionnen_lumeth_home.topic_04` (`keyword`: 收回, `label`: 收回): she takes back the three goods on her own shelf, pays copper for what is sound, and declines anything else because she cannot judge it. Source: the home's `fionnen_fare` service.
+5. `fionnen_lumeth_home.topic_04` (`keyword`: 收回, `label`: 收回): she takes back the three goods on her own shelf, pays copper for what is sound, and declines food outside her assortment because she cannot judge it. Source: the home's `fionnen_fare` service.
 
 ### D. `fionnen_sylara_home` (希拉拉‧希倫特布魯克)
 
@@ -112,7 +112,7 @@ Every scene declares `revision: r1`, opens with a complete actor utterance, hold
 2. `fionnen_sylara_home.topic_01` (`keyword`: 藥草, `label`: 藥草): 止血藥草 grows in the shaded inner beds, is hung to dry out of the sun, and is rubbed onto a cut to close it. Source: the `forest_plots` node; the item registry row (`healing_herb`); the `fionnen_remedies` shelf.
 3. `fionnen_sylara_home.topic_02` (`keyword`: 蜂蠟膏, `label`: 蜂蠟膏): 森林蜂蠟膏 is hive wax from 盧梅斯 cooked slowly with herbs until it darkens, and it seals a cut against water and soil. Source: the item registry row (`fionnen_beeswax_salve`); the hives at 花蕊蜜園.
 4. `fionnen_sylara_home.topic_03` (`keyword`: 光法, `label`: 光法): the Fionnen affinity for light is an everyday fact, light closes a wound and takes down swelling, and bone and dirt still need hands. Source: 種族設定 › 斐歐恩族 特色 (親和光屬性魔法); 生活方式 › 性文化 (the body spoken of plainly).
-5. `fionnen_sylara_home.topic_04` (`keyword`: 收回, `label`: 收回): she takes back the three goods on her own shelf, declines herbs she does not keep, and will not pass on anything already opened. Source: the home's `fionnen_remedies` service.
+5. `fionnen_sylara_home.topic_04` (`keyword`: 收回, `label`: 收回): she takes back the three goods on her own shelf and declines herbs she does not keep. Source: the home's `fionnen_remedies` service.
 
 ---
 
@@ -158,7 +158,7 @@ None of the four names contains 店 or 舖, none of the descriptions contains �
 | 希拉拉‧希倫特布魯克 | NPC host | `world/lore/npc_profiles/fionnen_homes_b.py` (`fionnen_sylara`), `places_fionnen.py` |
 | 格威內爾‧斯威夫塔羅 | NPC host | `world/lore/npc_profiles/fionnen_homes_a.py` (`fionnen_gwynnel`), `places_fionnen.py` |
 | 斐歐恩族 | Race branch (人稱) | `tmp/story_settings/world_info.md` 種族設定 › 精靈族; `docs/lore/overview.md` 精靈族 |
-| 王國 | Polity | `tmp/story_settings/world_info.md` 國家與政治 (人類帝國‧格蘭迪亞) |
+| 王國 | Polity | `tmp/story_settings/world_info.md` 國家與政治 (人類王國‧阿爾托利亞) |
 | 森林百花蜜 | Item (`fionnen_wildflower_honey`) | `world/lore/items/data_elven_village_goods.py`, `world/lore/settlements/assortments.py` (`fionnen_fare`) |
 | 精靈蜜漬花蕊 | Item (`elven_candied_blossom`) | `world/lore/items/data_inspect_only_codex.py`, `world/lore/settlements/assortments.py` (`fionnen_fare`) |
 | 普通餐食 | Item (`meal`) | `world/lore/items/data_core_items.py`, `world/lore/settlements/assortments.py` (`fionnen_fare`) |
@@ -191,7 +191,7 @@ Short forms in the prose (蜂蠟膏, 藥膏, 蜜) resolve to the rows above and 
 - The Traditional Chinese linter's `[english-term]` warnings over the four dialogue files name YAML keys, scene identifiers and the hosts' romanised slugs. They are structural tokens, not player prose.
 - The same warnings over `fionnen_homes_b.py` name Python identifiers, docstring module paths and the romanised slugs.
 - The same warnings over the four interior documents name the header comment, the YAML keys and the doorway aliases.
-- The same warning over the dialogue and interior files names 希拉拉, as above.
+- The Traditional Chinese linter's `[reduplication]` warning over the sylara dialogue file and the sylara interior document flags 希拉拉, as above.
 - No other warning category appears.
 
 ---

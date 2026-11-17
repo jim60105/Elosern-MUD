@@ -10,7 +10,7 @@ topics:
     lines:
     - kind: speech
       speaker: actor
-      text: 「這把弓拿在手裡，第一件要學的是什麼？」
+      text: 「剛開始學弓的時候，第一件要學的是什麼？」
     - kind: narration
       text: 她把自己的弓靠到靶架邊，走到你側面，低頭看你的腳。
     - kind: speech
@@ -90,10 +90,10 @@ topics:
       text: 「不比。這條道上，每個人只管自己的準頭。」
     - kind: speech
       speaker: host
-      text: 「要比就比昨天那五支。你昨天中了幾支，今天多一支，就是贏了。」
+      text: 「要比，就跟自己上回練的時候比。今天比上回更穩，就是贏了。」
     - kind: speech
       speaker: actor
       text: 「那總該有個對手吧？」
     - kind: speech
       speaker: host
-      text: 「靶就在那裡。它不會讓，也不會輸。你射得夠久，就會曉得這比跟人比難得多。」
+      text: 「靶就在那裡，它不會讓，也不會輸。門邊有備用的弓，想練就挑一把去試。」

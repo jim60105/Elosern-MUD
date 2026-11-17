@@ -24,7 +24,7 @@ topics:
       text: 「村子裡常有人受傷嗎？」
     - kind: speech
       speaker: host
-      text: 「進深林的獵人回來，身上總帶著幾道。孩子跑得太急也會摔。備著，總比臨時去找好。」
+      text: 「進深林的獵人回來，身上總帶著幾道傷口。孩子跑得太急也會摔。備著，總比臨時去找好。」
 - topic_id: fionnen_sylara_home.topic_02
   keyword: 蜂蠟膏
   label: 蜂蠟膏
@@ -85,15 +85,15 @@ topics:
       text: 「你做的藥膏和藥水，用不完能拿回來嗎？」
     - kind: speech
       speaker: host
-      text: 「森林蜂蠟膏、止血藥草和治療藥水，用不上了都可以拿來。封口還完整，我看過成色算銅幣給你。」
+      text: 「森林蜂蠟膏、止血藥草和治療藥水，用不上都可以拿來，我看過成色算銅幣給你。」
     - kind: speech
       speaker: host
-      text: 「開過的就留著自己用。裡頭沾過什麼，我看不出來，也不敢再給下一個人。」
+      text: 「其他的草藥我不熟，也就不收。我的畦裡種什麼、熬什麼，我都清楚；別人的東西混進來，我沒把握。」
     - kind: speech
       speaker: actor
-      text: 「那從外頭帶來的藥草呢？」
+      text: 「那從山外帶來的藥草呢？」
     - kind: narration
       text: 她搖頭，把桌上的藥草束攏到一邊。
     - kind: speech
       speaker: host
-      text: 「我沒備的草藥就不收。長在什麼坡上、什麼時候採下，我都不曉得，混進我的畦裡只會添麻煩。」
+      text: 「山外帶回來的你自己留著。我沒備的草藥不收，混進我的畦裡只會添麻煩。」
