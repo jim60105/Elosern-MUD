@@ -234,7 +234,7 @@ SUBRACE_REGISTRY: dict[str, Subrace] = {
     "eolas": Subrace(
         "eolas", "elf", "伊歐拉斯族", "幻童精靈", 80, "elven_village_eolas",
         _ALL_ELEMENTS,
-        "幽月谷村的幻童精靈。外表永駐童年，親和所有屬性魔法，並擅長神之秘法。",
+        "幽月谷村的幻童精靈。外表永駐二十歲，親和所有屬性魔法，並擅長神之秘法。",
         StatModifiers(),
     ),
     "wolfkin": Subrace(
