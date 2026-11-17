@@ -8,8 +8,9 @@
 
 ## 2. Completion publication
 
-- [ ] 2.1 Extend `art_push.py` matching to the actor-owned receipt, including pending/failed states without artwork. Extend `test_art_push.py` for success, failure, canceled/foreign job, retired epoch and no duplicate candidate publication; the focused art-push command in design must pass.
-- [ ] 2.2 Keep `stores/elosern/creation.js` navigation signature independent of portrait state. Add `tests/store/creation_portrait.test.js` proving art-only replacement leaves mode, unsent values, local step and concept revision unchanged; the focused Vitest command in design must pass.
+- [ ] 2.1 Change worker batch results/signal contract to bounded `(subject_key, image_id)` completions for each actually applied success/failure. Return `_fail_batch`'s applied failures on client-construction failure; omit stale no-ops and never merge distinct images by subject. Migrate all producers/receivers/signal-shape fixtures without an alias or old-payload fallback. Extend real worker tests for normal success/failure, client-constructor failure and stale token outcomes.
+- [ ] 2.2 Extend `web/webclient/presentation/art_push.py` matching to actor-owned current receipt/image, including pending/failed states without artwork; recheck inside the coordinator's current-context factory. Extend `test_art_push.py` with worker-to-coordinator success/failure, canceled/foreign job, older completion after newer admission, retired epoch and no duplicate publication. Focused worker/art-push commands in design must pass.
+- [ ] 2.3 Keep store navigation signature independent of portrait. Guard `use-creation-form.js::syncFromDraft` with existing `stable_stringify.js` content comparison; wire `{generation, epoch}` context through `AppClient`/overlay, preserving genuine save/reset/new-context synchronization. Add store and mounted-real-overlay regressions starting from a saved custom draft with unsent edits, then fresh equal-draft pending/ready/failed panels. Assert every field/step/concept survives; test changed draft/reset/save/context controls. The focused Vitest command in design must pass.
 
 ## 3. Delivery acceptance
 

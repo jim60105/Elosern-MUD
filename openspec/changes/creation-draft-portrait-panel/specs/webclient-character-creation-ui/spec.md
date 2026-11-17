@@ -84,5 +84,9 @@ An available creation panel SHALL carry `portrait` with exactly `status` and sta
 - **THEN** both the presenter validator and the mirrored browser validator reject the whole panel
 
 #### Scenario: Portrait publication preserves local form context
-- **WHEN** a matching art settlement republishes portrait state without changing the saved draft
-- **THEN** the creation stage, local step and unsent field values stay unchanged, and a nonmatching character/session receives no portrait data
+- **WHEN** a matching art settlement republishes freshly decoded portrait state with the same saved custom draft contents after the player edits local identity/story/allocation fields
+- **THEN** the creation stage, local step and every unsent value stay unchanged despite a new draft object identity, and a nonmatching character/session receives no portrait data
+
+#### Scenario: Real draft changes retain their synchronization
+- **WHEN** saved draft contents change, a confirmed reset or correlated save settles, or creation initializes a new actor presentation context
+- **THEN** the existing guarded draft synchronization runs for that lifecycle without being triggered by portrait-only results or revisions
