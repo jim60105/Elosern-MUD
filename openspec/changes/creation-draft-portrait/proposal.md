@@ -9,6 +9,7 @@ The backend and empty slot do not yet let the player request and inspect a portr
 - Make `CreationPortraitSlot` render all committed states and emit generation intent.
 - Mount the real `GalleryGenerateDrawer` in creation context with free-text-only capabilities.
 - Correlate admission/results/revisions, keep refused input, and render completion without losing unsent form edits.
+- Display server-provided offline refusal and offer explicit status refresh through existing synchronization, never a client probe or automatic generation retry.
 - Add real-component stories and managed fake-client journeys for generation, reconnect and reset.
 
 ## Capabilities

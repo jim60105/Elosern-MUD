@@ -15,15 +15,19 @@ The creation portrait slot SHALL render server portrait state and emit generatio
 
 #### Scenario: Refused input remains editable
 - **WHEN** admission fails or the correlated request result rejects
-- **THEN** the drawer retains its prompt, uses the existing failure surface, unlocks through the shared gate, and never resubmits automatically
+- **THEN** the drawer retains its editable prompt and failure surface, releases request loading through the shared gate, and never resubmits automatically; server unavailability may still disable submit
 
 #### Scenario: All committed states remain accessible
 - **WHEN** the panel reports empty, pending, ready, failed or unavailable
-- **THEN** the slot uses the current server silhouette except ready uses supplied artwork; pending and unavailable disable generation, failed displays the supplied safe reason and permits retry, and all transitions have status text announced through a live region
+- **THEN** the slot uses the current server silhouette except ready uses supplied artwork; pending and unavailable disable generation, failed/unavailable display the safe server reason, failed permits retry, and all transitions have status text announced through a live region
 
-#### Scenario: Connectivity diagnostics do not gate the drawer
-- **WHEN** creation has an otherwise valid request while the art client is unreachable
-- **THEN** no probe is called or cached verdict consulted by the drawer or admission path; the request follows ordinary admission and the worker's actual failure becomes the retryable failed state
+#### Scenario: Server availability drives disabled controls without client probes
+- **WHEN** the panel supplies unavailable service state, including after a stale client attempted submission
+- **THEN** slot/drawer generation is disabled from that server signal and its reason is visible; the server independently refuses admission, no client probe runs, and prompt/form/optional creation remain usable
+
+#### Scenario: Explicit status refresh does not generate
+- **WHEN** the player refreshes unavailable status from the slot or within the drawer
+- **THEN** intent reaches existing manual `ui_sync`, no generation request or client probe occurs, and a refreshed healthy/unknown server state permits only a new explicit submit without replaying the refused request
 
 #### Scenario: Form state survives a full portrait journey
 - **WHEN** an admitted request publishes pending and later ready or failed while the player navigates steps and edits fields

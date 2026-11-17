@@ -14,13 +14,17 @@ See `proposal.md`. This seventh change is the concrete live-slot/drawer integrat
 
 ### Passive slot and shared drawer contract
 
-Extend `CreationPortraitSlot.vue` props with `portrait`, `disabled` and `canGenerate`; emit `generate` only. Its host derives silhouette by change 3’s table lookup, current form name and the committed portrait union. Empty/pending/failed/unavailable show the current supplied silhouette; ready passes server artwork unchanged to `ArtworkPreview`. Generation controls are present only after this integration change; pending/unavailable are disabled, failed/empty/ready permit explicit generate/regenerate subject to shared dispatch gate and existing identity input constraints. Do not run full custom-form validation just to open a portrait request.
+Extend `CreationPortraitSlot.vue` props with `portrait`, `disabled` and `canGenerate`; emit intents only, never dispatch. Its host derives silhouette by change 3's table lookup, current form name and the committed portrait union. Empty/pending/failed/unavailable show the current supplied silhouette; ready passes server artwork unchanged to `ArtworkPreview`. Generation controls are present only after this integration change; pending/unavailable are disabled, failed/empty/ready permit explicit generate/regenerate subject to shared dispatch gate and existing identity input constraints. Do not run full custom-form validation just to open a portrait request.
+
+Add `refresh-status` intent for unavailable state; the slot still never dispatches. The host forwards it through a `request-sync` event to `AppClient`, which calls existing `store.requestPresentationSync("manual")`. Generation remains disabled while the server reports unavailable, but refresh remains accessible under the ordinary synchronization gate. No client probe/clock, new action, recovery timer or generation replay is introduced.
 
 Announce status with `role="status"` and text, never animation alone. Decorative silhouettes are aria-hidden; ready art carries meaningful current-name alternative text. Native buttons keep visible focus. Spinner/breathing and card transitions respect existing full/reduced/off preferences; no new token or text below `--text-xs`.
 
 Mount the real `GalleryGenerateDrawer` from the creation overlay, above the creation modal at the existing drawer tier, with `context="creation"`. Add its optional `context` prop defaulting to `gallery`. Creation switches only its approved contextual copy and suppresses the existing-character/equipment link and misleading gallery-only explanatory text. Gallery usage with absent prop retains all current behavior.
 
 Pass a small view-model projection, not a second gallery state: `{capabilities: {supports_field_selection: false, supports_free_text: true, max_cards: 1}, groups: [], selected: null, equipment_summary: null}` and a ready-art preview when available. Drawer `submit` may still emit `fields: []`; the host deliberately constructs only the five creation payload keys. The slot emits intent and drawer emits data; neither dispatches.
+
+Pass optional `unavailableReason` to the real drawer only from committed creation `portrait.status === "unavailable"`; default empty preserves gallery behavior. In creation context the drawer renders that server reason, disables submit but keeps its prompt editable, and offers a `refresh-status` control inside its own focus trap, forwarding the same host synchronization intent. Keep existing rejection feedback and input after offline refusal. A refreshed healthy/unknown panel re-enables explicit submission; refresh itself never generates or probes. A stale UI can still submit, so server refusal remains authoritative.
 
 ### Request ownership and lifecycle
 
@@ -69,8 +73,9 @@ Abbreviations: A artwork, W wall, S steps, R request, P panel, C cleanup, I inte
 | Other currently open change | Conflict against A/W/S/R/P/C/I |
 | --- | --- |
 | ciaran-village-local-goods | none in product files/specs; no creation/art/data regeneration overlap |
-| fionnen-village-craft-homes | none in product files/specs; only CI manifests if new tests are registered |
 | fionnen-village-fare-homes | none in product files/specs; only CI manifests if new tests are registered |
+
+Connectivity-capability ownership is R only; P/I consume R's APIs/state rather than authoring another connectivity delta. Neither currently open village change touches `art-service-connectivity-surface` or `world/art/connectivity.py`, so the amendment adds no external conflict. A newly opened change touching either must serialize with R. `fionnen-village-craft-homes` is now archived and is not counted as an open-change conflict.
 
 Dependency DAG: A → W → S; A → R; R and S → P → C; S and C → I. A safe single-engineer delivery order is A, W, S, R, P, C, I. P explicitly depends on S because its mounted-form preservation regression must exercise real steps. No child Git repo is needed.
 
@@ -82,7 +87,7 @@ Preserved verbatim from the surviving generator: schema 6 → 7 replacements, th
 
 Two schema-shape cutovers mean versions 7 then 8, rather than an increment in every newly split delivery. The form’s “always visible” persona scenario is narrowed to the story step with retained values to implement the approved stepped form. Copied control scenarios replace inherited shipped race/affinity values with registry-relative mechanisms; no user content decision changes. Activation rollback guarantees distinguish newly introduced state from previously committed draft art, as approved §14 requires.
 
-Connectivity is the one behavioral deviation from approved §7.3: preserve the authoritative handoff and existing diagnostic-only contract, not the design's offline pre-disable/rejection sentence. Creation never probes connectivity or gates on its cache; a valid offline request reaches the worker and reports its real failure with explicit retry. `unavailable` is reserved for structural receipt/authorization failure, not a cached network verdict. No extra connectivity surface or continue-anyway probe is added.
+Connectivity follows approved §§7.3/12 through an explicit main-spec amendment, not a design deviation: R owns the sole creation-admission exception to `art-service-connectivity-surface`; P/I consume its server snapshot to disable generation and show the reason. No client-side probe exists, and gallery/ensure/queue/worker remain ungated. Refusal writes no portrait state and explicit synchronization/retry recovers without a durable lock. This is the one recovered handoff fact superseded by the supervisor: diagnostic-only described the old main contract, not an immutable predecessor decision.
 
 Strict validation requires existing scenario titles to survive MODIFIED replacement. Keep the historical numeric “Schema version ships as the integer 6” title while its outcome asserts the new version, and keep “Preset lacks artwork” while its body describes absent official art. These are scenario-identity mechanics, not compatibility behavior.
 
@@ -94,11 +99,14 @@ Add `tests/overlays/creation_portrait.test.js`; extend existing overlay/concept 
 
 The focused browser methods must cover generation to ready while editing steps, failed generation/retry, disconnect/reconnect without replay, reset/canceled late settle, and custom/preset activation disposition. Existing keyboard custom and preset journeys retain their assertions; geometry checks use both reference viewports. Update the frontend and synchronization guides. Register new methods/modules with the shard tool and map actual tests to added delta scenarios without guessed traceability ids.
 
+Add `test_offline_refusal_and_explicit_retry`: submit against a fake failed probe, prove no policy/receipt/job write and preserved prompt/form, display the server reason with generation disabled, then deterministically invalidate/replace the server test cache and request manual status refresh. The refreshed state must permit one explicit retry through the real admission/worker path, never enqueue during refresh or replay the refused request. Use the managed fake-client/seed control pattern and test cache seam, not browser health probing, production unavailable attributes, sleep or elapsed-time assertions. Also keep preset/custom activation usable while all art services are offline.
+
 ```text
 pnpm exec vitest run web/webclient-app/tests/overlays/creation_portrait.test.js web/webclient-app/tests/overlays/creation_overlay.test.js web/webclient-app/tests/overlays/concept_fill_navigation.test.js
 pnpm run build
 uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_browser_creation_portrait.CreationPortraitJourneys.test_generate_while_editing
 uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_browser_creation_portrait.CreationPortraitJourneys.test_reconnect_and_reset
+uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_browser_creation_portrait.CreationPortraitJourneys.test_offline_refusal_and_explicit_retry
 pnpm run build-storybook
 pnpm run showcase-coverage
 openspec validate creation-draft-portrait --strict
