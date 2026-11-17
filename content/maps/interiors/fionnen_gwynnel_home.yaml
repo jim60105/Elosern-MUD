@@ -1,0 +1,21 @@
+# Permanent interior authored source (schema version 1).
+# The sole authority for the room's identity, name, prose, scene metadata and
+# its one exterior entrance relationship. The room id is the stable place key
+# a service record joins to, so a service record declares no geometry.
+version: 1
+kind: interior
+id: fionnen_gwynnel_home
+rooms:
+  fionnen_gwynnel_home:
+    name_zh: 格威內爾的家
+    desc_zh: 屋子搭在木作空地邊的板根之間，屋樑上橫放著一排風乾的弓材，屋角立著一張削木用的木馬。牆上的木釘掛著幾把未上弦的長弓，地上積著一層木屑。
+    scene_archetype: tavern_interior
+connections: []
+exterior:
+  settlement: elven_village_fionnen
+  node: craft_glade
+  room: fionnen_gwynnel_home
+  doorway_key: 格威內爾的家
+  doorway_aliases:
+  - gwynnel
+  - gwynnel's home
