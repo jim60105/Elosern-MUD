@@ -855,3 +855,10 @@ test("creation is in the production panel allowlist and a bad panel rejects atom
   assert.equal(store.getState().phase, "awaiting_initial_snapshot");
 });
 
+test("the Storybook creation fixture validates against schema 7", async () => {
+  const { CREATION_PANEL_SAMPLE } = await import(
+    "../../../../webclient-app/stories/fixtures/creation_panels.js"
+  );
+  assert.doesNotThrow(() => Protocol.validateCreationPanel(CREATION_PANEL_SAMPLE));
+});
+

@@ -3,8 +3,9 @@ from tools.spec_traceability import covers_requirement
 from copy import deepcopy
 import unittest
 from unittest.mock import patch
-from web.webclient.presentation.creation import AGE_MAXIMUM, AGE_MINIMUM, APPARENT_AGE_MAXIMUM, APPARENT_AGE_MINIMUM, CREATION_SCHEMA_VERSION, CreationPanelError, MAX_BACKGROUND_CODE_POINTS, MAX_DESCRIPTION_CODE_POINTS, MAX_DISPLAY_NAME_CODE_POINTS, MAX_EMPHASIS_CODE_POINTS, MAX_EXPLANATION_CODE_POINTS, MAX_LABEL_CODE_POINTS, MAX_NAME_LENGTH, MAX_PRESET_KEY_CODE_POINTS, MAX_PRESETS, MAX_PROFILES, MAX_RACES, MAX_RACE_KEY_CODE_POINTS, MAX_SPECIALTY_CODE_POINTS, MAX_SUBRACES, MAX_SUBRACE_KEY_CODE_POINTS, MIN_NAME_LENGTH, validate_creation
+from web.webclient.presentation.creation import AGE_MAXIMUM, AGE_MINIMUM, APPARENT_AGE_MAXIMUM, APPARENT_AGE_MINIMUM, CREATION_SCHEMA_VERSION, CreationPanelError, MAX_BACKGROUND_CODE_POINTS, MAX_DESCRIPTION_CODE_POINTS, MAX_DISPLAY_NAME_CODE_POINTS, MAX_EMPHASIS_CODE_POINTS, MAX_EXPLANATION_CODE_POINTS, MAX_LABEL_CODE_POINTS, MAX_NAME_LENGTH, MAX_PRESET_KEY_CODE_POINTS, MAX_PRESETS, MAX_PROFILES, MAX_RACES, MAX_RACE_KEY_CODE_POINTS, MAX_SILHOUETTES, MAX_SPECIALTY_CODE_POINTS, MAX_SUBRACES, MAX_SUBRACE_KEY_CODE_POINTS, MIN_NAME_LENGTH, validate_creation
 from world.art.gallery_fallback import band_key_for
+from world.lore.sex import SEX_VALUES
 from web.webclient.presentation.protocol import (
     MAX_CANONICAL_JSON_BYTES,
     ProtocolValidationError,
@@ -511,6 +512,15 @@ class CreationPanelValidationTests(unittest.TestCase):
                     sex,
                     entry["apparent_age_minimum"],
                 )
+                self.assertEqual(
+                    expected_key,
+                    band_key_for(
+                        "portrait:character:1",
+                        sex,
+                        entry["apparent_age_maximum"],
+                    ),
+                    "a silhouette interval must not straddle a band boundary",
+                )
                 artwork = entry["artwork"]
                 self.assertEqual(artwork["attempts"], [])
                 self.assertEqual(artwork["retention_sources"], [])
@@ -521,6 +531,12 @@ class CreationPanelValidationTests(unittest.TestCase):
                     artwork["terminal"]["source_id"],
                     f"portrait.alpha:{expected_key}",
                 )
+
+    def test_the_silhouette_bound_covers_the_advertised_sex_vocabulary(self):
+        # Three non-empty bands per advertised sex is the builder's partition;
+        # a future vocabulary growth must move the bound rather than emit a
+        # table its own validator rejects.
+        self.assertLessEqual(len(SEX_VALUES) * 3, MAX_SILHOUETTES)
 
 
     def test_silhouette_table_rejects_every_malformed_case(self):

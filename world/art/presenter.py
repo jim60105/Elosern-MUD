@@ -537,7 +537,10 @@ def preset_artwork(preset_key: str) -> dict:
     ``official_content_reference_for_preset`` is resolved against the mounted
     snapshot; its admitted default is the ONLY possible image attempt. The
     chain always carries the built-in alpha terminal and claims no generation
-    and no retention. A pure read: nothing is created or written.
+    and no retention. A pure read: nothing is created or written. An
+    unregistered key is defensive only — the caller's card set comes from the
+    same registry — and falls back to the adult band so serialization stays
+    total instead of failing the whole panel.
     """
     from world.art.official_refs import official_content_reference_for_preset
     from world.lore.player_presets import PLAYER_PRESET_REGISTRY
