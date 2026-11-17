@@ -180,17 +180,19 @@ drawer 的文案有兩處依賴「已存在的角色」（「透過目前的角�
 
 本設計原先規劃兩個交付（`creation-portrait-layout` 與 `creation-draft-portrait`）；實際提案依「一個工作天可完成」切成七個 change。協議變更、兩個 UI 介面，以及請求／狀態／生命週期的整合各自有獨立的測試擁有者，因此分開交付；肖像欄的空白狀態留在 UI 切片，其餘狀態與生成流程一起交付。
 
-| 序 | change | 範圍 | schema | commit |
-| --- | --- | --- | --- | --- |
-| 1 | `creation-panel-artwork` | `presets[].artwork` 與 `custom.silhouettes` 的 canonical descriptor、presenter 與瀏覽器鏡像驗證器 | 7 | `b10d6d91`、`9083d9d8` |
-| 2 | `creation-preset-card-wall` | 卡牌牆的本地展開與明確選取 | 7 | `f49cd972` |
-| 3 | `creation-stepped-form` | 三步表單、概念引導、空白肖像欄 | 7 | `21682318` |
-| 4 | `creation-draft-portrait-request` | `creation.portrait.generate` 的准入與序列化、connectivity 的唯一例外 | 7 | `a483442a`、`5b7c45d7`、`12f61043` |
-| 5 | `creation-draft-portrait-panel` | 面板 `portrait` 區塊、schema 8、完成發佈 | 8 | `3126d1e9`、`f3b02b74`、`4d506462` |
-| 6 | `creation-draft-portrait-cleanup` | 重設與啟用的所有權、rollback 保證 | 8 | `ef4f72d8`、`7ebd5d07` |
-| 7 | `creation-draft-portrait` | 真實 `GalleryGenerateDrawer` 整合與顯式狀態刷新 | 8 | `c17480e7`、`3edcd79d`、`b3aebb81` |
+| 序 | change | 範圍 | schema | 前端視覺 | commit |
+| --- | --- | --- | --- | --- | --- |
+| 1 | `creation-panel-artwork` | `presets[].artwork` 與 `custom.silhouettes` 的 canonical descriptor、presenter 與瀏覽器鏡像驗證器 | 7 | 間接：只提供資料與 fixtures，無版面 | `b10d6d91`、`9083d9d8` |
+| 2 | `creation-preset-card-wall` | 卡牌牆的本地展開與明確選取 | 7 | **是**：卡牌牆版面、`creation-overlay.css`、stories、`visual-review.md` | `f49cd972` |
+| 3 | `creation-stepped-form` | 三步表單、概念引導、空白肖像欄 | 7 | **是**：分步表單與引導欄版面、元件 CSS 拆分、stories、`visual-review.md` | `21682318` |
+| 4 | `creation-draft-portrait-request` | `creation.portrait.generate` 的准入與序列化、connectivity 的唯一例外 | 7 | 否：後端 action 與驗證 | `a483442a`、`5b7c45d7`、`12f61043` |
+| 5 | `creation-draft-portrait-panel` | 面板 `portrait` 區塊、schema 8、完成發佈 | 8 | 間接：提供狀態與表格同步，無版面 | `3126d1e9`、`f3b02b74`、`4d506462` |
+| 6 | `creation-draft-portrait-cleanup` | 重設與啟用的所有權、rollback 保證 | 8 | 否：只有生命週期與行為回歸 | `ef4f72d8`、`7ebd5d07` |
+| 7 | `creation-draft-portrait` | 真實 `GalleryGenerateDrawer` 整合與顯式狀態刷新 | 8 | **是**：肖像欄五態、drawer 文案與版面、stories、`visual-review.md` | `c17480e7`、`3edcd79d`、`b3aebb81` |
 
 兩個 schema 切換點：change 1 升到 7（descriptor 與 silhouettes），change 5 升到 8（`portrait` 區塊）。其餘 change 沿用當前版本。
+
+前端視覺的實作者是 change 2、3、7；三者各自產出 `visual-review.md`，並在 1451x790 與 2560x1440 驗證。change 1 與 5 只讓畫面有東西可畫（descriptor 與 portrait 狀態），change 4 與 6 不動任何版面。
 
 ### 9.2 依賴、衝突與平行實作批次
 
