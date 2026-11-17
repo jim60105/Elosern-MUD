@@ -63,7 +63,12 @@ prerequisite fails.
 - **THEN** the panel does not fabricate a value
 
 ### Requirement: Creation presentation derives finite controls from immutable registries
-The `presets` array SHALL contain at most 8 preset cards, each with exactly `key` (1..64), `display_name` (1..128), `race` (1..64), `race_description` (1..512), nullable `subrace`, `emphasis` (1..256), `background` (1..256), and `artwork`, derived from `PLAYER_PRESET_REGISTRY` and the race registry rather than duplicated literals. The `custom` object SHALL contain exactly `name`, `age`, `races`, `subraces`, `profiles`, `affinity`, `sex`, and `silhouettes`.
+The presenter SHALL derive bounded, exact-shape preset cards and custom controls from `PLAYER_PRESET_REGISTRY`, the race registry and the starting-profile resolver, never duplicated literals. Presets SHALL carry `artwork` and custom controls SHALL carry `silhouettes` under the schemas below.
+
+#### Scenario: Preview additions preserve exact control shapes
+- **WHEN** finite creation controls are serialized
+- **THEN** `presets` contains at most 8 cards, each with exactly `key` (1..64), `display_name` (1..128), `race` (1..64), `race_description` (1..512), nullable `subrace`, `emphasis` (1..256), `background` (1..256), and `artwork`
+- **AND** `custom` contains exactly `name`, `age`, `races`, `subraces`, `profiles`, `affinity`, `sex`, and `silhouettes`
 
 #### Scenario: Preset cards render from registry data
 - **WHEN** the creation panel ships for a pending character

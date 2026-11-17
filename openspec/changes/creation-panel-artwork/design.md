@@ -34,6 +34,8 @@ Copy the three current requirement blocks and apply the generator’s exact repl
 
 The repository CLI additionally requires every existing scenario title to survive a MODIFIED block. Its first strict validation rejected the recovered numeric scenario-title rename. Retain the historical title “Schema version ships as the integer 6” as an identifier while its WHEN/THEN asserts 7 (and change 5 asserts 8 under the same identifier). No runtime version-6 support is retained. This mechanical correction preserves the recovered requirement body and two ADDED blocks without weakening validation.
 
+The blocking review found the recovered finite-controls body exceeded the mandatory under-500-character limit. Move its exact field/bound obligations into “Preview additions preserve exact control shapes”, leaving a short SHALL body. This is a mechanical relocation, not a schema or wording retune of either preserved ADDED requirement.
+
 ## Risks / Trade-offs
 
 An actor-specific `other` table prevents global reuse; it avoids a new fallback policy and guarantees future-subject parity. Descriptor additions can exceed the existing panel byte bound; retain the bound and reject the whole oversize payload. Test a valid synthetic maximum-fit payload and a separately oversize payload rather than raising the envelope cap.
