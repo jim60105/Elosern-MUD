@@ -275,6 +275,9 @@ class PortraitAdapterTests(CreationActionBase):
             if str(record.db.gallery_image_id or "")
         ]
 
+    @covers_requirement(
+        "webclient-character-creation-ui::pending-characters-request-portraits-from-exact-draft-values"
+    )
     def test_a_valid_request_reports_success_without_a_confirmation(self):
         result = self._run()
         self.assertEqual(result["outcome"], "success")
@@ -288,6 +291,9 @@ class PortraitAdapterTests(CreationActionBase):
             {"mode": "named", "stable_key": str(self.character.pk)},
         )
 
+    @covers_requirement(
+        "webclient-character-creation-ui::pending-characters-request-portraits-from-exact-draft-values"
+    )
     def test_a_rejection_preserves_an_existing_confirmation(self):
         from web.webclient.actions.creation_actions import FINGERPRINT_NDB_KEY
 
@@ -302,6 +308,9 @@ class PortraitAdapterTests(CreationActionBase):
         self.assertEqual(self._jobs(), [])
         self.assertIsNone(self.character.db.portrait_policy)
 
+    @covers_requirement(
+        "webclient-character-creation-ui::pending-characters-request-portraits-from-exact-draft-values"
+    )
     def test_known_unavailable_rejects_with_the_creation_panel(self):
         self.fake_client.fail_probe()
         result = self._run()

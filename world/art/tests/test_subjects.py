@@ -662,6 +662,9 @@ class DraftDescriptionTests(PromptFixture):
             apparent_age=23,
         )
 
+    @covers_requirement(
+        "art-subject-model::draft-portrait-descriptions-use-only-validated-request-values"
+    )
     def test_stored_identity_cannot_override_the_draft(self):
         # A shell whose stored identity, persona, equipment and name all
         # disagree with the submitted values: none of it may reach the render.
@@ -678,6 +681,9 @@ class DraftDescriptionTests(PromptFixture):
         for forbidden in ("別的名字", "stored clothing", "t_other_race"):
             self.assertNotIn(forbidden, text)
 
+    @covers_requirement(
+        "art-subject-model::draft-portrait-descriptions-use-only-validated-request-values"
+    )
     def test_existing_composition_remains_equivalent(self):
         entity = Mock()
         entity.db.race = self.values.race
@@ -689,6 +695,9 @@ class DraftDescriptionTests(PromptFixture):
             character_description(entity, self.values.apparent_age, fields=()),
         )
 
+    @covers_requirement(
+        "art-subject-model::draft-portrait-descriptions-use-only-validated-request-values"
+    )
     def test_description_validation_precedes_rendering(self):
         with self.assertRaises(ArtSubjectError):
             draft_character_description(object(), "")

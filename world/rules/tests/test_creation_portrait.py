@@ -47,6 +47,7 @@ from world.tests.synthetic_data import (
     make_subrace,
     synthetic_registries,
 )
+from tools.spec_traceability import covers_requirement
 
 # A race that permits exactly one sex member, so a forbidden-sex rejection is
 # observable without touching a shipped race's rule.
@@ -144,6 +145,9 @@ class _DraftPortraitCase(EvenniaTestCase):
 class AdmissionWritesTests(_DraftPortraitCase):
     """One valid request queues exactly one named-subject image job."""
 
+    @covers_requirement(
+        "webclient-character-creation-ui::pending-characters-request-portraits-from-exact-draft-values"
+    )
     def test_a_valid_draft_request_needs_no_saved_form(self):
         admission = self.admit(custom_prompt="  紅色長髮  ")
         self.assertEqual(len(self.jobs()), 1)
@@ -267,6 +271,9 @@ class AdmissionWritesTests(_DraftPortraitCase):
 class InFlightTests(_DraftPortraitCase):
     """A second request while one job is live is refused without writes."""
 
+    @covers_requirement(
+        "webclient-character-creation-ui::pending-characters-request-portraits-from-exact-draft-values"
+    )
     def test_a_second_request_is_rejected_before_the_policy_write(self):
         first = self.admit()
         receipt_before = dict(self.receipt())
@@ -397,6 +404,9 @@ class RollbackTests(_DraftPortraitCase):
 class ConnectivityRefusalTests(_DraftPortraitCase):
     """The one admission exception: known-unavailable refuses retryably."""
 
+    @covers_requirement(
+        "webclient-character-creation-ui::pending-characters-request-portraits-from-exact-draft-values"
+    )
     def test_known_unavailable_refuses_before_mutation_and_permits_retry(self):
         self.client.fail_probe()
         with self.assertRaises(PortraitServiceUnavailable) as caught:

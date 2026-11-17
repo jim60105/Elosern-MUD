@@ -27,6 +27,7 @@ from ._support import (
     _open_t_creation_scope,
     custom_payload,
 )
+from tools.spec_traceability import covers_requirement
 
 
 class CreationPayloadValidationTests(unittest.TestCase):
@@ -204,6 +205,9 @@ class PortraitPayloadValidationTests(unittest.TestCase):
         "custom_prompt": "  紅髮  ",
     }
 
+    @covers_requirement(
+        "webclient-character-creation-ui::pending-characters-request-portraits-from-exact-draft-values"
+    )
     def test_the_exact_payload_normalizes_its_prompt(self):
         from web.webclient.actions.creation_actions import (
             validate_creation_portrait_payload,
@@ -217,6 +221,9 @@ class PortraitPayloadValidationTests(unittest.TestCase):
         )
         self.assertEqual(blank["custom_prompt"], "")
 
+    @covers_requirement(
+        "webclient-character-creation-ui::pending-characters-request-portraits-from-exact-draft-values"
+    )
     def test_malformed_payloads_raise(self):
         from web.webclient.actions.creation_actions import (
             CreationActionError,
