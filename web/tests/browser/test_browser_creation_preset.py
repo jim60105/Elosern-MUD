@@ -30,6 +30,7 @@ def _press(page, key, wait_ms=60):
 
 class PresetCreationJourneys(CreationBrowserTest):
     @covers_requirement("webclient-character-creation-ui::creation-browser-acceptance-is-keyboard-only-and-desktop-bounded")
+    @covers_requirement("webclient-character-creation-ui::preset-browsing-is-local-until-deliberate-selection")
     @covers_requirement("creation-activation-gating::activation-confirmation-follows-a-successful-save")
     def test_preset_selection_confirm_activate_reaches_exploration(self):
         page = self._login_creation()
