@@ -70,7 +70,7 @@ topics:
       text: 「弓棚的門從來不關。誰的弓要換弦、要調，拿去棚裡，牆上有弦，自己動手。」
     - kind: speech
       speaker: host
-      text: 「村裡人取弓不問我。箭射壞了，靶道的樹幹上還留著痕。」
+      text: 「村裡人取弓不問我。箭射壞了就自己換；靶道的樹幹上還留著歷來的箭痕。」
     - kind: speech
       speaker: actor
       text: 「外頭來的人呢？也能從弓棚拿弓嗎？」
@@ -95,7 +95,7 @@ topics:
       text: 「我做的弓，沒斷的拿回來。我看過弦槽與弓身，還能用的算銅幣給你。」
     - kind: speech
       speaker: host
-      text: 「弓身上的木頭砍下來，還能拿去做別的東西，不必丟。」
+      text: 「弓身上的木料拆下來，還能拿去做別的東西，不必丟。」
     - kind: speech
       speaker: actor
       text: 「別處買來的弓，你也願意看嗎？」

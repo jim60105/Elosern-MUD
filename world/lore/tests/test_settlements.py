@@ -200,7 +200,7 @@ class PlaceRegistryTests(unittest.TestCase):
         ),
         "ciaran_valwyn_home": (
             'ciaran_valwyn_home', 'elven_village_ciaran', PlaceKind.HOME, '瓦爾溫的家',
-            "村北那株老樹下，樹根環抱間是這戶人家。沿著每一面牆，一輩子蒐羅來的零物擱在織籃與挖空的石裡，羽毛、種子、一綑綑紮起的絲，樣樣被細心留著，樣樣有一個故事。這是一個被留下來的事物裝滿的家，不是一間鋪子。",
+            "村北那株老樹下，樹根環抱間是這戶人家。沿著每一面牆，一輩子蒐羅來的零物擱在織籃與挖空的石臼裡，羽毛、種子、壓實的藍染料塊與幾罐晶砂，樣樣被細心留著，樣樣有一個故事。屋裡裝滿留下來的東西，沒有鋪子的樣子。",
             'old_tree_north', '瓦爾溫的家', ('valwyn', "valwyn's home"),
             'elf', 'ciaran', 'female',
         ),
