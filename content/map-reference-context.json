@@ -20,7 +20,9 @@
       "elven_fare",
       "elven_remedies",
       "elven_sundries",
+      "eolas_fare",
       "eolas_kilnware",
+      "eolas_remedies",
       "eolas_silkwork",
       "eolas_wandcraft",
       "general_sundries",
@@ -163,6 +165,9 @@
       "ciaran_valwyn",
       "ciaran_vethiel",
       "eolas_naelara",
+      "eolas_nirnel",
+      "eolas_raellin",
+      "eolas_saelnel",
       "eolas_sirelwen",
       "eolas_taelith"
     ],
@@ -187,6 +192,8 @@
       "ciaran_valwyn_home",
       "ciaran_vethiel_home",
       "eolas_naelara_home",
+      "eolas_nirnel_home",
+      "eolas_raellin_home",
       "eolas_sirelwen_home",
       "eolas_taelith_home"
     ],
@@ -231,7 +238,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "3271ad91a0205a66ff512ba30293e26c3cade74775d1bdcb3d79a3a3340a75d7",
+  "fingerprint": "e99100245dbcbcf129e187e4a65345379713a69791336c080b1ff3db4fae8678",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -958,6 +965,78 @@
           "domain": "interior_room",
           "map_id": "eolas_naelara_home",
           "object_id": "eolas_naelara_home"
+        }
+      }
+    ],
+    "interior_room:eolas_nirnel_home:eolas_nirnel_home": [
+      {
+        "source": "place:eolas_nirnel_home",
+        "source_domain": "places",
+        "source_file": "world/lore/settlements/places_eolas.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "eolas_nirnel_home",
+          "object_id": "eolas_nirnel_home"
+        }
+      },
+      {
+        "source": "service_host:eolas_nirnel",
+        "source_domain": "service_hosts",
+        "source_file": "world/rules/guild_config/_hosts.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "eolas_nirnel_home",
+          "object_id": "eolas_nirnel_home"
+        }
+      }
+    ],
+    "interior_room:eolas_raellin_home:eolas_raellin_home": [
+      {
+        "source": "place:eolas_raellin_home",
+        "source_domain": "places",
+        "source_file": "world/lore/settlements/places_eolas.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "eolas_raellin_home",
+          "object_id": "eolas_raellin_home"
+        }
+      },
+      {
+        "source": "service_host:eolas_raellin",
+        "source_domain": "service_hosts",
+        "source_file": "world/rules/guild_config/_hosts.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "eolas_raellin_home",
+          "object_id": "eolas_raellin_home"
+        }
+      }
+    ],
+    "interior_room:eolas_saelnel_home:eolas_saelnel_home": [
+      {
+        "source": "place:eolas_saelnel_home",
+        "source_domain": "places",
+        "source_file": "world/lore/settlements/places_eolas.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "eolas_saelnel_home",
+          "object_id": "eolas_saelnel_home"
+        }
+      },
+      {
+        "source": "service_host:eolas_saelnel",
+        "source_domain": "service_hosts",
+        "source_file": "world/rules/guild_config/_hosts.py",
+        "target": {
+          "cell": null,
+          "domain": "interior_room",
+          "map_id": "eolas_saelnel_home",
+          "object_id": "eolas_saelnel_home"
         }
       }
     ],
@@ -16224,7 +16303,7 @@
     "world/lore/nations.py": "43f7f423802ecd56ade274588a789dd3673dae7811c8e87ea34af45208506802",
     "world/lore/npc_card.py": "dfcfdd19ccbe3e92f7a3a7a8a561e423ba8710b14b7172cefb5f1c4fb9713dbd",
     "world/lore/npc_editorial_review.py": "9344e2b199fb4c2d83e2d18742aaa124b6eeb9a5585fa5afcc60fc0e8ecc3fdb",
-    "world/lore/npc_profiles/__init__.py": "587818e00de2e1c2c79cbf10f672ed4864cc85dd3992ca05971302f04f086d1e",
+    "world/lore/npc_profiles/__init__.py": "5819d59f3c448c34d33d263dc14b3e0efd4f790401addffacdc50cb95a73f76d",
     "world/lore/npc_profiles/altoria_guild.py": "4e1aeaa10c8a87788b94842fff83727511febc727e933c021c2fa1b7975cdf04",
     "world/lore/npc_profiles/altoria_lower.py": "485d327f3885fc8b48a1ca31ad4e45085471a727a6234e255dde33aa470708f3",
     "world/lore/npc_profiles/altoria_trade.py": "13e835f3954920902b8a60afdb25b03c263b73bc0855ee6aa8c48ef4072b8f36",
@@ -16232,7 +16311,8 @@
     "world/lore/npc_profiles/ciaran_homes_a.py": "c82e5c6a858a8df432a33fe3763283b608be82589adc75a5ae84c4326a42fb1a",
     "world/lore/npc_profiles/ciaran_homes_b.py": "b0de829a2d3b36bf3a3d59b3c3610189746117b8d9129dcf4afa0ced9085a461",
     "world/lore/npc_profiles/eolas_homes_a.py": "2cacc4ed57ac915014bd3cde2ea1356affa0a37a5c164d1648cbb9951e4dc334",
-    "world/lore/npc_profiles/inventory.py": "07c7de20827fa9eea147ff19cd528e96b0cb6e296f2ef20966a292c059ee4c30",
+    "world/lore/npc_profiles/eolas_homes_b.py": "2024e8569aba03ea014e5810eb137d9fe13f33c7663a7ae3192175712606d8cc",
+    "world/lore/npc_profiles/inventory.py": "5c6e881998c928eab7902462d27ffc88902a983806e0cf1edb24e71916452ac1",
     "world/lore/npc_profiles/shape.py": "988fc9dea7ad2f706bef99f8d6df265e423802af79a76880b6099cd2ba2be4fa",
     "world/lore/npc_tiers.py": "ef6a82a681f9212ab71295771986769e6f7285538367f72297bad6dddb66fd48",
     "world/lore/player_presets/__init__.py": "7640ad1e9fcdee37be50038eb956441baf7ed9f347b4ffc0f748b695c887fee0",
@@ -16251,14 +16331,14 @@
     "world/lore/scenes.py": "ba525c31108b5abcd3c487df9578d6e38e5dc2504b6cf4cf5711313e2dd97898",
     "world/lore/settlements/__init__.py": "13b916e302018d28878942694d5e9ba6457b7eb8818ac8272504cbb002fd8f7c",
     "world/lore/settlements/_prose_lang.py": "7cf3638af425039e2568341c9f4159385225b07c5b6fb688bb73eda0aeb66692",
-    "world/lore/settlements/assortments.py": "894f06f237dd073b1326a39484b01e31efbd3def8c8b6b8beda5c70a116472b8",
+    "world/lore/settlements/assortments.py": "5b6c367945ab07524e03c0e26973c260419830ab2128f83071232c165c2380e0",
     "world/lore/settlements/capability_declarations.py": "190fc2ce62a335fe7906968e0e10f86ce9fedadf5873476b3b1742fd552c5861",
     "world/lore/settlements/places.py": "af05eb2c51800ce94c784306ae184f2c0e71ed758feff9812e11f66d9f66a19a",
     "world/lore/settlements/places_altoria_lower.py": "e1502c9c0d8346c2c69b52d75a877f30d5e6d66a9f1f13a228f97595c6cb03b2",
     "world/lore/settlements/places_altoria_middle.py": "51cefb1e5f27a72c3e63fd7b4d9f71ea55494583d0dea057e455446c8b069662",
     "world/lore/settlements/places_altoria_upper.py": "278fb7af1e89be3df25543547fbd3fad3f59ffd36830304af1a9b67627a540eb",
     "world/lore/settlements/places_ciaran.py": "c076e49271811a95d306856ae43b76f62f2fe1c8b23df97059726673e3b5adc8",
-    "world/lore/settlements/places_eolas.py": "dde96873727913b94f2c0a9dff209855475dc6a86413cd386e533d5add4538f5",
+    "world/lore/settlements/places_eolas.py": "8794ae89c0e815f36cc93673d737d1b24bd114d9b926a08d9ff93ecb3de7e0e7",
     "world/lore/settlements/settlements.py": "4176d2a10150142f6159d8adbd35db6611ff28b225a5ca7710e6ed040ad01117",
     "world/lore/settlements/shops.py": "940f04d7c6db2dbcef7e3a14cd2716cde8b753dcd0e73aafffb9b8433854ab1d",
     "world/lore/sex.py": "41636022009a201f954611dbea378438a0469ca166eff54034a87489c5c2cda4",
@@ -16501,7 +16581,7 @@
     "world/rules/rulebook/combat_modifiers.yaml": "8d79781657c43e12d2aaabb4899f57b72110905e72fafb876ce7725e9937b685",
     "world/rules/rulebook/commerce/altoria.yaml": "9e35ac5f6387314550f1087bbd181b559e31f46934c14480331bb708751b7065",
     "world/rules/rulebook/commerce/ciaran.yaml": "8d6045b117f1190e682b957e4e495745a53d8248f5666e68ee86656882ac262c",
-    "world/rules/rulebook/commerce/eolas.yaml": "85eb22f37089dcf6806223b8fb173494acf6867cc8473ae0374ea2780d050358",
+    "world/rules/rulebook/commerce/eolas.yaml": "05b61a96e3fd02b3740c3eb91f2e896d769e84e70cf6150fd25e9fc3becf273c",
     "world/rules/rulebook/commerce/scales.yaml": "661c3a2ebd6a81ce5303f8a6edcd69dfbe02cf760d3d45e3ea0bdcaa8da9e4f9",
     "world/rules/rulebook/cross_lineage_unlock.yaml": "ba8592ff747c2497e4bc5ae6f0caafc592c843043fa25ca9cdd19e319eee6ba3",
     "world/rules/rulebook/defeat_aftermath.yaml": "10d969d9ca9320effade9978df535bcc7867be5445331ff156e5631592ee853a",
