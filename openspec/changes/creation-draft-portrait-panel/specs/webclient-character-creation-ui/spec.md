@@ -65,7 +65,7 @@ prerequisite fails.
 ## ADDED Requirements
 
 ### Requirement: Creation portrait state is a closed read-only union
-An available creation panel SHALL carry `portrait` with exactly `status` and state-dependent `artwork` or `reason`. Status SHALL be `empty`, `pending`, `ready`, `failed` or `unavailable`, derived from the pending character’s authorized draft-portrait state. Both validators SHALL reject malformed state combinations; presentation SHALL neither enqueue nor establish policy.
+An available creation panel SHALL carry `portrait` with exactly `status` and state-dependent `artwork` or `reason`. Status SHALL be `empty`, `pending`, `ready`, `failed` or `unavailable`, derived from authorized draft-portrait state and the server's current service-availability snapshot. Both validators SHALL reject malformed combinations; presentation SHALL neither probe, enqueue nor establish policy.
 
 #### Scenario: The five states have exact fields
 - **WHEN** an available panel serializes portrait state
@@ -73,7 +73,15 @@ An available creation panel SHALL carry `portrait` with exactly `status` and sta
 
 #### Scenario: Pending and completion are authoritative
 - **WHEN** the receipt’s latest job is pending/in progress, then settles successfully or fails
-- **THEN** the panel reports pending, then ready with that exact card or failed with the safe server reason; a character without a receipt reports empty
+- **THEN** the panel reports pending, then ready with that exact card or failed with the safe server reason when no current availability refusal applies; no receipt normally reports empty
+
+#### Scenario: Known service unavailability is a transient server signal
+- **WHEN** a current failed server connectivity snapshot exists without an already-admitted live job
+- **THEN** portrait reports unavailable with its bounded safe reason, without writing portrait state or deleting an existing card; absent/expired/mismatched cache entries do not create an unavailable lock
+
+#### Scenario: Explicit refresh permits recovery without replay
+- **WHEN** an explicit synchronization or reconnect rebuilds the panel after a newer successful verdict or expiry/configuration change invalidates the failed snapshot
+- **THEN** availability is recomputed read-only, existing card/job ownership remains intact, and only a new explicit generate request can enqueue work
 
 #### Scenario: Reconnect rebuilds state without writes
 - **WHEN** the same pending character reconnects or the server reloads with a valid receipt and job/card state

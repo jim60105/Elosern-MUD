@@ -9,6 +9,7 @@ Creation reconnects need authoritative progress rather than browser guesses. Exp
 - **BREAKING** creation panel 7 → 8 adds required `portrait` and rejects every other version.
 - Serialize the closed portrait state union read-only; mirror validation in the browser.
 - Publish pending/settled portrait changes to creation watchers without resetting unsent form state.
+- Project the request slice's transient server availability into `portrait.unavailable`; explicit synchronization can clear a stale display refusal without probing or actor-state writes.
 
 ## Capabilities
 

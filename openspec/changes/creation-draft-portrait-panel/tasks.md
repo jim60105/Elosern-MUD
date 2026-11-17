@@ -2,7 +2,7 @@
 
 ## 1. Read-only portrait state
 
-- [ ] 1.1 Add the immutable receipt/job/card/error reader to `world/rules/creation_portrait.py` and exact-card descriptor builder in `world/art/presenter.py`. Add synthetic `test_creation_panel/test_portrait.py` cases for each state, missing/corrupt receipt, foreign image control and reconnect/reload reconstruction; assert zero writes, no prompt exposure and unchanged ordinary-character eligibility rejection.
+- [ ] 1.1 Add the immutable receipt/job/card/error reader to `world/rules/creation_portrait.py`, consuming the request slice's pure cached-availability reader, and exact-card descriptor builder in `world/art/presenter.py`. Implement the design's explicit precedence including transient service-unavailable reason without a presenter probe/state write. Test every state, cache expiry/config change on explicit refresh, ready-card preservation, admitted pending work, foreign image and reconnect; ordinary eligibility stays unchanged.
 - [ ] 1.2 Extend presenter `_serialize`/`validate_creation`, immutable view plumbing and browser mirror with required portrait union; move 7 to 8 and reject all other versions. Add identical state/field/URL/reason rejection matrices in Python and `protocol_creation.test.js`; focused commands in design must pass without increasing byte caps.
 - [ ] 1.3 Update every affected synthetic panel builder/story fixture and `docs/development/webclient-synchronization.md` to schema 8 and the closed union. Expected state is valid fixtures, unchanged optional proposal semantics and no duplicate panel-version requirement.
 
