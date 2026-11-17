@@ -9,6 +9,7 @@ Rules that hold for every task:
 - Add no test and no assertion that names a place, host, item, price or line from this change.
 - Use the names, keys, ages, prices and stock figures of `design.md` exactly.
 - Before writing any card, room prose or dialogue, read `/var/home/jim60105/repos/MUD/tmp/story_settings/world_info.md` (`tmp/` is git-ignored, so the file exists only in the primary checkout, not in a worktree; read it by this absolute path), `.agents/skills/npc-dialogue-content/SKILL.md` with its `references/scene-schema.md`, and the `chinese-content-writing-guideline` and `writing-style-guideline` skills.
+- Write every card and scene with the world source's 性文化 and 倫理觀 (no shame about sex or the bare body). That ease lives in dress, bearing and how a host speaks of her own goods; it does not turn a fare host's home into a sexual scene.
 - The server refuses to start until every gate of a host is satisfied, so the registries load only after groups 2 to 6 are all done. Verification that loads them is in group 7.
 - Run every Evennia test command alone, exactly as written, with nothing before or after it. If the test guard refuses a command for discovering more than 100 tests, run its labels as separate commands.
 

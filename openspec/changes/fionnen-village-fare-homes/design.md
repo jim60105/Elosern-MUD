@@ -406,6 +406,7 @@ One file per host. The filename stem is the profile key; the file declares no ow
 - A merchant's scenes name only goods on her own shelf, by registry display name, and state no number: no price, no quantity. The 收回 topic matches the service: a merchant buys back only what her shelf offers.
 - Name only places that exist: the village's nodes and shared interiors listed in Context, and the hosts of this village named in the Decision 1 table of this change or an earlier applied one.
 - Speak as a villager sharing what she makes. Elves need nothing from outsiders and are neither servants nor curiosities.
+- That body ease rides in the greeting and in 菲爾溫's 森林 scene; it never becomes a sexual scene in a fare host's home.
 - An existing test reads every village table and rejects proprietor vocabulary. No greeting or line contains any of: 老闆, 店主, 本店, 營業時間, 營業, 庫存, 存貨, 存量, 售價, 光臨, 開店, 開門, 打烊. Say the world-side thing instead: the door is never shut, the shelf is what she finished this season.
 
 **`world/lore/dialogue/content/fionnen_elunwen.yaml`** — topic ID prefix `fionnen_elunwen_home`. Greeting: lowers her bow after the shot lands, glances at the guest's stance, and nods toward the spare bows.
@@ -421,7 +422,7 @@ One file per host. The filename stem is the profile key; the file declares no ow
 
 | `topic_id` | `keyword` and `label` | The scene covers |
 | --- | --- | --- |
-| `fionnen_firwen_home.topic_01` | 森林 | the village in the giant trees: two levels, brook, plots, hives |
+| `fionnen_firwen_home.topic_01` | 森林 | the village in the giant trees: two levels, brook, plots, hives, and the open 林泉浴場 where washing, laundry and talk happen among neighbours |
 | `fionnen_firwen_home.topic_02` | 光庭 | 林間光庭: the gap in the canopy where the village gathers |
 | `fionnen_firwen_home.topic_03` | 外人 | how the village regards visitors: unconcerned; the path stays hidden because nobody thinks to show it |
 | `fionnen_firwen_home.topic_04` | 往事 | pure_chain successor of 森林: a small memory from before the canopy opened |

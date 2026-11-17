@@ -331,6 +331,8 @@ Create `world/lore/npc_profiles/eolas_homes_a.py` in the shape of `world/lore/np
 
 World source, mandatory: read `/var/home/jim60105/repos/MUD/tmp/story_settings/world_info.md` (`tmp/` is git-ignored, so the file exists only in the primary checkout, not in a worktree; read it by this absolute path), sections 種族設定 › 精靈族, 社會與文化 and 特殊設定, before writing, and write every card from it. All elves are women. About 300 exist and the three nations rank them above royalty. They have no fixed trades, no marriage and no schooling; ability comes from lifespan. A host shares what she loves making and takes coin because the village wants guests looked after, so no card speaks of a shop, stock or business. Eolas look, from the world source: appearance fixed at ten years, 135-145 cm, varied hair and eye colours. Every host is centuries old and speaks with an adult's knowledge and an elder's patience. The village is defined by magic study in all elements, by what its people have read and written, and by a valley that feeds and clothes itself: write each host through her craft, her experiments and her daily work. Dress is the village's own white spider-silk cloth.
 
+Eolas feel no shame about the bare body or about being seen (world source 生活方式 › 性文化 and 社會與文化 › 倫理觀; `docs/lore/overview.md` 性愛與身體; `docs/lore/settlement-locations.md` 〈公共浴場〉聚落差異 puts all three villages at open pools with no partitions and no attendant, and keeps that contrast as the hook for stories). Write every host with that ease: it sits in how she dresses, how she sits and how she speaks of what she makes, at the frankness of `world/lore/dialogue/content/ciaran_vethiel.yaml` topic_03 (「身軀原本就值得坦然展現，因此織得極薄透光」). The ease stays in bearing, dress and everyday talk: no scene stages a sexual act, and no line remarks on the guest's body. The Eolas look ten and are centuries old; the prose never uses that gap for sexual content.
+
 Each card fills the seven fields of `NpcCard` from the brief below, in Traditional Chinese, within the card limits (leaf 600, identity section 600, whole card 2000 code points). The brief fixes the facts; the sentences are yours. Follow `.agents/skills/npc-dialogue-content/SKILL.md` and the two writing-guideline skills.
 
 **`eolas_naelara` 奈拉拉‧弗羅斯特威洛** — `age=610`, `apparent_age=10`
@@ -380,6 +382,7 @@ One file per host. The filename stem is the profile key; the file declares no ow
 - A merchant's scenes name only goods on her own shelf, by registry display name, and state no number: no price, no quantity. The 收回 topic matches the service: a merchant buys back only what her shelf offers.
 - Name only places that exist: the village's nodes and shared interiors listed in Context, and the hosts of this village named in the Decision 1 table of this change or an earlier applied one.
 - Speak as a villager sharing what she makes. Elves need nothing from outsiders and are neither servants nor curiosities.
+- The body ease of Decision 6 rides in the greeting and in the 白衣 scene; it never becomes a sexual scene.
 - An existing test reads every village table and rejects proprietor vocabulary. No greeting or line contains any of: 老闆, 店主, 本店, 營業時間, 營業, 庫存, 存貨, 存量, 售價, 光臨, 開店, 開門, 打烊. Say the world-side thing instead: the door is never shut, the shelf is what she finished this season.
 
 **`world/lore/dialogue/content/eolas_naelara.yaml`** — topic ID prefix `eolas_naelara_home`. Greeting: pauses the reel, asks the guest to step softly, offers to show the silk and the white dress.
@@ -388,7 +391,7 @@ One file per host. The filename stem is the profile key; the file declares no ow
 | --- | --- | --- |
 | `eolas_naelara_home.topic_01` | 養蛛 | how the spiders are kept: quiet steps, a season lost when a web tears |
 | `eolas_naelara_home.topic_02` | 蛛絲 | what a bundle of 精靈蛛絲 is for and why it is plentiful here |
-| `eolas_naelara_home.topic_03` | 白衣 | 精靈傳統服飾 as the village's everyday white cloth, woven from this grove |
+| `eolas_naelara_home.topic_03` | 白衣 | 精靈傳統服飾 as the village's everyday white cloth, woven from this grove and worn thin on purpose: a body is worth showing plainly, and a guest who finds it too sheer is the one out of place |
 | `eolas_naelara_home.topic_04` | 收回 | takes back her own unused silk and dresses; declines cloth from outside |
 
 **`world/lore/dialogue/content/eolas_sirelwen.yaml`** — topic ID prefix `eolas_sirelwen_home`. Greeting: looks up from a slate, asks which element the guest favours, and points to the wands on the rack.

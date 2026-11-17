@@ -18,6 +18,7 @@ It is a game-data change. It adds no mechanism and changes no requirement, so it
 - `content/map-reference-context.json` is regenerated.
 - `docs/lore/settlement-locations.md` is revised: the 翠綠森林村 case description names the village's hosts and what each shares, and the last item of 未來擴充方向 no longer lists 翠綠森林村 as waiting for homes and hosts.
 - No test is edited. The slice modules this change extends are already enumerated by the tests the previous village change adjusted.
+- Host cards, voice lines, room prose and dialogue follow the world source's 性文化 and 倫理觀 — no shame about sex or the bare body — as this village's craft change does, and say so plainly where a host would say it.
 - Cards, voice lines, room prose and dialogue are human-reviewed prose. The line-by-line review is recorded in `docs/lore/fionnen-fare-homes-review.md`. No test asserts wording.
 
 ## Capabilities

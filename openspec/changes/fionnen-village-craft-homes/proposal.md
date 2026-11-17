@@ -17,6 +17,7 @@ It is a game-data change. It adds no mechanism and changes no requirement, so it
 - `world/lore/npc_profiles/inventory.py` and `docs/development/npc-editorial-review.md` gain one `place_host` and one `dialogue_table` entry per host.
 - `content/map-reference-context.json` is regenerated.
 - Two existing tests that list the place slice modules each gain the new module, with no new assertion on shipped data: the slice-order case in `world/lore/tests/test_settlements.py` and the module list in `tests/test_map_runtime_contract.py`. `tools/map_reference_context.py` gains the new module in its place-source lookup.
+- Host cards, voice lines, room prose and dialogue follow the world source's 性文化 and 倫理觀: no shame about sex or the bare body, the weaver's dress worn thin on purpose, and the intimacy goods `tremor_crystal` (恆振晶) and `embracing_vine` (纏枝魔藤) on the 巧作者's shelf.
 - Cards, voice lines, room prose and dialogue are human-reviewed prose. The line-by-line review is recorded in `docs/lore/fionnen-craft-homes-review.md`. No test asserts wording.
 
 ## Capabilities
