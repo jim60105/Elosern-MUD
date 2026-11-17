@@ -306,5 +306,36 @@ ASSORTMENT_REGISTRY: dict[str, AssortmentDefinition] = {
                 "eolas_kiln_flatbread", "meal",
             ),
         ),
+        # fionnen-village-craft-homes: the 翠綠森林村 shelves. Each one is one
+        # villager's home — the toy carver's bracers, tuned crystals and raised
+        # vines; the bow maker's longbows; the weaver's hunting dress, veil and
+        # white dress — never a storefront's stock.
+        AssortmentDefinition(
+            key="fionnen_trinkets",
+            display_name_zh="森林巧作",
+            allowed_item_kinds=frozenset({ItemKind.ACCESSORY, ItemKind.TOY}),
+            allowed_equipment_slots=frozenset({EquipmentSlot.ACCESSORY}),
+            item_keys=(
+                "fionnen_archer_bracer", "tremor_crystal", "embracing_vine",
+            ),
+        ),
+        AssortmentDefinition(
+            key="fionnen_bowcraft",
+            display_name_zh="森林弓藝",
+            allowed_item_kinds=frozenset({ItemKind.WEAPON}),
+            allowed_equipment_slots=frozenset({EquipmentSlot.WEAPON_MAIN}),
+            item_keys=(
+                "elven_longbow",
+            ),
+        ),
+        AssortmentDefinition(
+            key="fionnen_attire",
+            display_name_zh="森林衣飾",
+            allowed_item_kinds=frozenset({ItemKind.ARMOR}),
+            allowed_equipment_slots=frozenset({EquipmentSlot.ARMOR}),
+            item_keys=(
+                "fionnen_leafweave_garb", "elven_forest_veil", "elven_traditional_robe",
+            ),
+        ),
     )
 }
