@@ -15,8 +15,13 @@ from world.lore.sex import DEFAULT_SEX
 from world.lore.starting_kits import SUBRACE_STARTING_KIT_REGISTRY
 from world.observability import log_info, log_warn
 from world.rules import start_location
+from world.rules.creation_identity import (
+    CharacterCreationError,
+    resolve_race_and_subrace,
+    validate_age,
+    validate_sex,
+)
 from world.rules.equipment import toggle_equipment
-from world.rules.identity import IdentityError, resolve_sex
 from world.rules.progression import (
     lineage_ownership_closure,
     seed_lineage_proficiency,
@@ -169,10 +174,6 @@ PERSONA_IMPORT_CARD_KEYS = (
 MAX_PERSONA_FIELD_LENGTH = 600
 
 
-class CharacterCreationError(ValueError):
-    """Raised when a creation request is invalid or cannot commit."""
-
-
 @dataclass(frozen=True)
 class StartingProfile:
     """Raw allocation bounds plus post-allocation static modifiers."""
@@ -232,18 +233,9 @@ class _ValidatedCreation:
 
 def resolve_starting_profile(race_key: str, subrace_key: str | None = None) -> StartingProfile:
     """Resolve player allocation bounds entirely from immutable lore."""
-    race = RACE_REGISTRY.get(race_key)
-    if race is None:
-        raise CharacterCreationError(f"unknown race {race_key!r}")
-    subrace = None
-    if subrace_key:
-        subrace = SUBRACE_REGISTRY.get(subrace_key)
-        if subrace is None:
-            raise CharacterCreationError(f"unknown subrace {subrace_key!r}")
-        if subrace.race_key != race_key:
-            raise CharacterCreationError(
-                f"subrace {subrace_key!r} does not belong to race {race_key!r}"
-            )
+    race_key, subrace_key = resolve_race_and_subrace(race_key, subrace_key)
+    race = RACE_REGISTRY[race_key]
+    subrace = SUBRACE_REGISTRY[subrace_key] if subrace_key else None
 
     bounds = {key: getattr(race.vital_baseline, key) for key in GAUGE_KEYS}
     bounds.update({key: getattr(race.static_baseline, key) for key in STATIC_KEYS})
@@ -272,36 +264,6 @@ def _validate_name(value: Any) -> str:
     if any(char in name for char in "/:"):
         raise CharacterCreationError("display name contains a reserved separator")
     return name
-
-
-def _validate_age(value: Any, field: str) -> int:
-    """Validate one canonical age input as an exact integer in the reasonable range.
-
-    The bounds mirror the creation wizard's advertised presentation constants
-    (``AGE_MINIMUM``/``AGE_MAXIMUM``); this validator is the numeric authority
-    every creation entry point converges on.
-    """
-    if type(value) is not int or not 0 <= value <= 10000:
-        raise CharacterCreationError(
-            f"{field} must be an integer from 0 to 10000"
-        )
-    return value
-
-
-def _validate_sex(value: Any, race_key: str) -> str:
-    """Validate the sex channel against the race's declared set.
-
-    Delegates the whole rule to ``world.rules.identity``: an omitted or
-    ``None`` sex normalizes to the race-permitted default (``DEFAULT_SEX``
-    when the race permits it, otherwise the race's single permitted member),
-    and a declared member the race forbids is refused with the same named
-    error. The identity seam is the only implementation of the rule; this
-    wrapper preserves the player creation error surface.
-    """
-    try:
-        return resolve_sex(race_key, value)
-    except IdentityError as error:
-        raise CharacterCreationError(str(error)) from error
 
 
 def _validate_allocations(profile: StartingProfile, allocations: Any) -> dict[str, int]:
@@ -440,8 +402,8 @@ def preflight_character_creation(
         raise CharacterCreationError("creation mode must be 'preset' or 'custom'")
 
     valid_name = _validate_name(name)
-    valid_age = _validate_age(age, "age")
-    valid_apparent_age = _validate_age(apparent_age, "apparent_age")
+    valid_age = validate_age(age, "age")
+    valid_apparent_age = validate_age(apparent_age, "apparent_age")
     if not isinstance(race, str):
         raise CharacterCreationError("race must be a registry key")
     if request.mode == "custom":
@@ -479,7 +441,7 @@ def preflight_character_creation(
         if request.mode == "custom"
         else None
     )
-    checked_sex = _validate_sex(sex, race)
+    checked_sex = validate_sex(sex, race)
     nation = request.nation
     if nation is None:
         nation = getattr(character, "nation", None)
@@ -491,15 +453,56 @@ def preflight_character_creation(
     )
 
 
+def ensure_player_portrait_policy(character: Any) -> dict[str, Any]:
+    """Establish or reuse exactly the character's own named portrait policy.
+
+    The explicit named policy (``{"mode": "named", "stable_key": str(pk)}``)
+    is the art lifecycle's eligibility marker. Two writers share this one
+    helper: activation (``finalize_player_portrait``) and the pending-character
+    draft portrait request, so a portrait requested during creation and one
+    requested after activation name the SAME subject — the image never has to
+    move. An already-matching named policy is reused verbatim; a named policy
+    naming a different stable key is a deterministic rejection (a character can
+    never own two named portrait subjects). A generic policy is replaced by the
+    named one, because a pending shell's profile carries no unique portrait.
+
+    The helper schedules nothing and writes nothing else; the caller owns its
+    transaction, so a rollback leaves no policy behind.
+    """
+    named = {"mode": "named", "stable_key": str(character.pk)}
+    existing = character.db.portrait_policy if hasattr(character, "db") else None
+    if existing is not None:
+        if not hasattr(existing, "get"):
+            raise CharacterCreationError("portrait_policy must be a mapping or None")
+        policy = dict(existing)
+        mode = policy.get("mode")
+        if mode == "named":
+            if policy.get("stable_key") != named["stable_key"]:
+                raise CharacterCreationError(
+                    "the character already carries a different named portrait policy"
+                )
+            return named
+        if mode != "generic":
+            raise CharacterCreationError(
+                f"unknown portrait policy mode {mode!r}"
+            )
+    character.db.portrait_policy = named
+    return named
+
+
 def finalize_player_portrait(character: Any, *, skip_portrait: bool = False) -> None:
     """Establish the named portrait policy and schedule the post-commit ensure.
 
-    The explicit named policy (``{"mode": "named", "stable_key": str(pk)}``)
-    is the art lifecycle's eligibility marker; ``schedule_portrait_ensure``
-    registers the exception-safe post-commit ensure. Must be called INSIDE the
-    activation transaction (fix-creation-finalization-safety D3): a rollback
-    removes the policy attribute and the registered on-commit job never fires,
-    so no rolled-back creation can leave portrait state behind.
+    The named policy is established through ``ensure_player_portrait_policy``,
+    the one helper the draft portrait request also uses: a character that
+    already requested a portrait while pending therefore keeps exactly the
+    policy that request established (activation never re-keys it), while a
+    character that never requested one gains its policy here.
+    ``schedule_portrait_ensure`` registers the exception-safe post-commit
+    ensure. Must be called INSIDE the activation transaction
+    (fix-creation-finalization-safety D3): a rollback removes the policy
+    attribute and the registered on-commit job never fires, so no rolled-back
+    creation can leave portrait state behind.
 
     ``skip_portrait`` (default False: generate) is the explicit player-created
     skip flag (change ``gallery-autogen-retrofit``): the named policy is still
@@ -509,10 +512,7 @@ def finalize_player_portrait(character: Any, *, skip_portrait: bool = False) -> 
     write, it is read inside the activation transaction, so a rollback leaves
     no portrait state either way.
     """
-    character.db.portrait_policy = {
-        "mode": "named",
-        "stable_key": str(character.pk),
-    }
+    ensure_player_portrait_policy(character)
     if skip_portrait:
         return
     from world.art.service import schedule_portrait_ensure

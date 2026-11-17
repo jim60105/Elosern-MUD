@@ -34,6 +34,7 @@ from world.rules.presentation_events import (
     PublicationGroup,
     clear_alignment_observers,
     current_publication_group,
+    defer_publication_callbacks,
     emit_alignment_fact,
     new_publication_group,
     on_publication_commit,
@@ -1093,6 +1094,92 @@ class RollbackSilenceTests(EvenniaTest):
         self.assertIs(observed[0], captured)
         self.assertIsNot(observed[0], ambient)
         self.assertIsNone(current_publication_group())
+
+
+class DeferredPublicationCallbackTests(EvenniaTest):
+    """The one deferral scope: real commits drain, rollbacks run nothing."""
+
+    def test_nested_scopes_reuse_the_outer_collector_and_drain_once(self):
+        observed: list[str] = []
+        with self.captureOnCommitCallbacks(execute=True):
+            with defer_publication_callbacks() as outer:
+                with defer_publication_callbacks() as inner:
+                    self.assertIs(inner, outer)
+                    on_publication_commit(lambda: observed.append("nested"))
+                self.assertEqual(observed, [], "an inner scope never drains")
+                on_publication_commit(lambda: observed.append("outer"))
+        self.assertEqual(observed, ["nested", "outer"])
+
+    def test_a_successful_inner_savepoint_does_not_qualify_before_outer_commit(self):
+        observed: list[str] = []
+        with self.captureOnCommitCallbacks(execute=True):
+            with defer_publication_callbacks():
+                with transaction.atomic():
+                    on_publication_commit(lambda: observed.append("inner"))
+                self.assertEqual(observed, [])
+                with transaction.atomic():
+                    on_publication_commit(lambda: observed.append("outer"))
+        self.assertEqual(observed, ["inner", "outer"])
+
+    def test_the_scope_owner_discards_collected_callbacks(self):
+        # The collector is the mutation owner's compensation for a rolled-back
+        # unit: discard() empties it, so the registered drain publishes nothing.
+        observed: list[str] = []
+        with self.captureOnCommitCallbacks(execute=True):
+            with defer_publication_callbacks() as collector:
+                on_publication_commit(lambda: observed.append("discarded"))
+                collector.discard()
+        self.assertEqual(observed, [])
+
+    def test_a_body_exception_registers_no_drain(self):
+        observed: list[str] = []
+        with self.captureOnCommitCallbacks(execute=False) as callbacks:
+            with self.assertRaises(RuntimeError):
+                with defer_publication_callbacks():
+                    on_publication_commit(lambda: observed.append("never"))
+                    raise RuntimeError("mutation failed")
+        self.assertEqual(callbacks, [])
+        self.assertEqual(observed, [])
+
+    def test_a_deferred_callback_keeps_its_captured_group(self):
+        observed: list = []
+        with self.captureOnCommitCallbacks(execute=True):
+            with defer_publication_callbacks():
+                with publication_group() as captured:
+                    on_publication_commit(
+                        lambda: observed.append(current_publication_group())
+                    )
+        self.assertEqual(len(observed), 1)
+        self.assertIs(observed[0], captured)
+        self.assertIsNone(current_publication_group())
+
+    def test_every_callback_runs_and_the_first_failure_still_propagates(self):
+        observed: list[str] = []
+
+        def broken():
+            observed.append("broken")
+            raise RuntimeError("publication failed")
+
+        with self.captureOnCommitCallbacks(execute=False) as callbacks:
+            with defer_publication_callbacks():
+                on_publication_commit(broken)
+                on_publication_commit(lambda: observed.append("after"))
+        self.assertEqual(len(callbacks), 1)
+        with self.assertRaises(RuntimeError):
+            callbacks[0]()
+        self.assertEqual(observed, ["broken", "after"])
+
+    def test_a_callback_registered_during_the_drain_joins_the_same_drain(self):
+        observed: list[str] = []
+
+        def outer_callback():
+            observed.append("outer")
+            on_publication_commit(lambda: observed.append("registered-during-drain"))
+
+        with self.captureOnCommitCallbacks(execute=True):
+            with defer_publication_callbacks():
+                on_publication_commit(outer_callback)
+        self.assertEqual(observed, ["outer", "registered-during-drain"])
 
 
 if __name__ == "__main__":
