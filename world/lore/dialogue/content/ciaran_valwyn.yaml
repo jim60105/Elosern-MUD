@@ -1,12 +1,12 @@
 schema_version: 1
-greeting: 村北古樹下的石屋裡懸滿四處蒐羅來的奇異物件。瓦爾溫‧斯蒂爾瓦特爾正把一串洗淨的海貝穿上皮繩，聽見門口動靜便滿臉驚喜地轉過身來：「哎，有客人來了！你是打哪兒來的呀？路上看見什麼奇聞了？快進來坐下歇會兒。我這屋裡掛著的每件收藏都有來歷，想聽哪一段我都講給你聽。」
+greeting: 村北古樹下的石屋裡懸滿四處蒐羅來的奇異物件。瓦爾溫‧斯蒂爾瓦特爾正把一疊壓實的藍染料塊擺上木架，聽見門口動靜便滿臉驚喜地轉過身來：「哎，有客人來了！你是打哪兒來的呀？路上看見什麼奇聞了？快進來坐下歇會兒。我這屋裡掛著的每件收藏都有來歷，想聽哪一段我都講給你聽。」
 topics:
 - topic_id: ciaran_valwyn_home.topic_01
   keyword: 蒐羅
   label: 蒐羅
   fallback:
     scene_id: ciaran_valwyn_home.topic_01_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
@@ -17,32 +17,38 @@ topics:
       speaker: host
       text: 「是啊！沿著山徑拾得、深潭邊換來、溪水沖刷上岸，全都在這兒呢。你看那根青翎，是三百年前一隻大鳥避雷落進谷底時褪下，那天雨下得好急……哎呀，我又扯遠了。這些物件各繫著小木牌記著歲月，我留著作紀念，是不換給外人的喔。」
     - kind: speech
+      speaker: host
+      text: 「架子那頭另有一疊暗影谷藍染，是我從下游淺灘的染草壓出來的；罈裡裝的是溪裡淘的暗影谷晶砂，那些就隨人取用啦。」
+    - kind: speech
       speaker: actor
       text: 每件零星物件都標註著年歲與地點，整理起來想必費了不少心神吧？
     - kind: speech
       speaker: host
       text: 「一點也不費事，記下它們從哪裡來，就是最快活的事啦！屋裡能看的物件多得很，你看中哪樣隨管開口問，我全都記得一清二楚。」
 - topic_id: ciaran_valwyn_home.topic_02
-  keyword: 蛛絲
-  label: 蛛絲
+  keyword: 藍染
+  label: 藍染
   fallback:
     scene_id: ciaran_valwyn_home.topic_02_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
-      text: 門邊懸著的那幾捆銀亮絲線，就是傳聞中質地極韌的精靈蛛絲嗎？
+      text: 架子下那幾塊壓得方正的深藍料子，也是你蒐羅回來的嗎？
     - kind: narration
-      text: 瓦爾溫‧斯蒂爾瓦特爾伸手牽起一縷微光流轉的絲線，示範般在指尖拉扯繃直。
+      text: 瓦爾溫‧斯蒂爾瓦特爾彎腰搬起一塊染料，指腹抹過斷面，指尖染上一層藍。
     - kind: speech
       speaker: host
-      text: 「正是精靈蛛絲！深林裡的巨蛛吐出來的絲，韌度驚人，就算編製成細索，強風暴雨也扯它不斷。村裡每個族人都懂如何採絲編繩，我平時編得格外起勁，多出來的就掛在門邊供人取用。」
+      text: 「這個呀，是我自己壓的暗影谷藍染！下游那片淺灘的水又寬又緩，族人把染草擱在石上揉洗，汁水沉澱下來就結成這樣的染料塊。」
+    - kind: speech
+      speaker: host
+      text: 「織房坡上晾的布，藍色都從這裡來。下過溪水的手，要好幾天才褪得掉呢。」
     - kind: speech
       speaker: actor
-      text: 這種蛛絲如果拿來當作防具或修補行頭的素材，需要怎麼跟你換取？
+      text: 原來村子布匹的藍都從這裡來。那蛛絲呢？我聽說精靈的蛛絲也在這一帶。
     - kind: speech
       speaker: host
-      text: 「你想帶幾束回去鞣製皮甲或加固弓弦，跟我說一聲便好，我替你從掛繩上解下來。照定好的價錢留下銅幣，就能安心帶進深山闖蕩啦。」
+      text: 「蛛絲是幽月谷村那邊的東西啦，蛛絲林邊的奈拉拉‧弗羅斯特威洛織得最好。兩村的族人偶爾互相走動，她織的白衣我見過，細得像月光。」
 - topic_id: ciaran_valwyn_home.topic_03
   keyword: 耳環
   label: 耳環
@@ -93,7 +99,7 @@ topics:
   label: 以物易物
   fallback:
     scene_id: ciaran_valwyn_home.topic_04_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
@@ -105,7 +111,7 @@ topics:
       text: 「我最愛跟人換東西了！不過比起金屬銅幣，我更喜歡換各處的奇聞軼事。你講一段在山林荒野的見聞，我就講一段這屋裡某件老物件的來歷，這才算真正划算的交換呀。」
     - kind: speech
       speaker: actor
-      text: 如果先前跟你換走的精靈蛛絲沒能用完，也能完好帶回來退換嗎？
+      text: 如果先前跟你換走的暗影谷藍染或暗影谷晶砂沒用完，也能帶回來嗎？
     - kind: speech
       speaker: host
-      text: 「只要蛛絲沒有散落受損、原樣整捆拿回來，我自會替你收下，按著收購的規矩算回銅幣貼補盤纏。好料子回了這間屋子，遲早還能派上新用場呢。」
+      text: 「染塊沒受潮、晶砂還裝在原來的罐裡，原樣拿回來，我自會替你收下，按著收購的規矩算回銅幣貼補盤纏。好料子回了這間屋子，遲早還能派上新用場呢。」
