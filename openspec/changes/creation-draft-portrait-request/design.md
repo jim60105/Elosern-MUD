@@ -1,0 +1,63 @@
+# Design
+
+## Context
+
+See `proposal.md`. `request_gallery_image` currently derives the subject from `portrait_policy`, requires canonical ages and calls `description_for(entity, apparent_age, fields, custom_prompt)`. Pending shells need neither a saved complete form nor canonical identity. `finalize_player_portrait` currently writes named policy only during activation. `gallery_job_in_flight` is a read under the shared queue lock; `settle_gallery_generated` already rejects a deleted record or mismatched generation token.
+
+## Goals / Non-Goals
+
+**Goals:** one exact request using validated draft values, early named-policy ownership, and bounded draft-image provenance.
+
+**Non-Goals:** panel version changes, UI/drawer mounting, reset/activation cleanup, altered activated-gallery caps, equipment/appearance selection or a new art worker. No temporary writes of draft identity onto the shell and no fake entity/proxy.
+
+## Decisions
+
+### Exact adapter and shared identity validation
+
+Add `validate_creation_portrait_payload` and `_creation_portrait_adapter(actor, payload, session=None)` in `web/webclient/actions/creation_actions.py`; register only `creation.portrait.generate` in `registry.py`. Payload has exactly `{race, subrace, sex, apparent_age, custom_prompt}`. Race/subrace are nonblank bounded identifiers using `MAX_KEY_CODE_POINTS`; both are required and registered, subrace belongs to race, sex is a concrete shared-vocabulary member permitted by race, apparent age is an integer 0..10000 excluding bool, and prompt is a string accepted by `gallery_prompt.validate_custom_prompt` (including empty/whitespace-only). No `age`, subject, fields, binding, face rectangle, actor or equipment is accepted. Keep dispatcher epoch/revision/request-id and replay checks unchanged. A new request uses the caller’s current form, not the persisted wizard draft.
+
+Add `world/rules/creation_portrait.py` with frozen `DraftPortraitRequest` and `request_draft_portrait(account, character, request)`. Extract the existing identity checks from `character_creation.py` (`_validate_age`, `_validate_sex` and race/subrace resolution) into the pure `world/rules/creation_identity.py`, imported by both creation and this request. The pure module imports only registry/validation dependencies and no art service, avoiding a subjects-to-character-creation cycle. Do not call full allocation/name preflight or manufacture missing fields. Recheck ownership, PlayerCharacter and `creation_pending` inside the synchronous rules transaction. Map errors through `creation_messages.py` to stable safe zh-TW messages. Adapters make no `.db` writes.
+
+### Named policy, receipt and the one enqueue seam
+
+Extract `ensure_player_portrait_policy(character)` into `world/rules/character_creation.py`; it establishes/reuses exactly `{"mode": "named", "stable_key": str(character.pk)}` and rejects a conflicting existing named key. Both request and `finalize_player_portrait` call it. It schedules nothing itself. Snapshot/restore the affected Evennia attribute caches on failed request transactions.
+
+The rules owner alone writes a bounded `creation_portrait` attribute, exactly `{version: 1, image_id: <uuid>, retained_image_id: <uuid or null>, fallback_key: <validated built-in key>}`. `image_id` is the latest admitted request; `retained_image_id` is the last readable creation-owned card when the next request starts. At admission, derive that retained id from the prior receipt’s current/retained ids and actual gallery reads; a failed request id never replaces the retained successful id. Resolve `fallback_key` from the admitted sex/apparent age and the character’s full subject key using change 1’s pure resolver; it supplies ready-descriptor geometry without reading uncommitted identity later. Store no prompt/identity copy here. No ledger grows with repeated failures. The art owner only receives these authorized ids and never changes this character attribute.
+
+Extend the existing `request_gallery_image` seam with an optional typed `draft_values` argument, accepted only for an explicitly pending character and empty fields/no binding/no supplied rectangle. The value is a frozen validated snapshot of race/subrace/sex/apparent age, defined alongside the pure draft description input in `world/art/subjects.py`. Its constructor and service entry revalidate registry membership, compatibility and apparent-age bounds through `creation_identity.py`. Canonical age checks remain mandatory for every ordinary or activated request; the pending path validates its explicit apparent age instead. No generic `skip_age_check` flag or alternate public queue bypass. This is an explicit delta to `art-gallery-autogen`’s previously unconditional canonical-age sentence. Startup automatic recovery explicitly skips pending policies, preserving already admitted jobs without inventing an automatic replacement.
+
+For draft requests, perform in-flight detection and enqueue atomically inside the same existing `queue_lock` acquisition in `enqueue_gallery_job`; do not acquire the non-reentrant lock around a service call that acquires it again. Recheck the request’s pending ownership before policy/receipt writes; rules transactions serialize reactor-side actions and queue locking serializes worker settlement. The policy, job and receipt either commit together or roll back with their caches restored. The shared seam mints the image id and returns it for the receipt.
+
+### Description and replacement
+
+Add `draft_character_description(values, custom_prompt)` in `world/art/subjects.py`, sharing the `art.character_description` render helper with `character_description`. Resolve subrace to its parent race’s image-recognizable display label and render the submitted apparent age. Sex is validated and used by fallback, but the current template has no sex input; do not add a second prompt schema. Appearance/equipment slots are empty; normalized custom text uses the existing custom slot. Never read a shell name, persona, equipment, actual age or concept text. Preserve the existing registry-driven prompt-unavailable fallback.
+
+The character kind remains uncapped after activation. The draft path stores server-authorized replacement metadata on its existing per-image job, naming only `retained_image_id`. On successful settlement, through service-owned queue/gallery helpers, append the new card, set it as default and remove only that previous creation-owned card in one database transaction. Defer file unlink until commit and outside gallery lock. Failed generation retains the previous card/default. Existing queued job snapshot values remain authoritative even if the form changes; they never reread form state at settlement.
+
+No cleanup occurs on save, browsing, identity edits or concept fill. `creation-draft-portrait-cleanup` owns reset and activation disposition; the receipt/queue metadata are its concrete input.
+
+### Action echo and unchanged confirmation
+
+Add the action to `web/static/webclient/js/elosern/command_echo.js` and its literal coverage manifest with a bounded action label. No typed-command alias exists. Echo contains neither prompt nor draft identity. Local opening remains silent. Update Python registry/catalog equality tests. The portrait adapter never calls `_confirmed_success`, `_invalidate_confirmation`, `_store_proposal`, `_clear_proposal` or a draft save. A portrait result cannot open activation confirmation.
+
+### Connectivity authority and offline behavior
+
+Preserve the authoritative handoff's diagnostic-only connectivity decision and the existing `art-service-connectivity-surface` contract: neither creation admission nor presentation/drawer imports or calls the probe, and no cached connectivity verdict disables submission. This explicitly departs from the approved design's §7.3 offline pre-disable/rejection sentence. The handoff requires non-gating, and an existing diagnostic verdict cannot safely authorize a later generation attempt. There is no new probe whose outcomes both continue. An otherwise valid offline request is admitted normally; the existing worker attempts it and its real failure produces the safe failed state and explicit retry. Synchronous validation/queue errors still reject normally without state writes. Keep `commands/art.py` the only connectivity importer.
+
+## Risks / Trade-offs
+
+The canonical-age exception is intentionally limited to the new owned pending input; tests must reject raw character subjects, invalid typed inputs and activated callers trying it. Per-draft replacement adds job metadata rather than changing global character-kind caps. Existing gallery/default semantics and policy-free preview builders stay unchanged.
+
+## Acceptance and documentation
+
+Add `world/rules/tests/test_creation_portrait.py`; extend `web/webclient/actions/tests/test_creation_actions/test_payload_validation.py` and `test_adapter.py`, `world/art/tests/test_service/test_gallery_request_seam.py`, `world/art/tests/test_subjects.py`, queue settlement tests, action-catalog coverage and command-echo tests. Test synthetic forbidden sex/race combinations, missing/invalid values, ownership/pending rejection, two-session in-flight admission, failed-write rollback, shell identity disagreement, empty prompts and repeated regenerations with unrelated card controls. Use an injected fake art client, never a live endpoint. A refusing fake client must demonstrate normal admission followed by a worker failure, without a probe call; retain the existing connectivity import-boundary test.
+
+Update `docs/development/webclient-synchronization.md` for the action and draft receipt; update `finalize_player_portrait`’s docstring to distinguish activation-created policy from preexisting draft policy. Do not change blueprint policy schemas; their reserved player `str(pk)` namespace already matches this design. Keep `creation-activation-gating` unchanged; tests exercise that gate with a portrait request between save and activation.
+
+```text
+uv run --locked --env-file=.env.evennia-test evennia test --settings test_settings.py --keepdb world.rules.tests.test_creation_portrait
+uv run --locked --env-file=.env.evennia-test evennia test --settings test_settings.py --keepdb web.webclient.actions.tests.test_creation_actions.test_payload_validation web.webclient.actions.tests.test_creation_actions.test_adapter
+uv run --locked --env-file=.env.evennia-test evennia test --settings test_settings.py --keepdb world.art.tests.test_service.test_gallery_request_seam world.art.tests.test_subjects
+node --test web/static/webclient/js/tests/command_echo.test.js
+openspec validate creation-draft-portrait-request --strict
+```
