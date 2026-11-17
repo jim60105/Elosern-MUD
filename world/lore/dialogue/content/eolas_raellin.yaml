@@ -1,0 +1,96 @@
+schema_version: 1
+greeting: 雷林‧莉特弗特從窯邊回來，籃裡的豆餅還冒著熱氣。她把最上面那張掰成兩半，一半遞過來：「先吃。你是要往獸徑上去，還是剛從外頭回來？邊吃邊說。」衣袖挽到肩頭，額上還帶著窯火的紅。
+topics:
+- topic_id: eolas_raellin_home.topic_01
+  keyword: 豆餅
+  label: 豆餅
+  fallback:
+    scene_id: eolas_raellin_home.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「幽月窯烤豆餅是怎麼做的？聞起來和城裡賣的餅不一樣。」
+    - kind: speech
+      speaker: host
+      text: 「豆子種在石階菜畦，泡軟了磨成泥，揉進貯存的麥粉裡。麵團發好，等窯燒完那一爐，熱還在牆裡的時候貼進去。」
+    - kind: speech
+      speaker: host
+      text: 「窯火太旺會焦，太涼又不熟。我守在火門邊聽聲音，聽見餅皮在響就翻面。」
+    - kind: speech
+      speaker: actor
+      text: 「所以這餅是跟著別人的窯一起烤的？」
+    - kind: speech
+      speaker: host
+      text: 「村裡的窯本來就共用。我烤餅，泰莉斯‧恩貝爾莉夫燒她的玻璃，火門前大家輪著用嘛。」
+    - kind: speech
+      speaker: host
+      text: 「出爐的餅掰開要冒氣，才算剛好。放涼了也還軟，帶上獸徑走一天不會硬。」
+- topic_id: eolas_raellin_home.topic_02
+  keyword: 菜畦
+  label: 菜畦
+  fallback:
+    scene_id: eolas_raellin_home.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「做餅的豆子和香草，都是從哪裡來的？」
+    - kind: speech
+      speaker: host
+      text: 「石階菜畦。豆子種在下層水氣足的地方，塊根在旁邊，香草往上一層，妮爾內爾‧德米多每天早上去採。」
+    - kind: narration
+      text: 她把籃裡的豆莢抓了一把，放在掌心撥了撥。
+    - kind: speech
+      speaker: host
+      text: 「那幾層石畦由村人一起砌成。誰有空就去翻土、引水，收成之後各家需要多少就取多少。」
+    - kind: speech
+      speaker: actor
+      text: 「向妮爾內爾拿香草，也要算銅幣嗎？」
+    - kind: speech
+      speaker: host
+      text: 「她採給我的那份，我用餅換。村裡的人互相換東西，銅幣是留給山外來的客人的嘛。」
+- topic_id: eolas_raellin_home.topic_03
+  keyword: 共食
+  label: 共食
+  fallback:
+    scene_id: eolas_raellin_home.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「村子裡的人平日都在哪裡吃飯？」
+    - kind: speech
+      speaker: host
+      text: 「共食棚。谷底空地旁邊那間棚子，傍晚誰先到誰升火，做好的東西擺上長桌，坐下來就吃。」
+    - kind: speech
+      speaker: host
+      text: 「在那裡吃不用留銅幣。村裡沒有誰欠誰，多做一份就多吃一份。」
+    - kind: speech
+      speaker: actor
+      text: 「那外來的客人呢？也能坐下來一起吃嗎？」
+    - kind: speech
+      speaker: host
+      text: 「坐下來吃當然可以。若要帶著走，我才收你銅幣。共食棚是村人的桌，路上的食糧是我替客人備的嘛。」
+- topic_id: eolas_raellin_home.topic_04
+  keyword: 收回
+  label: 收回
+  fallback:
+    scene_id: eolas_raellin_home.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你替我備的餅，路上吃不完，還能帶回來嗎？」
+    - kind: speech
+      speaker: host
+      text: 「我包好的、沒拆開的也一樣，拿回來我收，算銅幣給你。拆過的就別帶回來了，放不久。」
+    - kind: speech
+      speaker: host
+      text: 「外頭買來的乾糧我不收。我摸不清裡頭摻了什麼，擺進籃子裡只會壞了別的食物。」
+    - kind: speech
+      speaker: actor
+      text: 「自己做的餅，能拿來給你嗎？」
+    - kind: speech
+      speaker: host
+      text: 「你自己做的我肯嚐，可我不能收進籃子裡換銅幣。谷裡的餅只從這座窯出來嘛。」
