@@ -2,7 +2,7 @@
   "schema_version": 1,
   "key": "city_street",
   "label_zh": "城市街道",
-  "scene_sentence_zh": "鋪著石板的主要街道上人來人往，攤販的叫賣聲與馬車的輪聲此起彼落。",
+  "scene_sentence_zh": "鋪著石板的主要街道上人來人往，攤販的叫賣聲與馬車的車輪聲此起彼落。",
   "asset": "web/static/art/scenes/city_street.webp",
   "file": {
     "format": "webp",

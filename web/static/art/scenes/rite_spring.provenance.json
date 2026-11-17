@@ -2,7 +2,7 @@
   "schema_version": 1,
   "key": "rite_spring",
   "label_zh": "泉之石龕",
-  "scene_sentence_zh": "苔蘚覆滿的泉池上緣開著一座低矮石龕，墨黑的水面映著林隙間垂落的冷光。",
+  "scene_sentence_zh": "苔蘚覆滿的泉池上緣有一座低矮石龕，墨黑的水面映著林隙間垂落的冷光。",
   "asset": "web/static/art/scenes/rite_spring.webp",
   "file": {
     "format": "webp",

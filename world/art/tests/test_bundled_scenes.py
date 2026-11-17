@@ -238,6 +238,8 @@ class CommittedCollectionTests(unittest.TestCase):
 
     def test_every_sidecar_records_the_shipped_bytes(self):
         """Each provenance record's checksum and size are the committed file."""
+        from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY
+
         for key in SCENE_ART_KEYS:
             with self.subTest(key=key):
                 path = SCENES_DIRECTORY / bundled_asset_filename(key)
@@ -253,6 +255,16 @@ class CommittedCollectionTests(unittest.TestCase):
                 )
                 self.assertEqual(record["file"]["bytes"], len(payload))
                 self.assertEqual(record["license"]["distribution"], "permitted")
+                # The caption is display data mirrored from the archetype
+                # registry, while the composed prompt stays under
+                # ``production.description``. Drift here shows a reader a
+                # sentence no illustration was composed for.
+                archetype = SCENE_ARCHETYPE_REGISTRY.get(key)
+                if archetype is not None:
+                    self.assertEqual(record["label_zh"], archetype.display_name_zh)
+                    self.assertEqual(
+                        record["scene_sentence_zh"], archetype.scene_sentence
+                    )
 
 
 class BrokenCoverageTests(unittest.TestCase):

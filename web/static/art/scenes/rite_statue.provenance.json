@@ -2,7 +2,7 @@
   "schema_version": 1,
   "key": "rite_statue",
   "label_zh": "鹿影石雕",
-  "scene_sentence_zh": "風掃過的草原上立著白色鹿形石雕，斷角與苔痕在斜陽下拖出長長的影子。",
+  "scene_sentence_zh": "風掃過的草原上立著白色鹿形石雕，斷角與苔痕在斜陽下拖出細長的影子。",
   "asset": "web/static/art/scenes/rite_statue.webp",
   "file": {
     "format": "webp",

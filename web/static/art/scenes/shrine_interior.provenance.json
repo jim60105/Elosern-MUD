@@ -2,7 +2,7 @@
   "schema_version": 1,
   "key": "shrine_interior",
   "label_zh": "神殿內部",
-  "scene_sentence_zh": "莊嚴的神殿內燭光搖曳，香氣裊繞，虔誠的信徒在神像前低聲祈禱。",
+  "scene_sentence_zh": "莊嚴的神殿內燭光搖曳，香煙繚繞，虔誠的信徒在神像前低聲祈禱。",
   "asset": "web/static/art/scenes/shrine_interior.webp",
   "file": {
     "format": "webp",
