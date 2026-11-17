@@ -24,6 +24,9 @@ items:
     effects:
       - stat: mp
         amount: 40
+  ciaran_antivenom_tincture:
+    effects:
+      - remove_status: poisoned
   # Cleansing (add-equipment-immunity-and-attached-buffs D3): the negative
   # removal selector clears every active debuff-polarity instance; a status
   # removal carries no amount by construction.

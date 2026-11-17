@@ -32,31 +32,31 @@ assortments:
         max_stock: 3
         initial_stock: 1
         restock_quantity: 1
-      - item_key: elven_traditional_robe
-        buy_copper: 120
-        sell_copper: 60
-        max_stock: 3
-        initial_stock: 1
-        restock_quantity: 1
-      - item_key: elven_forest_veil
-        buy_copper: 150
-        sell_copper: 75
-        max_stock: 3
-        initial_stock: 1
-        restock_quantity: 1
   - key: elven_fare
     offers:
-      - item_key: elven_candied_blossom
+      - item_key: ciaran_nightbloom_preserve
         buy_copper: 20
         sell_copper: 10
         max_stock: 20
         initial_stock: 10
         restock_quantity: 5
+      - item_key: ciaran_ember_mushroom_skewer
+        buy_copper: 12
+        sell_copper: 6
+        max_stock: 20
+        initial_stock: 10
+        restock_quantity: 5
   - key: elven_sundries
     offers:
-      - item_key: elven_spider_silk
-        buy_copper: 60
-        sell_copper: 30
+      - item_key: ciaran_indigo_dye
+        buy_copper: 30
+        sell_copper: 15
+        max_stock: 20
+        initial_stock: 10
+        restock_quantity: 5
+      - item_key: ciaran_crystal_sand
+        buy_copper: 40
+        sell_copper: 20
         max_stock: 20
         initial_stock: 10
         restock_quantity: 5
@@ -80,11 +80,17 @@ assortments:
         max_stock: 3
         initial_stock: 1
         restock_quantity: 1
-  # The hedge healer's remedies. Both are also capital goods; the village
-  # sells them at everyday scale, cheaper than 王都雜貨 per the two-price
-  # rule (potion band 50..500).
+  # The hedge healer's remedies. The tincture is hers alone; the two potions
+  # are also capital goods, sold here at everyday scale, cheaper than 王都雜貨
+  # per the two-price rule (potion band 50..500).
   - key: elven_remedies
     offers:
+      - item_key: ciaran_antivenom_tincture
+        buy_copper: 60
+        sell_copper: 30
+        max_stock: 10
+        initial_stock: 5
+        restock_quantity: 5
       - item_key: greater_healing_potion
         buy_copper: 150
         sell_copper: 75

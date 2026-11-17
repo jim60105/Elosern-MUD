@@ -54,7 +54,7 @@ topics:
   label: 耳環
   fallback:
     scene_id: ciaran_gwenaera_home.topic_03_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
@@ -66,7 +66,7 @@ topics:
       text: 「這款月牙耳環是我最順手的活計，幾百年來一對接著一對絞，閉上眼睛手指都能辨清弧度。」
     - kind: speech
       speaker: host
-      text: 「採集蛛絲的瓦爾溫耳上掛著的那對也是我親手編絞，和我身上這幾副出自同一批銀絲。晴天時我還會把它們攤在銀葉樹下，讓飾品沾染樹葉的銀光。」
+      text: 「壓藍染的瓦爾溫耳上掛著的那對也是我親手編絞，和我身上這幾副出自同一批銀絲。晴天時我還會把它們攤在銀葉樹下，讓飾品沾染樹葉的銀光。」
     - kind: speech
       speaker: actor
       text: 「彎曲的月牙弧度襯著銀葉的光澤，難怪村裡人都願意戴著它。」

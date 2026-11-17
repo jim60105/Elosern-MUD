@@ -255,7 +255,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "35deaf835d0db328a19e3ced5bbf0b8a8edd6c7f6ef491e3a2f5c269df3ac973",
+  "fingerprint": "fd183188fc7ecc2ec5c3a4960da659412fe781817c6796029cced4da72a71f0c",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -16469,7 +16469,7 @@
     "world/lore/items/assembly.py": "798c120726b223e39e6282734f61f1e569b605ee19dc2eb839187d4d9601faa6",
     "world/lore/items/data_armor_accessories_materials.py": "a6c7418f8d25ea1db8633a3db2b8f53127ec67184710df67c3a24bb1ef608c90",
     "world/lore/items/data_core_items.py": "2867da3ace7e9a4181622e043e2055cc818edfb68217db27d98ca1441dc7b70e",
-    "world/lore/items/data_elven_village_goods.py": "b6b6091874e03d1d8e7761b4fa7877a918d64242f489482302f6ecc59d5e6be8",
+    "world/lore/items/data_elven_village_goods.py": "aa09709a70673e4c92f8971cc1e2464db35dfb3641c2f8278eae716e2033d45b",
     "world/lore/items/data_guild_accessories.py": "b7413f65c4ad8659d919a929cc6e5ecc97316940f05a588e2bb8965697c82101",
     "world/lore/items/data_inspect_only_codex.py": "b8fbed1622fa840b2573722e6f048ae16c7721d2887e309f32a1d2cfcd1410cb",
     "world/lore/items/data_intimacy_items.py": "e9d5363bab120577130942aec267087b3505ee88a05054376631acbdedf67d9a",
@@ -16493,8 +16493,8 @@
     "world/lore/npc_profiles/altoria_lower.py": "744b069ab74a9380f882a8db319132548dbd7517e6b85555e3cf2a54a74829de",
     "world/lore/npc_profiles/altoria_trade.py": "0f877088fb1ba44264dff809e172ac87b1828d465da830133e8da489fe36c888",
     "world/lore/npc_profiles/altoria_upper.py": "2b63b521a2d7d25de671c51610a19fd2f88f4ed8b750df5d274222af44b8af28",
-    "world/lore/npc_profiles/ciaran_homes_a.py": "806794677fcdf587803ef3ce6d329b9d82ca8de295d4c510bc5ee7fc84d1be63",
-    "world/lore/npc_profiles/ciaran_homes_b.py": "ac7b7533eb9a6840902a24fbd7822bdc1faa3c172ab1c64fd7e38003c592c7ae",
+    "world/lore/npc_profiles/ciaran_homes_a.py": "c12f72b235228e2aa2499cc0a71e652422c13f9752dac63e2b10524c795f17d9",
+    "world/lore/npc_profiles/ciaran_homes_b.py": "bdc56bcfcd773e429bb7a147c34acbfc3b8fc0ca6ce82fce3724600f10cc528a",
     "world/lore/npc_profiles/eolas_homes_a.py": "21fde12d4a8556b1a1d3cd91a11f43d5d327dbc1359969b9e793060c7838721d",
     "world/lore/npc_profiles/eolas_homes_b.py": "00c72527e56b125bc26c7fd3a66fddc0499bc4eae4d5b181a34439aaa0efe04e",
     "world/lore/npc_profiles/fionnen_homes_a.py": "253586ec682f298022ec05da07414a5be595eed20cbde353443e4cf4ec36f6a1",
@@ -16518,7 +16518,7 @@
     "world/lore/scenes.py": "ba525c31108b5abcd3c487df9578d6e38e5dc2504b6cf4cf5711313e2dd97898",
     "world/lore/settlements/__init__.py": "13b916e302018d28878942694d5e9ba6457b7eb8818ac8272504cbb002fd8f7c",
     "world/lore/settlements/_prose_lang.py": "7cf3638af425039e2568341c9f4159385225b07c5b6fb688bb73eda0aeb66692",
-    "world/lore/settlements/assortments.py": "355c541cea69dfe8a672fa1fd8a7ae8c6ea640b4120fd008e97aee6d7d23cf8b",
+    "world/lore/settlements/assortments.py": "a027b40d9e07c9fa286987957941149976e98215a0f96d85923898e1082e8cfe",
     "world/lore/settlements/capability_declarations.py": "190fc2ce62a335fe7906968e0e10f86ce9fedadf5873476b3b1742fd552c5861",
     "world/lore/settlements/places.py": "1a5d6031664d15ccdc95b5129f60b2893e30cce52d41cefa6b3faf0c44532247",
     "world/lore/settlements/places_altoria_lower.py": "e1502c9c0d8346c2c69b52d75a877f30d5e6d66a9f1f13a228f97595c6cb03b2",
@@ -16768,7 +16768,7 @@
     "world/rules/rulebook/combat.yaml": "bb081b5a1b40b26487eb7c2e4da13cede4122db78771846472972e9645ef2528",
     "world/rules/rulebook/combat_modifiers.yaml": "8d79781657c43e12d2aaabb4899f57b72110905e72fafb876ce7725e9937b685",
     "world/rules/rulebook/commerce/altoria.yaml": "9e35ac5f6387314550f1087bbd181b559e31f46934c14480331bb708751b7065",
-    "world/rules/rulebook/commerce/ciaran.yaml": "8d6045b117f1190e682b957e4e495745a53d8248f5666e68ee86656882ac262c",
+    "world/rules/rulebook/commerce/ciaran.yaml": "48129781c6386745d1427e7349b3090e701391e6ed233c13bd691ffc9fc748da",
     "world/rules/rulebook/commerce/eolas.yaml": "05b61a96e3fd02b3740c3eb91f2e896d769e84e70cf6150fd25e9fc3becf273c",
     "world/rules/rulebook/commerce/fionnen.yaml": "4fcb7a891c086242325060fd9f2eea8c22d14e33b440c899f11a57fa783d2916",
     "world/rules/rulebook/commerce/scales.yaml": "8e60e539d43578ff8f707e0c7e14e0bd5b2d979acb5bec48551473366bc2499e",
@@ -16779,7 +16779,7 @@
     "world/rules/rulebook/guild_economy.yaml": "8cd93986ac6aed5024b63803dbe381570d596742b87048c289c0f1a7a35c673a",
     "world/rules/rulebook/guild_exam_restrictions.yaml": "60a7df45d0db574d08b0974b75f75512a5e44c74024918a8e27114414a255c8a",
     "world/rules/rulebook/instance.yaml": "aa73bc6238b00771288efd3f6dabc179cf827e547df7f0327c83062cb0b486e4",
-    "world/rules/rulebook/item_effects.yaml": "58b7c71fe1694e06f23e1e2938cb5e58eb4407cbfd02c9a908d6bad2728004b6",
+    "world/rules/rulebook/item_effects.yaml": "ca4908312b14137e24950ad180bcdafe54aad955384fcf3bd117ce3674d2596b",
     "world/rules/rulebook/monster_behaviour.yaml": "f185526a851d7a1ed83d7671546bcb93c17df3e9dcac5bd9158dfe08eef5cb67",
     "world/rules/rulebook/movement.yaml": "072a1054db3806316e0ce384d326e5c60e14611a039dd1c22cedde5fb26eab37",
     "world/rules/rulebook/npc_schedules.yaml": "4807e4f54107f3e4a8941ee1ce1988088a74ff914d46037e32c8254e5d347b50",

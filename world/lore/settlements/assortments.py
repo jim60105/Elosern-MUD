@@ -79,12 +79,11 @@ def assortment_membership_violation(
 # The six elven-craft assortments serve 暗影谷村 (design §6.2, §10 change 7,
 # grown by ciaran-village-crafts):
 # each villager's home carries one shelf of what its host happens to make or
-# collect. They share keys with the capital where the world document
-# requires it — ``elven_spider_silk`` and ``elven_candied_blossom`` are also
-# capital goods, offered in the village at everyday prices. Two shops
-# offering one key through two different assortments is the case this model
-# exists to serve; only one shop referencing two overlapping assortments is
-# rejected (design §4.1).
+# collect. Each of the three villages sells what it makes, and the goods a
+# village shares with the capital are priced at everyday figures at home.
+# Two shops offering one key through two different assortments is the case
+# this model exists to serve; only one shop referencing two overlapping
+# assortments is rejected (design §4.1).
 ASSORTMENT_REGISTRY: dict[str, AssortmentDefinition] = {
     definition.key: definition
     for definition in (
@@ -214,7 +213,6 @@ ASSORTMENT_REGISTRY: dict[str, AssortmentDefinition] = {
             allowed_equipment_slots=frozenset({EquipmentSlot.ARMOR}),
             item_keys=(
                 "dark_elf_kimono", "dark_elf_ninja_garb",
-                "elven_traditional_robe", "elven_forest_veil",
             ),
         ),
         AssortmentDefinition(
@@ -222,7 +220,7 @@ ASSORTMENT_REGISTRY: dict[str, AssortmentDefinition] = {
             display_name_zh="精靈飯食",
             allowed_item_kinds=frozenset({ItemKind.FOOD}),
             item_keys=(
-                "elven_candied_blossom",
+                "ciaran_nightbloom_preserve", "ciaran_ember_mushroom_skewer",
             ),
         ),
         AssortmentDefinition(
@@ -230,15 +228,15 @@ ASSORTMENT_REGISTRY: dict[str, AssortmentDefinition] = {
             display_name_zh="精靈雜貨",
             allowed_item_kinds=frozenset({ItemKind.MATERIAL}),
             item_keys=(
-                "elven_spider_silk",
+                "ciaran_indigo_dye", "ciaran_crystal_sand",
             ),
         ),
         # ciaran-village-crafts: two more villagers' shelves. 精靈綴飾 is the
         # adornment maker's work — the crescent earring moves here verbatim
         # from 精靈雜貨, joined by the prism charm; 精靈調藥 is the hedge
         # healer's remedies. Both remedies are also capital goods, offered in
-        # the village at everyday prices under the same two-price rule as the
-        # silk.
+        # the village at everyday prices under the same two-price rule that
+        # keeps a shared capital good at everyday figures at home.
         AssortmentDefinition(
             key="elven_adornments",
             display_name_zh="精靈綴飾",
@@ -253,7 +251,8 @@ ASSORTMENT_REGISTRY: dict[str, AssortmentDefinition] = {
             display_name_zh="精靈調藥",
             allowed_item_kinds=frozenset({ItemKind.POTION}),
             item_keys=(
-                "greater_healing_potion", "mana_potion",
+                "ciaran_antivenom_tincture", "greater_healing_potion",
+                "mana_potion",
             ),
         ),
         # eolas-village-craft-homes: the 幽月谷村 shelves. Each one is one

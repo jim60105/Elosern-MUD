@@ -1,4 +1,4 @@
-"""Village-made local goods of the Eolas and Fionnen elven villages."""
+"""Village-made local goods of the Eolas, Fionnen and Ciaran elven villages."""
 
 from world.lore.items.vocab import (
     EquipmentModifierKey,
@@ -118,5 +118,66 @@ ROWS: tuple[ItemDefinition, ...] = (
         ),
         equipment_slot=EquipmentSlot.ARMOR,
         modifier_key=EquipmentModifierKey.FIONNEN_LEAFWEAVE_GARB,
+    ),
+    ItemDefinition(
+        key="ciaran_nightbloom_preserve",
+        display_name_zh="暗影谷夜綻花釀",
+        price_table_key="specialty_food",
+        sellable=True,
+        presentation=ItemPresentation(
+            kind=ItemKind.FOOD,
+            icon_key=ItemIconKey.FOOD,
+            rarity=ItemRarity.UNCOMMON,
+            summary_zh="谷裡入夜才綻的花趁夜採下，浸進糖漿裡釀成，是花饌好手最得意的一味。",
+        ),
+    ),
+    ItemDefinition(
+        key="ciaran_ember_mushroom_skewer",
+        display_name_zh="暗影谷炭烤蕈串",
+        price_table_key="specialty_food",
+        sellable=True,
+        presentation=ItemPresentation(
+            kind=ItemKind.FOOD,
+            icon_key=ItemIconKey.FOOD,
+            rarity=ItemRarity.COMMON,
+            summary_zh="谷裡採來的蕈子串在竹籤上，擱炭火烤透的野地熱食。",
+        ),
+    ),
+    ItemDefinition(
+        key="ciaran_indigo_dye",
+        display_name_zh="暗影谷藍染",
+        price_table_key="material",
+        sellable=True,
+        presentation=ItemPresentation(
+            kind=ItemKind.MATERIAL,
+            icon_key=ItemIconKey.MATERIAL,
+            rarity=ItemRarity.COMMON,
+            summary_zh="下游染布淺灘邊用植物揉出的染料塊，村裡布匹那身藍就從這裡來。",
+        ),
+    ),
+    ItemDefinition(
+        key="ciaran_crystal_sand",
+        display_name_zh="暗影谷晶砂",
+        price_table_key="material",
+        sellable=True,
+        presentation=ItemPresentation(
+            kind=ItemKind.MATERIAL,
+            icon_key=ItemIconKey.MATERIAL,
+            rarity=ItemRarity.UNCOMMON,
+            summary_zh="從谷裡溪水淘洗出的圓潤晶砂，磨亮之後綴進村人的飾物裡。",
+        ),
+    ),
+    ItemDefinition(
+        key="ciaran_antivenom_tincture",
+        display_name_zh="暗影谷解毒草露",
+        price_table_key="potion",
+        sellable=True,
+        presentation=ItemPresentation(
+            kind=ItemKind.POTION,
+            icon_key=ItemIconKey.POTION,
+            rarity=ItemRarity.UNCOMMON,
+            summary_zh="以自家藥草園的解毒草浸出的草露，飲下能解去身上所中的毒。",
+        ),
+        use_mechanics=ItemUseMechanics(consumable=True, combat_allowed=True),
     ),
 )
