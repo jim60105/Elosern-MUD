@@ -85,6 +85,7 @@ from world.art.gallery_prompt import (
 )
 from world.art.paths import resolved_under_store_root
 from world.art.queue import (
+    _cancel_gallery_jobs_locked,
     _enqueue_gallery_job_locked,
     _gallery_job_in_flight_locked,
     enqueue_gallery_job,
@@ -215,6 +216,62 @@ def serialized_gallery_mutation(subject: ArtSubject) -> Iterator[GalleryMutation
         token.closed = True
         _active_mutation.reset(context_token)
         queue_lock.release()
+
+
+def remove_creation_portrait_output(
+    subject: ArtSubject, image_ids, *, mutation_token, clear_error: bool
+) -> tuple[int, list]:
+    """Remove exactly the named creation-owned jobs/cards inside the caller's unit.
+
+    The service half of the draft portrait cleanup (change
+    ``creation-draft-portrait-cleanup``). The rules owner validated its
+    receipt and passes only the receipt's own image ids for the character's
+    own subject; this seam accepts nothing else. It requires the active
+    subject-bound mutation token (the shared queue serialization is already
+    held, so only already-locked queue primitives are used) and an open
+    database transaction owned by the caller, so a failure anywhere rolls the
+    whole cleanup back:
+
+    - the named per-image jobs are deleted (a late settlement then finds no
+      record and publishes nothing);
+    - under ``gallery_lock`` the named cards are dropped and, when
+      ``clear_error`` is set, the subject's recorded generation error is
+      cleared.
+
+    No file is touched here. Returns ``(deleted job count, removed stored
+    identities)``; the caller unlinks the identities through
+    :func:`unlink_creation_portrait_files` only after a real commit and after
+    every lock was released.
+    """
+    _require_active_mutation_token(mutation_token, subject)
+    if not transaction.get_connection().in_atomic_block:
+        raise GalleryMutationError(
+            "a creation portrait cleanup requires the caller's database transaction"
+        )
+    ids = tuple(
+        image_id
+        for image_id in image_ids
+        if gallery_api._canonical_uuid_text(image_id) is not None
+    )
+    deleted = _cancel_gallery_jobs_locked(subject, ids)
+    with gallery_api.gallery_lock:
+        removed = gallery_api._remove_cards_locked(subject, ids)
+        if clear_error:
+            gallery_api._clear_error_locked(subject)
+    return deleted, removed
+
+
+def unlink_creation_portrait_files(subject: ArtSubject, identities) -> None:
+    """Unlink committed-removed creation card files (never raises).
+
+    Runs only from a commit-qualified callback after the queue and gallery
+    serialization were released. Each file goes through the one confined
+    deletion path; an unresolvable, missing or failing unlink is a bounded
+    diagnostic and the unreferenced file is reclaimed by the startup orphan
+    prune. The committed card removal is never undone by a file failure.
+    """
+    for identity in identities:
+        gallery_api.unlink_stored_file(subject, identity)
 
 
 def _gallery_auto_generation_pending(subject) -> bool:

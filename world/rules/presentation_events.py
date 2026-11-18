@@ -156,7 +156,10 @@ _active_deferral: contextvars.ContextVar[DeferredPublicationCallbacks | None] = 
 )
 
 
-def _drain_deferred_callbacks(collector: DeferredPublicationCallbacks) -> None:
+def _drain_deferred_callbacks(
+    collector: DeferredPublicationCallbacks,
+    delivered: list[Callable[[], None]] | None = None,
+) -> None:
     """Run every collected callback once, in registration order.
 
     The collector stays active for the whole drain so a callback that registers
@@ -171,6 +174,8 @@ def _drain_deferred_callbacks(collector: DeferredPublicationCallbacks) -> None:
     first_error: BaseException | None = None
     try:
         while (callback := collector.pop_next()) is not None:
+            if delivered is not None:
+                delivered.append(callback)
             try:
                 callback()
             except BaseException as error:  # observability: ignore R2: the first failure is re-raised after the remaining callbacks run (Django's run_on_commit contract)
@@ -215,7 +220,30 @@ def defer_publication_callbacks() -> Iterator[DeferredPublicationCallbacks]:
     _active_deferral.reset(token)
     from django.db import transaction
 
-    transaction.on_commit(lambda: _drain_deferred_callbacks(collector))
+    transaction.on_commit(_DeferredDrain(collector))
+
+
+class _DeferredDrain:
+    """The one ``on_commit`` registration of an outermost deferral scope.
+
+    Calling it drains the collector. ``delivered`` is a snapshot (taken when
+    the drain finishes) of the callbacks it ran, in order: a read-only
+    introspection aid so a caller that captured on-commit callbacks can still
+    classify the publication work this drain delivered. It never re-runs them.
+    """
+
+    __slots__ = ("_collector", "delivered")
+
+    def __init__(self, collector: DeferredPublicationCallbacks) -> None:
+        self._collector = collector
+        self.delivered: tuple[Callable[[], None], ...] = ()
+
+    def __call__(self) -> None:
+        delivered: list[Callable[[], None]] = []
+        try:
+            _drain_deferred_callbacks(self._collector, delivered)
+        finally:
+            self.delivered = tuple(delivered)
 
 
 def new_publication_group() -> PublicationGroup:

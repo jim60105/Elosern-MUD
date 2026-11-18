@@ -9,7 +9,7 @@ each adapter re-resolves the owning account from the authenticated session's
 puppet, verifies that the puppet is an owned ``PlayerCharacter`` still pending
 creation, and calls only the public deterministic creation-wizard APIs
 (``save_preset_draft``, ``save_custom_draft``, ``activate_draft``,
-``clear_draft``). Activation performs no relocation: the character stays in
+``reset_creation_draft``). Activation performs no relocation: the character stays in
 虛境.
 ``creation.concept`` writes nothing persistent at all: the validated proposal
 lands only in the session-scoped transient slot the presentation layer renders
@@ -51,8 +51,8 @@ from world.rules.creation_portrait import (
 )
 from world.rules.creation_wizard import (
     activate_draft,
-    clear_draft,
     draft_fingerprint,
+    reset_creation_draft,
     save_custom_draft,
     save_preset_draft,
 )
@@ -707,14 +707,25 @@ def _creation_activate_adapter(actor: Any, payload: dict[str, Any], session: Any
 
 
 def _creation_reset_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
-    """Idempotently clear the staging draft; the character stays pending."""
+    """Confirmed reset: clear the draft and its creation portrait; stay pending.
+
+    The rules owner (``reset_creation_draft``) clears the staging draft and
+    the creation-owned portrait receipt, jobs, cards and recorded draft
+    failure in one serialized transaction; the transient proposal is cleared
+    only after it committed. A rules rejection is a stable rejected result; any
+    other failure propagates, so a failed cleanup is never reported as a
+    successful reset.
+    """
     del payload
     account = _pending_owner(actor)
     if account is None:
         return _rejected("ownership_rejected")
     if not bool(getattr(actor, "creation_pending", False)):
         return _rejected("already_complete")
-    clear_draft(actor)
+    try:
+        reset_creation_draft(account, actor)
+    except CharacterCreationError as error:
+        return _rejected(error)
     _clear_proposal(session)
     message = "已清除角色草稿。"
     return _success("draft_cleared", message, AFFECTED_CREATION)
