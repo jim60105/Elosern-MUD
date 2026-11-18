@@ -37,10 +37,12 @@ class ConceptCreationJourneys(CreationBrowserTest):
     # isolated server (the activated character state of one journey must never
     # leak into the next login).
     @covers_requirement("concept-transient-fill::the-browser-form-pre-fills-from-the-proposal-without-submitting")
+    @covers_requirement("webclient-character-creation-ui::concept-guide-completion-follows-proposal-fields")
     def test_concept_field_journey_to_activation_at_the_reference_viewport(self):
         self._concept_journey((1451, 790))
 
     @covers_requirement("concept-transient-fill::the-browser-form-pre-fills-from-the-proposal-without-submitting")
+    @covers_requirement("webclient-character-creation-ui::concept-guide-completion-follows-proposal-fields")
     def test_concept_field_journey_to_activation_at_the_capped_viewport(self):
         self._concept_journey((2560, 1440))
 
@@ -163,6 +165,33 @@ class ConceptCreationJourneys(CreationBrowserTest):
         # The retired in-form proposal notice and its button are gone.
         self.assertEqual(page.locator('[data-testid="creation-proposal-notice"]').count(), 0)
         self.assertEqual(page.locator('[data-testid="creation-proposal-open"]').count(), 0)
+
+        # The apply landed on the identity step, and the concept guide marks
+        # every value this proposal carries without ever listing sex or
+        # portrait (the proposal contract has neither).
+        self.assertEqual(
+            page.evaluate(
+                "document.querySelector('[data-testid=\"creation-steps-tab-identity\"]')"
+                ".getAttribute('aria-current')"
+            ),
+            "step",
+        )
+        page.locator('[data-testid="creation-mode-concept"]').click()
+        guide = page.locator('[data-testid="creation-concept-fill"]')
+        guide.first.wait_for(state="visible", timeout=5000)
+        fill_marks = page.evaluate(
+            "() => [...document.querySelectorAll('[data-testid=\"creation-concept-fill\"]')]"
+            ".map((el) => [el.getAttribute('data-fill-keys'), el.getAttribute('data-present')])"
+        )
+        self.assertGreaterEqual(len(fill_marks), 1)
+        for keys, present in fill_marks:
+            if keys != "affinity_elements":  # may legitimately be empty
+                self.assertEqual(present, "true", keys)
+            self.assertNotIn("sex", keys)
+            self.assertNotIn("portrait", keys)
+        page.locator('[data-testid="creation-mode-custom"]').click()
+        page.wait_for_selector('[data-testid="creation-steps"]', timeout=5000)
+        self.assertEqual(sent_action_count(page, "creation.custom"), 0)
 
         # Complete the form keyboard-only: the transient fields now arrive
         # pre-filled, so the journey only verifies the Tab order from the

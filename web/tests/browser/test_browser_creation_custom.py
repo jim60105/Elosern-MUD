@@ -45,6 +45,7 @@ def _open_step(page, step):
 
 
 class CustomCreationJourneys(CreationBrowserTest):
+    @covers_requirement("webclient-character-creation-ui::custom-step-navigation-preserves-unsent-form-authority")
     def test_stepped_form_keyboard_navigation_fits_both_viewports(self):
         page = self._login_creation()
         install_outbound_recorder(page)
