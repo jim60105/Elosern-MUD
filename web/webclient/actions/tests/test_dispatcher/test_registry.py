@@ -73,6 +73,9 @@ class RegistryTests(unittest.TestCase):
                     "creation.roll_name",
                     "creation.activate",
                     "creation.reset",
+                    # Admitted by creation-draft-portrait-request: the pending
+                    # character's one draft portrait request.
+                    "creation.portrait.generate",
                     "explore.move",
                     "explore.look",
                     "explore.talk_open",
