@@ -1,11 +1,13 @@
 """Targeted OOB art completion push tests (task 4.3).
 
-Covers the ``asset_completed`` signal boundary: the payload contains only the
-subject key, the subscriber runs on the calling thread (never the worker
+Covers the ``asset_completed`` signal boundary: the payload contains exactly the
+subject key and the settled image id, the subscriber runs on the calling thread (never the worker
 thread), a referencing session receives one newer ``art`` update, a
 non-referencing or creation-mode session receives nothing, a late completion
 for an old room replaces nothing, a bad session does not stop the others, and
-``world/art/`` never imports ``web/``.
+``world/art/`` never imports ``web/``. A pending creation actor receives its
+``creation`` panel only for its current receipt's own image
+(creation-draft-portrait-panel).
 """
 
 from types import SimpleNamespace
@@ -61,6 +63,10 @@ from world.rules.tests._combat_session_helpers import open_synthetic_scope
 _MONSTER_VISUAL_KEYS = tuple(sorted(get_monster_visual_registry()))
 _MONSTER_KEY_A = _MONSTER_VISUAL_KEYS[0]
 _MONSTER_KEY_B = _MONSTER_VISUAL_KEYS[1]
+
+# A canonical completed image id for notifications whose ordinary art/gallery/
+# roster matching depends only on the subject reference.
+_IMAGE_ID = "f0e1d2c3-b4a5-4697-8879-6a5b4c3d2e1f"
 
 
 class FakeSession:
@@ -252,8 +258,8 @@ class ArtPushPureGateTests(unittest.TestCase):
         coord2.registry = reg2
         sess2.ndb.elosern_coordinator = coord2
 
-        _push_for_subject(sess1, sess1.actor, "target")
-        _push_for_subject(sess2, sess2.actor, "target")
+        _push_for_subject(sess1, sess1.actor, "target", _IMAGE_ID)
+        _push_for_subject(sess2, sess2.actor, "target", _IMAGE_ID)
 
         self.assertEqual(len(contexts_sess1), 3)
         self.assertIs(contexts_sess1[0], contexts_sess1[1])
@@ -295,7 +301,7 @@ class ArtPushBoundaryTests(EvenniaTestCase):
         self.assertEqual(violations, [])
 
     @covers_requirement("webclient-art-panel::worker-completion-pushes-a-targeted-art-panel-update")
-    def test_signal_payload_contains_only_the_subject_key(self):
+    def test_signal_payload_contains_only_the_subject_key_and_image_id(self):
         received = []
 
         def receiver(sender, **kwargs):
@@ -304,16 +310,21 @@ class ArtPushBoundaryTests(EvenniaTestCase):
         asset_completed.connect(receiver, weak=False)
         try:
             from world.art.subjects import ArtSubject, ArtSubjectKind
-            from world.art.worker import _notify_completed_batch
+            from world.art.worker import ArtCompletion, _notify_completed_batch
 
-            _notify_completed_batch([ArtSubject(ArtSubjectKind.SCENE, "t_synth_bazaar")])
+            _notify_completed_batch(
+                [ArtCompletion(subject_key="scene:t_synth_bazaar", image_id=_IMAGE_ID)]
+            )
         finally:
             asset_completed.disconnect(receiver)
         self.assertEqual(len(received), 1)
         # Django injects ``signal`` and ``sender``; the payload adds exactly
         # one project-local field.
         self.assertEqual(received[0]["subject_key"], "scene:t_synth_bazaar")
-        self.assertEqual(set(received[0]) - {"signal", "sender"}, {"subject_key"})
+        self.assertEqual(received[0]["image_id"], _IMAGE_ID)
+        self.assertEqual(
+            set(received[0]) - {"signal", "sender"}, {"subject_key", "image_id"}
+        )
 
     def test_dispatch_uid_makes_connection_reentrant(self):
         connect_art_push()
@@ -338,9 +349,11 @@ class ArtPushBoundaryTests(EvenniaTestCase):
         asset_completed.connect(receiver, weak=False)
         try:
             from world.art.subjects import ArtSubject, ArtSubjectKind
-            from world.art.worker import _notify_completed_batch
+            from world.art.worker import ArtCompletion, _notify_completed_batch
 
-            _notify_completed_batch([ArtSubject(ArtSubjectKind.SCENE, "t_synth_bazaar")])
+            _notify_completed_batch(
+                [ArtCompletion(subject_key="scene:t_synth_bazaar", image_id=_IMAGE_ID)]
+            )
         finally:
             asset_completed.disconnect(receiver)
         self.assertEqual(received_thread_names, [main_thread])
@@ -579,7 +592,7 @@ class ArtPushPresenterTests(EvenniaTestCase):
             account.characters.add(other_char)
             other_char.account = account
             self._view(session, "mine", other_key)
-            on_asset_completed(subject_key=other_key)
+            on_asset_completed(subject_key=other_key, image_id=_IMAGE_ID)
 
         updates = [k["ui_update"][0][0] for k in session.sent if "ui_update" in k]
         self.assertEqual(len(updates), 1)
@@ -650,7 +663,7 @@ class ArtPushPresenterTests(EvenniaTestCase):
         )
 
         with patch("evennia.SESSION_HANDLER.get_sessions", return_value=[session]):
-            on_asset_completed(subject_key=monster_key)
+            on_asset_completed(subject_key=monster_key, image_id=_IMAGE_ID)
 
         updates = [k["ui_update"][0][0] for k in session.sent if "ui_update" in k]
         self.assertEqual(len(updates), 1)
@@ -705,7 +718,7 @@ class ArtPushPresenterTests(EvenniaTestCase):
             patch("evennia.SESSION_HANDLER.get_sessions", return_value=[session]),
             patch("web.webclient.presentation.art_push.log_info") as info_mock,
         ):
-            on_asset_completed(subject_key=b_key)
+            on_asset_completed(subject_key=b_key, image_id=_IMAGE_ID)
 
         self.assertIn("gallery", info_mock.call_args.kwargs["context"]["panels"])
         gallery = self._first_update(session)["panels"]["gallery"]
@@ -753,7 +766,7 @@ class ArtPushPresenterTests(EvenniaTestCase):
             patch("evennia.SESSION_HANDLER.get_sessions", return_value=[session]),
             patch("web.webclient.presentation.art_push.log_info") as info_mock,
         ):
-            on_asset_completed(subject_key=c_key)
+            on_asset_completed(subject_key=c_key, image_id=_IMAGE_ID)
 
         candidates = info_mock.call_args.kwargs["context"]["panels"]
         self.assertIn("art", candidates, "C's portrait completion is a real push")
@@ -801,7 +814,7 @@ class ArtPushPresenterTests(EvenniaTestCase):
             patch("web.webclient.presentation.ingress.is_webclient", return_value=True),
             patch("web.webclient.presentation.art_push.log_info") as info_mock,
         ):
-            on_asset_completed(subject_key=sibling_key)
+            on_asset_completed(subject_key=sibling_key, image_id=_IMAGE_ID)
 
         # Only the roster references the sibling, so it is the single compared
         # candidate; the rendered content equals the committed baseline, so the
@@ -870,7 +883,7 @@ class ArtPushPresenterTests(EvenniaTestCase):
             patch("evennia.SESSION_HANDLER.get_sessions", return_value=[session]),
             patch("web.webclient.presentation.art_push.log_info") as info_mock,
         ):
-            on_asset_completed(subject_key=char_key)
+            on_asset_completed(subject_key=char_key, image_id=_IMAGE_ID)
 
         updates = [k["ui_update"][0][0] for k in session.sent if "ui_update" in k]
         self.assertEqual(len(updates), 1)
@@ -888,7 +901,7 @@ class ArtPushPresenterTests(EvenniaTestCase):
         session = self._make_session()
         with patch("evennia.SESSION_HANDLER.get_sessions", return_value=[session]):
             card = self._complete_scene()
-            on_asset_completed(subject_key=self._scene_key)
+            on_asset_completed(subject_key=self._scene_key, image_id=_IMAGE_ID)
         updates = [
             kwargs
             for kwargs in session.sent
@@ -975,7 +988,7 @@ class ArtPushPresenterTests(EvenniaTestCase):
             patch("evennia.SESSION_HANDLER.get_sessions", return_value=[session]),
             patch("web.webclient.presentation.art_push.log_info") as info_mock,
         ):
-            on_asset_completed(subject_key=ally_key)
+            on_asset_completed(subject_key=ally_key, image_id=_IMAGE_ID)
 
         envelope = self._first_update(session)
         self.assertEqual(
@@ -1032,7 +1045,7 @@ class ArtPushPresenterTests(EvenniaTestCase):
             patch.object(registry, "render", side_effect=fake_render),
             patch("evennia.SESSION_HANDLER.get_sessions", return_value=[session]),
         ):
-            on_asset_completed(subject_key=ally_key)
+            on_asset_completed(subject_key=ally_key, image_id=_IMAGE_ID)
 
         panels = self._first_update(session)["panels"]
         self.assertIn("art", panels)
@@ -1063,7 +1076,7 @@ class ArtPushPresenterTests(EvenniaTestCase):
 
         host_key, _ = self._settle_named_portrait("synthetic-host")
         with patch("evennia.SESSION_HANDLER.get_sessions", return_value=[session]):
-            on_asset_completed(subject_key=host_key)
+            on_asset_completed(subject_key=host_key, image_id=_IMAGE_ID)
 
         updates = [k["ui_update"][0][0] for k in session.sent if "ui_update" in k]
         self.assertEqual(len(updates), 1)
@@ -1085,7 +1098,7 @@ class ArtPushPresenterTests(EvenniaTestCase):
         other_room = create_object(Room, key="distant room")
         ally.location = other_room
         with patch("evennia.SESSION_HANDLER.get_sessions", return_value=[session]):
-            on_asset_completed(subject_key=ally_key)
+            on_asset_completed(subject_key=ally_key, image_id=_IMAGE_ID)
         self.assertEqual(session.sent, [])
 
     def test_non_referencing_session_receives_nothing(self):
@@ -1099,7 +1112,7 @@ class ArtPushPresenterTests(EvenniaTestCase):
         session = self._make_session(other_player)
         with patch("evennia.SESSION_HANDLER.get_sessions", return_value=[session]):
             self._complete_scene()
-            on_asset_completed(subject_key=self._scene_key)
+            on_asset_completed(subject_key=self._scene_key, image_id=_IMAGE_ID)
         self.assertEqual(session.sent, [])
 
     @covers_requirement("webclient-art-panel::worker-completion-pushes-a-targeted-art-panel-update")
@@ -1109,7 +1122,7 @@ class ArtPushPresenterTests(EvenniaTestCase):
         session = self._make_session(pending, mode="creation")
         with patch("evennia.SESSION_HANDLER.get_sessions", return_value=[session]):
             self._complete_scene()
-            on_asset_completed(subject_key=self._scene_key)
+            on_asset_completed(subject_key=self._scene_key, image_id=_IMAGE_ID)
         self.assertEqual(session.sent, [])
 
     @covers_requirement("webclient-art-panel::worker-completion-pushes-a-targeted-art-panel-update")
@@ -1121,7 +1134,7 @@ class ArtPushPresenterTests(EvenniaTestCase):
         self.player.location = other_room
         with patch("evennia.SESSION_HANDLER.get_sessions", return_value=[session]):
             self._complete_scene()
-            on_asset_completed(subject_key=self._scene_key)
+            on_asset_completed(subject_key=self._scene_key, image_id=_IMAGE_ID)
         self.assertEqual(session.sent, [])
 
     def test_one_bad_session_does_not_stop_the_others(self):
@@ -1138,7 +1151,7 @@ class ArtPushPresenterTests(EvenniaTestCase):
             patch("web.webclient.presentation.art_push.log_warn") as log_warn,
         ):
             self._complete_scene()
-            on_asset_completed(subject_key=self._scene_key)
+            on_asset_completed(subject_key=self._scene_key, image_id=_IMAGE_ID)
         log_warn.assert_called()
         updates = [
             kwargs
@@ -1174,7 +1187,7 @@ class ArtPushPresenterTests(EvenniaTestCase):
         # A completes while the wall no longer lists it.
         session.sent.clear()
         with patch("evennia.SESSION_HANDLER.get_sessions", return_value=[session]):
-            on_asset_completed(subject_key=sub_a.full())
+            on_asset_completed(subject_key=sub_a.full(), image_id=_IMAGE_ID)
 
         self.assertEqual(session.sent, [])
         rendered = session.ndb.elosern_coordinator.registry.render(
@@ -1213,7 +1226,7 @@ class ArtPushPresenterTests(EvenniaTestCase):
         )
 
         with patch("evennia.SESSION_HANDLER.get_sessions", return_value=[session]):
-            on_asset_completed(subject_key=monster_key)
+            on_asset_completed(subject_key=monster_key, image_id=_IMAGE_ID)
 
         updates = [k["ui_update"][0][0] for k in session.sent if "ui_update" in k]
         self.assertEqual(len(updates), 1)
@@ -1232,7 +1245,7 @@ class ArtPushPresenterTests(EvenniaTestCase):
             patch("evennia.SESSION_HANDLER.get_sessions", return_value=[session]),
             patch("web.webclient.presentation.art_push.log_warn") as warn_mock,
         ):
-            on_asset_completed(subject_key=self._scene_key)
+            on_asset_completed(subject_key=self._scene_key, image_id=_IMAGE_ID)
         warn_mock.assert_called_once()
         self.assertEqual(warn_mock.call_args.args, ("art_push_unavailable",))
         kw = warn_mock.call_args.kwargs
@@ -1269,3 +1282,197 @@ class ArtPushPresenterTests(EvenniaTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CreationPortraitPushTests(EvenniaTestCase):
+    """Worker -> signal -> coordinator delivery of a pending draft portrait."""
+
+    def setUp(self):
+        from web.webclient.presentation.tests.test_creation_panel._support import (
+            _open_t_creation_scope,
+            _shipped_race_affinity,
+        )
+        from world.art import connectivity
+        from world.tests.start_room_fixture import stub_start_room
+
+        self.enterContext(stub_start_room())
+        _open_t_creation_scope(self)
+        handle = patch(
+            "web.webclient.presentation.creation._validate_affinity",
+            _shipped_race_affinity,
+        )
+        handle.start()
+        self.addCleanup(handle.stop)
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tempdir.cleanup)
+        settings = override_settings(
+            ART_STORE_ROOT=self.tempdir.name,
+            ART_SD_CLIENT="world.art.fake_sd_client.FakeSDWebUIClient",
+        )
+        settings.enable()
+        self.addCleanup(settings.disable)
+        connectivity._reset_for_testing()
+        self.addCleanup(connectivity._reset_for_testing)
+        super().setUp()
+        connect_art_push()
+        self.registry = build_production_registry()
+        self.account, self.character = self._pending("push-creator")
+        self.queued = []
+
+    def _pending(self, name):
+        from evennia.utils.create import create_account
+
+        account = create_account(name, f"{name}@example.test", "testpassword", typeclass=Account)
+        character = create_object(PlayerCharacter, key=f"{name}-shell")
+        account.at_post_create_character(character)
+        return account, character
+
+    def _session(self, actor=None, *, sessid=1, queued=False):
+        actor = actor or self.character
+        session = FakeSession(actor, sessid=sessid)
+        coordinator = PresentationCoordinator(
+            session,
+            self.registry,
+            calendar_provider=_fake_calendar,
+            scheduler=self.queued.append if queued else None,
+        )
+        session.ndb.elosern_coordinator = coordinator
+        coordinator.full_snapshot(build_presentation_context(session, actor))
+        session.sent.clear()
+        return session
+
+    def _run_queued(self):
+        callbacks, self.queued[:] = list(self.queued), []
+        for callback in callbacks:
+            callback()
+
+    def _admit(self, account=None, character=None):
+        from world.art.fake_sd_client import FakeSDWebUIClient
+        from world.rules.creation_portrait import DraftPortraitRequest, request_draft_portrait
+        from web.webclient.presentation.tests.test_creation_panel._support import _T_RACE, _T_SUBRACE
+
+        with patch("world.art.connectivity.resolve_sd_client", return_value=FakeSDWebUIClient()):
+            return request_draft_portrait(
+                account or self.account,
+                character or self.character,
+                DraftPortraitRequest(race=_T_RACE, subrace=_T_SUBRACE, sex="female", apparent_age=30),
+            )
+
+    def _drain(self, sessions, client=None, *, resolve_error=None):
+        from world.art.fake_sd_client import FakeSDWebUIClient
+        from world.art.worker import drain_synchronous
+
+        resolver = (
+            patch("world.art.worker.resolve_sd_client", side_effect=resolve_error)
+            if resolve_error is not None
+            else patch("world.art.worker.resolve_sd_client", return_value=client or FakeSDWebUIClient())
+        )
+        with resolver, patch("evennia.SESSION_HANDLER.get_sessions", return_value=sessions):
+            drain_synchronous(10)
+
+    def _failing_client(self):
+        from world.art.fake_sd_client import FakeSDWebUIClient
+        from world.art.sd_worker import SDError
+
+        client = FakeSDWebUIClient()
+        client.fail_every_call(SDError("sd_generation_error", "scripted"))
+        return client
+
+    def _updates(self, session):
+        return [kwargs["ui_update"][0][0] for kwargs in session.sent if "ui_update" in kwargs]
+
+    def _subject_key(self, character=None):
+        from world.art.subjects import named_character_subject
+
+        return named_character_subject(character or self.character).full()
+
+    @covers_requirement("webclient-art-panel::worker-completion-pushes-a-targeted-art-panel-update")
+    def test_a_settled_success_publishes_the_ready_creation_panel_once(self):
+        admission = self._admit()
+        session = self._session()
+        self._drain([session])
+        updates = self._updates(session)
+        self.assertEqual(len(updates), 1)
+        self.assertEqual(set(updates[0]["panels"]), {"creation"})
+        portrait = updates[0]["panels"]["creation"]["portrait"]
+        self.assertEqual(portrait["status"], "ready")
+        self.assertIn(admission.image_id, portrait["artwork"]["attempts"][0]["resource"]["url"])
+
+    @covers_requirement("webclient-art-panel::worker-completion-pushes-a-targeted-art-panel-update")
+    def test_a_generation_failure_settles_the_pending_panel_failed(self):
+        self._admit()
+        session = self._session()
+        self._drain([session], self._failing_client())
+        updates = self._updates(session)
+        self.assertEqual(len(updates), 1)
+        self.assertEqual(updates[0]["panels"]["creation"]["portrait"]["status"], "failed")
+
+    @covers_requirement("webclient-art-panel::worker-completion-pushes-a-targeted-art-panel-update")
+    def test_a_client_construction_failure_settles_the_pending_panel_failed(self):
+        # The admission ran against a successful verdict; only the worker's
+        # own client resolution fails afterwards.
+        self._admit()
+        session = self._session()
+        self._drain([session], resolve_error=RuntimeError("cannot construct the client"))
+        updates = self._updates(session)
+        self.assertEqual(len(updates), 1)
+        self.assertEqual(updates[0]["panels"]["creation"]["portrait"]["status"], "failed")
+
+    @covers_requirement("webclient-art-panel::worker-completion-pushes-a-targeted-art-panel-update")
+    def test_a_foreign_or_canceled_image_publishes_no_creation(self):
+        self._admit()
+        session = self._session()
+        other_account, other = self._pending("push-bystander")
+        other_admission = self._admit(other_account, other)
+        with patch("evennia.SESSION_HANDLER.get_sessions", return_value=[session]):
+            # An image this receipt never admitted (a canceled request).
+            on_asset_completed(subject_key=self._subject_key(), image_id=_IMAGE_ID)
+            # Another pending character's own completion.
+            on_asset_completed(
+                subject_key=self._subject_key(other), image_id=other_admission.image_id
+            )
+        self.assertEqual(session.sent, [])
+
+    @covers_requirement("webclient-art-panel::worker-completion-pushes-a-targeted-art-panel-update")
+    def test_an_older_completion_delivered_after_a_newer_admission_publishes_nothing(self):
+        first = self._admit()
+        session = self._session(queued=True)
+        self._drain([session])
+        # The completion of the first image is queued, not yet drained, when a
+        # newer request is admitted.
+        self._admit()
+        self.assertEqual(session.sent, [])
+        with patch("web.webclient.presentation.art_push.log_warn") as warn:
+            self._run_queued()
+        self.assertEqual(self._updates(session), [])
+        warn.assert_not_called()
+        # Delivered only after the newer admission, it never qualifies at all.
+        with patch("evennia.SESSION_HANDLER.get_sessions", return_value=[session]):
+            on_asset_completed(subject_key=self._subject_key(), image_id=first.image_id)
+        self._run_queued()
+        self.assertEqual(self._updates(session), [])
+
+    def test_a_retired_sequence_publishes_no_creation(self):
+        self._admit()
+        session = self._session(queued=True)
+        self._drain([session])
+        session.ndb.elosern_coordinator.reset()
+        self._run_queued()
+        self.assertEqual(self._updates(session), [])
+
+    def test_an_unrelated_pending_session_receives_nothing(self):
+        self._admit()
+        _other_account, other = self._pending("push-unrelated")
+        other_session = self._session(other, sessid=2)
+        own_session = self._session(sessid=1)
+        self._drain([other_session, own_session])
+        self.assertEqual(other_session.sent, [])
+        self.assertEqual(len(self._updates(own_session)), 1)
+
+    def test_a_notification_without_a_canonical_image_id_is_ignored(self):
+        admission = self._admit()
+        session = self._session()
+        with patch("evennia.SESSION_HANDLER.get_sessions", return_value=[session]):
+            on_asset_completed(subject_key=self._subject_key())
+            on_asset_completed(subject_key=self._subject_key(), image_id=admission.image_id.upper())
+        self.assertEqual(session.sent, [])

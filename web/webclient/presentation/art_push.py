@@ -22,6 +22,16 @@ was null because the portrait lacked real imagery becomes the real catalog key
 without another gameplay or focus action. A scene-only match, a session outside
 exploration, and an unavailable exploration panel add nothing, so a completion
 that only the current scene references cannot widen the publication.
+
+A pending creation actor's own draft portrait (creation-draft-portrait-panel)
+qualifies the ``creation`` panel only while the actor's CURRENT receipt owns
+the exact completed image id. Its publication is a standalone ``creation``
+intent rendered from current state when the coordinator drains it, and the
+context factory rechecks the receipt there: an older completion delivered
+after a newer admission (or a reset) publishes nothing. Art, gallery and the
+exploration companion are unavailable in creation mode and a pending roster
+row claims no generation subject, so creation never shares a notification
+with another qualifying panel in practice.
 """
 
 from typing import Any
@@ -37,6 +47,8 @@ from web.webclient.presentation.coordinator import (
 )
 from web.webclient.presentation.ingress import build_presentation_context, is_webclient
 from web.webclient.presentation.registry import build_production_registry
+from world.art.gallery import _canonical_uuid_text
+from world.rules.creation_portrait import receipt_owns_image
 
 # Stable per-subscriber identity so re-connecting from at_server_start is a
 # re-entrant no-op.
@@ -145,7 +157,78 @@ def _panel_matches_subject(panel_name: str, payload: dict[str, Any], subject_key
     return False
 
 
-def _push_for_subject(session: Any, actor: Any, subject_key: str) -> None:
+class _StaleCreationCompletion(Exception):
+    """The actor's receipt no longer owns the completed image at drain time."""
+
+
+def _publish_creation(
+    session: Any,
+    actor: Any,
+    coordinator: PresentationCoordinator,
+    subject_key: str,
+    image_id: str,
+) -> None:
+    """Queue the standalone ``creation`` publication for one owned completion.
+
+    The panel is declared affected rather than pre-rendered, so the
+    coordinator renders it from current canonical state when the intent
+    drains (and transmits nothing when it equals the committed baseline).
+    The context factory rechecks receipt ownership at that moment; a newer
+    admission or a reset since the notification raises the private stale
+    marker, which this group alone answers (``independent`` gives it a fresh
+    standalone group no other request can join) and which is dropped silently.
+    """
+
+    def _current_context() -> PresentationContext:
+        if not receipt_owns_image(actor, subject_key, image_id):
+            raise _StaleCreationCompletion(subject_key)
+        return build_presentation_context(session, actor)
+
+    deferred = coordinator.enqueue_publication(
+        _current_context,
+        affected_panels=("creation",),
+        independent=True,
+    )
+
+    def _published(receipt: Any) -> None:
+        if receipt is None:
+            return None
+        log_info(
+            "art_completion_push",
+            context={
+                "subject": subject_key,
+                "session": getattr(session, "sessid", "?"),
+                "panels": ["creation"],
+                "revision": receipt.revision,
+                "kind": receipt.kind,
+                "published": receipt.published,
+            },
+        )
+        return None
+
+    def _failed(failure: Any) -> None:
+        error = failure.value if isinstance(failure, Failure) else failure
+        if isinstance(error, _StaleCreationCompletion):
+            # A newer request (or a reset) superseded this image before the
+            # drain: the current state is that request's own publication.
+            return None
+        log_warn(
+            "art_push_unavailable",
+            context={
+                "surface": "creation",
+                "session": getattr(session, "sessid", "?"),
+                "subject": subject_key,
+            },
+            exc=error,
+        )
+        return None
+
+    deferred.addCallbacks(_published, _failed)
+
+
+def _push_for_subject(
+    session: Any, actor: Any, subject_key: str, image_id: str
+) -> None:
     """Re-render and push matching panels for one session."""
     coordinator: PresentationCoordinator = getattr(
         getattr(session, "ndb", None), "elosern_coordinator", None
@@ -184,6 +267,11 @@ def _push_for_subject(session: Any, actor: Any, subject_key: str) -> None:
         exploration_payload = registry.render("exploration", context)
         if exploration_payload.get("available"):
             matching_panels["exploration"] = exploration_payload
+
+    if "creation" in registry.panel_names and receipt_owns_image(
+        actor, subject_key, image_id
+    ):
+        _publish_creation(session, actor, coordinator, subject_key, image_id)
 
     if not matching_panels:
         return
@@ -232,13 +320,22 @@ def _push_for_subject(session: Any, actor: Any, subject_key: str) -> None:
 def on_asset_completed(**kwargs: Any) -> None:
     """Subscriber: push completed art to referencing WebClient sessions.
 
-    The signal payload carries only ``subject_key``. Only live WebClient
-    sessions with an attached coordinator and an active puppet are considered;
-    every session is isolated so one bad session cannot stop notification to
-    the others. Nothing here mutates canonical state.
+    The signal payload carries exactly ``subject_key`` and the settled
+    ``image_id``; a notification missing either (or with a non-canonical image
+    id) is not a completion and is ignored. Only live WebClient sessions with
+    an attached coordinator and an active puppet are considered; every session
+    is isolated so one bad session cannot stop notification to the others.
+    Nothing here mutates canonical state.
     """
     subject_key = kwargs.get("subject_key")
+    image_id = kwargs.get("image_id")
     if not isinstance(subject_key, str) or not subject_key:
+        return
+    if _canonical_uuid_text(image_id) is None:
+        log_warn(
+            "art_push_unavailable",
+            context={"surface": "art", "subject": subject_key, "reason": "image_id"},
+        )
         return
     from evennia import SESSION_HANDLER
 
@@ -252,7 +349,7 @@ def on_asset_completed(**kwargs: Any) -> None:
             coordinator = getattr(getattr(session, "ndb", None), "elosern_coordinator", None)
             if coordinator is None:
                 continue
-            _push_for_subject(session, actor, subject_key)
+            _push_for_subject(session, actor, subject_key, image_id)
         except Exception as error:
             # A bad session logs a bounded diagnostic and cannot stop the
             # others; the push never propagates back into world/art/.
