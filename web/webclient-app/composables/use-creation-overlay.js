@@ -10,11 +10,15 @@ import { useCreationCustom } from "./use-creation-custom.js";
 import { useCreationProposal } from "./use-creation-proposal.js";
 import { useCreationDispatch } from "./use-creation-dispatch.js";
 import { useCreationStage } from "./use-creation-stage.js";
+import { useCreationSteps } from "./use-creation-steps.js";
 
 export function useCreationOverlay(props, emit) {
   const form = useCreationForm(props);
   const custom = useCreationCustom(props, form, emit);
-  const proposal = useCreationProposal(props, form, custom);
+  // The custom form's local step (registers no watcher), created before the
+  // proposal group so a fresh concept apply can land on the first step.
+  const steps = useCreationSteps({ errorFields: custom.formErrorFields });
+  const proposal = useCreationProposal(props, form, custom, steps);
   const dispatch = useCreationDispatch(props, form, emit);
   const stage = useCreationStage(props, form, emit, { rollPending: dispatch.rollPending });
   // Mount-time proposal fill: a panel that already carries an unconsumed
@@ -26,5 +30,6 @@ export function useCreationOverlay(props, emit) {
     ...proposal,
     ...dispatch,
     ...stage,
+    ...steps,
   };
 }

@@ -6,6 +6,10 @@
 // use-creation-overlay.js facade.
 import { computed, reactive, ref, watch } from "vue";
 
+// The seven starting allocation axes, in the order the form holds them (the
+// keys of `allocations` below and of the custom payload).
+export const ALLOCATION_AXES = Object.freeze(["hp", "mp", "sp", "atk_phys", "agility", "defense", "magic_power"]);
+
 export function useCreationForm(props) {
   const available = computed(() => props.creation.available === true);
   const reason = computed(() => props.creation.reason?.message ?? "");

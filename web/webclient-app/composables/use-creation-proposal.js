@@ -6,7 +6,7 @@
 // SFC did.
 import { ref, watch } from "vue";
 
-export function useCreationProposal(props, form, custom) {
+export function useCreationProposal(props, form, custom, steps) {
   const {
     conceptPending,
     latchedStage,
@@ -24,7 +24,7 @@ export function useCreationProposal(props, form, custom) {
     runGuardedSync,
     personaFilled,
   } = form;
-  const { races, affinityMax, affinityElements } = custom;
+  const { races, affinityMax, affinityElements, formErrorFields } = custom;
 
   // The panel's optional `proposal` slot pre-fills the form only when its
   // `revision` is strictly newer than the last applied revision: a panel
@@ -40,6 +40,9 @@ export function useCreationProposal(props, form, custom) {
       return;
     }
     reviewPrompt.value = "";
+    // The fill replaces the values a previous submit's errors referred to.
+    formErrorFields.value = [];
+    if (steps) steps.nativeErrorField.value = null;
     // A race-changing proposal over locally-typed persona prose shows a
     // non-blocking review prompt naming the incoming race (design D5 — the
     // server never overwrites or clears what the player typed).
@@ -107,6 +110,9 @@ export function useCreationProposal(props, form, custom) {
     if (conceptPending.value) conceptPending.value = false;
     if (mode.value === "concept") {
       if (props.stage) latchedStage.value = props.stage;
+      // A fresh concept apply lands on the custom form's first step
+      // (creation-stepped-form); rebuilds and remounts never reach here.
+      if (steps) steps.goToStep("identity");
       setMode("custom");
       if (typeof props.pushToast === "function") {
         props.pushToast({ title: "概念提案已套用到自訂表單", tone: "info" });

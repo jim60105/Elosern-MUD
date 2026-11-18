@@ -75,13 +75,19 @@ export function useCreationCustom(props, form, emit) {
 
   // The age bounds gate (design D1): reject when EITHER age field is below the
   // descriptor's minimum — the server stays authoritative.
-  const gatePassed = computed(
-    () => Number(age.value) >= minimumAge.value && Number(apparentAge.value) >= minimumApparentAge.value,
-  );
+  const ageMeetsMinimum = computed(() => Number(age.value) >= minimumAge.value);
+  const apparentMeetsMinimum = computed(() => Number(apparentAge.value) >= minimumApparentAge.value);
+  const gatePassed = computed(() => ageMeetsMinimum.value && apparentMeetsMinimum.value);
   const gateError = ref(false);
   const budgetError = ref(false);
   const subraceError = ref(false);
   const personaError = ref(false);
+  // The field identifiers (use-creation-steps.js FIELD_STEP keys) the gate
+  // that set the active error points at: structured presentation data for the
+  // step rail and focus routing, so nothing ever parses `formMessage`. Written
+  // only beside the flags below; the stepped form drops entries once the
+  // player edits that step, and a fresh proposal fill clears them.
+  const formErrorFields = ref([]);
 
   // The legacy `creation-form-message` hook (Phase-0 audit §2.3 REMAP-TO-TESTID):
   // a single form-message element that surfaces a server rejection (result.code /
@@ -139,17 +145,25 @@ export function useCreationCustom(props, form, emit) {
     budgetError.value = false;
     subraceError.value = false;
     personaError.value = false;
+    formErrorFields.value = [];
     if (!gatePassed.value) {
       gateError.value = true;
+      formErrorFields.value = [
+        ...(ageMeetsMinimum.value ? [] : ["age"]),
+        ...(apparentMeetsMinimum.value ? [] : ["apparent_age"]),
+      ];
       return;
     }
     if (hasSubraces.value && !subrace.value) {
       subraceError.value = true;
+      formErrorFields.value = ["subrace"];
       return;
     }
     const profile = currentProfile.value;
     if (profile && allocationTotal.value !== profile.budget) {
       budgetError.value = true;
+      // The budget is a sum, so the error lands on the first displayed axis.
+      formErrorFields.value = profile.axes?.[0] ? [`allocations.${profile.axes[0].axis}`] : [];
       return;
     }
     // Persona local validation is all-empty-or-all-filled (design D5): a
@@ -157,6 +171,9 @@ export function useCreationCustom(props, form, emit) {
     const filled = personaFilled();
     if (filled !== 0 && filled !== 3) {
       personaError.value = true;
+      // The partial triple lands on its first empty textarea.
+      const empty = ["personality", "life_story", "habit"].find((key) => persona[key].trim() === "");
+      formErrorFields.value = empty ? [`persona.${empty}`] : [];
       return;
     }
     const payload = {
@@ -214,6 +231,7 @@ export function useCreationCustom(props, form, emit) {
     budgetBriefing,
     gatePassed,
     formMessage,
+    formErrorFields,
     resultMessage,
     onRaceChange,
     toggleAffinity,

@@ -29,6 +29,7 @@ import CreationOverlay from "../../components/CreationOverlay.vue";
 import { useElosernStore } from "../../stores/elosern.js";
 import {
   CREATION_PANEL_SAMPLE,
+  CREATION_PANEL_CUSTOM_DRAFT_SAMPLE,
   CREATION_PANEL_PROPOSAL_SAMPLE,
   CREATION_PANEL_PROPOSAL_TRANSIENT_SAMPLE,
 } from "../../stories/fixtures.js";
@@ -457,5 +458,126 @@ describe("concept fill navigation pins (standalone overlay)", () => {
         .findAll('[data-testid^="creation-affinity-"]')
         .filter((node) => node.element.checked),
     ).toHaveLength(0);
+  });
+});
+
+// creation-stepped-form: a fresh concept apply lands on the custom form's
+// first step; rebuilds and remounts keep the step; the concept guide marks
+// only the values the current proposal actually carries.
+describe("concept apply step landing and guide (creation-stepped-form)", () => {
+  const tid = (id) => `[data-testid="${id}"]`;
+  // Visibility of the v-show step pages is judged on attached nodes.
+  let mounted = null;
+  const mountOverlay = (props) => {
+    mounted = mount(CreationOverlay, { props, attachTo: document.body });
+    return mounted;
+  };
+  afterEach(() => {
+    mounted?.unmount();
+    mounted = null;
+  });
+  const proposalPanel = (proposal, base = CREATION_PANEL_SAMPLE) => ({ ...base, proposal });
+  const transient = (revision) => ({ ...CREATION_PANEL_PROPOSAL_TRANSIENT_SAMPLE.proposal, revision });
+  const shownStep = (wrapper) => ["identity", "story", "allocation"]
+    .filter((key) => wrapper.get(tid(`creation-steps-panel-${key}`)).isVisible());
+  const fills = (wrapper) => Object.fromEntries(
+    wrapper.findAll(tid("creation-concept-fill")).map((li) => [li.attributes("data-fill-keys"), li.attributes("data-present")]),
+  );
+
+  async function openStep(wrapper, key) {
+    await wrapper.get(tid(`creation-steps-tab-${key}`)).trigger("click");
+    await nextTick();
+  }
+
+  it("a fresh apply from the concept tab lands on the first step once; a same-revision rebuild keeps the step", async () => {
+    const pushToast = vi.fn();
+    const wrapper = mountOverlay({ creation: CREATION_PANEL_SAMPLE, stage: { stage: "root" }, dispatch: vi.fn(() => "request-1"), pushToast });
+    await wrapper.get(tid("creation-mode-custom")).trigger("click");
+    await openStep(wrapper, "allocation");
+    await wrapper.get(tid("creation-mode-concept")).trigger("click");
+    await wrapper.get(tid("creation-field-concept")).setValue(CONCEPT_TEXT);
+    await wrapper.get(tid("creation-concept-submit")).trigger("click");
+    // The pending window keeps the concept tab and its guide.
+    expect(wrapper.get(tid("creation-concept-loading")).exists()).toBe(true);
+    expect(wrapper.get(tid("creation-concept-guide")).exists()).toBe(true);
+
+    await wrapper.setProps({ creation: proposalPanel(transient(1)) });
+    expect(wrapper.get(tid("creation-overlay")).attributes("data-mode")).toBe("custom");
+    expect(shownStep(wrapper)).toEqual(["identity"]);
+    expect(pushToast).toHaveBeenCalledTimes(1);
+
+    await openStep(wrapper, "story");
+    await wrapper.setProps({ creation: proposalPanel(transient(1)) });
+    expect(shownStep(wrapper)).toEqual(["story"]);
+    expect(pushToast).toHaveBeenCalledTimes(1);
+    // Nothing was saved or submitted on the player's behalf.
+    expect((wrapper.emitted("action") ?? []).map(([a]) => a.action_id)).toEqual([]);
+  });
+
+  it("a fresh revision arriving outside the concept tab fills without moving the step", async () => {
+    const pushToast = vi.fn();
+    const wrapper = mountOverlay({ creation: CREATION_PANEL_SAMPLE, pushToast });
+    await wrapper.get(tid("creation-mode-custom")).trigger("click");
+    // A typed form survives a no-draft panel refresh (the existing rule).
+    await wrapper.get(tid("creation-field-age")).setValue(30);
+    await openStep(wrapper, "allocation");
+    await wrapper.setProps({ creation: proposalPanel(transient(1)) });
+    expect(shownStep(wrapper)).toEqual(["allocation"]);
+    expect(wrapper.get(tid("creation-field-displayName")).element.value).toBe(transient(1).display_name);
+    expect(pushToast).not.toHaveBeenCalled();
+  });
+
+  it("a remount over an unconsumed proposal fills without navigation or toast", async () => {
+    const pushToast = vi.fn();
+    const wrapper = mountOverlay({ creation: proposalPanel(transient(3)), pushToast });
+    expect(wrapper.get(tid("creation-overlay")).attributes("data-mode")).toBe("preset");
+    await wrapper.get(tid("creation-mode-custom")).trigger("click");
+    expect(shownStep(wrapper)).toEqual(["identity"]);
+    expect(wrapper.get(tid("creation-field-displayName")).element.value).toBe(transient(3).display_name);
+    expect(pushToast).not.toHaveBeenCalled();
+  });
+
+  it("the race-change review prompt stays visible on every step", async () => {
+    const draftPanel = CREATION_PANEL_CUSTOM_DRAFT_SAMPLE;
+    const otherRace = draftPanel.custom.races.find((race) => race.key !== draftPanel.draft.race).key;
+    const wrapper = mountOverlay({ creation: draftPanel });
+    await wrapper.setProps({ creation: proposalPanel({ ...transient(1), race: otherRace }, draftPanel) });
+    for (const key of ["identity", "story", "allocation"]) {
+      await openStep(wrapper, key);
+      expect(wrapper.get(tid("creation-proposal-review")).isVisible()).toBe(true);
+    }
+  });
+
+  it("guide marks follow present values only: omitted keys stay open, zeros count, sex and portrait are never listed", async () => {
+    const proposal = {
+      revision: 1,
+      race: CREATION_PANEL_SAMPLE.custom.races[0].key,
+      subrace: null,
+      allocations: { hp: 0, mp: 0, sp: 0, atk_phys: 0, agility: 0, defense: 0, magic_power: 0 },
+      persona: { personality: "合成個性", life_story: "", habit: "" },
+      age: 0,
+    };
+    const frozen = structuredClone(proposal);
+    const wrapper = mountOverlay({ creation: CREATION_PANEL_SAMPLE });
+    await wrapper.get(tid("creation-mode-concept")).trigger("click");
+    expect(Object.values(fills(wrapper)).every((present) => present === "false")).toBe(true);
+
+    await wrapper.setProps({ creation: proposalPanel(proposal) });
+    await wrapper.get(tid("creation-mode-concept")).trigger("click");
+    const marks = fills(wrapper);
+    expect(marks).toEqual({
+      display_name: "false",
+      "age apparent_age": "true",
+      "race subrace": "true",
+      allocations: "true",
+      affinity_elements: "false",
+      background: "false",
+      "persona.personality": "true",
+      "persona.life_story": "false",
+      "persona.habit": "false",
+    });
+    expect(Object.keys(marks).join(" ")).not.toMatch(/sex|portrait/);
+    // The guide only reads the proposal.
+    expect(proposal).toStrictEqual(frozen);
   });
 });

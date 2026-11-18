@@ -468,13 +468,19 @@ describe("CreationOverlay (B5 overlays family)", () => {
     expect(lastAction(wrapper, "creation.custom")).toBeNull(); // not auto-emitted on resume
   });
 
-  it("the three persona textareas always render in custom mode", async () => {
+  it("the three persona textareas stay mounted and are visible and editable on the story step", async () => {
     const wrapper = mount(CreationOverlay, { props: { creation: CREATION_PANEL_SAMPLE } });
     await switchToCustom(wrapper);
-    // No draft, no proposal: the block renders empty and editable (D5).
+    // No draft, no proposal: the block renders empty and editable (D5). It
+    // stays mounted (values kept) while another step is shown.
     expect(wrapper.get('[data-testid="creation-persona-personality"]').element.value).toBe("");
-    expect(wrapper.get('[data-testid="creation-persona-life_story"]').exists()).toBe(true);
-    expect(wrapper.get('[data-testid="creation-persona-habit"]').exists()).toBe(true);
+    await wrapper.get('[data-testid="creation-steps-tab-story"]').trigger("click");
+    for (const key of ["personality", "life_story", "habit"]) {
+      const area = wrapper.get(`[data-testid="creation-persona-${key}"]`);
+      expect(area.isVisible()).toBe(true);
+      expect(area.attributes("disabled")).toBeUndefined();
+      expect(area.attributes("readonly")).toBeUndefined();
+    }
     // The retired generated indicator never renders.
     expect(wrapper.find('[data-testid="creation-concept-indicator"]').exists()).toBe(false);
   });

@@ -1,0 +1,284 @@
+/* CreationCustomSteps (design §6.1): rail, one step page, previous/next. */
+.creation-steps {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.creation-proposal-review {
+  flex: none;
+  margin: 0;
+  padding: var(--sp-2) var(--sp-3);
+  color: var(--gold-400);
+  background: var(--ink-900);
+  border-left: 2px solid var(--gold-500);
+  font-size: var(--text-md);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+/* -- Step rail: equal cells, current step gold rule + gold text ------------- */
+.creation-steps__rail { flex: none; }
+.creation-steps__rail ol {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--sp-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.creation-steps__rail li {
+  min-width: 0;
+  border-top: 2px solid var(--ink-600);
+  transition: border-color var(--motion-fast) var(--ease-standard);
+}
+.creation-steps__rail li[data-state="done"] { border-color: var(--gold-600); }
+.creation-steps__rail li[data-state="active"] { border-color: var(--gold-400); }
+.creation-steps__rail li[data-state="error"] { border-color: var(--seal-500); }
+
+.creation-steps__tab {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-3);
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-1);
+  color: var(--paper-500);
+  background: none;
+  border: 0;
+  font: 400 var(--text-xl) / 1.4 var(--f-display);
+  letter-spacing: 0.08em;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color var(--motion-fast) var(--ease-standard), background-color var(--motion-fast) var(--ease-standard);
+}
+.creation-steps__tab:hover { color: var(--paper-200); }
+.creation-steps__tab:focus-visible { outline: 2px solid var(--gold-400); outline-offset: -2px; }
+.creation-steps__tab[aria-current="step"] {
+  color: var(--gold-300);
+  background: linear-gradient(180deg, var(--gold-glow), transparent 85%);
+}
+.creation-steps__rail li[data-state="done"] .creation-steps__tab { color: var(--paper-300); }
+
+.creation-steps__no {
+  color: var(--gold-500);
+  font: var(--text-xs) var(--f-num);
+  letter-spacing: 0.12em;
+}
+.creation-steps__rail li[data-state="todo"] .creation-steps__no { color: var(--paper-500); }
+
+/* The error mark is text plus a seal diamond, never colour alone. */
+.creation-steps__flag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  color: var(--seal-400);
+  font: var(--text-xs) var(--f-sans);
+  letter-spacing: 0.06em;
+}
+.creation-steps__flag i {
+  flex: none;
+  width: calc(8px * var(--ui-scale));
+  height: calc(8px * var(--ui-scale));
+  background: var(--seal-500);
+  transform: rotate(45deg);
+}
+
+.creation-steps__remaining {
+  margin-left: auto;
+  color: var(--paper-400);
+  font: var(--text-xs) var(--f-sans);
+  letter-spacing: 0.04em;
+}
+.creation-steps__remaining b {
+  display: inline-block;
+  min-width: 1.5em;
+  color: var(--gold-300);
+  font: var(--text-lg) var(--f-num);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.creation-steps__remaining[data-over="true"] b { color: var(--seal-400); }
+
+/* -- One step page --------------------------------------------------------- */
+.creation-steps__pages {
+  flex: 1;
+  min-height: 0;
+  /* A fallback only: every normal step fits at the reference viewports. */
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ink-600) transparent;
+}
+.creation-steps__page {
+  box-sizing: border-box;
+  min-height: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
+  gap: var(--sp-4) var(--sp-6);
+  padding: var(--sp-5) var(--sp-6);
+  background: var(--panel);
+  border-top: 1px solid var(--band-edge-dim);
+  animation: creation-step-in var(--motion-reveal) var(--ease-enter);
+}
+@keyframes creation-step-in { from { opacity: 0; } }
+
+/* Identity: name | sex, age | apparent age, race | subrace, then the lore
+   note across both columns (the DOM keeps the established Tab order). */
+.creation-race-description {
+  grid-row: 4;
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: var(--sp-3) var(--sp-4);
+  color: var(--paper-300);
+  background: linear-gradient(90deg, var(--gold-glow), transparent 70%);
+  border-left: 2px solid var(--gold-600);
+  font: var(--text-md) / 1.8 var(--f-serif);
+  overflow-wrap: anywhere;
+}
+
+.creation-steps__hint {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--paper-400);
+  font-size: var(--text-md);
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+
+/* -- Fields ---------------------------------------------------------------- */
+.creation-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  min-width: 0;
+  color: var(--paper-300);
+  font-size: var(--text-md);
+}
+.creation-field__row { display: flex; align-items: center; gap: var(--sp-2); min-width: 0; }
+.creation-field__row input { flex: 1; min-width: 0; }
+.creation-roll-button { flex: none; line-height: 1; }
+
+.creation-field input,
+.creation-field select,
+.creation-field textarea,
+.creation-stepper input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: calc(40px * var(--ui-scale));
+  color: var(--paper-100);
+  background: var(--ink-860);
+  border: 1px solid var(--ink-600);
+  border-radius: var(--radius-sm);
+  padding: var(--sp-2) var(--sp-3);
+  font: var(--text-base) / 1.6 var(--f-sans);
+  transition: border-color var(--motion-fast) var(--ease-standard);
+}
+.creation-field textarea { resize: vertical; }
+.creation-field :is(input, select, textarea):hover,
+.creation-stepper input:hover { border-color: var(--ink-edge); }
+.creation-field :is(input, select, textarea):focus-visible,
+.creation-stepper input:focus-visible {
+  outline: none;
+  border-color: var(--gold-500);
+  box-shadow: var(--focus);
+}
+.creation-steps [aria-invalid="true"]:is(input, select, textarea) { border-color: var(--seal-500); }
+.creation-field :disabled { color: var(--paper-500); cursor: wait; }
+
+/* Story: hint and affinity across, then the four texts as a 2 x 2 grid. */
+.creation-affinity {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2) var(--sp-5);
+  margin: 0;
+  padding: var(--sp-2) var(--sp-4) var(--sp-3);
+  border: 1px solid var(--band-edge-dim);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-md);
+}
+.creation-affinity legend { color: var(--paper-400); padding: 0 var(--sp-2); }
+.creation-affinity-item { display: inline-flex; align-items: center; gap: var(--sp-2); color: var(--paper-300); min-height: calc(28px * var(--ui-scale)); }
+.creation-affinity-item input { width: calc(18px * var(--ui-scale)); height: calc(18px * var(--ui-scale)); margin: 0; accent-color: var(--gold-500); }
+.creation-affinity-item input:focus-visible { outline: 2px solid var(--gold-400); outline-offset: calc(3px * var(--ui-scale)); }
+.creation-affinity-item input:disabled + span { color: var(--paper-500); }
+
+/* Allocation: running total, briefing, then the axes in two columns. */
+.creation-steps__page--allocation { grid-template-columns: minmax(0, 1fr); gap: var(--sp-4); }
+.creation-allocation-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sp-2) var(--sp-6);
+  padding-bottom: var(--sp-3);
+  border-bottom: 1px solid var(--band-edge-dim);
+}
+.creation-allocation-total {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  margin: 0;
+  color: var(--paper-400);
+  font-size: var(--text-md);
+  font-variant-numeric: tabular-nums;
+}
+.creation-allocation-total b { color: var(--gold-300); font: 400 var(--text-2xl) / 1 var(--f-num); }
+.creation-allocation-total__of { color: var(--paper-400); font-family: var(--f-num); }
+.creation-budget-briefing {
+  flex: 1 1 calc(320px * var(--ui-scale));
+  margin: 0;
+  color: var(--paper-400);
+  font-size: var(--text-sm);
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.creation-allocations {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-4) calc(var(--sp-6) * 2);
+  align-content: start;
+  min-width: 0;
+}
+.creation-allocation {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) calc(136px * var(--ui-scale));
+  column-gap: var(--sp-3);
+  align-items: center;
+  min-width: 0;
+}
+.creation-allocation__label { color: var(--paper-100); font-size: var(--text-md); }
+.creation-allocation__help { grid-column: 1; margin: var(--sp-1) 0 0; color: var(--paper-500); font-size: var(--text-xs); line-height: 1.5; overflow-wrap: anywhere; }
+.creation-stepper { grid-column: 2; grid-row: 1 / 3; display: flex; gap: var(--sp-1); align-items: center; }
+.creation-stepper input { padding: var(--sp-1); text-align: center; font-variant-numeric: tabular-nums; }
+.creation-stepper .ui-icon-btn { flex: none; width: calc(32px * var(--ui-scale)); height: calc(36px * var(--ui-scale)); }
+.creation-allocation__bar { grid-column: 1 / -1; height: calc(3px * var(--ui-scale)); margin-top: var(--sp-2); background: var(--ink-700); overflow: hidden; }
+.creation-allocation__bar > span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--gold-600), var(--gold-400));
+  transform-origin: left;
+  transition: transform var(--motion-fast) var(--ease-standard);
+}
+
+/* -- Previous / next ------------------------------------------------------- */
+.creation-steps__nav { flex: none; display: flex; align-items: center; gap: var(--sp-3); }
+.creation-steps__next { margin-left: auto; min-width: calc(200px * var(--ui-scale)); }
+
+@media (max-height: 800px) {
+  .creation-steps { gap: var(--sp-3); }
+  .creation-steps__page { padding-block: var(--sp-4); gap: var(--sp-3) var(--sp-6); }
+}
+
+@media (max-width: 1000px) {
+  .creation-steps__pages { overflow: visible; }
+  .creation-steps__page { grid-template-columns: minmax(0, 1fr); }
+  .creation-race-description { grid-row: auto; }
+  .creation-allocations { grid-template-columns: minmax(0, 1fr); }
+}
