@@ -305,6 +305,9 @@ PREVIOUS_MANIFEST_KEYS = {
     # The landmark rite's arrival card, panel and backdrop joined the frozen
     # set with landmark-rite-surfaces.
     "World/LandmarkRite",
+    # The preset card wall, built and story-documented before the creation
+    # overlay mounts it (creation-preset-card-wall).
+    "Overlays/CreationPresetWall",
 }
 
 # The Overlays-directory story files that sit outside the B5 family: the
@@ -326,6 +329,9 @@ OVERLAYS_KEYS_JOINED_AFTER_B5 = (
     "Overlays/GalleryStageTransformModal",
     # The gallery window joined before its mount (gallery-window-component).
     "Overlays/GalleryWindow",
+    # The preset card wall joined before its mount
+    # (creation-preset-card-wall).
+    "Overlays/CreationPresetWall",
 )
 
 

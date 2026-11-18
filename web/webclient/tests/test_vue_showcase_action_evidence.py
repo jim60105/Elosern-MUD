@@ -290,6 +290,9 @@ class VueShowcaseActionEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
                 # The landmark rite's arrival card, panel and backdrop joined
                 # the frozen set with landmark-rite-surfaces.
                 "World/LandmarkRite",
+                # The preset card wall, built and story-documented before the
+                # creation overlay mounts it (creation-preset-card-wall).
+                "Overlays/CreationPresetWall",
             },
         )
         result = run_node(["scripts/component-coverage.mjs"], timeout=120)

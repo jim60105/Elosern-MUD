@@ -281,6 +281,9 @@ PREVIOUS_MANIFEST_KEYS = {
     # The landmark rite's arrival card, panel and backdrop joined the frozen
     # set with landmark-rite-surfaces.
     "World/LandmarkRite",
+    # The preset card wall, built and story-documented before the creation
+    # overlay mounts it (creation-preset-card-wall).
+    "Overlays/CreationPresetWall",
 }
 
 # The World-directory story files that sit outside the B4 family: the
