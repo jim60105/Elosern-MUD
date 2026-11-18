@@ -13,5 +13,5 @@
 
 ## 3. Integration acceptance
 
-- [ ] 3.1 Run the focused component command in design; build with `pnpm run build` before its focused custom browser module. Verify keyboard completion and no page-level horizontal overflow at both reference viewports, plus normal-step content fitting without internal step scrolling.
-- [ ] 3.2 Run `pnpm run build-storybook` and `pnpm run showcase-coverage`; register new browser methods via `uv run --locked python -m tools.shard_register fix`, then run `uv run --locked python -m tools.contract_gate` and `openspec validate creation-stepped-form --strict`. All gates must pass without warnings.
+- [x] 3.1 Run the focused component command in design; build with `pnpm run build` before its focused custom browser module. Verify keyboard completion and no page-level horizontal overflow at both reference viewports, plus normal-step content fitting without internal step scrolling.
+- [x] 3.2 Run `pnpm run build-storybook` and `pnpm run showcase-coverage`; register new browser methods via `uv run --locked python -m tools.shard_register fix`, then run `uv run --locked python -m tools.contract_gate` and `openspec validate creation-stepped-form --strict`. All gates must pass without warnings.

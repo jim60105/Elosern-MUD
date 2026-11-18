@@ -57,21 +57,24 @@ class ViewportCreationJourney(CreationBrowserTest):
             },
             timeout=30000,
         )
-        # The finite controls are the Vue app's creation-field-* data-testid hooks.
-        controls = page.locator('[data-testid^="creation-field-"]')
+        # The finite controls are the Vue app's creation-field-* data-testid
+        # hooks; the identity step opens first and shows its own.
+        controls = page.locator(
+            '[data-testid="creation-steps-panel-identity"] [data-testid^="creation-field-"]'
+        )
         self.assertGreaterEqual(controls.count(), 1)
         for index in range(controls.count()):
             self.assertTrue(controls.nth(index).is_visible())
-        # Reach every field through the bounded scroll regions at all desktop
-        # acceptance sizes. Focus must reveal the entire control above actions.
+        # Every field is reachable on its step at all desktop acceptance
+        # sizes: the portrait column and the steps sit side by side, each
+        # step fits without internal scrolling, and focus reveals the whole
+        # control above the footer actions.
         for width, height in ((1451, 790), (1741, 948), (2560, 1440)):
             with self.subTest(viewport=(width, height)):
                 page.set_viewport_size({"width": width, "height": height})
                 # The app writes its chrome factor from the resize listener, so
-                # a read that straddles that write mixes two layouts (measured:
-                # region 0's right edge past region 1's left). Wait for the
-                # factor this viewport implies, then measure the three regions
-                # in one layout snapshot.
+                # a read that straddles that write mixes two layouts. Wait for
+                # the factor this viewport implies, then measure.
                 page.wait_for_function(
                     "(v) => getComputedStyle(document.documentElement)"
                     ".getPropertyValue('--ui-scale').trim() === v",
@@ -81,40 +84,41 @@ class ViewportCreationJourney(CreationBrowserTest):
                 self.assertLessEqual(
                     page.evaluate("document.documentElement.scrollWidth"), width
                 )
-                boxes = page.evaluate(
-                    """() => Array.from(document.querySelectorAll('.creation-region'))
-                      .slice(0, 3)
-                      .map((el) => { const r = el.getBoundingClientRect();
-                        return { x: r.x, y: r.y, width: r.width, height: r.height }; })"""
+                columns = page.evaluate(
+                    """() => ['creation-portrait-slot', 'creation-steps']
+                      .map((id) => document.querySelector(`[data-testid="${id}"]`).getBoundingClientRect())
+                      .map((r) => ({ x: r.x, width: r.width }))"""
                 )
-                self.assertEqual(len(boxes), 3, "the custom form renders its three regions")
-                self.assertLessEqual(boxes[0]["x"] + boxes[0]["width"], boxes[1]["x"])
-                # The middle region bounds itself to 640px at the reference,
-                # scaled by the chrome factor at every acceptance size
-                # (`.creation-persona { max-width: calc(640px * var(--ui-scale)) }`).
-                self.assertLessEqual(
-                    boxes[1]["width"], 640 * ui_scale((width, height)) + 1
-                )
-                self.assertLessEqual(boxes[1]["x"] + boxes[1]["width"], boxes[2]["x"])
-                fields = page.locator(
-                    '[data-testid="creation-body"] input, '
-                    '[data-testid="creation-body"] select, '
-                    '[data-testid="creation-body"] textarea'
-                )
-                for index in range(fields.count()):
-                    field = fields.nth(index)
-                    if field.is_disabled():
-                        continue
-                    field.focus()
-                    field.scroll_into_view_if_needed()
-                    box = field.bounding_box()
-                    footer = page.locator(".creation-overlay__footer").bounding_box()
-                    self.assertGreaterEqual(box["y"], 0)
-                    self.assertLessEqual(box["y"] + box["height"], footer["y"])
+                self.assertLessEqual(columns[0]["x"] + columns[0]["width"], columns[1]["x"])
+                self.assertLessEqual(columns[1]["x"] + columns[1]["width"], width)
+                for step in ("identity", "story", "allocation"):
+                    page.locator(f'[data-testid="creation-steps-tab-{step}"]').click()
+                    panel = page.locator(f'[data-testid="creation-steps-panel-{step}"]')
+                    panel.wait_for(state="visible", timeout=5000)
+                    self.assertLessEqual(
+                        page.evaluate(
+                            "() => { const p = document.querySelector('.creation-steps__pages');"
+                            " return p.scrollHeight - p.clientHeight; }"
+                        ),
+                        1,
+                        step,
+                    )
+                    fields = panel.locator("input, select, textarea")
+                    for index in range(fields.count()):
+                        field = fields.nth(index)
+                        if field.is_disabled():
+                            continue
+                        field.focus()
+                        box = field.bounding_box()
+                        footer = page.locator(".creation-overlay__footer").bounding_box()
+                        self.assertGreaterEqual(box["y"], 0)
+                        self.assertLessEqual(box["y"] + box["height"], footer["y"])
+        page.locator('[data-testid="creation-steps-tab-identity"]').click()
         # Direct entry is never normalized by a decorative bar or a stepper.
         subrace = page.locator('[data-testid="creation-subrace"]')
         if subrace.count():
             subrace.select_option(index=0)
+        page.locator('[data-testid="creation-steps-tab-allocation"]').click()
         mana = page.locator('[data-testid="creation-field-mp"]')
         offense = page.locator('[data-testid="creation-field-magic_power"]')
         self.assertNotEqual(
@@ -204,6 +208,7 @@ class PointerCreationJourneys(CreationBrowserTest):
         page.evaluate("document.querySelector('[data-testid=\"creation-subrace\"]').focus()")
         _press(page, "ArrowDown")
         page.wait_for_timeout(150)
+        page.locator('[data-testid="creation-steps-tab-allocation"]').click()
         for axis, value in (
             ("hp", "100"), ("mp", "50"), ("sp", "31"),
             ("atk_phys", "21"), ("agility", "21"), ("defense", "1"),
