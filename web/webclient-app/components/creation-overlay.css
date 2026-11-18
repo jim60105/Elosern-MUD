@@ -167,7 +167,7 @@
 .creation-overlay__footer .ui-btn--primary { margin-left: auto; min-width: calc(160px * var(--ui-scale)); }
 /* The local validation message rides the footer between 重設 and the
    primary action, so an error never costs the step page its height. */
-.creation-overlay__footer .creation-form-message { flex: 1 1 0; min-width: 0; max-height: none; margin-left: var(--sp-3); }
+.creation-overlay__footer .creation-form-message { flex: 1 1 0; min-width: 0; max-height: calc(var(--text-md) * 3.2); margin-left: var(--sp-3); }
 .creation-overlay__keys {
   display: flex;
   flex-wrap: wrap;

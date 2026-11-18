@@ -63,6 +63,9 @@ const {
 
 const root = ref(null);
 const pad = (n) => String(n).padStart(2, "0");
+// The panels are named by their plain step title; the rail button's own name
+// also carries the live remaining points and the error flag.
+const STEP_TITLE = Object.fromEntries(STEPS.map((step) => [step.key, step.title]));
 const nextTitle = computed(() => STEPS[stepIndex.value + 1]?.title ?? null);
 
 // Presentation arithmetic only: the server profile's budget minus the entered
@@ -225,7 +228,7 @@ defineExpose({ submit });
         class="creation-steps__page creation-steps__page--identity"
         data-step-panel="identity"
         data-testid="creation-steps-panel-identity"
-        aria-labelledby="creation-steps-tab-identity"
+        :aria-label="STEP_TITLE.identity"
       >
         <div class="creation-field creation-field--name">
           <label for="creation-name-input">名稱</label>
@@ -298,7 +301,7 @@ defineExpose({ submit });
         class="creation-steps__page creation-steps__page--story"
         data-step-panel="story"
         data-testid="creation-steps-panel-story"
-        aria-labelledby="creation-steps-tab-story"
+        :aria-label="STEP_TITLE.story"
       >
         <p class="creation-steps__hint">背景可留空；個性、生平與習慣請全部填寫，或全部留空。</p>
         <fieldset v-if="affinityMax > 0" class="creation-affinity" data-testid="creation-affinity">
@@ -358,7 +361,7 @@ defineExpose({ submit });
         class="creation-steps__page creation-steps__page--allocation"
         data-step-panel="allocation"
         data-testid="creation-steps-panel-allocation"
-        aria-labelledby="creation-steps-tab-allocation"
+        :aria-label="STEP_TITLE.allocation"
       >
         <div class="creation-allocation-head">
           <p v-if="currentProfile" class="creation-allocation-total" data-testid="creation-allocation-total">
