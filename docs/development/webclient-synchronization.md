@@ -881,6 +881,52 @@ publishes nothing: no card, no stored file, no recorded error and no
 completion push. A settlement that won the queue lock first publishes
 normally, and the reset that follows removes that card and its file.
 
+### Activation disposes of the draft portrait
+
+Both activation entries — `world.rules.creation_wizard.activate_draft` and the
+direct `world.rules.character_creation.activate_player_character` — enter
+`draft_portrait_mutation(character)` before their snapshots and outer
+transaction. The nested direct call reuses the caller's unit, so one
+activation acquires the queue serialization exactly once. The start-arrival
+effects register through `on_publication_commit`, like the portrait ensure, so
+every lock-taking callback runs only after the commit AND after the queue and
+gallery serialization were released. A failure restores the gallery card
+cache and the activation attributes while the unit still holds the queue
+lock; the collected callbacks are discarded and no file is unlinked.
+
+The disposition itself is decided inside the activation transaction, after the
+deterministic preflight and before the shared portrait finalizer:
+
+- **Custom activation keeps draft art.** The named subject, its cards and any
+  in-flight creation job are the player's already committed work, so only the
+  staging `creation_portrait` receipt is removed. The shared
+  `_gallery_auto_generation_pending` guard sees the surviving card or job and
+  the default path enqueues no duplicate request. A job admitted while the
+  character was pending may settle normally after activation on the same
+  subject; its queued description stays the admitted snapshot, never a reread
+  of newer form values. With no prior work the ordinary post-commit automatic
+  generation still applies, and `skip_portrait` still only means "schedule
+  nothing" — it never deletes a card.
+- **Preset activation discards creation-owned art.** The draft card and any
+  creation job are removed with `clear_draft_portrait` before the finalizer
+  registers its ensure, so the preset's normal official/fallback/automatic
+  source decides the activated portrait and never inherits the custom image.
+  When the preset's official reference is satisfied, the guard enqueues
+  nothing; otherwise exactly one fresh automatic request remains. The removed
+  files are unlinked by the same commit-qualified, post-unlock callback as a
+  reset, and a canceled job's late settlement publishes nothing.
+
+Rollback restores only what the activation itself added. A receipt, named
+policy, cards, jobs and files committed before the activation belong to the
+pending character, not to the failed transaction, so they survive it
+unchanged. "A rolled-back creation leaves no portrait state" therefore means
+no **activation-added** policy or job; it does not erase the draft portrait.
+
+Identity edits (`sex`, `race`, `subrace`, `apparent age`), a concept apply and
+a revised custom save never invalidate, clear or regenerate the portrait and
+emit no mismatch warning. New art remains an explicit player request through
+`creation.portrait.generate`.
+
 ## Dialogue coupling
 
 Dialogue is a candidate dependency, not an unconditional transmission. Whenever

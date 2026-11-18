@@ -1361,6 +1361,79 @@ describe("portrait publications keep the unsent custom form (real store)", () =>
     expect(field("creation-field-displayName").value).toBe(EDITS["creation-field-displayName"]);
     expect(field("creation-field-hp").value).toBe(EDITS["creation-field-hp"]);
   });
+
+  // -- Identity edits never invalidate or regenerate the portrait ----------
+  // (webclient-character-creation-ui: "Identity edits preserve a creation
+  // portrait without warnings"). The portrait is a server-owned read model;
+  // editing the fields that name the subject changes no portrait state, emits
+  // no portrait action and raises no warning. Only an explicit player request
+  // asks for new art.
+  const portraitActions = () =>
+    sender.sent.actions.filter((action) => action.action_id.startsWith("creation.portrait"));
+  const readyStatus = () => store.view.panels.creation.portrait.status;
+  const PLAIN_RACE_KEY = CREATION_PANEL_SAMPLE.custom.races.find(
+    (race) => race.key !== SUBRACED_RACE_KEY && (race.subraces ?? []).length === 0,
+  )?.key;
+
+  it("editing sex, race, subrace and apparent age keeps a ready portrait silently", async () => {
+    await mountWith({ ...SAVED_CUSTOM_PANEL, portrait: CREATION_PORTRAIT_STATES.ready });
+    expect(readyStatus()).toBe("ready");
+    await edit("creation-sex", "female");
+    await edit("creation-field-apparentAge", "33");
+    // Move off the saved race, then back onto the subraced one and its subrace.
+    if (PLAIN_RACE_KEY) {
+      await edit("creation-race", PLAIN_RACE_KEY);
+      await nextTick();
+    }
+    await edit("creation-race", SUBRACED_RACE_KEY);
+    await nextTick();
+    await edit("creation-subrace", SUBRACED_SUBRACE_KEY);
+    await nextTick();
+    expect(readyStatus()).toBe("ready");
+    expect(portraitActions()).toEqual([]);
+    expect(field("creation-form-message")).toBeNull();
+    // The server's next equal-draft publication (carrying the portrait update)
+    // still presents the same ready art over the unsent edits.
+    await publish({ ...SAVED_CUSTOM_PANEL, portrait: CREATION_PORTRAIT_STATES.ready });
+    expect(readyStatus()).toBe("ready");
+    expect(portraitActions()).toEqual([]);
+  });
+
+  it("applying a concept keeps a ready portrait and submits only creation.concept", async () => {
+    await mountWith({ ...SAVED_CUSTOM_PANEL, portrait: CREATION_PORTRAIT_STATES.ready });
+    await appWrapper.find('[data-testid="creation-mode-concept"]').trigger("click");
+    await edit("creation-field-concept", "在燈下研讀古籍的學士。");
+    const before = sender.sent.actions.length;
+    await appWrapper.find('[data-testid="creation-concept-submit"]').trigger("click");
+    await nextTick();
+    expect(sender.sent.actions.slice(before).map((action) => action.action_id)).toEqual([
+      "creation.concept",
+    ]);
+    expect(readyStatus()).toBe("ready");
+    expect(portraitActions()).toEqual([]);
+    expect(field("creation-form-message")).toBeNull();
+  });
+
+  it("saving a revised custom draft keeps a ready portrait and regenerates nothing", async () => {
+    await mountWith({ ...SAVED_CUSTOM_PANEL, portrait: CREATION_PORTRAIT_STATES.ready });
+    // The saved beastfolk draft allocates 28 of its 30-point budget; raise two
+    // axes so the local budget gate passes exactly as the saved card allows.
+    await edit("creation-field-hp", "9");
+    await edit("creation-field-atk_phys", "5");
+    const before = sender.sent.actions.length;
+    await appWrapper.find('[data-testid="creation-submit"]').trigger("click");
+    await nextTick();
+    expect(sender.sent.actions.slice(before).map((action) => action.action_id)).toEqual([
+      "creation.custom",
+    ]);
+    expect(readyStatus()).toBe("ready");
+    // The saved draft comes back with its portrait: still the same ready slot,
+    // no warning and no new generation.
+    await publish({ ...SAVED_CUSTOM_PANEL, portrait: CREATION_PORTRAIT_STATES.ready });
+    expect(readyStatus()).toBe("ready");
+    expect(portraitActions()).toEqual([]);
+    expect(field("creation-form-message")).toBeNull();
+  });
 });
 
 describe("the presentation context gates equal-draft synchronization", () => {

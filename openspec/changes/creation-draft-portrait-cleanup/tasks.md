@@ -9,8 +9,8 @@
 ## 2. Activation disposition
 
 - [x] 2.1 Wrap `activate_draft` and direct `activate_player_character` entry points with the serialized rules unit before their outer transactions, reusing the same-character nested unit. Migrate start-arrival callback to `on_publication_commit` and keep callbacks deferred until queue release. Integrate preset-only cleanup after preflight and before finalization; include portrait state in rollback snapshots. Extend activation tests with barrier-controlled worker contention, outer-commit failure, post-cleanup failure, prior art survival and successful preset normal-source resolution. The focused activation command in design must pass.
-- [ ] 2.2 Keep custom card/in-flight work on the same subject, remove only staging receipt, and reuse the existing autogen guard. Test ready/pending/no-art/skip paths and late success after activation; count enqueues to prove no duplicate, while unchanged ordinary creation still auto-generates.
-- [ ] 2.3 Add synthetic overlay/rule regressions for sex/race/subrace/apparent-age edits, concept fill and custom save retaining portraits without invalidation, warning or automatic generation. Update finalizer/developer documentation to distinguish activation-added state from previously committed draft art; the focused Vitest command in design must pass.
+- [x] 2.2 Keep custom card/in-flight work on the same subject, remove only staging receipt, and reuse the existing autogen guard. Test ready/pending/no-art/skip paths and late success after activation; count enqueues to prove no duplicate, while unchanged ordinary creation still auto-generates.
+- [x] 2.3 Add synthetic overlay/rule regressions for sex/race/subrace/apparent-age edits, concept fill and custom save retaining portraits without invalidation, warning or automatic generation. Update finalizer/developer documentation to distinguish activation-added state from previously committed draft art; the focused Vitest command in design must pass.
 
 ## 3. Delivery acceptance
 
