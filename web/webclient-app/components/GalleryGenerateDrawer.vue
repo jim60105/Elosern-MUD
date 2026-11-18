@@ -58,7 +58,7 @@ function submit() {
 </script>
 
 <template>
-  <div class="gallery-ui">
+  <div class="gallery-ui" :class="{ 'gallery-ui--creation': creation }">
     <HudDrawer :open="true" :title="creation ? '繪製肖像' : '生成新圖'" :drawer-key="creation ? 'creation-portrait' : 'gallery-generate'" @close="emit('close')">
       <template v-if="landscape">
       <p class="gallery-muted">依照這個場景的設定，重新繪製它的背景圖。</p>
@@ -71,9 +71,36 @@ function submit() {
         </figcaption>
       </figure>
       </template>
-      <template v-else>
-      <p v-if="creation" class="gallery-muted">依照目前填寫的種族、血統、性別與外觀年齡，為角色繪製肖像。</p>
-      <p v-else class="gallery-muted">透過目前的角色資料，生成全新的角色肖像。</p>
+      <template v-else-if="creation">
+      <!-- Creation context (creation-draft-portrait): the character does not
+           exist yet, so the drawer is a focused two-column page — the
+           current portrait (or an empty plate) beside the one free-text
+           prompt, the server's unavailability, the notes and the feedback. -->
+      <p class="gallery-muted">依照目前填寫的種族、血統、性別與外觀年齡，為角色繪製肖像。</p>
+      <div class="gallery-editor-layout gallery-creation">
+        <aside class="gallery-editor-reference gallery-creation__reference">
+          <ArtworkPreview v-if="preview?.artwork" class="gallery-editor-portrait" :artwork="preview.artwork" :panel="model" :view-subject-id="preview.image_id" :alt="preview.label" />
+          <p v-else class="gallery-editor-placeholder">肖像<br>將在此現身</p>
+          <p class="gallery-muted">{{ preview?.artwork ? "目前的肖像" : "尚未繪製肖像" }}</p>
+        </aside>
+        <div class="gallery-creation__form">
+          <section class="gallery-creation__prompt">
+            <h4><label for="gallery-prompt">補充提示詞</label></h4>
+            <p class="gallery-muted">可用自然語言描述想要的氛圍、構圖、光影、表情或場景等。（非必填）</p>
+            <textarea id="gallery-prompt" v-model="prompt" :disabled="disabled" placeholder="例如：月光下的城牆、回頭凝視、微笑……"></textarea>
+            <p class="gallery-counter">{{ count }} / 512</p>
+          </section>
+          <p v-if="offline" class="gallery-feedback gallery-feedback--offline" role="status" data-testid="gallery-generate__unavailable">
+            <span>{{ unavailableReason }}</span>
+            <button type="button" data-testid="gallery-generate__refresh" @click="emit('refresh-status')">重新檢查</button>
+          </p>
+          <p v-if="rejected" class="gallery-feedback" role="status">操作未完成，輸入已保留。<button @click="emit('log')">查看伺服器訊息</button></p>
+          <p class="gallery-note">肖像只保留一張；重新繪製完成後會取代目前的肖像。送出後可以繼續填寫，完成的肖像會出現在左側的肖像欄。</p>
+        </div>
+      </div>
+      </template>
+      <template v-else-if="!creation">
+      <p class="gallery-muted">透過目前的角色資料，生成全新的角色肖像。</p>
       <div class="gallery-editor-layout">
       <aside class="gallery-editor-reference">
         <ArtworkPreview v-if="preview?.artwork" class="gallery-editor-portrait" :artwork="preview.artwork" :panel="model" :view-subject-id="preview.image_id" :alt="preview.label" />
@@ -91,7 +118,8 @@ function submit() {
       </div>
       </div>
       </template>
-      <section v-if="!creation && model.equipment_summary" class="gallery-section">
+      <template v-if="!creation">
+      <section v-if="model.equipment_summary" class="gallery-section">
         <h4>目前裝備摘要</h4>
         <button v-if="puppet" class="gallery-link" @click="emit('character')">從角色資料檢視</button>
         <div class="gallery-equipment">
@@ -111,20 +139,11 @@ function submit() {
         <textarea id="gallery-prompt" v-model="prompt" :disabled="disabled" placeholder="例如：月光下的城牆、回頭凝視、微笑……"></textarea>
         <p class="gallery-counter">{{ count }} / 512</p>
       </section>
-      <p v-if="offline" class="gallery-feedback gallery-feedback--offline" role="status" data-testid="gallery-generate__unavailable">
-        <span>{{ unavailableReason }}</span>
-        <button type="button" data-testid="gallery-generate__refresh" @click="emit('refresh-status')">重新檢查</button>
-      </p>
-      <template v-if="creation">
-      <p class="gallery-note">肖像只保留一張；重新繪製完成後會取代目前的肖像。</p>
-      <p class="gallery-note">送出後可以繼續填寫，完成的肖像會出現在左側的肖像欄。</p>
-      </template>
-      <template v-else>
       <p v-if="landscape" class="gallery-note">背景只保留一張，生成完成後會替換原圖；這是世界共用的背景，所有旅人看到的都會一起改變。</p>
       <p v-else-if="model.capabilities?.max_cards === 1" class="gallery-note">此圖庫保留一張肖像，生成完成後會替換原圖。</p>
       <p class="gallery-note">送出後會在圖庫中顯示生成中卡片，完成時自動加入圖庫。</p>
-      </template>
       <p v-if="rejected" class="gallery-feedback" role="status">操作未完成，輸入已保留。<button @click="emit('log')">查看伺服器訊息</button></p>
+      </template>
       <template #foot>
         <div class="gallery-actions">
           <button @click="emit('close')">取消</button>

@@ -7,6 +7,7 @@ import {
   CREATION_PANEL_PROPOSAL_SAMPLE,
   CREATION_PANEL_PROPOSAL_TRANSIENT_SAMPLE,
   CREATION_PANEL_UNAVAILABLE_SAMPLE,
+  CREATION_PORTRAIT_STATES,
 } from "../fixtures.js";
 import { CREATION_PANEL_WALL_DRAFT_SAMPLE, CREATION_PANEL_WALL_SAMPLE } from "../fixtures/creation_wall.js";
 
@@ -168,6 +169,84 @@ export const CustomAllocationError = {
   render: (args) =>
     renderAfterSteps(args, [step("allocation"), fill("creation-field-hp", "5"), step("identity"), click("creation-submit")]),
   args: { creation: CREATION_PANEL_CUSTOM_DRAFT_SAMPLE },
+};
+
+// -- The live portrait slot (creation-draft-portrait) --------------------------
+// Each committed `portrait` state beside the saved draft. Empty, pending,
+// failed and unavailable keep the server silhouette; ready shows the
+// supplied artwork. Failed and unavailable show the server reason.
+const portraitDraft = (state) => ({ ...CREATION_PANEL_CUSTOM_DRAFT_SAMPLE, portrait: CREATION_PORTRAIT_STATES[state] });
+
+export const CustomPortraitPending = {
+  render: renderOverlay,
+  args: { creation: portraitDraft("pending") },
+};
+
+export const CustomPortraitReady = {
+  render: renderOverlay,
+  args: { creation: portraitDraft("ready") },
+};
+
+export const CustomPortraitFailed = {
+  render: renderOverlay,
+  args: { creation: portraitDraft("failed") },
+};
+
+export const CustomPortraitUnavailable = {
+  render: renderOverlay,
+  args: { creation: portraitDraft("unavailable") },
+};
+
+// 生成肖像 opens the real gallery drawer in creation context over the
+// overlay: the prompt only, no field selection or equipment. Opening sends
+// nothing (this standalone mount has no store, so a submit would only emit).
+export const CustomPortraitDrawer = {
+  render: (args) => renderAfterSteps(args, [click("creation-portrait-generate")]),
+  args: { creation: portraitDraft("empty") },
+};
+
+// Regenerating from a ready portrait: the drawer shows it as the reference.
+export const CustomPortraitDrawerReady = {
+  render: (args) => renderAfterSteps(args, [click("creation-portrait-generate")]),
+  args: { creation: portraitDraft("ready") },
+};
+
+// A refused submission (the shared gate held, simulated by a dispatch that
+// admits nothing): the drawer keeps the typed prompt beside the existing
+// rejection feedback.
+export const CustomPortraitRefused = {
+  render: (args) =>
+    renderAfterSteps(args, [
+      click("creation-portrait-generate"),
+      () => {},
+      () => {
+        const field = document.querySelector('[data-drawer-key="creation-portrait"] textarea');
+        if (!field) return;
+        field.value = "月光下的城牆，回頭凝視";
+        field.dispatchEvent(new Event("input", { bubbles: true }));
+      },
+      click("gallery-generate__submit"),
+    ]),
+  args: { creation: portraitDraft("empty"), dispatch: () => null },
+};
+
+// The server reports the art service unavailable while the drawer is open:
+// submit is disabled, the prompt stays editable and a refresh is offered
+// inside the drawer (it emits request-sync; nothing is generated).
+export const CustomPortraitDrawerUnavailable = {
+  render: (args) => ({
+    setup() {
+      const panel = ref(portraitDraft("empty"));
+      onMounted(async () => {
+        await nextTick();
+        click("creation-portrait-generate")();
+        await nextTick();
+        panel.value = portraitDraft("unavailable");
+      });
+      return () => h(CreationOverlay, { ...args, creation: panel.value });
+    },
+  }),
+  args: {},
 };
 
 // The concept tab: the guide column (nothing filled yet) beside the concept
