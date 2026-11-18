@@ -13,6 +13,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from django.test import override_settings
+from tools.spec_traceability import covers_requirement
 from evennia.utils.create import create_account, create_object
 from evennia.utils.test_resources import EvenniaTestCase
 from typeclasses.accounts import Account
@@ -157,6 +158,7 @@ class _PortraitPanelCase(EvenniaTestCase):
 class PortraitStateTests(_PortraitPanelCase):
     """The five states, derived from authorized draft state only."""
 
+    @covers_requirement("webclient-character-creation-ui::creation-portrait-state-is-a-closed-read-only-union")
     def test_no_receipt_is_empty_and_writes_nothing(self):
         payload = self.assert_render_writes_nothing()
         self.assertEqual(payload["portrait"], {"status": "empty"})
@@ -164,6 +166,7 @@ class PortraitStateTests(_PortraitPanelCase):
         self.assertIsNone(self.character.db.portrait_policy)
         self.assertIsNone(gallery_api.record_for(self.subject()))
 
+    @covers_requirement("webclient-character-creation-ui::creation-portrait-state-is-a-closed-read-only-union")
     def test_pending_then_ready_with_the_exact_card(self):
         admission = self.admit()
         self.assertEqual(self.assert_render_writes_nothing()["portrait"], {"status": "pending"})
@@ -223,6 +226,7 @@ class PortraitStateTests(_PortraitPanelCase):
             path.unlink()
         self.assertEqual(self.portrait(), {"status": "empty"})
 
+    @covers_requirement("webclient-character-creation-ui::creation-portrait-state-is-a-closed-read-only-union")
     def test_reconnect_reconstructs_the_same_state_without_retrying(self):
         self.admit()
         self.drain()
@@ -333,6 +337,7 @@ class PortraitAvailabilityTests(_PortraitPanelCase):
             "reason": CREATION_REASON_MESSAGES["portrait_service_unavailable"],
         }
 
+    @covers_requirement("webclient-character-creation-ui::creation-portrait-state-is-a-closed-read-only-union")
     def test_a_current_failed_verdict_is_unavailable_without_a_receipt(self):
         self.cache_failed_verdict()
         self.assertEqual(self.assert_render_writes_nothing()["portrait"], self.service_unavailable())

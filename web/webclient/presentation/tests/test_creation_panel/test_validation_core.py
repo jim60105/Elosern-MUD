@@ -748,12 +748,14 @@ class CreationPortraitValidationTests(unittest.TestCase):
         handle.start()
         self.addCleanup(handle.stop)
 
+    @covers_requirement("webclient-character-creation-ui::creation-portrait-state-is-a-closed-read-only-union")
     def test_each_state_accepts_exactly_its_fields(self):
         for label, portrait in _PORTRAIT_VALID:
             with self.subTest(label=label):
                 validated = validate_creation(_valid_payload(portrait=deepcopy(portrait)))
                 self.assertEqual(validated["portrait"], portrait)
 
+    @covers_requirement("webclient-character-creation-ui::creation-portrait-state-is-a-closed-read-only-union")
     def test_every_malformed_portrait_rejects_the_whole_panel(self):
         for label, portrait in _PORTRAIT_INVALID:
             with self.subTest(label=label):
