@@ -284,6 +284,12 @@ PREVIOUS_MANIFEST_KEYS = {
     # The preset card wall, built and story-documented before the creation
     # overlay mounts it (creation-preset-card-wall).
     "Overlays/CreationPresetWall",
+    # The stepped creation form split the overlay into a step rail, a
+    # portrait column and a concept guide, each with its own component
+    # story (creation-stepped-form).
+    "Overlays/CreationCustomSteps",
+    "Overlays/CreationPortraitSlot",
+    "Overlays/CreationConceptGuide",
 }
 
 # The World-directory story files that sit outside the B4 family: the

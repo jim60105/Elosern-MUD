@@ -287,6 +287,12 @@ class VueShowcaseDataEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
                 # The preset card wall, built and story-documented before the
                 # creation overlay mounts it (creation-preset-card-wall).
                 "Overlays/CreationPresetWall",
+                # The stepped creation form split the overlay into a step
+                # rail, a portrait column and a concept guide, each with its
+                # own component story (creation-stepped-form).
+                "Overlays/CreationCustomSteps",
+                "Overlays/CreationPortraitSlot",
+                "Overlays/CreationConceptGuide",
             },
         )
         result = run_node(["scripts/component-coverage.mjs"], timeout=120)

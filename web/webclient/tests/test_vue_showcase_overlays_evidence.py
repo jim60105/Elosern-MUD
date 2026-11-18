@@ -308,6 +308,12 @@ PREVIOUS_MANIFEST_KEYS = {
     # The preset card wall, built and story-documented before the creation
     # overlay mounts it (creation-preset-card-wall).
     "Overlays/CreationPresetWall",
+    # The stepped creation form split the overlay into a step rail, a
+    # portrait column and a concept guide, each with its own component
+    # story (creation-stepped-form).
+    "Overlays/CreationCustomSteps",
+    "Overlays/CreationPortraitSlot",
+    "Overlays/CreationConceptGuide",
 }
 
 # The Overlays-directory story files that sit outside the B5 family: the
@@ -332,6 +338,11 @@ OVERLAYS_KEYS_JOINED_AFTER_B5 = (
     # The preset card wall joined before its mount
     # (creation-preset-card-wall).
     "Overlays/CreationPresetWall",
+    # The stepped creation form's step rail, portrait column and concept
+    # guide joined as component stories (creation-stepped-form).
+    "Overlays/CreationCustomSteps",
+    "Overlays/CreationPortraitSlot",
+    "Overlays/CreationConceptGuide",
 )
 
 
