@@ -828,6 +828,59 @@ the existing activation gate stays authoritative. Creation, activation and
 deterministic gameplay remain available while art is offline; only this
 optional admission is refused.
 
+### Confirmed reset discards the creation portrait
+
+`creation.reset` keeps its payload (`{}`), its `draft_cleared` success and its
+`creation` panel, and still clears the session's transient proposal after the
+rules call succeeds. The rules owner is
+`world.rules.creation_wizard.reset_creation_draft`, not `clear_draft` (which
+stays portrait-free because activation also removes a draft).
+
+Every rules entry that reads or writes the receipt, its cards or its jobs —
+the portrait request, confirmed reset and both activation entries — enters
+`world.rules.creation_portrait.draft_portrait_mutation(character)` first. The
+order is deferred commit callbacks, then the shared art queue lock, then one
+database transaction, then the gallery lock. A write transaction never waits
+for the queue lock: an outer entry inside a caller's own open transaction is
+rejected before the lock is taken (Django's `durable` rule; the test
+framework's wrapper blocks are tolerated), and the background worker, which
+holds the queue lock while it waits for the database writer, can therefore
+never deadlock with it. The same character may nest on the same thread.
+
+Inside that unit the reset rechecks ownership and pending state, removes
+`creation_draft`, and calls `clear_draft_portrait`, which removes exactly:
+
+- the `creation_portrait` receipt itself;
+- the job records keyed by the receipt's `image_id` and `retained_image_id`
+  on the character's own `portrait:character:<pk>` subject;
+- the cards with those ids (a default naming one becomes `null`);
+- the subject's recorded generation error. A pending character's subject can
+  only carry creation work, so that error is the draft failure.
+
+The receipt is the only authority: no payload names a subject, card or image,
+and unrelated cards, other subjects, official preferences and the named
+`portrait_policy` stay unchanged. A missing receipt is an idempotent no-op,
+so a repeated reset succeeds. A present but malformed or unauthorized receipt
+is dropped without touching any card or job. Nothing is scheduled: no
+automatic portrait is queued for a pending character.
+
+Files are never unlinked inside the transaction. The removed cards' confined
+stored identities are unlinked by one `on_publication_commit` callback in the
+unit's deferral scope, so only a real commit qualifies them, and they run
+after the queue and gallery locks were released. A failed unlink is a bounded
+diagnostic. It never restores a card or falsifies the commit, and the
+unreferenced file is reclaimed by the startup orphan prune. No prune runs
+mid-game. A failure anywhere before the commit rolls the database back,
+restores the character and gallery attribute caches, drops every collected
+callback and re-raises, so the adapter never reports a failed cleanup as a
+reset.
+
+A canceled job's worker may still return. Settlement reloads its record by
+job key under the queue lock, finds none, discards the temporary output and
+publishes nothing: no card, no stored file, no recorded error and no
+completion push. A settlement that won the queue lock first publishes
+normally, and the reset that follows removes that card and its file.
+
 ## Dialogue coupling
 
 Dialogue is a candidate dependency, not an unconditional transmission. Whenever

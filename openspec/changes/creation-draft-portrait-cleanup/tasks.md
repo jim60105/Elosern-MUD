@@ -4,7 +4,7 @@
 
 - [x] 1.1 Add rules-owned `reset_creation_draft`/`clear_draft_portrait` using the request slice's serialized unit before any transaction/read/write. Add service-owned exact-id job/card/error cleanup with the active token, private already-locked primitives and commit-qualified post-unlock confined unlinks. Extend `test_creation_portrait.py` for ready/pending/failed/unsaved and repeated reset, ownership rejection, unrelated controls and injected removal failure. The focused rules command in design must pass with no premature file deletion.
 - [x] 1.2 Route the reset adapter through the new owner, preserving confirmed-reset payload/result and transient proposal clearing. Add barrier-controlled separate-connection threaded tests for worker settlement contending with reset in both orders, including late failure; canceled output never reappears, no write transaction waits for queue serialization, callbacks run after lock release, and rollback restores caches and persisted state.
-- [ ] 1.3 Update synchronization documentation with exact reset receipt/card/job ownership and late-token behavior; verify against the same focused tests, without a mid-game global prune or compatibility path.
+- [x] 1.3 Update synchronization documentation with exact reset receipt/card/job ownership and late-token behavior; verify against the same focused tests, without a mid-game global prune or compatibility path.
 
 ## 2. Activation disposition
 
