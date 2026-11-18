@@ -758,37 +758,53 @@ def activate_draft(
     re-check inside the transaction: the first commit flips ``creation_pending``
     to false and clears the draft, and any later admission for the same shell
     fails its pending re-check rather than double-applying.
+
+    The serialized draft portrait unit is entered BEFORE the snapshots and
+    the outer transaction, so the background art worker can never settle a
+    creation job between the activation's reads and its commit; the nested
+    direct activation reuses the same unit. Commit callbacks run only after
+    the outer commit and after the queue serialization was released. The
+    draft portrait disposition itself (custom keeps, preset discards) is
+    applied inside ``activate_player_character``; this owner restores the
+    gallery caches when the outer commit fails.
     """
-    old_key = character.key
-    attribute_snapshots = snapshot_attributes(
-        character, _CREATION_ATTRIBUTE_KEYS + ("creation_draft",)
-    )
-    trait_snapshot = snapshot_traits(character)
-    origin = character.location
-    try:
-        with transaction.atomic():
-            if not bool(getattr(character, "creation_pending", False)):
-                # A character activated between render and submit is rejected as
-                # already complete regardless of whether a stale draft remains.
-                raise CharacterCreationError("character creation is already complete")
-            draft = read_draft(character)
-            if draft is None:
-                raise CharacterCreationError("no creation draft saved")
-            request = _request_from_draft(draft)
-            preflight_character_creation(account, character, request)
-            persona = draft.get("persona")
-            result = activate_player_character(
-                account, character, request,
-                persona=persona, write_observer=write_observer,
-            )
-    except Exception:
-        # Covers the outer-commit failure, where the inner activation's own
-        # except never ran (subrace-start-settlements D4).
-        restore_activation_placement(character, origin)
-        character.key = old_key
-        restore_traits(character, trait_snapshot)
-        restore_attributes(character, attribute_snapshots)
-        raise
+    with draft_portrait_mutation(character) as unit:
+        old_key = character.key
+        attribute_snapshots = snapshot_attributes(
+            character, _CREATION_ATTRIBUTE_KEYS + ("creation_draft",)
+        )
+        trait_snapshot = snapshot_traits(character)
+        portrait_snapshot = snapshot_draft_portrait_state(character)
+        origin = character.location
+        try:
+            with transaction.atomic():
+                if not bool(getattr(character, "creation_pending", False)):
+                    # A character activated between render and submit is
+                    # rejected as already complete regardless of whether a
+                    # stale draft remains.
+                    raise CharacterCreationError("character creation is already complete")
+                draft = read_draft(character)
+                if draft is None:
+                    raise CharacterCreationError("no creation draft saved")
+                request = _request_from_draft(draft)
+                preflight_character_creation(account, character, request)
+                persona = draft.get("persona")
+                result = activate_player_character(
+                    account, character, request,
+                    persona=persona, write_observer=write_observer,
+                )
+        except Exception:
+            # Covers the outer-commit failure, where the inner activation's
+            # own except never ran (subrace-start-settlements D4). The
+            # collected callbacks (arrival effects, the portrait ensure, a
+            # preset cleanup's file unlinks) are dropped with the rollback.
+            unit.deferral.discard()
+            restore_activation_placement(character, origin)
+            character.key = old_key
+            restore_traits(character, trait_snapshot)
+            restore_draft_portrait_state(portrait_snapshot)
+            restore_attributes(character, attribute_snapshots)
+            raise
     return result
 
 
