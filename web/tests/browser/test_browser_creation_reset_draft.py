@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from tools.spec_traceability import covers_requirement
+from web.webclient.presentation.creation import CREATION_SCHEMA_VERSION
 from .browser_helpers import (
     focus_creation_action_dock,
     install_outbound_recorder,
@@ -85,7 +86,7 @@ class ResetAndDraftJourneys(CreationBrowserTest):
             page,
             {
                 "creation": {
-                    "schema_version": 7,
+                    "schema_version": CREATION_SCHEMA_VERSION,
                     "available": False,
                     "reason": {"code": "registry_unavailable", "message": reason},
                 }
