@@ -46,7 +46,10 @@
       "index": 2,
       "name": "packed-2",
       "files_a": [
-        "web.tests.browser.test_browser_combat_rejection.CombatReconnectBrowserTest.test_reconnect_resumes_same_session_without_new_round"
+        "web.tests.browser.test_browser_combat_rejection.CombatReconnectBrowserTest.test_reconnect_resumes_same_session_without_new_round",
+        "web.tests.browser.test_browser_creation_portrait.CreationPortraitJourneys.test_generate_while_editing",
+        "web.tests.browser.test_browser_creation_portrait.CreationPortraitJourneys.test_reconnect_and_reset",
+        "web.tests.browser.test_browser_creation_portrait.CreationPortraitJourneys.test_offline_refusal_and_explicit_retry"
       ],
       "files_b": [
         "web.tests.browser.test_map_editor_geography.MapEditorGeographyBrowserTest.test_a_river_point_drag_is_one_continent_command_that_stales_the_partition",
@@ -59,7 +62,10 @@
       "index": 3,
       "name": "packed-3",
       "files_a": [
-        "web.tests.browser.test_browser_combat_rejection.CombatReconnectBrowserTest.test_disconnect_after_submit_shows_uncertain_notice_no_retry"
+        "web.tests.browser.test_browser_combat_rejection.CombatReconnectBrowserTest.test_disconnect_after_submit_shows_uncertain_notice_no_retry",
+        "web.tests.browser.test_browser_creation_portrait_disposition.CreationPortraitDispositionJourneys.test_worker_failure_and_retry",
+        "web.tests.browser.test_browser_creation_portrait_disposition.CreationPortraitDispositionJourneys.test_custom_activation_keeps_the_portrait_offline",
+        "web.tests.browser.test_browser_creation_portrait_disposition.CreationPortraitDispositionJourneys.test_preset_activation_discards_the_draft_portrait_offline"
       ],
       "files_b": [
         "web.tests.browser.test_browser_bundled_scene_assets.BundledSceneAssetsBrowserTest.test_terminal_pack_static_decode"

@@ -55,11 +55,15 @@ class CreationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             runtime.env["ELOSERN_BROWSER_CREATION_DRAFT"] = "1"
         if self.CREATION_PRESET_DRAFT:
             runtime.env["ELOSERN_BROWSER_CREATION_PRESET_DRAFT"] = "1"
+        self._configure_runtime(runtime)
         self.server = ManagedServer(runtime=runtime)
         self.server.start()
         self.base_url = f"http://127.0.0.1:{self.server.runtime.http_port}"
         self.webclient_url = self.server.runtime.webclient_url
         super().setUp()
+
+    def _configure_runtime(self, runtime) -> None:
+        """A subclass's extra runtime setup before its server boots (none here)."""
 
     def tearDown(self) -> None:
         server = getattr(self, "server", None)

@@ -261,6 +261,11 @@ def at_server_init():
 
 
 def at_server_start():
+    # The opt-in art control channel (sd_control): a third gated harness
+    # concern, inert unless the runtime set ELOSERN_BROWSER_SD_CONTROL.
+    from web.tests.browser import sd_control
+
+    sd_control.install_if_configured()
     synth = os.environ.get("ELOSERN_BROWSER_SYNTH_CATALOGS") == "1"
     _install_synthetic_catalogs_if_flagged()
     import importlib
@@ -322,6 +327,9 @@ def at_server_start():
 
 
 def at_server_stop():
+    from web.tests.browser import sd_control
+
+    sd_control.uninstall()
     hook = _production("at_server_stop")
     if hook is not None:
         return hook()
