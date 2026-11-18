@@ -495,7 +495,8 @@ class DraftPortraitDispositionTests(_DraftPortraitActivationMixin, EvenniaTest):
         return enqueued
 
     @covers_requirement(
-        "art-gallery-autogen::every-player-activation-path-finalizes-the-portrait-lifecycle"
+        "art-gallery-autogen::every-player-activation-path-finalizes-the-portrait-lifecycle",
+        "player-character-creation::draft-portrait-lifecycle-follows-reset-and-activation-ownership",
     )
     def test_custom_activation_keeps_a_ready_card_and_queues_no_duplicate(self):
         admission, path = self.ready_card()
@@ -614,6 +615,9 @@ class DraftPortraitDispositionTests(_DraftPortraitActivationMixin, EvenniaTest):
         serialized.assert_not_called()
         self.assertTrue(self.character.creation_pending)
 
+    @covers_requirement(
+        "player-character-creation::draft-portrait-lifecycle-follows-reset-and-activation-ownership"
+    )
     def test_preset_activation_discards_creation_art_before_its_own_portrait(self):
         first, first_path = self.ready_card()
         pending = self.admit()
@@ -681,6 +685,9 @@ class DraftPortraitDispositionTests(_DraftPortraitActivationMixin, EvenniaTest):
         self.assertEqual(presented["origin"], ORIGIN_OFFICIAL)
         self.assertTrue(presented["url"].startswith("/art/official/"))
 
+    @covers_requirement(
+        "player-character-creation::draft-portrait-lifecycle-follows-reset-and-activation-ownership"
+    )
     def test_a_failure_after_cleanup_preserves_prior_art(self):
         for mode, stage in (
             ("preset", "draft_portrait"),

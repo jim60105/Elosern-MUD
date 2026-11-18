@@ -83,16 +83,11 @@ gallery-bearing kind.
 - **THEN** normal automatic generation remains eligible; bundled terminal availability alone does not satisfy the official-catalog guard
 
 ### Requirement: Player creation may skip the automatic portrait
-`world/rules/character_creation.py::finalize_player_portrait` SHALL accept an explicit skip flag,
-defaulting to generating. It SHALL establish the explicit named `portrait_policy` on every path,
-including the skipped one. A skipped creation
-SHALL enqueue nothing and SHALL leave the character with an empty gallery. The flag SHALL
-be read inside the activation transaction like
-the rest of the finalization, so a rollback leaves no portrait state either way.
+`world/rules/character_creation.py::finalize_player_portrait` SHALL accept an explicit skip flag, defaulting to generating, and establish `portrait_policy` on every path, including the skipped one. A skipped creation SHALL enqueue nothing. It SHALL preserve a custom activation's committed draft portrait; a preset activation discards creation-owned draft art before normal portrait finalization. Reading the flag inside the activation transaction keeps committed draft portrait state on rollback.
 
 #### Scenario: A skipped creation starts with an empty gallery
 - **WHEN** a character is activated with the skip flag set
-- **THEN** it carries the named portrait policy, its gallery is empty, no job is enqueued, and it resolves through the standard chain's terminal fallback seam rather than owning any portrait state of its own
+- **THEN** it carries the named portrait policy, a previously empty gallery stays empty, no job is enqueued, and it resolves through the standard chain's terminal fallback seam rather than owning any portrait state of its own
 
 #### Scenario: The default path still generates
 - **WHEN** a character is activated without the skip flag, without a satisfying official default and without an existing card or in-flight job
@@ -100,7 +95,7 @@ the rest of the finalization, so a rollback leaves no portrait state either way.
 
 #### Scenario: A rolled-back skipped activation leaves nothing
 - **WHEN** an activation with the skip flag set rolls back
-- **THEN** no portrait policy and no gallery state remain on the character
+- **THEN** no newly established portrait policy or gallery state remains; previously committed draft portrait state is unchanged
 
 #### Scenario: The empty gallery resolves through the terminal fallback seam
 - **WHEN** a skipped character's empty gallery is presented
@@ -165,7 +160,7 @@ Creation and validated import SHALL establish named portrait policy transactiona
 
 #### Scenario: A rolled-back creation emits no job
 - **WHEN** a creation attempt fails and its transaction rolls back
-- **THEN** no portrait policy is persisted and no post-commit portrait job is emitted
+- **THEN** no activation-created portrait policy is persisted and no post-commit portrait job is emitted; previously committed draft portrait state is preserved
 
 #### Scenario: A validated import schedules per eligible record
 - **WHEN** an all-or-nothing import batch commits with validated named records carrying canonical ages
@@ -189,7 +184,11 @@ Every successful activation transport SHALL establish the same named portrait po
 
 #### Scenario: Rolled-back activation leaves no portrait state
 - **WHEN** the activation transaction fails after the policy would have been assigned
-- **THEN** no `portrait_policy` and no portrait job remain on the character
+- **THEN** no activation-added `portrait_policy` or portrait job remains on the character; previously committed creation portrait policy, receipt, cards and jobs are unchanged
+
+#### Scenario: Draft art satisfies the custom activation guard
+- **WHEN** a custom activation has a creation-generated card or an existing creation job on its named subject
+- **THEN** finalization reuses the same policy and the shared idempotency guard enqueues no duplicate
 
 ### Requirement: Validated named-NPC spawn schedules its guarded gallery request after the spawn transaction commits
 The SceneBuilder spawn path SHALL schedule the guarded gallery request for a spawned occupant that carries an

@@ -733,6 +733,9 @@ class ResetCleanupTests(_DraftPortraitCase):
             ),
         )
 
+    @covers_requirement(
+        "player-character-creation::draft-portrait-lifecycle-follows-reset-and-activation-ownership"
+    )
     def test_a_ready_portrait_is_removed_and_its_file_unlinked_only_after_commit(self):
         from world.rules.creation_portrait import PORTRAIT_EMPTY, read_draft_portrait
 
@@ -771,6 +774,9 @@ class ResetCleanupTests(_DraftPortraitCase):
         self.assertEqual(self.drain(), 0)
         self.assertEqual(self.cards(), [])
 
+    @covers_requirement(
+        "player-character-creation::draft-portrait-lifecycle-follows-reset-and-activation-ownership"
+    )
     def test_a_claimed_job_settling_after_reset_publishes_nothing(self):
         self.admit()
         job_key, token = _claim_one(self)
@@ -812,6 +818,9 @@ class ResetCleanupTests(_DraftPortraitCase):
         self.character.attributes.reset_cache()
         self.assertEqual(read_draft_portrait(self.character).status, PORTRAIT_EMPTY)
 
+    @covers_requirement(
+        "player-character-creation::draft-portrait-lifecycle-follows-reset-and-activation-ownership"
+    )
     def test_an_unsaved_draft_resets_twice_and_queues_nothing_while_pending(self):
         from world.art.service import _recover_named_portraits
 
@@ -1155,6 +1164,9 @@ class IdentityEditRetentionTests(_DraftPortraitCase):
             self.account, self.character, CharacterCreationRequest(**values)
         )
 
+    @covers_requirement(
+        "webclient-character-creation-ui::identity-edits-preserve-a-creation-portrait-without-warnings"
+    )
     def test_ready_and_pending_portraits_survive_every_identity_edit(self):
         from world.rules.creation_portrait import (
             PORTRAIT_PENDING,
@@ -1191,6 +1203,9 @@ class IdentityEditRetentionTests(_DraftPortraitCase):
             "the admitted snapshot is never re-read from newer form values",
         )
 
+    @covers_requirement(
+        "webclient-character-creation-ui::identity-edits-preserve-a-creation-portrait-without-warnings"
+    )
     def test_a_race_and_subrace_change_keeps_the_portrait(self):
         from world.rules.creation_portrait import PORTRAIT_READY, read_draft_portrait
 
