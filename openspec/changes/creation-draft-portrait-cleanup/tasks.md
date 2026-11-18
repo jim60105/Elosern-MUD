@@ -14,4 +14,4 @@
 
 ## 3. Delivery acceptance
 
-- [ ] 3.1 Run focused commands in design plus `world.art.tests.test_queue` and `web.webclient.actions.tests.test_creation_actions.test_adapter` with the same standalone Evennia command prefix. Register new test modules/methods with `uv run --locked python -m tools.shard_register fix`. Run `uv run --locked python -m tools.contract_gate` and `openspec validate creation-draft-portrait-cleanup --strict`; expect no warning/failure.
+- [x] 3.1 Run focused commands in design plus `world.art.tests.test_queue` and `web.webclient.actions.tests.test_creation_actions.test_adapter` with the same standalone Evennia command prefix. Register new test modules/methods with `uv run --locked python -m tools.shard_register fix`. Run `uv run --locked python -m tools.contract_gate` and `openspec validate creation-draft-portrait-cleanup --strict`; expect no warning/failure.
