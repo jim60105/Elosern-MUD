@@ -418,6 +418,27 @@ def run_seed(runtime: BrowserRuntime) -> subprocess.CompletedProcess[str]:
     )
 
 
+def run_initial_setup(runtime: BrowserRuntime) -> subprocess.CompletedProcess[str]:
+    """Complete Evennia's one-time initial setup before the server boots.
+
+    A boot that performs the setup itself ends by restarting the server, and
+    the replacement server can lose the internal webserver port to the
+    outgoing one (see :mod:`web.tests.browser.initial_setup`). This runs the
+    same steps in their own process, after the seed and before the managed
+    server starts, so the runtime's server boot is its only start.
+    """
+    env = _base_env(runtime)
+    return subprocess.run(
+        [sys.executable, "-m", "web.tests.browser.initial_setup"],
+        cwd=str(PROJECT_ROOT),
+        env=env,
+        text=True,
+        capture_output=True,
+        timeout=300,
+        check=False,
+    )
+
+
 _READY_BODY_MARKER = "id=\"main-sub\""
 
 

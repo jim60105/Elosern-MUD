@@ -69,6 +69,15 @@ class ManagedServerFastTests(unittest.TestCase):
         )
         bind_wait.start()
         self.addCleanup(bind_wait.stop)
+        # The fake world has no database: running the real initial setup would
+        # spawn a process. Its placement in the sequence is covered by
+        # test_initial_setup_runs_between_seed_and_boot.
+        setup = mock.patch.object(
+            ManagedServer, "_run_initial_setup", return_value=None
+        )
+        setup.start()
+        self.addCleanup(setup.stop)
+        self._initial_setup_patch = setup
         self.server = ManagedServer(runtime=self.runtime, runner=self.fake)
 
     def _patch_steps(self, ready: bool = True):
@@ -115,6 +124,65 @@ class ManagedServerFastTests(unittest.TestCase):
         self.assertEqual(
             [call[0] for call in self.fake.calls], []
         )
+
+    def test_initial_setup_runs_between_seed_and_boot(self):
+        """Evennia's initial setup completes off-server, before the boot.
+
+        A boot that performs it ends by restarting the server, and the
+        replacement can lose the internal webserver port to the outgoing one.
+        The setup runs after the seed (which creates the Account #1 the setup
+        requires) and before anything binds a port.
+        """
+        self._initial_setup_patch.stop()
+        steps: list[str] = []
+
+        def recording(name: str, result: subprocess.CompletedProcess):
+            def _step(_runtime):
+                steps.append(name)
+                return result
+
+            return _step
+
+        patchers = (
+            mock.patch(
+                "web.tests.browser.harness.fixtures.run_migrate",
+                recording("migrate", _ok_result("migrate")),
+            ),
+            mock.patch(
+                "web.tests.browser.harness.fixtures.run_seed",
+                recording("seed", _ok_result("seed")),
+            ),
+            mock.patch(
+                "web.tests.browser.harness.fixtures.run_initial_setup",
+                recording("setup", _ok_result("setup")),
+            ),
+            mock.patch(
+                "web.tests.browser.harness.fixtures.webclient_ready",
+                return_value=True,
+            ),
+            mock.patch(
+                "web.tests.browser.harness.fixtures.world_bootstrapped",
+                return_value=True,
+            ),
+            mock.patch(
+                "web.tests.browser.harness.fixtures.web_server_settled",
+                return_value=True,
+            ),
+        )
+        for patcher in patchers:
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+        fake = self.fake
+
+        def recording_runner(runtime, *args, **kwargs):
+            if args and args[0] == "start":
+                steps.append("boot")
+            return fake(runtime, *args, **kwargs)
+
+        self.server.runner = recording_runner
+        self.server.start()
+        self.assertEqual(steps, ["migrate", "seed", "setup", "boot"])
 
     def test_readiness_timeout_is_reported(self):
         """A ready-poll timeout raises with diagnostics and still stops."""
@@ -405,6 +473,7 @@ class InternalPortWaitTests(unittest.TestCase):
         for target, result in (
             ("run_migrate", _ok_result("migrate")),
             ("run_seed", _ok_result("seed")),
+            ("run_initial_setup", _ok_result("initial setup")),
         ):
             patcher = mock.patch(
                 f"web.tests.browser.harness.fixtures.{target}",
@@ -700,6 +769,7 @@ class StartupSerializationTests(unittest.TestCase):
         for target, result in (
             ("run_migrate", _ok_result("migrate")),
             ("run_seed", _ok_result("seed")),
+            ("run_initial_setup", _ok_result("initial setup")),
         ):
             patcher = mock.patch(
                 f"web.tests.browser.harness.fixtures.{target}",
@@ -813,11 +883,15 @@ class StartupSerializationTests(unittest.TestCase):
             "web.tests.browser.harness.fixtures.run_seed",
             return_value=_ok_result("seed"),
         )
+        setup = mock.patch(
+            "web.tests.browser.harness.fixtures.run_initial_setup",
+            return_value=_ok_result("initial setup"),
+        )
         lock = mock.patch(
             "web.tests.browser.harness._startup_lock",
             side_effect=lambda: _RecordingLock(),
         )
-        for patcher in (migrate, seed, poll, booted, settled, lock):
+        for patcher in (migrate, seed, setup, poll, booted, settled, lock):
             patcher.start()
             self.addCleanup(patcher.stop)
 
@@ -850,6 +924,23 @@ class RealServerBootTest(unittest.TestCase):
             self.assertTrue(server.pids.get("portal"), "portal pid recorded")
             self.assertTrue(server.pids.get("server"), "server pid recorded")
             self.assertTrue(fixtures.webclient_ready(server.runtime, timeout=30))
+            # The initial setup ran off-server: the booted server neither
+            # performs it nor restarts itself, which is the restart whose
+            # replacement server used to lose the internal webserver port.
+            self.assertEqual(server.initial_setup_result.returncode, 0)
+            # ``collectstatic`` is the setup sequence's own last side effect
+            # before the restart request: its output proves the steps ran.
+            self.assertIn(
+                "static files copied", server.initial_setup_result.stdout
+            )
+            server_log = (server.runtime.log_dir / "server.log").read_text(
+                encoding="utf-8", errors="replace"
+            )
+            self.assertNotIn("Initial setup", server_log)
+            self.assertNotIn("restarted in 'reset' mode", server_log)
+            self.assertEqual(
+                server_log.count("Evennia Server successfully started."), 1
+            )
         finally:
             server.stop()
         self.assertFalse(server.runtime.root_dir.exists())

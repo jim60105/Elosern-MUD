@@ -1061,7 +1061,8 @@
         "web.tests.browser.test_map_editor_generation.MapEditorGenerationBrowserTest.test_only_the_explicit_controls_regenerate_and_old_outlines_are_labelled",
         "web.tests.browser.test_map_editor_workflows.MapEditorWorkflowsChromiumTest.test_local_map_and_interior_authoring_reloads_in_the_core_after_every_operation",
         "web.tests.browser.test_map_editor_workflows.MapEditorWorkflowsChromiumTest.test_a_location_drag_is_one_command_and_undo_redo_and_restart_agree",
-        "web.tests.browser.test_map_editor_workflows.MapEditorFollowingReferenceFirefoxTest.test_external_changes_are_adopted_or_held_behind_an_open_draft"
+        "web.tests.browser.test_map_editor_workflows.MapEditorFollowingReferenceFirefoxTest.test_external_changes_are_adopted_or_held_behind_an_open_draft",
+        "web.tests.browser.test_harness.ManagedServerFastTests.test_initial_setup_runs_between_seed_and_boot"
       ],
       "files_b": [
         "web.tests.browser.test_browser_party_acceptance.PartyAcceptanceBrowserTest.test_cancelled_exit_keeps_the_whole_draft_and_a_committed_exit_settles_once"

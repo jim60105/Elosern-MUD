@@ -726,3 +726,35 @@ gate 修復」切三）與 `SelectedSettlementSyncTests`（328 s／11，依「�
 `maps-34-5` 仍在 395–430 s 之間浮動：它剩下的重類別是 `MetricCutoverTests`
 與選取類別，屬類別層級分配（每個 worker 拿一整個類別）的長尾，仍有硬限
 20 分鐘的 36%。
+
+### 2026-11-18：受管 runtime 的初始設定改在伺服器之外完成
+
+run 44121602063（commit `6aae7409`）有 5 個瀏覽器分片各以同一種方式失敗：
+`HarnessError: managed server did not become ready in time`，耗時 800 秒以上，
+而該次啟動的 `server.log` 尾端是
+`twisted.internet.error.CannotListenError: Couldn't listen on 127.0.0.1:<internal port>: [Errno 98] Address already in use`。
+
+根因不在連接埠配置（`992448a3` 與 `73f089cf` 修的是同級行程搶佔釋放連接埠）。
+受管 runtime 的資料庫是全新的，`evennia start` 因此在啟動時執行 Evennia 的一次性
+初始設定，並以 `portal_reset_server()` 要求入口程式以 `reset` 模式重啟伺服器
+（`evennia/server/initial_setup.py`）。入口程式在舊伺服器的 AMP 連線一斷就啟動
+新伺服器，此時舊行程還沒關閉它的監聽 socket；在滿載的 runner 上，新伺服器就以
+`Address already in use` 死在自己的內部 webserver 連接埠上，入口程式從此只把
+請求代理到一個空埠。接下來的就緒輪詢燒完整個 240 秒預算，重試又換成另一份全新
+資料庫並重跑同一段初始設定與同一次重啟，因此每個分片都連錯三次後才回報逾時。
+本機單一行程的 boot 記錄可直接看到該次重啟：
+`Evennia Server successfully started.` 之後 18 秒出現
+`Evennia Server successfully restarted in 'reset' mode.`。
+
+修法是讓測試架構自己完成 Evennia 的初始設定：新增
+`web/tests/browser/initial_setup.py`，由 `fixtures.run_initial_setup` 在 seed
+之後、啟動伺服器之前在獨立行程中執行同一組步驟（建立物件、
+`at_initial_setup` hook、`collectstatic`），`TEST_ENVIRONMENT` 只抑制最後那次
+「要求入口程式重啟」的呼叫，並照樣寫入 `last_initial_setup_step = "done"`，
+因此受管伺服器啟動時已讀到完整狀態，不需要也不會重啟。資料庫狀態與重啟後相同，
+斷言、逾時與重試預算都沒有放寬。
+
+本機實測（同一台機器、同一份 runtime）：boot 總時間 50.5 → 38.3 秒
+（`migrate=2.7s seed=12.2s setup=2.4s boot=4.4s ready=16.5s`），
+`server.log` 只剩一行 `Evennia Server successfully started.`，
+啟動步驟（`startup_step`）各只執行一次。

@@ -203,15 +203,17 @@ class ManagedServer:
         self._pidfile_originals: dict[Path, str | None] = {}
         self.migrate_result: subprocess.CompletedProcess[str] | None = None
         self.seed_result: subprocess.CompletedProcess[str] | None = None
+        self.initial_setup_result: subprocess.CompletedProcess[str] | None = None
         self.boot_result: subprocess.CompletedProcess[str] | None = None
 
     # -- lifecycle ----------------------------------------------------------
 
     def start(self) -> None:
-        """Migrate, seed, boot, and wait until the world is up.
+        """Migrate, seed, complete the initial setup, boot, and wait until the
+        world is up.
 
-        On any failure (migrate, seed, boot, readiness, or world-bootstrap
-        timeout), owned
+        On any failure (migrate, seed, initial setup, boot, readiness, or
+        world-bootstrap timeout), owned
         processes are stopped and temporary state is removed so a failing run
         cannot leak live servers, occupied ports, or databases.
 
@@ -250,12 +252,16 @@ class ManagedServer:
                 self.runtime = fixtures.recreate_runtime(self.runtime)
                 self.migrate_result = None
                 self.seed_result = None
+                self.initial_setup_result = None
                 self.boot_result = None
 
     def _start_once(self) -> None:
-        """One migrate/seed/boot/readiness attempt against the current runtime.
+        """One migrate/seed/setup/boot/readiness attempt on this runtime.
 
-        Migrate and seed touch no ports and may overlap sibling processes.
+        Migrate, seed and the initial setup touch no ports and may overlap
+        sibling processes; they leave the database in the state the server
+        would have produced had it performed Evennia's initial setup itself,
+        so the runtime's boot is its only server start.
         Everything from the port allocation to the portal holding the ports
         (allocate, clear pidfiles, boot, record pids) runs in ONE acquisition
         of the runner-local startup lock: a sibling cannot allocate ports
@@ -276,6 +282,8 @@ class ManagedServer:
         at = mark("migrate", at)
         self._run_seed()
         at = mark("seed", at)
+        self._run_initial_setup()
+        at = mark("setup", at)
         with _startup_lock():
             self.runtime.allocate_ports()
             self._clear_pidfiles()
@@ -426,6 +434,18 @@ class ManagedServer:
                 + _tail(result.stderr)
             )
 
+    def _run_initial_setup(self) -> None:
+        """Complete Evennia's one-time initial setup off the server process."""
+        result = fixtures.run_initial_setup(self.runtime)
+        self.initial_setup_result = result
+        if result.returncode != 0:
+            raise HarnessError(
+                "initial setup failed\n"
+                + _tail(result.stdout)
+                + "\n"
+                + _tail(result.stderr)
+            )
+
     def _run_boot(self) -> None:
         """Run ``evennia start`` and wait for the launcher to finish."""
         try:
@@ -553,6 +573,7 @@ class ManagedServer:
         for label, result in (
             ("migrate", self.migrate_result),
             ("seed", self.seed_result),
+            ("initial setup", self.initial_setup_result),
             ("boot", self.boot_result),
         ):
             if result is not None:
