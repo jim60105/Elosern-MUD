@@ -929,6 +929,45 @@ a revised custom save never invalidate, clear or regenerate the portrait and
 emit no mismatch warning. New art remains an explicit player request through
 `creation.portrait.generate`.
 
+### The client side of the creation portrait
+
+`composables/use-creation-portrait.js` (composed by `useCreationOverlay`) is
+the only browser owner of the request. It holds local UI state only: whether
+the generation drawer is open, the one admitted request id, a rejection flag
+and the focus target to return to. The committed `creation.portrait` union is
+the sole source of pending, ready, failed and unavailable; a local submit never
+fabricates a portrait state.
+
+- **Admission.** Submit reads the current race, subrace, sex and apparent-age
+  refs and the drawer's own prompt, and calls the return-bearing dispatch once.
+  A `null` admission (the single-mutation gate is held) keeps the drawer open
+  with its rejection feedback and sends nothing.
+- **Settlement.** Only the result whose `requestId` matches settles the request.
+  A non-success outcome (`rejected`, `stale`, `error`) keeps the drawer and its
+  prompt. A success closes the drawer once the gate releases, which means its
+  declared presentation revision (the pending panel) is committed, and focus
+  returns to the slot. A gate release without a matching result (a synchronous
+  send failure, a lost mutation) only clears the submitting state. Settlement
+  is computed from the current `result` and `dispatchState`, one tick after the
+  dispatch call, because the store publishes synchronously inside it.
+- **Lifecycle.** A new presentation context (reconnect, epoch or actor change),
+  an unavailable panel, leaving the custom mode or a confirmation screen closes
+  the drawer and forgets its request. Nothing is ever resent; a reconnect shows
+  the server's state.
+- **Availability.** `unavailable` disables generation in the slot and the drawer
+  and shows the server's reason; the prompt stays editable. The slot's and the
+  drawer's 重新檢查 emit `refresh-status`; the overlay forwards `request-sync`
+  and AppClient calls `store.requestPresentationSync("manual")`, the ordinary
+  `ui_sync` gate. There is no client probe, timer or replay: a refreshed empty
+  or ready panel re-enables only a new explicit submit.
+
+The browser journeys (`test_browser_creation_portrait*.py`) drive the real
+request, queue, worker and push path through the harness-only
+`web/tests/browser/sd_control.py` channel: the runtime's fake image client
+reads a mode file (probe and generation outcomes, or a held generation), and a
+reactor-thread poll executes numbered commands (`drain`, `drain_sync`,
+`reset_probe_cache`, `probe`, `in_flight`, `cards`) and acknowledges each one.
+
 ## Dialogue coupling
 
 Dialogue is a candidate dependency, not an unconditional transmission. Whenever
