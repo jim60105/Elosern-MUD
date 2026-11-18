@@ -59,6 +59,11 @@ const props = defineProps({
   // the SOLE writer of the concept-apply success confirmation toast (D3);
   // the store writes only failure crits.
   pushToast: { type: Function, default: null },
+  // The presentation context ({generation, epoch}) the panel belongs to
+  // (creation-draft-portrait-panel): a new actor/epoch resynchronizes from
+  // its saved draft even when the contents are equal, while a same-context
+  // republish of an equal draft (a portrait update) leaves the form alone.
+  presentationContext: { type: Object, default: null },
 });
 
 const emit = defineEmits(["action", "request-reset", "cancel-confirm"]);

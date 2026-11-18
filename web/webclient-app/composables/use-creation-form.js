@@ -5,6 +5,7 @@
 // proposal/settlement/stage watchers join in the sibling groups through the
 // use-creation-overlay.js facade.
 import { computed, reactive, ref, watch } from "vue";
+import stableStringify from "../lib/stable_stringify.js";
 
 // The seven starting allocation axes, in the order the form holds them (the
 // keys of `allocations` below and of the custom payload).
@@ -114,10 +115,23 @@ export function useCreationForm(props) {
     }
   });
 
+  // The applied-draft signature (creation-draft-portrait-panel): the
+  // presentation context ({generation, epoch}, wired from AppClient) plus the
+  // draft's stable content. A freshly decoded panel carries a new but equal
+  // draft object on every portrait/proposal republish; only a real content
+  // change or a new context may resynchronize (and so overwrite) the form.
+  function draftSignature() {
+    const context = props.presentationContext ?? null;
+    const key = context ? `${context.generation ?? ""}|${context.epoch ?? ""}` : "";
+    return key + "\u0000" + stableStringify(props.creation.draft ?? null);
+  }
+  let appliedSignature = null;
+
   // Re-sync every wizard field from the server-confirmed draft carried by the
   // latest `creation` panel payload; with no draft, reset to the preset state
   // with default field values.
   function syncFromDraft() {
+    appliedSignature = draftSignature();
     const d = props.creation.draft;
     if (!d) {
       // With no server draft the wizard resets to the preset state UNLESS the
@@ -181,11 +195,11 @@ export function useCreationForm(props) {
   }
 
   syncFromDraft();
-  watch(
-    () => props.creation.draft,
-    syncFromDraft,
-    { deep: true },
-  );
+  watch(draftSignature, (signature) => {
+    if (signature !== appliedSignature) {
+      syncFromDraft();
+    }
+  });
 
   function personaFilled() {
     return [persona.personality, persona.life_story, persona.habit].filter(
