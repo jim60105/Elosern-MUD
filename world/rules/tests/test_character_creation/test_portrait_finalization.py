@@ -530,12 +530,26 @@ class DraftPortraitDispositionTests(_DraftPortraitActivationMixin, EvenniaTest):
         self.assertNotEqual(first.image_id, pending.image_id)
 
     def test_a_skipped_custom_activation_keeps_the_card_and_queues_nothing(self):
+        # The skip flag is an activation request field, not part of the saved
+        # draft, so the direct transport carries it explicitly.
+        from world.rules.creation_wizard import save_custom_draft
+
         admission, path = self.ready_card()
-        enqueued = self.activate_custom(skip_portrait=True)
+        save_custom_draft(self.account, self.character, self.custom_request())
+        with self.count_enqueues() as enqueued:
+            with self.captureOnCommitCallbacks(execute=True) as callbacks:
+                activate_player_character(
+                    self.account,
+                    self.character,
+                    self.custom_request(skip_portrait=True),
+                )
         self.assertEqual(self.card_ids(), [admission.image_id])
         self.assertTrue(path.exists())
         self.assertEqual(self.jobs(), [])
         self.assertEqual(enqueued, [], "a skipped creation schedules nothing")
+        self.assertEqual(
+            _portrait_ensure_callbacks(callbacks), [], "no ensure is even registered"
+        )
 
     def test_an_untouched_custom_activation_still_generates_once(self):
         enqueued = self.activate_custom()
@@ -768,6 +782,48 @@ class _BlockingCall:
         return self.original(*args, **kwargs)
 
 
+class _ProbedLock:
+    """Delegate to one real lock and signal every acquisition attempt."""
+
+    def __init__(self, lock, attempted):
+        self._lock = lock
+        self._attempted = attempted
+
+    def __enter__(self):
+        self._attempted.set()
+        return self._lock.__enter__()
+
+    def __exit__(self, *exc_info):
+        return self._lock.__exit__(*exc_info)
+
+    def acquire(self, *args, **kwargs):
+        self._attempted.set()
+        return self._lock.acquire(*args, **kwargs)
+
+    def release(self):
+        return self._lock.release()
+
+    def locked(self):
+        return self._lock.locked()
+
+
+@contextmanager
+def _probed_serialization(attempted):
+    """Signal the serialized-mutation acquisition attempt, then acquire."""
+    from world.rules import creation_portrait
+
+    original = creation_portrait.serialized_gallery_mutation
+
+    @contextmanager
+    def probe(subject):
+        attempted.set()
+        with original(subject) as token:
+            yield token
+
+    with patch.object(creation_portrait, "serialized_gallery_mutation", probe):
+        yield
+
+
 class ActivationSettlementContentionTests(
     _DraftPortraitActivationMixin, TransactionTestCase
 ):
@@ -861,11 +917,15 @@ class ActivationSettlementContentionTests(
         job_key, token = self.claim_one()
         tmp, target, identity = self.outputs(job_key)
         blocker = _BlockingCall(gallery_api.append_replacement_card)
+        self.addCleanup(blocker.release.set)
         started = threading.Event()
+        attempted = threading.Event()
         self.observe_activation_entry(started)
         errors: list = []
         results: dict = {}
-        with patch("world.art.queue.gallery_api.append_replacement_card", blocker):
+        with patch(
+            "world.art.queue.gallery_api.append_replacement_card", blocker
+        ), _probed_serialization(attempted):
             settle = _run_on_own_connection(
                 lambda: self.settle(job_key, token, identity, tmp),
                 errors,
@@ -879,9 +939,10 @@ class ActivationSettlementContentionTests(
                 results,
                 "activate",
             )
+            # The activation thread has reached the serialization point; the
+            # worker still holds it, so the activation cannot pass.
+            self.assertTrue(attempted.wait(20))
             activation.join(0.2)
-            # The activation waits for the queue serialization BEFORE its
-            # transaction or any receipt read; it cannot overtake the worker.
             self.assertTrue(activation.is_alive())
             self.assertFalse(started.is_set())
             blocker.release.set()
@@ -909,11 +970,15 @@ class ActivationSettlementContentionTests(
         job_key, token = self.claim_one()
         tmp, target, identity = self.outputs(job_key)
         blocker = _BlockingCall(gallery_api.append_replacement_card)
+        self.addCleanup(blocker.release.set)
         started = threading.Event()
+        attempted = threading.Event()
         self.observe_activation_entry(started)
         errors: list = []
         results: dict = {}
-        with patch("world.art.queue.gallery_api.append_replacement_card", blocker):
+        with patch(
+            "world.art.queue.gallery_api.append_replacement_card", blocker
+        ), _probed_serialization(attempted):
             settle = _run_on_own_connection(
                 lambda: self.settle(job_key, token, identity, tmp),
                 errors,
@@ -927,6 +992,7 @@ class ActivationSettlementContentionTests(
                 results,
                 "activate",
             )
+            self.assertTrue(attempted.wait(20))
             activation.join(0.2)
             self.assertTrue(activation.is_alive())
             self.assertFalse(started.is_set())
@@ -957,9 +1023,13 @@ class ActivationSettlementContentionTests(
         job_key, token = self.claim_one()
         tmp, target, identity = self.outputs(job_key)
         blocker = _BlockingCall(creation_portrait.clear_draft_portrait)
+        self.addCleanup(blocker.release.set)
+        attempted = threading.Event()
         errors: list = []
         results: dict = {}
-        with patch.object(creation_portrait, "clear_draft_portrait", blocker):
+        with patch.object(
+            creation_portrait, "clear_draft_portrait", blocker
+        ), patch("world.art.queue.queue_lock", _ProbedLock(queue_lock, attempted)):
             activation = _run_on_own_connection(
                 lambda: activate_draft(self.account, self.character),
                 errors,
@@ -973,9 +1043,10 @@ class ActivationSettlementContentionTests(
                 results,
                 "settle",
             )
+            # The worker has reached the queue acquisition the activation
+            # holds; it cannot publish while the cleanup is in progress.
+            self.assertTrue(attempted.wait(20))
             settle.join(0.2)
-            # The worker waits on the queue lock the activation holds; it
-            # never reaches the database writer before the commit.
             self.assertTrue(settle.is_alive())
             blocker.release.set()
             activation.join(20)

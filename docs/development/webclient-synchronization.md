@@ -905,16 +905,18 @@ deterministic preflight and before the shared portrait finalizer:
   character was pending may settle normally after activation on the same
   subject; its queued description stays the admitted snapshot, never a reread
   of newer form values. With no prior work the ordinary post-commit automatic
-  generation still applies, and `skip_portrait` still only means "schedule
-  nothing" — it never deletes a card.
+  generation still applies. `skip_portrait` only suppresses automatic
+  scheduling; it never deletes a card itself.
 - **Preset activation discards creation-owned art.** The draft card and any
   creation job are removed with `clear_draft_portrait` before the finalizer
   registers its ensure, so the preset's normal official/fallback/automatic
   source decides the activated portrait and never inherits the custom image.
   When the preset's official reference is satisfied, the guard enqueues
-  nothing; otherwise exactly one fresh automatic request remains. The removed
-  files are unlinked by the same commit-qualified, post-unlock callback as a
-  reset, and a canceled job's late settlement publishes nothing.
+  nothing; otherwise the ordinary guarded automatic request remains eligible.
+  A skipped preset activation removes the same creation art and schedules
+  nothing. The removed files are unlinked by the same commit-qualified,
+  post-unlock callback as a reset, and a canceled job's late settlement
+  publishes nothing.
 
 Rollback restores only what the activation itself added. A receipt, named
 policy, cards, jobs and files committed before the activation belong to the

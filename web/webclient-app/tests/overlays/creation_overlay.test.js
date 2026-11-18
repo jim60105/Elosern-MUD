@@ -1409,6 +1409,22 @@ describe("portrait publications keep the unsent custom form (real store)", () =>
     expect(sender.sent.actions.slice(before).map((action) => action.action_id)).toEqual([
       "creation.concept",
     ]);
+    // The server answers with a proposal; applying it replaces the generated
+    // identity/form fields. The portrait state is not one of them.
+    await publish({
+      ...SAVED_CUSTOM_PANEL,
+      portrait: CREATION_PORTRAIT_STATES.ready,
+      proposal: {
+        revision: 1,
+        race: SUBRACED_RACE_KEY,
+        subrace: SUBRACED_SUBRACE_KEY,
+        allocations: { hp: 9, mp: 4, sp: 4, atk_phys: 5, agility: 2, defense: 2, magic_power: 4 },
+        persona: { personality: "概念個性", life_story: "概念生平", habit: "概念習慣" },
+        apparent_age: 41,
+      },
+    });
+    expect(field("creation-field-apparentAge").value).toBe("41");
+    expect(field("creation-persona-personality").value).toBe("概念個性");
     expect(readyStatus()).toBe("ready");
     expect(portraitActions()).toEqual([]);
     expect(field("creation-form-message")).toBeNull();
