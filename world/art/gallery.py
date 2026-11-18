@@ -960,7 +960,9 @@ def card_state_snapshot(subject: ArtSubject):
     record = _consolidate(subject)
     if record is None:
         return None
-    return record, snapshot_attributes(record, ("cards", "default_image_id"))
+    return record, snapshot_attributes(
+        record, ("cards", "default_image_id", "last_error_code", "last_error_at")
+    )
 
 
 def restore_card_state(snapshot) -> None:
@@ -971,6 +973,54 @@ def restore_card_state(snapshot) -> None:
 
     record, values = snapshot
     restore_attributes(record, values)
+
+
+def _remove_cards_locked(subject: ArtSubject, image_ids) -> list:
+    """Drop exactly the named cards under an ALREADY-HELD ``gallery_lock``.
+
+    The rollback-capable half of a card removal (change
+    ``creation-draft-portrait-cleanup``): the record change happens inside the
+    caller's database transaction and NO file is touched. The returned stored
+    identities are unlinked by the caller only after its transaction committed
+    and both the queue and gallery serialization were released. A default
+    naming a dropped card is reset to ``None`` exactly like
+    :func:`remove_card`; every other card, the official preferences and a
+    missing record are left alone.
+    """
+    wanted = {image_id for image_id in image_ids if isinstance(image_id, str)}
+    record = _consolidate(subject)
+    if record is None or not wanted:
+        return []
+    entries = list(record.db.cards or [])
+    kept: list = []
+    removed: list = []
+    for entry in entries:
+        if isinstance(entry, Mapping) and entry.get("image_id") in wanted:
+            identity = entry.get("stored_identity")
+            if identity:
+                removed.append(identity)
+            log_info(
+                "gallery_card_removed",
+                context={"subject": subject.full(), "image_id": entry.get("image_id")},
+            )
+            continue
+        kept.append(entry)
+    if len(kept) == len(entries):
+        return []
+    record.db.cards = kept
+    if record.db.default_image_id in wanted:
+        record.db.default_image_id = None
+    return removed
+
+
+def _clear_error_locked(subject: ArtSubject) -> None:
+    """Clear the subject's recorded error under an ALREADY-HELD ``gallery_lock``."""
+    record = _consolidate(subject)
+    if record is None or record.db.last_error_code is None:
+        return
+    record.db.last_error_code = None
+    record.db.last_error_at = None
+    log_info("gallery_error_cleared", context={"subject": subject.full()})
 
 
 def remove_card(subject: ArtSubject, image_id: str) -> None:

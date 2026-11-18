@@ -3,8 +3,9 @@
 This module is the sole writer of a pending character's ``creation_draft``
 staging attribute. It exposes a frozen no-mutation read model
 (:func:`read_creation_view`), draft saves validated through the existing public
-``preflight_character_creation``, an idempotent reset (:func:`clear_draft`),
-and :func:`activate_draft`, which re-validates the stored draft, re-checks
+``preflight_character_creation``, the idempotent confirmed reset
+(:func:`reset_creation_draft`, which also discards the creation-owned draft
+portrait) and :func:`activate_draft`, which re-validates the stored draft, re-checks
 ownership and pending state against committed data, and clears the draft inside
 one deterministic ``transaction.atomic()`` block together with the existing
 all-or-nothing ``activate_player_character`` write.
@@ -40,6 +41,14 @@ from world.rules.character_creation import (
     resolve_starting_profile,
     restore_activation_placement,
     validate_affinity_elements,
+)
+from world.rules.creation_portrait import (
+    CREATION_PORTRAIT_ATTRIBUTE,
+    _require_owned_pending,
+    clear_draft_portrait,
+    draft_portrait_mutation,
+    restore_draft_portrait_state,
+    snapshot_draft_portrait_state,
 )
 from world.rules.surfaces import (
     restore_attributes,
@@ -677,9 +686,51 @@ def save_custom_draft(
 
 
 def clear_draft(character: Any) -> None:
-    """Idempotently clear the staging draft; the character stays pending."""
+    """Idempotently clear only the staging draft; the character stays pending.
+
+    Deliberately portrait-free: activation also removes a draft and custom
+    activation keeps its portrait. A player's confirmed reset goes through
+    :func:`reset_creation_draft`, which discards the creation portrait too.
+    """
     if character.attributes.has("creation_draft"):
         character.attributes.remove("creation_draft")
+
+
+#: Character attributes a failed reset restores in process.
+_RESET_ATTRIBUTE_KEYS = ("creation_draft", CREATION_PORTRAIT_ATTRIBUTE, "portrait_policy")
+
+
+def reset_creation_draft(account: Any, character: Any) -> None:
+    """Confirmed reset: clear the draft and its creation-owned portrait together.
+
+    The serialized draft portrait unit is entered BEFORE the reset
+    transaction opens or any receipt/card state is read, and ownership and
+    pending state are rechecked inside it. One transaction removes the
+    ``creation_draft`` staging attribute and, through
+    :func:`world.rules.creation_portrait.clear_draft_portrait`, the receipt
+    plus exactly the receipt-owned jobs, cards and recorded draft failure.
+    The named portrait policy is retained and nothing is scheduled. A missing
+    draft or receipt is an idempotent no-op, so a repeated reset succeeds.
+
+    A failure anywhere rolls the database back, restores the character and
+    gallery caches, drops every collected callback (so no file is unlinked)
+    and re-raises: a failed cleanup never reports a successful reset.
+    Removed files are unlinked only after the commit and after the locks were
+    released.
+    """
+    with draft_portrait_mutation(character) as unit:
+        snapshots = snapshot_attributes(character, _RESET_ATTRIBUTE_KEYS)
+        portrait_snapshot = snapshot_draft_portrait_state(character)
+        try:
+            with transaction.atomic():
+                _require_owned_pending(account, character)
+                clear_draft(character)
+                clear_draft_portrait(character, unit)
+        except BaseException:
+            unit.deferral.discard()
+            restore_draft_portrait_state(portrait_snapshot)
+            restore_attributes(character, snapshots)
+            raise
 
 
 def activate_draft(
@@ -707,37 +758,53 @@ def activate_draft(
     re-check inside the transaction: the first commit flips ``creation_pending``
     to false and clears the draft, and any later admission for the same shell
     fails its pending re-check rather than double-applying.
+
+    The serialized draft portrait unit is entered BEFORE the snapshots and
+    the outer transaction, so the background art worker can never settle a
+    creation job between the activation's reads and its commit; the nested
+    direct activation reuses the same unit. Commit callbacks run only after
+    the outer commit and after the queue serialization was released. The
+    draft portrait disposition itself (custom keeps, preset discards) is
+    applied inside ``activate_player_character``; this owner restores the
+    gallery caches when the outer commit fails.
     """
-    old_key = character.key
-    attribute_snapshots = snapshot_attributes(
-        character, _CREATION_ATTRIBUTE_KEYS + ("creation_draft",)
-    )
-    trait_snapshot = snapshot_traits(character)
-    origin = character.location
-    try:
-        with transaction.atomic():
-            if not bool(getattr(character, "creation_pending", False)):
-                # A character activated between render and submit is rejected as
-                # already complete regardless of whether a stale draft remains.
-                raise CharacterCreationError("character creation is already complete")
-            draft = read_draft(character)
-            if draft is None:
-                raise CharacterCreationError("no creation draft saved")
-            request = _request_from_draft(draft)
-            preflight_character_creation(account, character, request)
-            persona = draft.get("persona")
-            result = activate_player_character(
-                account, character, request,
-                persona=persona, write_observer=write_observer,
-            )
-    except Exception:
-        # Covers the outer-commit failure, where the inner activation's own
-        # except never ran (subrace-start-settlements D4).
-        restore_activation_placement(character, origin)
-        character.key = old_key
-        restore_traits(character, trait_snapshot)
-        restore_attributes(character, attribute_snapshots)
-        raise
+    with draft_portrait_mutation(character) as unit:
+        old_key = character.key
+        attribute_snapshots = snapshot_attributes(
+            character, _CREATION_ATTRIBUTE_KEYS + ("creation_draft",)
+        )
+        trait_snapshot = snapshot_traits(character)
+        portrait_snapshot = snapshot_draft_portrait_state(character)
+        origin = character.location
+        try:
+            with transaction.atomic():
+                if not bool(getattr(character, "creation_pending", False)):
+                    # A character activated between render and submit is
+                    # rejected as already complete regardless of whether a
+                    # stale draft remains.
+                    raise CharacterCreationError("character creation is already complete")
+                draft = read_draft(character)
+                if draft is None:
+                    raise CharacterCreationError("no creation draft saved")
+                request = _request_from_draft(draft)
+                preflight_character_creation(account, character, request)
+                persona = draft.get("persona")
+                result = activate_player_character(
+                    account, character, request,
+                    persona=persona, write_observer=write_observer,
+                )
+        except Exception:
+            # Covers the outer-commit failure, where the inner activation's
+            # own except never ran (subrace-start-settlements D4). The
+            # collected callbacks (arrival effects, the portrait ensure, a
+            # preset cleanup's file unlinks) are dropped with the rollback.
+            unit.deferral.discard()
+            restore_activation_placement(character, origin)
+            character.key = old_key
+            restore_traits(character, trait_snapshot)
+            restore_draft_portrait_state(portrait_snapshot)
+            restore_attributes(character, attribute_snapshots)
+            raise
     return result
 
 
@@ -777,6 +844,7 @@ __all__ = [
     "draft_fingerprint",
     "read_creation_view",
     "read_draft",
+    "reset_creation_draft",
     "save_custom_draft",
     "save_preset_draft",
 ]

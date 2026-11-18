@@ -255,7 +255,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "bcdff0b6ea87bb036f044d13e9f694fa08919e9a56d9e0a2e422b25e28cd5855",
+  "fingerprint": "6cdefa7cb644f7aac13489a84f098c58da6c1f2c545d354bdccc3a34274c8865",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -16615,7 +16615,7 @@
     "world/rules/camping.py": "19d4c1123af23841327252981c8ab51dbf8caea56fb7b80e7ff26c5cdca0e433",
     "world/rules/caravan_arrivals.py": "e811db84b8fd6992130ba77db149839f6159ff02097fff122c4ac96861248f39",
     "world/rules/cast_settlement.py": "7dc704ec3352f374216c83ee16d5b004bc46a3dfadb2be1010070eec6c5bf06a",
-    "world/rules/character_creation.py": "5f4dbd96722ca8214faab5a281f16aa92e2c78853011283eb0ae1960a2f0de39",
+    "world/rules/character_creation.py": "07424ce227ebfb644d93040c6d6345192dc3a4d81dfe314ee87d545bd206c34a",
     "world/rules/church.py": "d0d197ca2b70aa2623edeecf065f4d702789bfcfde32dc59d1e8b028397e7b52",
     "world/rules/church_rulebook.py": "7373da0ee3b9311dc8dbb1c768ff54437ad180a86307ef7fc2c6d3480f679f7e",
     "world/rules/clock.py": "7068284d0c3d688965208e61a6604368d7fc7d5f715a3917322962f8eaaa49a2",
@@ -16650,8 +16650,8 @@
     "world/rules/correspondence.py": "4c7601c0ac797ce0e16becc186da411d3746443dcf15911b3931842037c673f6",
     "world/rules/creation_identity.py": "30eca3c4f8330d88219597ec4a0d45e3d366ec321dc115552101d47bbfd73264",
     "world/rules/creation_messages.py": "6cfb1663d6bb4038d197a0f2cd8143b0bb2cee2ac84a4936e3c3742b575db4e6",
-    "world/rules/creation_portrait.py": "2e263258add56c626224c19250a23bc1fd676672832ed05c65ccbf07f74d1460",
-    "world/rules/creation_wizard.py": "a63e40d2178d02395a5da16ebc934b8831497245c5e6e9b3395c2e2097d01e6b",
+    "world/rules/creation_portrait.py": "65ff68c569e6b54556c177a52e9d8f1eeff40aa06eb1653ad97417dcc77fd893",
+    "world/rules/creation_wizard.py": "6cf90e167f6b6c01979171ca891a4bc7d41997ffd0ae3bc6f8a62acef0083edf",
     "world/rules/cross_lineage_unlock.py": "2d5be43005b3e54430e40fb48286367f88dc8a01b9b40d4fcd054c42f5d11d99",
     "world/rules/defeat_aftermath/__init__.py": "d21525ea09e3c34d72953eb6d9272371d94b5b76ebe37b39f7f3a0ffc09d3551",
     "world/rules/defeat_aftermath/aftermath.py": "ad09806eeef0efeaa53ae98a60b69a9f96b3e20fad3950f074b15840d9e95f7f",
@@ -16750,7 +16750,7 @@
     "world/rules/player_messages.py": "b6020c28561d50e49ea3aa6d39c22e913678b635d6c599e12fcae206d78b5456",
     "world/rules/pleasure.py": "09d5fdf11f720c6d0be2349542684b532d61f4a2a52cce84b81d6ab2204c02ab",
     "world/rules/possession.py": "bcf4f398e8195424bc0c950f49270bf0e70f0b71dd83df3a2a899432cbe7db8c",
-    "world/rules/presentation_events.py": "141f1525c3ef939af00e271525584f777c0411bf529f37ed789bfa70000c3f21",
+    "world/rules/presentation_events.py": "4bad13870c005c4483d69d79f47c9379f9cbb156fb7ca3825ea5227faf02bb4d",
     "world/rules/progression/__init__.py": "268a84e2b4cd3a9f4a8bc2d4df724fe863f6b1a59dabaab88d6babd0fbe9f886",
     "world/rules/progression/_constants.py": "2996c37a60e0f5a120ad7338062513bc7c995e67e9a7cc7169709396c7b058e3",
     "world/rules/progression/_gates.py": "7fb01e3def546107c9a8e2c8a7a749a63b2ec42cdb368ebd4ee2264ca17b825c",

@@ -124,6 +124,38 @@ def _gallery_job_in_flight_locked(subject: ArtSubject) -> bool:
     )
 
 
+def _cancel_gallery_jobs_locked(subject: ArtSubject, image_ids) -> int:
+    """Delete exactly the named per-image jobs of one subject (already serialized).
+
+    Only ``world.art.service``'s serialized creation-portrait cleanup uses
+    this, inside the caller's database transaction: unlike
+    :func:`_finish_gallery_job` a failed delete RAISES, so the caller's
+    transaction rolls back instead of claiming a cancellation that did not
+    happen. Each job is resolved by its own exact key and must name exactly
+    this subject and image; anything else is left untouched. A worker that
+    later settles a deleted job finds no record and publishes nothing (its
+    temporary output is discarded). Returns the number of deleted jobs.
+    """
+    deleted = 0
+    for image_id in image_ids:
+        if gallery_api._canonical_uuid_text(image_id) is None:
+            continue
+        for record in GalleryJobRecord.objects.filter(
+            db_key=gallery_record_key(subject, image_id)
+        ).order_by("pk"):
+            if (
+                not is_gallery_job(record)
+                or record.db.kind != subject.kind.value
+                or record.db.subject_key != subject.key
+                or record.db.gallery_image_id != image_id
+            ):
+                continue
+            if not record.delete():
+                raise RuntimeError(f"gallery job {record.db_key!r} could not be deleted")
+            deleted += 1
+    return deleted
+
+
 def gallery_job_in_flight(subject: ArtSubject) -> bool:
     """True when a pending or in-progress gallery job exists for the subject.
 

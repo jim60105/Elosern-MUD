@@ -6,7 +6,9 @@
 `world/rules/character_creation.py::finalize_player_portrait` SHALL accept an explicit skip flag,
 defaulting to generating. It SHALL establish the explicit named `portrait_policy` on every path,
 including the skipped one. A skipped creation
-SHALL enqueue nothing and SHALL preserve any already committed draft portrait. The flag SHALL
+SHALL enqueue nothing. It SHALL preserve a custom activation's already committed draft portrait,
+while a preset activation still discards creation-owned draft art before its normal portrait
+source (draft portrait lifecycle). The flag SHALL
 be read inside the activation transaction like
 the rest of the finalization, so a rollback adds no portrait state and preserves previously committed draft portrait state.
 

@@ -283,11 +283,14 @@ def _portrait_ensure_callbacks(callbacks):
 
     Activation may legitimately schedule other spec'd callbacks (the
     lore-codex panel push rides the origin reveal); the art-asset-lifecycle
-    contract counts exactly one portrait-ensure registration.
+    contract counts exactly one portrait-ensure registration. Activation runs
+    inside the serialized draft portrait unit, so its publication callbacks
+    ride one deferred drain; the drain's delivered callbacks are expanded.
     """
     return [
         callback
-        for callback in callbacks
+        for captured in callbacks
+        for callback in getattr(captured, "delivered", (captured,))
         if getattr(callback, "__qualname__", "").startswith("schedule_portrait_ensure")
     ]
 

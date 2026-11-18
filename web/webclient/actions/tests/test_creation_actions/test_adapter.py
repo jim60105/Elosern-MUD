@@ -327,5 +327,34 @@ class PortraitAdapterTests(CreationActionBase):
         self.assertEqual(result["code"], "already_complete")
         self.assertEqual(self._jobs(), [])
 
+    def test_a_confirmed_reset_discards_the_draft_portrait_too(self):
+        _creation_custom_adapter(self.character, custom_payload())
+        self.assertEqual(self._run()["code"], "portrait_requested")
+        policy = dict(self.character.db.portrait_policy)
+        with self.captureOnCommitCallbacks(execute=True):
+            result = _creation_reset_adapter(self.character, {})
+        self.assertEqual(result["outcome"], "success")
+        self.assertEqual(result["code"], "draft_cleared")
+        self.assertEqual(result["affected_panels"], ("creation",))
+        self.assertIsNone(read_draft(self.character))
+        self.assertIsNone(self.character.db.creation_portrait)
+        self.assertEqual(self._jobs(), [])
+        self.assertEqual(dict(self.character.db.portrait_policy), policy)
+        self.assertTrue(self.character.creation_pending)
+
+    def test_a_failed_cleanup_is_never_reported_as_a_reset(self):
+        _creation_custom_adapter(self.character, custom_payload())
+        self._run()
+        receipt = dict(self.character.db.creation_portrait)
+        with patch(
+            "world.art.gallery._remove_cards_locked",
+            side_effect=RuntimeError("injected cleanup failure"),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "injected cleanup failure"):
+                _creation_reset_adapter(self.character, {})
+        self.assertIsNotNone(read_draft(self.character))
+        self.assertEqual(dict(self.character.db.creation_portrait), receipt)
+        self.assertEqual(len(self._jobs()), 1)
+
 if __name__ == "__main__":
     unittest.main()

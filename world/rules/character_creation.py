@@ -58,6 +58,10 @@ _CREATION_ATTRIBUTE_KEYS = (
     # Activation records the start-room arrival (subrace-start-settlements
     # D4); a rolled-back activation must leave no map-knowledge record.
     "map_knowledge",
+    # Activation drops the draft portrait receipt (custom) or discards the
+    # creation output with it (preset, creation-draft-portrait-cleanup); a
+    # rolled-back activation keeps the previously committed receipt.
+    "creation_portrait",
 )
 
 # The single deterministic race-bound mapping every identity channel and the
@@ -500,17 +504,23 @@ def finalize_player_portrait(character: Any, *, skip_portrait: bool = False) -> 
     character that never requested one gains its policy here.
     ``schedule_portrait_ensure`` registers the exception-safe post-commit
     ensure. Must be called INSIDE the activation transaction
-    (fix-creation-finalization-safety D3): a rollback removes the policy
-    attribute and the registered on-commit job never fires, so no rolled-back
-    creation can leave portrait state behind.
+    (fix-creation-finalization-safety D3): a rollback removes any policy THIS
+    activation added and the registered commit callback never fires, so a
+    rolled-back activation adds no portrait state. State committed BEFORE the
+    activation — a draft portrait request's policy, receipt, cards and jobs —
+    is not the activation's and survives its rollback unchanged
+    (creation-draft-portrait-cleanup).
 
     ``skip_portrait`` (default False: generate) is the explicit player-created
     skip flag (change ``gallery-autogen-retrofit``): the named policy is still
     established on the skipped path — the character stays eligible for a later
-    request — but nothing is scheduled, leaving an empty gallery that resolves
-    through the standard chain's fallback seam. Like every other finalization
-    write, it is read inside the activation transaction, so a rollback leaves
-    no portrait state either way.
+    request — but nothing is scheduled. Skipping means "schedule no automatic
+    request"; it never deletes an already generated draft card, so a skipped
+    custom activation keeps it, while an artless one resolves through the
+    standard chain's fallback seam. A draft card or in-flight creation job on
+    the same named subject satisfies the shared automatic-generation guard,
+    so the default path never queues a duplicate for it. Like every other
+    finalization write, the flag is read inside the activation transaction.
     """
     ensure_player_portrait_policy(character)
     if skip_portrait:
@@ -632,7 +642,51 @@ def activate_player_character(
     The character is moved into its subrace's start room and homed there
     inside the same transaction (subrace-start-settlements); a failure returns
     it to where it stood.
+
+    Draft portrait disposition (creation-draft-portrait-cleanup): the whole
+    activation runs inside the pending character's serialized draft portrait
+    unit (``world.rules.creation_portrait.draft_portrait_mutation``), entered
+    before the preflight, snapshots and transaction; ``activate_draft``'s
+    outer entry is reused. A custom activation keeps the named subject, its
+    cards and any in-flight creation job and drops only the staging
+    ``creation_portrait`` receipt, so the shared automatic-generation guard
+    sees the existing work and queues no duplicate. A preset activation
+    discards the creation-owned cards/jobs (``clear_draft_portrait``) BEFORE
+    the shared portrait finalization, so the preset's normal official/
+    fallback/automatic sources decide its portrait. Either disposition rolls
+    back with the activation; removed files are unlinked only after commit.
     """
+    from world.rules.creation_portrait import draft_portrait_mutation
+
+    with draft_portrait_mutation(character) as unit:
+        return _activate_player_character_locked(
+            account,
+            character,
+            request,
+            unit,
+            write_observer=write_observer,
+            persona=persona,
+        )
+
+
+def _activate_player_character_locked(
+    account: Any,
+    character: Any,
+    request: CharacterCreationRequest,
+    unit: Any,
+    *,
+    write_observer: Callable[[str], None] | None,
+    persona: Mapping[str, Any] | None,
+) -> CharacterCreationResult:
+    """The activation body, run inside the character's serialized unit."""
+    from world.rules.creation_portrait import (
+        CREATION_PORTRAIT_ATTRIBUTE,
+        clear_draft_portrait,
+        restore_draft_portrait_state,
+        snapshot_draft_portrait_state,
+    )
+    from world.rules.presentation_events import on_publication_commit
+
     validated = preflight_character_creation(account, character, request)
     try:
         start_room = start_location.resolve_start_room(validated.subrace)
@@ -718,6 +772,7 @@ def activate_player_character(
     old_key = character.key
     attribute_snapshots = snapshot_attributes(character, _CREATION_ATTRIBUTE_KEYS)
     trait_snapshot = snapshot_traits(character)
+    portrait_snapshot = snapshot_draft_portrait_state(character)
     # Companions built during THIS activation attempt, kept for the except
     # branch below (preset-companion-activation).
     built_companions: list[Any] = []
@@ -785,7 +840,10 @@ def activate_player_character(
             from world.rules.map_knowledge import record_arrival
 
             record_arrival(character)
-            transaction.on_commit(
+            # Registered through the publication commit seam so the effects
+            # (which may take the art queue lock) run only after the commit
+            # AND after the serialized draft portrait unit released it.
+            on_publication_commit(
                 lambda: _run_start_arrival_effects(character, start_room, origin)
             )
             if write_observer:
@@ -820,6 +878,19 @@ def activate_player_character(
             # The request's explicit ``skip_portrait`` flag (default False)
             # still establishes the policy but schedules nothing
             # (gallery-autogen-retrofit).
+            # Draft portrait disposition (creation-draft-portrait-cleanup),
+            # BEFORE the finalizer registers its guarded ensure: a preset
+            # discards the creation-owned cards/jobs and the receipt so it
+            # never inherits a custom image; a custom activation keeps the
+            # subject, cards and in-flight job and drops only the staging
+            # receipt. The stage fires only when a receipt existed.
+            if character.attributes.has(CREATION_PORTRAIT_ATTRIBUTE):
+                if request.mode == "preset":
+                    clear_draft_portrait(character, unit)
+                else:
+                    character.attributes.remove(CREATION_PORTRAIT_ATTRIBUTE)
+                if write_observer:
+                    write_observer("draft_portrait")
             finalize_player_portrait(character, skip_portrait=request.skip_portrait)
             if write_observer:
                 write_observer("portrait_policy")
@@ -839,6 +910,7 @@ def activate_player_character(
         restore_activation_placement(character, origin)
         character.key = old_key
         restore_traits(character, trait_snapshot)
+        restore_draft_portrait_state(portrait_snapshot)
         restore_attributes(character, attribute_snapshots)
         raise
     log_info(

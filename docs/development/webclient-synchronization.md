@@ -828,6 +828,107 @@ the existing activation gate stays authoritative. Creation, activation and
 deterministic gameplay remain available while art is offline; only this
 optional admission is refused.
 
+### Confirmed reset discards the creation portrait
+
+`creation.reset` keeps its payload (`{}`), its `draft_cleared` success and its
+`creation` panel, and still clears the session's transient proposal after the
+rules call succeeds. The rules owner is
+`world.rules.creation_wizard.reset_creation_draft`, not `clear_draft` (which
+stays portrait-free because activation also removes a draft).
+
+Every rules entry that reads or writes the receipt, its cards or its jobs —
+the portrait request, confirmed reset and both activation entries — enters
+`world.rules.creation_portrait.draft_portrait_mutation(character)` first. The
+order is deferred commit callbacks, then the shared art queue lock, then one
+database transaction, then the gallery lock. A write transaction never waits
+for the queue lock: an outer entry inside a caller's own open transaction is
+rejected before the lock is taken (Django's `durable` rule; the test
+framework's wrapper blocks are tolerated), and the background worker, which
+holds the queue lock while it waits for the database writer, can therefore
+never deadlock with it. The same character may nest on the same thread.
+
+Inside that unit the reset rechecks ownership and pending state, removes
+`creation_draft`, and calls `clear_draft_portrait`, which removes exactly:
+
+- the `creation_portrait` receipt itself;
+- the job records keyed by the receipt's `image_id` and `retained_image_id`
+  on the character's own `portrait:character:<pk>` subject;
+- the cards with those ids (a default naming one becomes `null`);
+- the subject's recorded generation error. A pending character's subject can
+  only carry creation work, so that error is the draft failure.
+
+The receipt is the only authority: no payload names a subject, card or image,
+and unrelated cards, other subjects, official preferences and the named
+`portrait_policy` stay unchanged. A missing receipt is an idempotent no-op,
+so a repeated reset succeeds. A present but malformed or unauthorized receipt
+is dropped without touching any card or job. Nothing is scheduled: no
+automatic portrait is queued for a pending character.
+
+Files are never unlinked inside the transaction. The removed cards' confined
+stored identities are unlinked by one `on_publication_commit` callback in the
+unit's deferral scope, so only a real commit qualifies them, and they run
+after the queue and gallery locks were released. A failed unlink is a bounded
+diagnostic. It never restores a card or falsifies the commit, and the
+unreferenced file is reclaimed by the startup orphan prune. No prune runs
+mid-game. A failure anywhere before the commit rolls the database back,
+restores the character and gallery attribute caches, drops every collected
+callback and re-raises, so the adapter never reports a failed cleanup as a
+reset.
+
+A canceled job's worker may still return. Settlement reloads its record by
+job key under the queue lock, finds none, discards the temporary output and
+publishes nothing: no card, no stored file, no recorded error and no
+completion push. A settlement that won the queue lock first publishes
+normally, and the reset that follows removes that card and its file.
+
+### Activation disposes of the draft portrait
+
+Both activation entries — `world.rules.creation_wizard.activate_draft` and the
+direct `world.rules.character_creation.activate_player_character` — enter
+`draft_portrait_mutation(character)` before their snapshots and outer
+transaction. The nested direct call reuses the caller's unit, so one
+activation acquires the queue serialization exactly once. The start-arrival
+effects register through `on_publication_commit`, like the portrait ensure, so
+every lock-taking callback runs only after the commit AND after the queue and
+gallery serialization were released. A failure restores the gallery card
+cache and the activation attributes while the unit still holds the queue
+lock; the collected callbacks are discarded and no file is unlinked.
+
+The disposition itself is decided inside the activation transaction, after the
+deterministic preflight and before the shared portrait finalizer:
+
+- **Custom activation keeps draft art.** The named subject, its cards and any
+  in-flight creation job are the player's already committed work, so only the
+  staging `creation_portrait` receipt is removed. The shared
+  `_gallery_auto_generation_pending` guard sees the surviving card or job and
+  the default path enqueues no duplicate request. A job admitted while the
+  character was pending may settle normally after activation on the same
+  subject; its queued description stays the admitted snapshot, never a reread
+  of newer form values. With no prior work the ordinary post-commit automatic
+  generation still applies. `skip_portrait` only suppresses automatic
+  scheduling; it never deletes a card itself.
+- **Preset activation discards creation-owned art.** The draft card and any
+  creation job are removed with `clear_draft_portrait` before the finalizer
+  registers its ensure, so the preset's normal official/fallback/automatic
+  source decides the activated portrait and never inherits the custom image.
+  When the preset's official reference is satisfied, the guard enqueues
+  nothing; otherwise the ordinary guarded automatic request remains eligible.
+  A skipped preset activation removes the same creation art and schedules
+  nothing. The removed files are unlinked by the same commit-qualified,
+  post-unlock callback as a reset, and a canceled job's late settlement
+  publishes nothing.
+
+Rollback restores only what the activation itself added. A receipt, named
+policy, cards, jobs and files committed before the activation belong to the
+pending character, not to the failed transaction, so they survive it
+unchanged. "A rolled-back creation leaves no portrait state" therefore means
+no **activation-added** policy or job; it does not erase the draft portrait.
+
+Identity edits (`sex`, `race`, `subrace`, `apparent age`), a concept apply and
+a revised custom save never invalidate, clear or regenerate the portrait and
+emit no mismatch warning. New art remains an explicit player request through
+`creation.portrait.generate`.
+
 ## Dialogue coupling
 
 Dialogue is a candidate dependency, not an unconditional transmission. Whenever
