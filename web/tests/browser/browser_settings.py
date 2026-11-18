@@ -208,6 +208,24 @@ ART_SD_CLIENT = _env_path(
     "world.art.fake_sd_client.FakeSDWebUIClient",
 )
 ART_SD_BASE_URL = "http://127.0.0.1:7860"
+# The connectivity verdict's settings (world.art.connectivity): this module
+# does not import the developer settings, so they are declared explicitly. A
+# missing knob would make every cached-verdict read an internal error, i.e. a
+# permanently "unavailable" creation portrait. No credentials ever.
+ART_SD_USERNAME = ""
+ART_SD_PASSWORD = ""
+ART_SD_PROBE_TIMEOUT_MS = 5000
+ART_SD_PROBE_CACHE_SECONDS = 300
+# The worker's local output pipeline and request knobs, at the production
+# defaults: a journey that drains a generation to a stored card (the
+# creation portrait journeys) reads every one of them.
+ART_SD_STYLES = ""
+ART_SD_MODULES = ""
+ART_SD_SERVER_RETAIN_IMAGES = True
+ART_SD_OUTPUT_FORMAT = "png"
+ART_SD_OUTPUT_EXTENSION = ".png"
+ART_SD_OUTPUT_QUALITY = 80
+ART_SD_PRESERVE_GENERATION_METADATA = True
 ART_SD_TIMEOUT_SECONDS = _env_int("ELOSERN_BROWSER_SD_TIMEOUT", 600)
 ART_SD_STEPS = 30
 ART_SD_CFG_SCALE = 7.0

@@ -75,6 +75,12 @@ export function useIntentHandlers(store, dispatchIntent) {
     store.requestCreationReset();
   }
 
+  // The creation portrait's explicit status refresh (creation-draft-portrait):
+  // the existing manual presentation sync, never a probe or a generation.
+  function onCreationRequestSync() {
+    return store.requestPresentationSync("manual");
+  }
+
   function onCreationCancelConfirm() {
     store.focusEscape();
   }
@@ -111,6 +117,7 @@ export function useIntentHandlers(store, dispatchIntent) {
     onCreationCancelConfirm,
     onCreationDispatch,
     onCreationRequestReset,
+    onCreationRequestSync,
     onCreateCharacter,
     onPartyBagAction,
     onPartyBagCombatItem,

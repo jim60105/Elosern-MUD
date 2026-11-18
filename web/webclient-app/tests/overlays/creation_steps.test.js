@@ -287,7 +287,7 @@ describe("CreationPortraitSlot: the persistent empty portrait", () => {
     expect(wrapper.find(tid("creation-portrait-silhouette")).exists()).toBe(false);
   });
 
-  it("shows the current name or an unnamed state, stays on every step and offers no control", async () => {
+  it("shows the current name or an unnamed state, stays on every step and emits nothing on its own", async () => {
     mountDraft();
     const name = wrapper.get(tid("creation-portrait-name"));
     expect(name.text()).toBe(DRAFT.display_name);
@@ -298,7 +298,9 @@ describe("CreationPortraitSlot: the persistent empty portrait", () => {
     for (const key of STEP_KEYS) {
       await openStep(key);
       expect(wrapper.get(tid("creation-portrait-slot")).isVisible()).toBe(true);
-      expect(wrapper.get(tid("creation-portrait-slot")).findAll("button")).toHaveLength(0);
+      // The generation control (creation-draft-portrait) is the slot's only
+      // action; merely showing the slot on a step uses none of it.
+      expect(wrapper.get(tid("creation-portrait-slot")).findAll("button")).toHaveLength(1);
     }
     expect(slot().emitted()).toStrictEqual({});
   });

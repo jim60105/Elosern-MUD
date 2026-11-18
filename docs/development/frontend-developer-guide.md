@@ -94,11 +94,12 @@ web/webclient/context_processors.py             webclient_vue_enabled 脈絡變�
 - **三步一直掛載。** 非目前步驟用 `v-show` 隱藏，因此不在焦點順序與無障礙樹中，原生 `validity` 仍可檢查。每個控制項帶 `data-creation-field`，值必須是 `FIELD_STEP` 的鍵。身分步驟的 DOM 順序維持「名稱、擲名、性別、年齡、外觀年齡、種族、種族說明、血統」，瀏覽器驗收的 Tab 順序依賴它；兩欄排版靠 CSS grid 完成。
 - **錯誤落點不是新驗證。** 頁尾「確認角色」呼叫 `CreationCustomSteps` 的 `submit()`：先記下第一個原生 `validity` 不合格的控制項，再原樣執行 `confirmCustom`（原生不合格不會阻擋送出，伺服器仍是權威），最後在原生錯誤與 `formErrorFields` 之中挑顯示順序最前的欄位，切到它的步驟並聚焦。`use-creation-custom.js` 的 `formErrorFields` 是與四個錯誤旗標同時寫入的欄位識別，步驟列與 `aria-invalid` 只讀它，不解析 `formMessage` 的文字。玩家在該步驟編輯後，該步驟的錯誤標記就撤下；表單訊息照舊保留到下一次送出。表單訊息在頁尾，位於「重設」與主要動作之間，不佔步驟頁高度。
 - **剩餘點數。** 步驟列第三格常駐顯示 `currentProfile.budget - allocationTotal`，不夾限、可為負；沒有對應的 profile 時顯示「—」，不臆造額度。
-- **肖像欄只讀 props。** `CreationOverlay` 依目前性別與外觀年齡，在伺服器的 `custom.silhouettes` 中找出唯一符合的一列，把它的 descriptor 交給肖像欄；找不到唯一一列時傳 `null`，肖像欄顯示空框。瀏覽器不複製年齡帶規則。此變更只有空白狀態，沒有生成按鈕。
+- **肖像欄只讀 props，只發出意圖。** `CreationOverlay` 依目前性別與外觀年齡，在伺服器的 `custom.silhouettes` 中找出唯一符合的一列，把它的 descriptor 交給肖像欄；找不到唯一一列時傳 `null`，肖像欄顯示空框。瀏覽器不複製年齡帶規則。肖像欄另外收到面板的 `portrait`、`disabled`（共用的單一 mutation 閘門或已准入的請求）與 `canGenerate`：空白、繪製中、失敗、服務離線顯示剪影，完成時原樣顯示伺服器的 artwork（替代文字帶目前名稱）；繪製中與服務離線停用生成，服務離線另有「重新檢查」。狀態文字放在一個常駐的 `role="status"` 區域，失敗與離線顯示伺服器原因。轉圈與呼吸動畫只用 `--motion-spin`／`--motion-pending`，`reduced`／`off` 時停止。肖像欄只發出 `generate` 與 `refresh-status`，從不送出動作。
+- **生成 drawer 是圖庫的那一個。** 外框把真正的 `GalleryGenerateDrawer` teleport 到 body，傳 `context="creation"` 與只開放補充提示詞的 view model（`use-creation-portrait.js::CREATION_DRAWER_MODEL`）。creation 情境換成建角文案與兩欄版面、靠右的閱讀寬度，不顯示裝備與角色資料連結；`unavailableReason` 非空時停用送出、保留可編輯的提示詞，並在 drawer 的焦點陷阱內提供「重新檢查」。沒有傳 `context` 的圖庫用法完全不變。請求、結果對應與重新連線的規則見 `webclient-synchronization.md` 的〈The client side of the creation portrait〉。
 
 概念生成模式是左側的 `CreationConceptGuide` 引導欄加上右側的概念輸入框。引導欄只讀目前提案：字串非空、數字有限（0 也算）、清單非空、配點物件至少一軸是數字，才算有值；一個項目對應的鍵只要有一個有值就打勾。性別與肖像永遠不列入。
 
-- **測試。** `tests/overlays/creation_steps.test.js` 涵蓋步驟導覽、剩餘點數、錯誤落點與肖像欄查表；`concept_fill_navigation.test.js` 涵蓋概念套用回到第一步與引導欄打勾。測試只用合成面板，不釘問題、清單文案或標記結構；這些由 `openspec/changes/creation-stepped-form/visual-review.md`（封存後在 archive 目錄）人工審查。Storybook 有 `Overlays/CreationCustomSteps`、`Overlays/CreationPortraitSlot`、`Overlays/CreationConceptGuide` 三個元件故事，`Overlays/CreationOverlay` 則涵蓋每一步、錯誤落點、空白肖像欄與引導欄的三種狀態。
+- **測試。** `tests/overlays/creation_steps.test.js` 涵蓋步驟導覽、剩餘點數、錯誤落點與肖像欄查表；`concept_fill_navigation.test.js` 涵蓋概念套用回到第一步與引導欄打勾。測試只用合成面板，不釘問題、清單文案或標記結構；這些由 `openspec/changes/creation-stepped-form/visual-review.md`（封存後在 archive 目錄）人工審查。Storybook 有 `Overlays/CreationCustomSteps`、`Overlays/CreationPortraitSlot`（五種肖像狀態與閘門停用）、`Overlays/CreationConceptGuide` 三個元件故事，`Overlays/GalleryGenerateDrawer` 有 creation 情境的故事，`Overlays/CreationOverlay` 則涵蓋每一步、錯誤落點、每種肖像狀態、drawer 開啟、拒絕與服務離線，以及引導欄的三種狀態。肖像欄、drawer 與請求所有權的行為測試在 `tests/overlays/creation_portrait.test.js`，版面與文案由 `openspec/changes/creation-draft-portrait/visual-review.md` 人工審查。
 
 ## 等寬字體（Jim Mono TC）
 

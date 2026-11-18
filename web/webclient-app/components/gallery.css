@@ -60,3 +60,40 @@
 .gallery-editor-scene .gallery-editor-placeholder { height: auto; margin: 0; }
 .gallery-editor-scene figcaption { display: flex; align-items: baseline; justify-content: space-between; gap: calc(12px * var(--ui-scale)); padding: calc(10px * var(--ui-scale)) calc(6px * var(--ui-scale)) calc(4px * var(--ui-scale)); }
 .gallery-editor-scene figcaption strong { color: var(--paper-50); font-family: var(--f-display); letter-spacing: .06em; font-weight: normal; font-size: var(--text-lg); }
+
+/* The creation context (creation-draft-portrait): a focused page beside the
+   still-visible creation form — the drawer keeps the shared chrome but is
+   anchored to the right edge at a reading width, so the form behind the
+   scrim stays legible as the thing being illustrated. Inside, the portrait
+   plate (the current portrait or an empty plate) stands beside the one
+   prompt, the server's state and the notes. */
+.gallery-ui--creation .hud-drawer {
+  left: auto;
+  width: min(calc(880px * var(--ui-scale)), calc(100vw - 32px * var(--ui-scale)));
+}
+.gallery-creation {
+  grid-template-columns: calc(220px * var(--ui-scale)) minmax(0, 1fr);
+  gap: calc(24px * var(--ui-scale));
+  align-items: start;
+}
+.gallery-creation__reference {
+  display: grid;
+  gap: calc(8px * var(--ui-scale));
+  padding-bottom: calc(10px * var(--ui-scale));
+  background: radial-gradient(ellipse 90% 40% at 50% 100%, var(--gold-glow), transparent 75%), linear-gradient(180deg, var(--ink-900), var(--ink-860));
+}
+.gallery-creation__reference .gallery-editor-portrait,
+.gallery-creation__reference .gallery-editor-placeholder { height: calc(300px * var(--ui-scale)); }
+.gallery-creation__form { display: grid; gap: calc(14px * var(--ui-scale)); min-width: 0; }
+.gallery-creation__prompt textarea { min-height: calc(140px * var(--ui-scale)); }
+.gallery-creation__form .gallery-note { margin: 0; font-size: var(--text-xs); line-height: 1.6; color: var(--paper-300); }
+.gallery-creation__form .gallery-feedback { margin: 0; }
+.gallery-ui .gallery-feedback--offline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(12px * var(--ui-scale));
+  border-color: var(--seal-500);
+  background: var(--seal-glow);
+}
+.gallery-ui .gallery-feedback--offline button { margin-left: 0; flex: none; }
