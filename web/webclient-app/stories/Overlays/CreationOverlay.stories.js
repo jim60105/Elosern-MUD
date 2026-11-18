@@ -51,7 +51,32 @@ const fill = (testid, value) => () => {
   const field = document.querySelector(`[data-testid="${testid}"]`);
   if (!field) return;
   field.value = value;
-  field.dispatchEvent(new Event("input"));
+  field.dispatchEvent(new Event("input", { bubbles: true }));
+};
+
+// Selects commit through `change`, the event their v-model listens to.
+const choose = (testid, value) => () => {
+  const field = document.querySelector(`[data-testid="${testid}"]`);
+  if (!field) return;
+  field.value = value;
+  field.dispatchEvent(new Event("change", { bubbles: true }));
+};
+
+const step = (key) => click(`creation-steps-tab-${key}`);
+const SUBRACED_RACE = CREATION_PANEL_SAMPLE.custom.races.find((race) => Array.isArray(race.subraces)).key;
+
+// A partial proposal: some fill items omitted, zero-valued allocations and a
+// zero age still count as filled (the concept guide's marks).
+const CREATION_PANEL_PARTIAL_PROPOSAL_SAMPLE = {
+  ...CREATION_PANEL_SAMPLE,
+  proposal: {
+    revision: 1,
+    race: "human",
+    subrace: null,
+    allocations: { hp: 0, mp: 0, sp: 0, atk_phys: 0, agility: 0, defense: 0, magic_power: 0 },
+    persona: { personality: "謹慎多疑", life_story: "", habit: "" },
+    age: 0,
+  },
 };
 
 export default {
@@ -88,18 +113,81 @@ export const PresetWallBrowsing = {
   args: { creation: CREATION_PANEL_WALL_DRAFT_SAMPLE },
 };
 
-// The custom form resumed from the server-persisted draft, with the sticky
-// action bar carrying 重設 and the single primary 確認自訂.
+// The custom form resumed from the server-persisted draft on its first
+// step (身分), beside the portrait slot: the silhouette the server table names
+// for the draft's sex and apparent age, and the draft name beneath it. The
+// footer carries 重設 and the single primary 確認角色 on every step.
 export const CustomDraft = {
   render: renderOverlay,
   args: { creation: CREATION_PANEL_CUSTOM_DRAFT_SAMPLE },
 };
 
-// The concept tab: the free-text concept field with the primary 套用概念 in
-// the shared action bar.
+// Step 02 (角色故事): affinity, background and the persona triple.
+export const CustomStoryStep = {
+  render: (args) => renderAfterSteps(args, [step("story")]),
+  args: { creation: CREATION_PANEL_CUSTOM_DRAFT_SAMPLE },
+};
+
+// Step 03 (能力配置): the running total, the briefing and the seven axes in
+// two columns; the rail keeps the remaining points on every step.
+export const CustomAllocationStep = {
+  render: (args) => renderAfterSteps(args, [step("allocation")]),
+  args: { creation: CREATION_PANEL_CUSTOM_DRAFT_SAMPLE },
+};
+
+// A fresh custom form: unnamed, default sex and age, so the slot shows the
+// table's silhouette for that interval and the unnamed label.
+export const CustomEmptySlot = {
+  render: (args) => renderAfterSteps(args, [click("creation-mode-custom")]),
+  args: { creation: CREATION_PANEL_SAMPLE },
+};
+
+// An over-budget sum: the rail's remainder turns negative (never clamped).
+export const CustomOverBudget = {
+  render: (args) => renderAfterSteps(args, [step("allocation"), fill("creation-field-agility", "4")]),
+  args: { creation: CREATION_PANEL_CUSTOM_DRAFT_SAMPLE },
+};
+
+// Error routing: a subrace-bearing race without a subrace, confirmed from
+// the allocation step, reopens 身分 at the subrace select with 需修正.
+export const CustomIdentityError = {
+  render: (args) =>
+    renderAfterSteps(args, [choose("creation-race", SUBRACED_RACE), step("allocation"), click("creation-submit")]),
+  args: { creation: CREATION_PANEL_CUSTOM_DRAFT_SAMPLE },
+};
+
+// A partially filled persona reopens 角色故事 at its first empty textarea.
+export const CustomStoryError = {
+  render: (args) =>
+    renderAfterSteps(args, [step("story"), fill("creation-persona-habit", ""), step("identity"), click("creation-submit")]),
+  args: { creation: CREATION_PANEL_CUSTOM_DRAFT_SAMPLE },
+};
+
+// A budget mismatch reopens 能力配置 at its first axis.
+export const CustomAllocationError = {
+  render: (args) =>
+    renderAfterSteps(args, [step("allocation"), fill("creation-field-hp", "5"), step("identity"), click("creation-submit")]),
+  args: { creation: CREATION_PANEL_CUSTOM_DRAFT_SAMPLE },
+};
+
+// The concept tab: the guide column (nothing filled yet) beside the concept
+// field, with the primary 套用概念 in the shared action bar.
 export const ConceptMode = {
   render: (args) => renderAfterSteps(args, [click("creation-mode-concept")]),
   args: { creation: CREATION_PANEL_SAMPLE },
+};
+
+// The guide over a partial proposal: only the items it carries are marked.
+export const ConceptPartialProposal = {
+  render: (args) => renderAfterSteps(args, [click("creation-mode-concept")]),
+  args: { creation: CREATION_PANEL_PARTIAL_PROPOSAL_SAMPLE },
+};
+
+// The guide over a complete proposal: every listed item is marked; sex and
+// portrait are never listed.
+export const ConceptFullProposal = {
+  render: (args) => renderAfterSteps(args, [click("creation-mode-concept")]),
+  args: { creation: CREATION_PANEL_PROPOSAL_TRANSIENT_SAMPLE },
 };
 
 // The in-flight apply (retool-concept-fill-navigation D1): the dispatch is

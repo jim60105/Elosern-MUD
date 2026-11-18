@@ -1162,7 +1162,8 @@
         "web.tests.browser.test_browser_title_codex.TitleCodexBrowserTest.test_titles_tab_geometry_at_reference_viewports"
       ],
       "files_b": [
-        "web.tests.browser.test_browser_creation_custom.CustomCreationJourneys.test_custom_form_keyboard_journey_to_activation"
+        "web.tests.browser.test_browser_creation_custom.CustomCreationJourneys.test_custom_form_keyboard_journey_to_activation",
+        "web.tests.browser.test_browser_creation_custom.CustomCreationJourneys.test_stepped_form_keyboard_navigation_fits_both_viewports"
       ]
     },
     {

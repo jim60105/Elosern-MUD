@@ -1,0 +1,72 @@
+/* CreationConceptGuide (design §8): what to write, what gets filled, and
+   what never is. */
+.creation-guide {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ink-600) transparent;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+  box-sizing: border-box;
+  padding: var(--sp-5) var(--sp-6);
+  background: var(--panel);
+  border-top: 1px solid var(--band-edge);
+}
+
+.creation-guide__title {
+  margin: 0 0 var(--sp-3);
+  color: var(--gold-500);
+  font: 400 var(--text-xs) var(--f-sans);
+  letter-spacing: 0.24em;
+}
+
+.creation-guide__asks {
+  margin: 0;
+  padding-left: 1.6em;
+  color: var(--paper-200);
+  font: var(--text-md) / 1.9 var(--f-serif);
+}
+.creation-guide__asks li::marker { color: var(--gold-500); font-family: var(--f-num); }
+
+.creation-guide__fills {
+  display: grid;
+  grid-template-columns: repeat(2, max-content);
+  gap: var(--sp-2) var(--sp-6);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--paper-400);
+  font-size: var(--text-md);
+}
+.creation-guide__fills li { display: flex; align-items: center; gap: var(--sp-2); white-space: nowrap; }
+/* Filled vs. not is a filled vs. outlined diamond plus hidden text. */
+.creation-guide__fills i {
+  flex: none;
+  width: calc(8px * var(--ui-scale));
+  height: calc(8px * var(--ui-scale));
+  border: 1px solid var(--gold-600);
+  transform: rotate(45deg);
+  transition: background-color var(--motion-fast) var(--ease-standard);
+}
+.creation-guide__fills li[data-present="true"] { color: var(--paper-50); }
+.creation-guide__fills li[data-present="true"] i { background: var(--gold-400); border-color: var(--gold-400); }
+
+.creation-guide__sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.creation-guide__note {
+  margin: auto 0 0;
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--band-edge-dim);
+  color: var(--paper-400);
+  font-size: var(--text-xs);
+  line-height: 1.7;
+}

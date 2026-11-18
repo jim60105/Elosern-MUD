@@ -13,6 +13,7 @@ from .browser_helpers import (
     store_state,
     wait_for_store_state,
 )
+from .browser_base import ACCEPTANCE_VIEWPORTS, ui_scale
 from .test_browser_creation_base import CreationBrowserTest
 
 
@@ -21,7 +22,121 @@ def _press(page, key, wait_ms=60):
     page.wait_for_timeout(wait_ms)
 
 
+def _active_testid(page):
+    return page.evaluate(
+        "document.activeElement && document.activeElement.getAttribute('data-testid')"
+    )
+
+
+def _open_step(page, step):
+    """Open one custom-form step from the keyboard: focus its rail button and
+    press Enter, then wait until that step's page is the one displayed."""
+    page.evaluate(
+        "(s) => document.querySelector(`[data-testid=\"creation-steps-tab-${s}\"]`).focus()",
+        step,
+    )
+    _press(page, "Enter")
+    page.wait_for_function(
+        "(s) => { const p = document.querySelector(`[data-testid=\"creation-steps-panel-${s}\"]`);"
+        " return p && p.offsetParent !== null; }",
+        arg=step,
+        timeout=5000,
+    )
+
+
 class CustomCreationJourneys(CreationBrowserTest):
+    @covers_requirement("webclient-character-creation-ui::custom-step-navigation-preserves-unsent-form-authority")
+    def test_stepped_form_keyboard_navigation_fits_both_viewports(self):
+        page = self._login_creation()
+        install_outbound_recorder(page)
+        self._wait_creation_available(page)
+        self._focus_dock(page)
+        _press(page, "ArrowDown")  # 自訂角色
+        _press(page, "Enter")
+        page.wait_for_selector('[data-testid="creation-steps"]', timeout=30000)
+
+        for width, height in ACCEPTANCE_VIEWPORTS:
+            with self.subTest(viewport=(width, height)):
+                page.set_viewport_size({"width": width, "height": height})
+                page.wait_for_function(
+                    "(v) => getComputedStyle(document.documentElement)"
+                    ".getPropertyValue('--ui-scale').trim() === v",
+                    arg="%g" % ui_scale((width, height)),
+                    timeout=15000,
+                )
+                self.assertLessEqual(page.evaluate("document.documentElement.scrollWidth"), width)
+                for step in ("identity", "story", "allocation"):
+                    _open_step(page, step)
+                    metrics = page.evaluate(
+                        """(s) => {
+                          const pages = document.querySelector('.creation-steps__pages');
+                          const footer = document.querySelector('.creation-overlay__footer').getBoundingClientRect();
+                          const panel = document.querySelector(`[data-testid="creation-steps-panel-${s}"]`);
+                          const controls = [...panel.querySelectorAll('input, select, textarea, button')]
+                            .map((el) => el.getBoundingClientRect());
+                          const remaining = document.querySelector('[data-testid="creation-steps-remaining"]');
+                          return {
+                            overflow: pages.scrollHeight - pages.clientHeight,
+                            pageWidth: document.documentElement.scrollWidth,
+                            lowest: Math.max(...controls.map((r) => r.bottom)),
+                            highest: Math.min(...controls.map((r) => r.top)),
+                            rightmost: Math.max(...controls.map((r) => r.right)),
+                            footerTop: footer.top,
+                            remainingShown: !!remaining && remaining.offsetParent !== null,
+                          };
+                        }""",
+                        step,
+                    )
+                    # A normal step fits its page: no internal step scroll,
+                    # every control above the footer and inside the viewport.
+                    self.assertLessEqual(metrics["overflow"], 1, step)
+                    self.assertLessEqual(metrics["pageWidth"], width, step)
+                    self.assertGreaterEqual(metrics["highest"], 0, step)
+                    self.assertLessEqual(metrics["lowest"], metrics["footerTop"], step)
+                    self.assertLessEqual(metrics["rightmost"], width, step)
+                    self.assertTrue(metrics["remainingShown"], step)
+
+        # The rail is native buttons in Tab order, and previous/next moves
+        # focus into the newly shown step.
+        _open_step(page, "identity")
+        _press(page, "Tab")
+        self.assertEqual(_active_testid(page), "creation-steps-tab-story")
+        page.evaluate("document.querySelector('[data-testid=\"creation-steps-next\"]').focus()")
+        _press(page, "Enter", wait_ms=150)
+        self.assertTrue(
+            page.evaluate(
+                "document.querySelector('[data-testid=\"creation-steps-panel-story\"]')"
+                ".contains(document.activeElement)"
+            )
+        )
+        page.evaluate("document.querySelector('[data-testid=\"creation-persona-personality\"]').focus()")
+        page.keyboard.type("未送出的個性")
+
+        # The fresh form has a subrace-bearing race and no subrace: confirming
+        # from the allocation step sends nothing, reopens 身分 and focuses
+        # the subrace select, while the typed story text survives.
+        self.assertEqual(page.locator('[data-testid="creation-subrace"]').count(), 1)
+        self.assertEqual(
+            page.evaluate("document.querySelector('[data-testid=\"creation-subrace\"]').value"), ""
+        )
+        _open_step(page, "allocation")
+        page.evaluate("document.querySelector('[data-testid=\"creation-submit\"]').focus()")
+        _press(page, "Enter", wait_ms=150)
+        self.assertEqual(sent_action_count(page, "creation.custom"), 0)
+        self.assertEqual(_active_testid(page), "creation-subrace")
+        self.assertEqual(
+            page.evaluate(
+                "document.querySelector('[data-testid=\"creation-steps-tab-identity\"]')"
+                ".closest('li').getAttribute('data-state')"
+            ),
+            "error",
+        )
+        self.assertTrue(page.locator('[data-testid="creation-form-message"]').is_visible())
+        self.assertEqual(
+            page.evaluate("document.querySelector('[data-testid=\"creation-persona-personality\"]').value"),
+            "未送出的個性",
+        )
+
     @covers_requirement("webclient-character-creation-ui::the-creation-dock-is-keyboard-first-form-capable-and-confirmation-protected")
     @covers_requirement("creation-activation-gating::activation-confirmation-follows-a-successful-save")
     def test_custom_form_keyboard_journey_to_activation(self):
@@ -108,7 +223,9 @@ class CustomCreationJourneys(CreationBrowserTest):
 
         # Fill the seven allocation inputs deterministically from the
         # advertised profile: one greedy span-fill that sums exactly to the
-        # derived race/subrace budget.
+        # derived race/subrace budget. They live on the allocation step,
+        # opened from the step rail by keyboard.
+        _open_step(page, "allocation")
         for axis, value in draft["allocations"].items():
             page.evaluate(
                 "document.querySelector('[data-testid=\"creation-field-%s\"]').focus()" % axis
@@ -163,6 +280,7 @@ class CustomCreationJourneys(CreationBrowserTest):
         page.evaluate("document.querySelector('[data-testid=\"creation-subrace\"]').focus()")
         _press(page, "ArrowDown")
         page.wait_for_timeout(150)
+        _open_step(page, "allocation")
         for axis, value in draft["allocations"].items():
             page.evaluate(
                 "document.querySelector('[data-testid=\"creation-field-%s\"]').focus()" % axis

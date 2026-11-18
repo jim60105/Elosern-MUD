@@ -77,7 +77,7 @@ web/webclient/context_processors.py             webclient_vue_enabled 脈絡變�
 
 ## 角色創建介面
 
-`CreationOverlay` 是建角的全畫面外框：頁首三欄（標題、共用 `.ui-tabs` 模式分頁、副標），頁尾固定放「重設」與該模式的主要動作。確認畫面、結果訊息、表單訊息與不可用原因的 `data-testid` 由外框持有，子元件不得另建一條確認路徑。設計來源為 `docs/superpowers/specs/2026-11-17-creation-portrait-redesign-design.md` §4–§5。
+`CreationOverlay` 是建角的全畫面外框：頁首三欄（標題、共用 `.ui-tabs` 模式分頁、副標），頁尾固定放「重設」與該模式的主要動作。確認畫面、結果訊息、表單訊息與不可用原因的 `data-testid` 由外框持有，子元件不得另建一條確認路徑。設計來源為 `docs/superpowers/specs/2026-11-17-creation-portrait-redesign-design.md` §4–§8。
 
 預設角色模式是 `CreationPresetWall` 卡牌牆：
 
@@ -86,6 +86,19 @@ web/webclient/context_processors.py             webclient_vue_enabled 脈絡變�
 - **dock 的預設角色清單沒有任何列。** `creation_menu.js` 的 `menus.presets` 只是導覽標記（保留標題，讓 Escape 有一層可退），store 的 `handleCreationItem` 也沒有 preset 儲存分支。不要再加回可以直接儲存草稿的 dock 列。
 - **立繪。** 每張卡的 `artwork` descriptor 原樣交給 `ArtworkPreview`，瀏覽器不組圖片網址。立繪框在兩種狀態用同一套尺寸：高度等於卡片高度（`100cqh`），寬度為 `min(100%, 56.25cqh)`。收合卡比 9:16 窄，框就是卡片，`ArtworkPreview` 以 cover 與臉部框選置頂裁切；展開卡比 9:16 寬，立繪完整顯示。`flex-grow` 過渡時 `min()` 連續變化，所以不會跳動。時間與曲線只用 `--motion-*`／`--ease-*`，`reduced` 與 `off` 直接切換。
 - **測試。** 測試只用合成卡片，不指名出貨的預設角色、不釘卡片數量或文案；版面、裁切與文案由該變更的 `visual-review.md` 人工審查。Storybook 的 `Overlays/CreationPresetWall` 與 `Overlays/CreationOverlay` 用 `stories/fixtures/creation_wall.js` 的合成卡片，立繪借用內建預設圖。
+
+自由創建模式是左側的 `CreationPortraitSlot` 肖像欄加上右側的 `CreationCustomSteps` 分步表單：
+
+- **表單狀態只有一份。** `CreationCustomSteps` 收到的 `form` prop 就是 `useCreationOverlay` 回傳的綁定物件，元件在 setup 裡解構出原本的 ref，`v-model` 直接寫回同一批 ref。不要把這個物件包進 `reactive()`（ref 會被自動解包，寫入就斷了），也不要在子元件另建一份欄位狀態。草稿同步、提案填入與送出組裝仍由既有 composable 負責。
+- **步驟是本地狀態。** `composables/use-creation-steps.js` 持有目前步驟（`identity`／`story`／`allocation`）與欄位對步驟的靜態表 `FIELD_STEP`。步驟狀態建在 facade 裡、早於 proposal 群組，所以切換模式分頁不會重設步驟；只有從概念分頁新套用的提案會回到 `identity`，重建與重新掛載都不導覽。步驟不進草稿，也不送出任何動作。
+- **三步一直掛載。** 非目前步驟用 `v-show` 隱藏，因此不在焦點順序與無障礙樹中，原生 `validity` 仍可檢查。每個控制項帶 `data-creation-field`，值必須是 `FIELD_STEP` 的鍵。身分步驟的 DOM 順序維持「名稱、擲名、性別、年齡、外觀年齡、種族、種族說明、血統」，瀏覽器驗收的 Tab 順序依賴它；兩欄排版靠 CSS grid 完成。
+- **錯誤落點不是新驗證。** 頁尾「確認角色」呼叫 `CreationCustomSteps` 的 `submit()`：先記下第一個原生 `validity` 不合格的控制項，再原樣執行 `confirmCustom`（原生不合格不會阻擋送出，伺服器仍是權威），最後在原生錯誤與 `formErrorFields` 之中挑顯示順序最前的欄位，切到它的步驟並聚焦。`use-creation-custom.js` 的 `formErrorFields` 是與四個錯誤旗標同時寫入的欄位識別，步驟列與 `aria-invalid` 只讀它，不解析 `formMessage` 的文字。玩家在該步驟編輯後，該步驟的錯誤標記就撤下；表單訊息照舊保留到下一次送出。表單訊息在頁尾，位於「重設」與主要動作之間，不佔步驟頁高度。
+- **剩餘點數。** 步驟列第三格常駐顯示 `currentProfile.budget - allocationTotal`，不夾限、可為負；沒有對應的 profile 時顯示「—」，不臆造額度。
+- **肖像欄只讀 props。** `CreationOverlay` 依目前性別與外觀年齡，在伺服器的 `custom.silhouettes` 中找出唯一符合的一列，把它的 descriptor 交給肖像欄；找不到唯一一列時傳 `null`，肖像欄顯示空框。瀏覽器不複製年齡帶規則。此變更只有空白狀態，沒有生成按鈕。
+
+概念生成模式是左側的 `CreationConceptGuide` 引導欄加上右側的概念輸入框。引導欄只讀目前提案：字串非空、數字有限（0 也算）、清單非空、配點物件至少一軸是數字，才算有值；一個項目對應的鍵只要有一個有值就打勾。性別與肖像永遠不列入。
+
+- **測試。** `tests/overlays/creation_steps.test.js` 涵蓋步驟導覽、剩餘點數、錯誤落點與肖像欄查表；`concept_fill_navigation.test.js` 涵蓋概念套用回到第一步與引導欄打勾。測試只用合成面板，不釘問題、清單文案或標記結構；這些由 `openspec/changes/creation-stepped-form/visual-review.md`（封存後在 archive 目錄）人工審查。Storybook 有 `Overlays/CreationCustomSteps`、`Overlays/CreationPortraitSlot`、`Overlays/CreationConceptGuide` 三個元件故事，`Overlays/CreationOverlay` 則涵蓋每一步、錯誤落點、空白肖像欄與引導欄的三種狀態。
 
 ## 等寬字體（Jim Mono TC）
 

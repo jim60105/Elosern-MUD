@@ -109,7 +109,6 @@ proposal carried a value for each.
 - **WHEN** a worst-case proposal — three 600-code-point persona fields, a maximum background, a maximum display name, both ages, and an eight-element affinity set — renders through the panel
 - **THEN** it SHALL still fit the canonical envelope bound
 
-
 ### Requirement: Persona rides the custom draft, payload, and activation
 The `custom_filled` draft SHALL carry a required, nullable `persona` key holding either null or exactly `{personality, life_story, habit}` with each value 1..600 non-empty code points validated through the existing persona-block validator. Activation SHALL write the character's persona record from the custom draft's persona key (falling back to the existing background-only branch when it is null).
 
@@ -142,12 +141,7 @@ The `custom_filled` draft SHALL carry a required, nullable `persona` key holding
 - **THEN** it SHALL store the submitted persona value verbatim without any carry-over or race comparison
 
 ### Requirement: The browser form pre-fills from the proposal without submitting
-Whenever the rendered proposal's `revision` exceeds the last revision the browser applied, the
-browser creation form SHALL copy the proposal's race, subrace, allocations, and three persona
-fields, plus every present transient-fill field — display name, actual age, apparent age,
-background, and affinity elements (filtered to the incoming race's registered element keys and
-trimmed to its input bound) — into the local unsent form state and record that revision.
-The form SHALL NOT auto-submit.
+The browser creation form SHALL apply only a fresh proposal revision to local unsent fields, preserving omitted values subject to the incoming race’s affinity bound. It SHALL NOT auto-submit. Fresh completion from concept mode SHALL navigate to the identity step; unchanged rebuilds and remounts SHALL NOT navigate.
 
 #### Scenario: A proposal fills an untouched form
 - **WHEN** the panel delivers a proposal carrying the base fields and all five transient-fill
@@ -168,7 +162,7 @@ The form SHALL NOT auto-submit.
 
 #### Scenario: Applying from the concept tab lands on the custom tab
 - **WHEN** a fresh proposal revision is applied while the player is on the concept tab
-- **THEN** the form switches to the custom tab showing the filled values, one toast confirms the
+- **THEN** the form switches to the custom tab’s identity step showing the filled values, one toast confirms the
   apply, and no action is submitted
 
 #### Scenario: A remount fills without navigating
@@ -198,7 +192,7 @@ The form SHALL NOT auto-submit.
 
 #### Scenario: A fresh apply from the concept tab switches tabs with exactly one toast
 - **WHEN** a fresh apply completes while the player is on the concept tab
-- **THEN** the form SHALL switch to the custom tab automatically, and the client SHALL surface exactly one toast naming the applied proposal — the success confirmation, written by the form's own apply path through the action-feedback queue API, never duplicated by the result slice (which stays silent on success)
+- **THEN** the form SHALL switch to the custom tab’s identity step automatically, and the client SHALL surface exactly one toast naming the applied proposal — the success confirmation, written by the form's own apply path through the action-feedback queue API, never duplicated by the result slice (which stays silent on success)
 
 #### Scenario: A rebuild or remount fills without navigating
 - **WHEN** a panel rebuild or a remount re-renders an already-unconsumed proposal
@@ -206,7 +200,7 @@ The form SHALL NOT auto-submit.
 
 #### Scenario: The persona textareas stay visible and editable
 - **WHEN** the browser creation form is in custom mode
-- **THEN** the form SHALL keep the three persona textareas visible and editable at all times
+- **THEN** the form SHALL keep the three persona textareas visible and editable on the story step, preserving their values while other steps are displayed
 
 #### Scenario: An all-empty persona triple submits null
 - **WHEN** persona local validation — all-empty-or-all-filled — meets an all-empty triple
