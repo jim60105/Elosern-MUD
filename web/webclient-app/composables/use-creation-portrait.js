@@ -144,6 +144,9 @@ export function useCreationPortrait(props, form, emit) {
 
   function submitPortrait(event) {
     if (submitting.value) return;
+    // No client-side availability check: the drawer already disables submit
+    // from the committed unavailable state, and a stale client's submission
+    // is refused by the server, which stays authoritative.
     const age = apparentAge.value;
     const payload = {
       race: race.value ?? null,

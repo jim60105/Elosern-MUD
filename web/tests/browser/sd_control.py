@@ -112,6 +112,11 @@ def _run(op: str) -> dict:
     if op == "drain_sync":
         from world.art.worker import drain_synchronous
 
+        if read_mode("generate", "ok") == "hold":
+            # A held generation on the reactor thread would stall this poll
+            # (and the whole server) until the hold limit.
+            raise RuntimeError("drain_sync refuses a held generation mode; use drain")
+
         total = 0
         for _ in range(50):
             claimed = drain_synchronous(4)
@@ -134,10 +139,8 @@ def _run(op: str) -> dict:
 
         return {"ok": connectivity.probe(force=True).ok}
     if op == "cards":
-        from world.art.gallery import cards_for
+        from world.art.gallery import cards_for, record_for
         from world.art.subjects import named_character_subject
-
-        from world.art.gallery import record_for
 
         subject = named_character_subject(_creation_character())
         record = record_for(subject)
@@ -200,6 +203,10 @@ class SDControl:
     def __init__(self, path: Path | str):
         self.path = Path(path)
         self._seq = 0
+        # A stale command or acknowledgement can never answer this handle's
+        # numbering.
+        for suffix in (".cmd", ".ack"):
+            Path(str(self.path) + suffix).unlink(missing_ok=True)
         self.set(probe="ok", generate="ok")
 
     def set(self, **mode: str) -> None:
