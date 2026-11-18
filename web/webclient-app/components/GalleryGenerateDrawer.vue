@@ -11,8 +11,21 @@ const props = defineProps({
   preview: { type: Object, default: null },
   disabled: { type: Boolean, default: false },
   rejected: { type: Boolean, default: false },
+  // creation-draft-portrait: the host context. "creation" switches the
+  // contextual copy for a character that does not exist yet and suppresses
+  // the gallery-only character link, equipment and gallery notes; the
+  // absent prop keeps every gallery behaviour.
+  context: { type: String, default: "gallery" },
+  // creation-draft-portrait: the server's unavailability reason from the
+  // committed creation portrait (empty otherwise). In creation context it
+  // disables submit, keeps the prompt editable and offers a status refresh.
+  unavailableReason: { type: String, default: "" },
 });
-const emit = defineEmits(["close", "submit", "character", "log"]);
+const emit = defineEmits(["close", "submit", "character", "log", "refresh-status"]);
+const creation = computed(() => props.context === "creation");
+// Server unavailability blocks only the submission; the prompt stays editable.
+const offline = computed(() => creation.value && props.unavailableReason !== "");
+const submitBlocked = computed(() => props.disabled || offline.value);
 const fields = ref([]);
 const prompt = ref("");
 const count = computed(() => [...prompt.value].length);
@@ -37,7 +50,7 @@ const reference = computed(() => {
 });
 
 function submit() {
-  if (!props.disabled) emit("submit", {
+  if (!submitBlocked.value) emit("submit", {
     fields: props.model.capabilities?.supports_field_selection ? [...fields.value] : [],
     custom_prompt: props.model.capabilities?.supports_free_text ? prompt.value : "",
   });
@@ -46,7 +59,7 @@ function submit() {
 
 <template>
   <div class="gallery-ui">
-    <HudDrawer :open="true" title="生成新圖" drawer-key="gallery-generate" @close="emit('close')">
+    <HudDrawer :open="true" :title="creation ? '繪製肖像' : '生成新圖'" :drawer-key="creation ? 'creation-portrait' : 'gallery-generate'" @close="emit('close')">
       <template v-if="landscape">
       <p class="gallery-muted">依照這個場景的設定，重新繪製它的背景圖。</p>
       <figure class="gallery-editor-scene" data-testid="gallery-generate__scene">
@@ -59,7 +72,8 @@ function submit() {
       </figure>
       </template>
       <template v-else>
-      <p class="gallery-muted">透過目前的角色資料，生成全新的角色肖像。</p>
+      <p v-if="creation" class="gallery-muted">依照目前填寫的種族、血統、性別與外觀年齡，為角色繪製肖像。</p>
+      <p v-else class="gallery-muted">透過目前的角色資料，生成全新的角色肖像。</p>
       <div class="gallery-editor-layout">
       <aside class="gallery-editor-reference">
         <ArtworkPreview v-if="preview?.artwork" class="gallery-editor-portrait" :artwork="preview.artwork" :panel="model" :view-subject-id="preview.image_id" :alt="preview.label" />
@@ -77,7 +91,7 @@ function submit() {
       </div>
       </div>
       </template>
-      <section v-if="model.equipment_summary" class="gallery-section">
+      <section v-if="!creation && model.equipment_summary" class="gallery-section">
         <h4>目前裝備摘要</h4>
         <button v-if="puppet" class="gallery-link" @click="emit('character')">從角色資料檢視</button>
         <div class="gallery-equipment">
@@ -97,14 +111,24 @@ function submit() {
         <textarea id="gallery-prompt" v-model="prompt" :disabled="disabled" placeholder="例如：月光下的城牆、回頭凝視、微笑……"></textarea>
         <p class="gallery-counter">{{ count }} / 512</p>
       </section>
+      <p v-if="offline" class="gallery-feedback gallery-feedback--offline" role="status" data-testid="gallery-generate__unavailable">
+        <span>{{ unavailableReason }}</span>
+        <button type="button" data-testid="gallery-generate__refresh" @click="emit('refresh-status')">重新檢查</button>
+      </p>
+      <template v-if="creation">
+      <p class="gallery-note">肖像只保留一張；重新繪製完成後會取代目前的肖像。</p>
+      <p class="gallery-note">送出後可以繼續填寫，完成的肖像會出現在左側的肖像欄。</p>
+      </template>
+      <template v-else>
       <p v-if="landscape" class="gallery-note">背景只保留一張，生成完成後會替換原圖；這是世界共用的背景，所有旅人看到的都會一起改變。</p>
       <p v-else-if="model.capabilities?.max_cards === 1" class="gallery-note">此圖庫保留一張肖像，生成完成後會替換原圖。</p>
       <p class="gallery-note">送出後會在圖庫中顯示生成中卡片，完成時自動加入圖庫。</p>
+      </template>
       <p v-if="rejected" class="gallery-feedback" role="status">操作未完成，輸入已保留。<button @click="emit('log')">查看伺服器訊息</button></p>
       <template #foot>
         <div class="gallery-actions">
           <button @click="emit('close')">取消</button>
-          <button class="gallery-primary" :disabled="disabled" @click="submit">開始生成</button>
+          <button class="gallery-primary" data-testid="gallery-generate__submit" :disabled="submitBlocked" @click="submit">開始生成</button>
         </div>
       </template>
     </HudDrawer>

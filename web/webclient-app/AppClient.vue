@@ -126,7 +126,7 @@ const {
   onAction, onDockActivate, onDockFocusChange,
   tradeNotice, tradePending, onShopTrade, clearTradeNotice,
   onPartyBagAction, onPartyBagCombatItem, onTitleBallotAction,
-  onCreationAction, onCreationDispatch, onCreationRequestReset, onCreationCancelConfirm,
+  onCreationAction, onCreationDispatch, onCreationRequestReset, onCreationRequestSync, onCreationCancelConfirm,
   onQuestAction, onPersonaEdit, onSubmitCommand, onSwitchCharacter, onCreateCharacter,
   npcPersonaEditor, npcPersonaSetField, npcPersonaSave, npcPersonaReload, npcPersonaDiscard,
   npcPersonaRetry, npcPersonaClose,
@@ -2072,6 +2072,8 @@ const rootStyle = computed(() => {
       @action="onCreationAction"
       @request-reset="onCreationRequestReset"
       @cancel-confirm="onCreationCancelConfirm"
+      @request-sync="onCreationRequestSync"
+      @log="openFullLog"
     />
 
     <!-- The full-log surface (design D4): the complete retained narrative,
@@ -2079,12 +2081,13 @@ const rootStyle = computed(() => {
          trapped, Escape-closing, with focus restored to the opener. While
          the gallery window is open it lifts above the modal tier, so a
          查看伺服器訊息 link inside a teleported gallery editor opens the log
-         over that editor. -->
+         over that editor; in creation mode the only opener is the portrait
+         drawer's same link, so the log lifts over that drawer too. -->
     <FullLogOverlay
       v-if="fullLogOpen"
       ref="fullLogRef"
       :lines="store.narrative"
-      :style="store.view.hudDrawer === 'gallery' ? { zIndex: 3100 } : null"
+      :style="store.view.hudDrawer === 'gallery' || store.view.mode === 'creation' ? { zIndex: 3100 } : null"
       @close="closeFullLog(true)"
     />
 

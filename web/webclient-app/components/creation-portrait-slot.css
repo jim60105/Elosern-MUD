@@ -1,5 +1,9 @@
-/* CreationPortraitSlot (design §7.1): a framed portrait column, the empty
-   state's silhouette standing on a pool of light, the name beneath. */
+/* CreationPortraitSlot (design §7.1): a framed portrait column — the figure
+   standing on a pool of light, the name on the band ornament, then a quiet
+   status plaque and the slot's one action. Every state differs from the
+   others by its heading text and its diamond mark's shape, not colour
+   alone; every animation runs on a motion token, so the reduced and off
+   levels resolve it to a static frame. */
 .creation-portrait {
   min-width: 0;
   min-height: 0;
@@ -17,9 +21,16 @@
     radial-gradient(ellipse 80% 45% at 50% 100%, var(--gold-glow), transparent 70%),
     linear-gradient(180deg, var(--ink-900), var(--ink-860));
   border: 1px solid var(--band-edge-dim);
+  transition: border-color var(--motion-base) var(--ease-standard);
 }
 
-.creation-portrait__figure {
+/* A finished portrait earns the gold frame; the floor light warms with it. */
+.creation-portrait[data-portrait="ready"] .creation-portrait__frame {
+  border-color: var(--band-edge);
+}
+
+.creation-portrait__figure,
+.creation-portrait__art {
   position: absolute;
   bottom: 0;
   left: 50%;
@@ -29,10 +40,55 @@
   transform: translateX(-50%);
 }
 
+/* The generated portrait fills the frame from the top, so a 3:4 or 9:16
+   card both read as a full-height figure. */
+.creation-portrait__art {
+  height: 100%;
+  animation: creation-portrait-arrive var(--motion-portrait) var(--ease-enter);
+}
+
+@keyframes creation-portrait-arrive {
+  from { opacity: 0; }
+}
+
 /* The shared alpha fill is near-black for light grounds; on this dark frame
    the empty figure is a slightly lifted ink shape that fades into the floor. */
 .creation-portrait__figure :deep(.artwork-alpha__fill) {
   background: linear-gradient(180deg, var(--ink-600), var(--ink-780) 70%, var(--ink-820));
+}
+
+/* Failed and offline keep the silhouette but let it recede a step. */
+.creation-portrait[data-portrait="failed"] .creation-portrait__figure,
+.creation-portrait[data-portrait="unavailable"] .creation-portrait__figure {
+  opacity: 0.7;
+}
+
+/* Pending: the silhouette breathes and a thin gold ring turns at its chest. */
+.creation-portrait[data-portrait="pending"] .creation-portrait__figure {
+  animation: creation-portrait-breathe var(--motion-pending) ease-in-out infinite;
+}
+
+@keyframes creation-portrait-breathe {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+
+.creation-portrait__spinner {
+  position: absolute;
+  top: 42%;
+  left: 50%;
+  width: calc(40px * var(--ui-scale));
+  height: calc(40px * var(--ui-scale));
+  margin: calc(-20px * var(--ui-scale)) 0 0 calc(-20px * var(--ui-scale));
+  border-radius: 50%;
+  border: 2px solid var(--ink-600);
+  border-top-color: var(--gold-400);
+  box-shadow: 0 0 calc(18px * var(--ui-scale)) var(--gold-glow);
+  animation: creation-portrait-spin var(--motion-spin) linear infinite;
+}
+
+@keyframes creation-portrait-spin {
+  to { transform: rotate(360deg); }
 }
 
 .creation-portrait__corner {
@@ -56,3 +112,69 @@
   overflow-wrap: anywhere;
 }
 .creation-portrait__name[data-unnamed="true"] { color: var(--paper-500); }
+
+/* The status plaque: a heading with its state mark, then the caption (the
+   design's fixed sentence, or the server's reason verbatim). */
+.creation-portrait__status {
+  flex: none;
+  display: grid;
+  gap: var(--sp-1);
+  padding: var(--sp-2) var(--sp-3);
+  border-left: 2px solid var(--gold-600);
+  background: linear-gradient(90deg, var(--gold-glow), transparent 85%);
+  outline: none;
+}
+.creation-portrait__status:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.creation-portrait__status[data-state="failed"],
+.creation-portrait__status[data-state="unavailable"] {
+  border-left-color: var(--seal-500);
+  background: linear-gradient(90deg, var(--seal-glow), transparent 85%);
+}
+
+.creation-portrait__state {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  color: var(--gold-300);
+  font: 400 var(--text-xs) / 1.4 var(--f-display);
+  letter-spacing: 0.16em;
+}
+.creation-portrait__status[data-state="failed"] .creation-portrait__state,
+.creation-portrait__status[data-state="unavailable"] .creation-portrait__state { color: var(--seal-light); }
+
+/* The state mark: an outlined diamond while nothing is drawn, a solid one
+   once the portrait is done, a half-filled one while drawing, and a crossed
+   one when something stands in the way. */
+.creation-portrait__mark {
+  flex: none;
+  width: calc(8px * var(--ui-scale));
+  height: calc(8px * var(--ui-scale));
+  transform: rotate(45deg);
+  border: 1px solid currentColor;
+}
+.creation-portrait__status[data-state="ready"] .creation-portrait__mark { background: currentColor; }
+.creation-portrait__status[data-state="pending"] .creation-portrait__mark {
+  background: linear-gradient(135deg, currentColor 50%, transparent 50%);
+}
+.creation-portrait__status[data-state="failed"] .creation-portrait__mark,
+.creation-portrait__status[data-state="unavailable"] .creation-portrait__mark {
+  background:
+    linear-gradient(45deg, transparent 44%, currentColor 44% 56%, transparent 56%),
+    linear-gradient(-45deg, transparent 44%, currentColor 44% 56%, transparent 56%);
+}
+
+.creation-portrait__caption {
+  margin: 0;
+  color: var(--paper-300);
+  font-size: var(--text-xs);
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.creation-portrait__actions {
+  flex: none;
+  display: flex;
+  gap: var(--sp-2);
+}
+.creation-portrait__actions > .ui-btn { flex: 1; min-width: 0; }

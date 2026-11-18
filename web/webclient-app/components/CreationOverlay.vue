@@ -24,6 +24,7 @@ import CreationPresetWall from "./CreationPresetWall.vue";
 import CreationCustomSteps from "./CreationCustomSteps.vue";
 import CreationPortraitSlot from "./CreationPortraitSlot.vue";
 import CreationConceptGuide from "./CreationConceptGuide.vue";
+import GalleryGenerateDrawer from "./GalleryGenerateDrawer.vue";
 
 // The shared mode tabs (design §4 labels), rendered in the header.
 const MODE_TABS = [
@@ -66,7 +67,10 @@ const props = defineProps({
   presentationContext: { type: Object, default: null },
 });
 
-const emit = defineEmits(["action", "request-reset", "cancel-confirm"]);
+// `request-sync` asks the host for the store's existing manual presentation
+// sync (the portrait status refresh); `log` opens the full log from the
+// portrait drawer's rejection feedback.
+const emit = defineEmits(["action", "request-reset", "cancel-confirm", "request-sync", "log"]);
 
 const creation = useCreationOverlay(props, emit);
 // The committed draft's preset key: the wall's entry card and its 目前草稿
@@ -96,6 +100,20 @@ const {
   requestReset,
   confirmCurrent,
   cancelConfirm,
+  portrait,
+  portraitSlot,
+  portraitDrawerOpen,
+  portraitRejected,
+  portraitUnavailableReason,
+  portraitSlotDisabled,
+  portraitDrawerDisabled,
+  portraitPreview,
+  portraitDrawerModel,
+  openPortraitDrawer,
+  closePortraitDrawer,
+  submitPortrait,
+  requestPortraitSync,
+  openPortraitLog,
 } = creation;
 
 // The empty portrait slot's silhouette: the single entry of the server's
@@ -212,7 +230,16 @@ function submitCustom() {
         />
 
         <div v-else-if="mode === 'custom'" class="creation-overlay__custom">
-          <CreationPortraitSlot :name="name" :silhouette="silhouette" />
+          <CreationPortraitSlot
+            ref="portraitSlot"
+            :name="name"
+            :silhouette="silhouette"
+            :portrait="portrait"
+            :disabled="portraitSlotDisabled"
+            :can-generate="true"
+            @generate="openPortraitDrawer"
+            @refresh-status="requestPortraitSync"
+          />
           <CreationCustomSteps ref="customSteps" :form="creation" />
         </div>
 
@@ -289,6 +316,27 @@ function submitCustom() {
         {{ reason }}
       </p>
     </div>
+
+    <!-- The real gallery generation drawer in creation context (design
+         §7.2), teleported to the body like the gallery's own editors so it
+         stands at the drawer tier above this overlay and keeps its own
+         focus trap and Escape. It receives a free-text-only view model and
+         emits data; the portrait composable owns the one dispatch. -->
+    <Teleport to="body">
+      <GalleryGenerateDrawer
+        v-if="portraitDrawerOpen && available && mode === 'custom'"
+        context="creation"
+        :model="portraitDrawerModel"
+        :preview="portraitPreview"
+        :disabled="portraitDrawerDisabled"
+        :rejected="portraitRejected"
+        :unavailable-reason="portraitUnavailableReason"
+        @close="closePortraitDrawer"
+        @submit="submitPortrait"
+        @refresh-status="requestPortraitSync"
+        @log="openPortraitLog"
+      />
+    </Teleport>
   </section>
 </template>
 
