@@ -251,7 +251,16 @@ class LandmarkRiteTests(_TravelStage):
         self.assertTrue(page.locator('[data-testid="rite-backdrop"]').is_visible())
         self.assertTrue(page.locator('[data-testid="anchor-actor-left"] [data-testid="companion-lineup"]').is_visible())
         self.assertEqual(page.locator('[data-testid="travel-map"]').count(), 0)
-        self.assertEqual(_page_text(page), _rite_panel()["guardian"]["form"])
+        form = _rite_panel()["guardian"]["form"]
+        # The stage's line replaces the previous page through the window's
+        # clear transition and types out at the reader's speed, so poll for
+        # the settled page instead of reading the outgoing one.
+        page.wait_for_function(
+            "(t) => ((document.querySelector('[data-testid=\"message-page\"]') || {}).innerText || '').trim() === t",
+            arg=form,
+            timeout=15000,
+        )
+        self.assertEqual(_page_text(page), form)
         self.assertTrue(page.evaluate(_PLATE_CLEAR))
         self._fits(page, "rite-panel", viewport)
 
