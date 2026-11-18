@@ -255,7 +255,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "b071de5d86e36bcebe5f0f7bb1c575b2976c99dc98df5336eaf995286b962b69",
+  "fingerprint": "bcdff0b6ea87bb036f044d13e9f694fa08919e9a56d9e0a2e422b25e28cd5855",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -16649,8 +16649,8 @@
     "world/rules/combat_view.py": "4200881cef76e3a9280eafa74fa3c52b88bb11389f346114af4106ad5ae92784",
     "world/rules/correspondence.py": "4c7601c0ac797ce0e16becc186da411d3746443dcf15911b3931842037c673f6",
     "world/rules/creation_identity.py": "30eca3c4f8330d88219597ec4a0d45e3d366ec321dc115552101d47bbfd73264",
-    "world/rules/creation_messages.py": "9bd38cb5fc1357d08453d2c2bd0553d8527701026e8ea0dd8c19b29eca1dfdb4",
-    "world/rules/creation_portrait.py": "f658f4de9aad5ebd53fd6c177782fd6263ea8c20e2955419b3dbec6468339d59",
+    "world/rules/creation_messages.py": "6cfb1663d6bb4038d197a0f2cd8143b0bb2cee2ac84a4936e3c3742b575db4e6",
+    "world/rules/creation_portrait.py": "2e263258add56c626224c19250a23bc1fd676672832ed05c65ccbf07f74d1460",
     "world/rules/creation_wizard.py": "a63e40d2178d02395a5da16ebc934b8831497245c5e6e9b3395c2e2097d01e6b",
     "world/rules/cross_lineage_unlock.py": "2d5be43005b3e54430e40fb48286367f88dc8a01b9b40d4fcd054c42f5d11d99",
     "world/rules/defeat_aftermath/__init__.py": "d21525ea09e3c34d72953eb6d9272371d94b5b76ebe37b39f7f3a0ffc09d3551",

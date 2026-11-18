@@ -78,7 +78,7 @@ unchanged, while its own `map.view` completions (updates) never do.
 | `status` | 6 | Each `fatigue` row is `{identity, name, reserve_percent, stage, label, severity, restriction, asleep}`; `asleep` is the canonical posture (voluntary and forced sleep) and agrees with the sleeping stages. Rows are the status source, the controlled body, then each further source-present traveller with readable physiology, at most 8. Version 6 adds the required `travel_capacity` (wilderness-travel-leg-ui): `null` outside wilderness exploration, when the party has no constructed physiology, or when the read fails (logged as `status_travel_capacity_unavailable`; the rest of the panel still renders). Inside it is exactly `{capacity: {normal, light, moderate, severe}, neighbours: [{exit_ref, seconds}], at_pace: {cautious, standard}}`: `capacity` counts hypothetical one-cell orthogonal foot steps on the current cell's terrain by worst after-step stage (the terminal exact-zero `forced_sleep` arrival counts in `severe`; flight never applies); `neighbours` holds at most 12 quotes, one per committed exploration move row by its opaque `exit_ref`, with `seconds` the existing preflight duration after the flight waiver (0 when flying) or `null` for a withheld destination, a disabled row, a settlement gateway or a refused/unresolved step; `at_pace` says whether the current worst stage already meets the cautious (light) and standard (moderate) thresholds. Neither field is an eligibility decision. Version 5 is rejected; there is no compatibility form. |
 | `area_map` | 2 | Unchanged. The travel stage decodes the wilderness window through `lib/travel-grid.js` until window-ui's schema cutover. |
 
-### Creation panel artwork (schema 7)
+### Creation panel artwork (schema 7, carried forward in 8)
 
 `creation` schema version 7 adds two canonical artwork fields
 (`creation-panel-artwork`): every `presets[]` card carries `artwork`, and
@@ -109,6 +109,82 @@ the table per pending character, using the prospective identity
 from `world/art/gallery_fallback.py`; the browser only looks a row up and
 copies no age-band rule. The preview is read-only and creates no character,
 gallery record, job or file.
+
+### Creation panel portrait (schema 8)
+
+`creation` schema version 8 (`creation-draft-portrait-panel`) adds the
+required `portrait` key to the available payload, which is now exactly
+`schema_version`, `available`, `kind`, `draft`, `presets`, `custom`,
+`portrait` and the optional `proposal`. The unavailable form keeps the common
+shape and carries no `portrait`. `CREATION_SCHEMA_VERSION` stays the single
+version authority; both exact validators reject v7 and every other version.
+
+`portrait` is a closed union keyed by `status`:
+
+| status | keys |
+|---|---|
+| `empty` | `status` |
+| `pending` | `status` |
+| `ready` | `status`, `artwork` (canonical descriptor) |
+| `failed` | `status`, `reason` |
+| `unavailable` | `status`, `reason` |
+
+`reason` is nonblank server-owned Traditional Chinese prose of at most 512
+code points (`MAX_PORTRAIT_REASON_CODE_POINTS` / `CREATION_MAX_PORTRAIT_REASON`);
+it never carries an exception, URL, prompt or endpoint. No key is nullable and
+no other key is accepted. The canonical byte cap is unchanged.
+
+`world/rules/creation_portrait.py::read_draft_portrait` derives the state as
+a pure read of the `creation_portrait` receipt, the exact job, card and error
+facts of the character's own `portrait:character:<pk>` subject, and the cached
+service verdict (`read_portrait_service_availability`). Presentation never
+probes, enqueues, establishes a policy or writes. Precedence:
+
+1. a present but malformed or unauthorized receipt (the named policy does not
+   name the character's own subject) is `unavailable` with a safe state reason;
+2. the receipt's admitted image still live in the queue is `pending`;
+3. a current failed service verdict is `unavailable` with its reason; an
+   absent, expired or configuration-mismatched verdict refuses nothing;
+4. the receipt's image settled into a presentable card is `ready`;
+5. a recorded generation error for that request is `failed`;
+6. anything else, including no receipt, is `empty`.
+
+Unavailability is transient: it neither cancels admitted work nor hides
+stored ownership, so an explicit `ui_sync` or reconnect after the verdict
+expires renders the same card ready again. A retained older card is not shown
+while a newer request is pending or failed. `ready` artwork is built by
+`world/art/presenter.py::draft_portrait_artwork`: exactly the receipt's own
+card as one runtime attempt at `portrait.default:<image_id>`, the subject's
+ordinary generation facts, the receipt's alpha terminal and no retention. No
+canonical-age eligibility call is made for this pending receipt, and no other
+subject or image is ever read. A subject-level error recorded by an older
+request can still show as `failed` until the next admission is claimed.
+
+#### Completion push
+
+`asset_completed` carries exactly `subject_key` and the canonical UUID
+`image_id` of each applied gallery settlement, success or failure. That
+includes the failures `_fail_batch` applies when the configured client cannot
+be constructed. Stale or no-op settlements emit nothing, and two images of
+one subject are two notifications. Art, gallery and roster matching is
+unchanged and uses only subject references. `creation` qualifies only for a
+creation-pending actor whose current receipt owns the completed image
+(`receipt_owns_image`). It is published as a standalone `creation`-affected
+intent: the coordinator renders it from current state at drain time, and the
+context factory rechecks ownership there. An older completion delivered after
+a newer admission or a reset publishes nothing.
+
+#### Client form synchronization
+
+The store's creation navigation signature stays preset keys, race keys and
+draft. A portrait-only publication creates a fresh but equal `draft` object, so
+`composables/use-creation-form.js` compares the presentation context and
+`stableStringify(draft)` against the last applied signature before it calls
+`syncFromDraft`. An equal draft in the same context leaves every local field,
+touched flag, mode, step and concept pin alone. A changed draft (a save or a
+confirmed reset) and a new presentation context (`AppClient` passes
+`{generation, epoch}`) still synchronize. A reconnect or a new actor is a new
+context and resynchronizes from the saved draft.
 
 ### Travel map repaint keys
 
