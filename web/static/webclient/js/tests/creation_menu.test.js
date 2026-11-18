@@ -116,10 +116,11 @@ function validPanel(overrides) {
     Object.assign({}, axes[k])
   );
   const panel = {
-    schema_version: 7,
+    schema_version: 8,
     available: true,
     kind: "creation",
     draft: null,
+    portrait: { status: "empty" },
     presets: [
       {
         key: SYNTH_PRESET.id,

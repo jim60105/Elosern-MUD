@@ -51,6 +51,11 @@ CREATION_REASON_MESSAGES: dict[str, str] = {
     "portrait_service_unavailable": "繪圖服務目前無法使用，請稍後再試一次。",
     "portrait_in_flight": "這個角色的肖像正在繪製中，請稍後再試。",
     "portrait_prompt_rejected": "補充提示詞格式不正確，請調整後再試。",
+    # Read-only creation portrait states (creation-draft-portrait-panel): the
+    # panel's ``portrait.reason`` texts for a settled failure and for a
+    # receipt the presenter cannot safely read.
+    "portrait_generation_failed": "肖像繪製失敗，請再試一次。",
+    "portrait_state_unavailable": "肖像狀態目前無法讀取。",
 }
 
 # Exact message fragments emitted by the deterministic service, mapped to

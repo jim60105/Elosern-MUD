@@ -133,16 +133,28 @@ def _shipped_race_affinity(value):
     return normalized
 
 
-def _valid_payload(draft=None, custom=None, presets=None, proposal=None):
-    """A schema-valid creation payload derived from the immutable registries."""
+_DEFAULT_PORTRAIT = object()
+
+
+def _valid_payload(draft=None, custom=None, presets=None, proposal=None, portrait=_DEFAULT_PORTRAIT):
+    """A schema-valid creation payload derived from the immutable registries.
+
+    ``portrait`` is the wire value to carry verbatim (default: the empty
+    state); any value, including ``None``, replaces it for rejection tests.
+    """
     view = CreationView(
         presets=build_preset_cards() if presets is None else presets,
         custom=build_custom_form() if custom is None else custom,
         draft=draft,
     )
     from web.webclient.presentation.creation import _serialize
+    from world.rules.creation_portrait import DraftPortraitView, PORTRAIT_EMPTY
 
-    payload = _serialize(view, actor_identity="1")
+    payload = _serialize(
+        view, actor_identity="1", portrait=DraftPortraitView(status=PORTRAIT_EMPTY)
+    )
+    if portrait is not _DEFAULT_PORTRAIT:
+        payload["portrait"] = portrait
     if proposal is not None:
         # The wire dict rides directly for validation tests; the presenter
         # path serializes the snapshot itself.

@@ -23,6 +23,7 @@ Twisted thread with the lock released and a bounded timeout.
 import os
 import tempfile
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -64,6 +65,19 @@ _CONVERSION_ALLOWANCE_SECONDS = 60
 
 class WorkerStoreError(ValueError):
     """Raised when a validated output identity would escape the store root."""
+
+
+@dataclass(frozen=True)
+class ArtCompletion:
+    """One applied gallery-job settlement: exactly its subject and image.
+
+    Captured from the claim-time snapshot BEFORE the settle deletes the job,
+    so a completion always names the exact requested image. It carries no
+    output path, prompt or worker internal.
+    """
+
+    subject_key: str
+    image_id: str
 
 
 # Exactly one sd-webui generation may be in flight at a time (one worker
@@ -439,9 +453,23 @@ def _claim_pairs(
     ]
 
 
+def _completion(subject: ArtSubject, image_id: str) -> ArtCompletion:
+    return ArtCompletion(subject_key=subject.full(), image_id=image_id)
+
+
+def _append_completion(completions: list[ArtCompletion], completion: ArtCompletion) -> None:
+    """Keep one entry per exact ``(subject_key, image_id)`` pair.
+
+    Distinct images of one subject are distinct completions and are never
+    merged by subject.
+    """
+    if completion not in completions:
+        completions.append(completion)
+
+
 def _run_and_settle_batch(
     pairs: list[tuple[GalleryJobRecord, ArtSubject, str, str]],
-) -> list[ArtSubject]:
+) -> list[ArtCompletion]:
     """Generate and settle one claimed batch on the background thread.
 
     The client is resolved once per batch: a bad ``ART_SD_CLIENT`` dotted path
@@ -450,10 +478,12 @@ def _run_and_settle_batch(
     subject never fails its batch-mates and no claimed job is left
     ``in_progress``.
 
-    Returns the subjects whose status was actually applied (a card published or
-    a bounded gallery error recorded). A stale result whose claim was requeued
-    or reclaimed is excluded, so the completion notification is emitted only
-    for a result that is truly the current job.
+    Returns one :class:`ArtCompletion` per job whose status was actually
+    applied (a card published or a bounded gallery error recorded), including
+    every failure ``_fail_batch`` applied when the client cannot be resolved.
+    A stale result whose claim was requeued or reclaimed is excluded, so the
+    completion notification is emitted only for a result that is truly the
+    current job.
     """
     try:
         client = resolve_sd_client()
@@ -463,17 +493,18 @@ def _run_and_settle_batch(
             context={"endpoint": _sd_endpoint(), "code": "sd_client_config_error"},
             exc=error,
         )
-        _fail_batch(pairs, "sd_client_config_error")
-        return []
-    settled: list[ArtSubject] = []
+        return _fail_batch(pairs, "sd_client_config_error")
+    settled: list[ArtCompletion] = []
     for record, subject, token, job_key in pairs:
+        # Captured BEFORE the settle: a terminal gallery settle deletes the
+        # job record, so the completion's image id is never re-read after it.
+        image_id = str(record.db.gallery_image_id or "")
         outcome = _settle_one(client, record, subject, token)
         if outcome is None:
             continue
         status, _identity, error, applied = outcome
         if applied:
-            if subject.full() not in {s.full() for s in settled}:
-                settled.append(subject)
+            _append_completion(settled, _completion(subject, image_id))
             _log_settled(
                 job_key,
                 subject,
@@ -485,14 +516,18 @@ def _run_and_settle_batch(
 
 def _fail_batch(
     pairs: list[tuple[GalleryJobRecord, ArtSubject, str, str]], error: str
-) -> None:
+) -> list[ArtCompletion]:
     """Settle every claimed job ``failed``; event only when applied.
+
+    Returns the completions of the failures actually applied, so a batch
+    that could not even construct its client still notifies its watchers.
 
     A stale job (requeued or reclaimed mid-flight) settles to a no-op and must
     not fabricate a settle event. The job's card is never appended, the
     bounded code lands on the subject's gallery record, and the spent job
     record is deleted.
     """
+    applied_failures: list[ArtCompletion] = []
     for record, subject, token, job_key in pairs:
         # The event fields are captured BEFORE the settle: the terminal
         # gallery-failed settle deletes the job record.
@@ -508,6 +543,8 @@ def _fail_batch(
                 ArtAssetStatus.FAILED, error,
             )
             _log_settled(job_key, subject, ArtAssetStatus.FAILED, error)
+            _append_completion(applied_failures, _completion(subject, image_id))
+    return applied_failures
 
 
 def _lease_timeout() -> float:
@@ -536,20 +573,25 @@ def _lease_timeout() -> float:
     return int(settings.ART_SCHEDULER_LIMIT) * per_item + _LEASE_MARGIN_SECONDS
 
 
-def _notify_completed_batch(subjects: list[ArtSubject]) -> None:
-    """Emit ``asset_completed`` for the subjects that really settled.
+def _notify_completed_batch(completions: list[ArtCompletion]) -> None:
+    """Emit ``asset_completed`` once per applied settlement.
 
     Runs on the reactor thread (the ``deferToThread`` success callback) or on
     the calling thread in deterministic ``drain_synchronous`` tests. Never runs
     on the worker generation thread, so no subscriber touches the DB from a
-    worker thread. The payload carries only the completed full subject key.
+    worker thread. The payload carries exactly the completed full subject key
+    and the canonical image id of the settled job.
     """
-    if not subjects:
+    if not completions:
         return
     from world.art.signals import asset_completed
 
-    for subject in subjects:
-        asset_completed.send(sender=subject.__class__, subject_key=subject.full())
+    for completion in completions:
+        asset_completed.send(
+            sender=ArtCompletion,
+            subject_key=completion.subject_key,
+            image_id=completion.image_id,
+        )
 
 
 def drain(limit: int) -> int:
@@ -597,10 +639,10 @@ def drain(limit: int) -> int:
 
 def _run_and_release_slot(
     pairs: list[tuple[GalleryJobRecord, ArtSubject, str, str]],
-) -> list[ArtSubject]:
+) -> list[ArtCompletion]:
     """Run a claimed batch on the worker thread and always release the slot.
 
-    Returns the subjects whose terminal status was actually applied so the
+    Returns the completions whose terminal status was actually applied so the
     reactor-thread callback can emit the completion notification.
     """
     try:

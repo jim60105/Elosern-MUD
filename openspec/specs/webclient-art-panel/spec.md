@@ -219,11 +219,7 @@ descriptors SHALL reference catalog entries by their opaque IDs.
 
 Canonical requirement ID: `webclient-art-panel::worker-completion-pushes-a-targeted-art-panel-update`.
 
-When an art-worker asset or gallery job settles and emits `asset_completed`,
-the `world/art/` settle path SHALL emit a bounded server-side notification
-carrying only the completed subject key. The presentation layer SHALL publish
-all qualifying freshly rendered panels together in one affected-panel
-`ui_update` at a newer revision per session per notification.
+For each applied gallery-job settlement, `world/art/` SHALL emit a bounded reactor-side `asset_completed` notification carrying exactly the completed subject key and image id. Presentation SHALL publish qualifying fresh panels together at one newer revision per session/notification. Pending creation SHALL additionally require its current receipt to own that image.
 
 #### Scenario: A done scene reaches sessions currently showing that scene
 
@@ -288,13 +284,13 @@ all qualifying freshly rendered panels together in one affected-panel
 #### Scenario: Each eligible session re-renders independently
 
 - **WHEN** a completion notification is processed for each connected WebClient session with an active puppet and an already-attached coordinator
-- **THEN** the presentation layer independently re-renders `art`, `gallery`, and `roster` from that session's current canonical state and current owned presentation selection
+- **THEN** the presentation layer independently re-renders `art`, `gallery`, and `roster`, plus `creation` for a pending actor, from that session's current canonical state and current owned presentation selection
 
 #### Scenario: Each available panel qualifies independently
 
 - **WHEN** freshly rendered panels are evaluated against the completed subject key
 - **THEN** art qualifies when its current scene subject or any portrait-catalog entry references that key, gallery when its rendered `selected` or any subject listed in its rendered `groups` equals that key, and roster when any rendered character row's portrait subject key equals that key
-- **AND** a subject listed on the rendered gallery wall qualifies a gallery update even when it is not selected, and roster qualification is not limited to the current puppet or characters present in its room
+- **AND** a subject listed on the rendered gallery wall qualifies a gallery update even when it is not selected, roster qualification is not limited to the current puppet or characters present in its room, and creation qualifies only for its pending actor's own subject and current receipt image id
 
 #### Scenario: Publication proceeds without art and omits unavailable panels
 
@@ -305,7 +301,8 @@ all qualifying freshly rendered panels together in one affected-panel
 #### Scenario: Late completions gate on fresh references only
 
 - **WHEN** a completion notification is evaluated for staleness
-- **THEN** it is gated on the freshly rendered current references rather than remembered selections, rooms, sent payloads, or completed image identities; a completion for an old room, a vanished entity, or a gallery subject the wall no longer lists does not replace that panel's current content or restore an old selection, and a different panel still referencing the same subject remains eligible
+- **THEN** ordinary art/gallery/roster eligibility uses freshly rendered references rather than remembered selections, rooms, sent payloads, or completed image identities; a completion for an old room, vanished entity or unlisted gallery subject cannot restore old content/selection, and another current reference remains eligible
+- **AND** creation additionally matches the completed image id to its current owned receipt; an older or canceled request cannot publish creation state for a newer request
 
 #### Scenario: Completion rendering is pure presentation
 
@@ -341,6 +338,18 @@ all qualifying freshly rendered panels together in one affected-panel
 #### Scenario: A listed but unselected wall subject refreshes its tile
 - **WHEN** a gallery job settles for companion B while the session's rendered gallery lists B in its groups and has companion A selected
 - **THEN** that session receives one newer update containing gallery, whose B subject row carries the newly resolved artwork and card count, and `selected` still names A
+
+#### Scenario: Completion identity is bounded and complete
+- **WHEN** an applied gallery success or failure is notified
+- **THEN** the signal carries exactly `subject_key` and canonical UUID `image_id`, with no prompt, path or worker internals; stale token/no-op settlements emit nothing and distinct image ids are not merged by subject
+
+#### Scenario: Client construction failure publishes its applied failure
+- **WHEN** resolving the configured art client raises after jobs are claimed
+- **THEN** every failure actually applied by `_fail_batch` enters the same completion path, and the matching pending creation panel becomes failed without a poll, reconnect or new action
+
+#### Scenario: An old image cannot settle a newer creation display
+- **WHEN** a receipt admits a newer request before an older completion notification is delivered
+- **THEN** the older image cannot qualify a creation publication, and current ordinary art/gallery/roster reference matching remains unchanged
 
 ### Requirement: Art degradation never blocks gameplay or leaks rejected content
 Image generation/service or source failures SHALL degrade presentation without blocking deterministic gameplay. Expected absence SHALL use approved normal artwork fallback; unexpected reached failures SHALL remain local after fallback. Player/OOB explanations SHALL contain no traceback, filesystem root, credential or rejected prompt. Browser-only failures SHALL not imply backend telemetry.

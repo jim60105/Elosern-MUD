@@ -378,7 +378,13 @@ var CREATION_MAX_SILHOUETTES = 16;
 // cards to resolve to custom.races (webclient-creation-display-labels).
 // v7 adds each preset card's canonical artwork descriptor and the custom
 // form's silhouettes lookup table (creation-panel-artwork).
-var CREATION_SCHEMA_VERSION = 7;
+// v8 adds the required read-only `portrait` state union
+// (creation-draft-portrait-panel); v7 and every other version are rejected.
+var CREATION_SCHEMA_VERSION = 8;
+// The portrait reason bound in code points (mirror of
+// MAX_PORTRAIT_REASON_CODE_POINTS) and the closed status vocabulary.
+var CREATION_MAX_PORTRAIT_REASON = 512;
+var CREATION_PORTRAIT_STATUSES = ["empty", "pending", "ready", "failed", "unavailable"];
 // Affinity picker bounds (mirror of web.webclient.presentation.creation and
 // the deterministic max_affinity_elements mapping). The race maxima are
 // 2/1/0 for human/beastfolk/elf; the element set is exactly the eight lore
@@ -595,7 +601,7 @@ var PANEL_ALLOWLIST = {
   item_holdings: ITEM_HOLDINGS_SCHEMA_VERSION,
   objectives: 1,
   services: SERVICES_SCHEMA_VERSION,
-  creation: 7,
+  creation: 8,
   exploration: 7,
   character: 9,
   lineage: 2,
@@ -807,6 +813,8 @@ module.exports = {
   CREATION_SEX_DEFAULT: CREATION_SEX_DEFAULT,
   CREATION_MAX_SEX_OPTIONS: CREATION_MAX_SEX_OPTIONS,
   CREATION_MAX_SILHOUETTES: CREATION_MAX_SILHOUETTES,
+  CREATION_MAX_PORTRAIT_REASON: CREATION_MAX_PORTRAIT_REASON,
+  CREATION_PORTRAIT_STATUSES: CREATION_PORTRAIT_STATUSES,
   CREATION_SCHEMA_VERSION: CREATION_SCHEMA_VERSION,
   CREATION_MAX_AFFINITY_ELEMENTS: CREATION_MAX_AFFINITY_ELEMENTS,
   CREATION_AFFINITY_ELEMENTS: CREATION_AFFINITY_ELEMENTS,

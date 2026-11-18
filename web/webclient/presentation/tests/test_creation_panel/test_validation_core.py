@@ -71,6 +71,9 @@ class CreationPanelValidationTests(unittest.TestCase):
             # v6 is the pre-artwork version: the exact gate rejects it on both
             # ends (creation-panel-artwork "A stale schema version is rejected").
             (lambda p: p.update(schema_version=6), "legacy schema_version 6"),
+            # v7 is the pre-portrait version (creation-draft-portrait-panel).
+            (lambda p: p.update(schema_version=7), "legacy schema_version 7"),
+            (lambda p: p.update(schema_version=9), "future schema_version 9"),
             (lambda p: p.update(available=False), "available"),
             (lambda p: p.update(kind="services"), "kind"),
         ):
@@ -84,7 +87,7 @@ class CreationPanelValidationTests(unittest.TestCase):
     @covers_requirement("webclient-character-creation-ui::creation-presentation-derives-finite-controls-from-immutable-registries")
     def test_custom_descriptor_ships_server_labelled_sex_options(self):
         payload = validate_creation(_valid_payload())
-        self.assertEqual(payload["schema_version"], 7)
+        self.assertEqual(payload["schema_version"], 8)
         self.assertEqual(
             payload["custom"]["sex"],
             [
@@ -635,3 +638,136 @@ class CreationPanelValidationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ---------------------------------------------------------------------------
+# v8 portrait union (creation-draft-portrait-panel). The matrix mirrors the
+# browser validator's exactly (protocol_creation.test.js "creation v8 ...").
+# ---------------------------------------------------------------------------
+
+_PORTRAIT_IMAGE_ID = "0b1c2d3e-4f50-4617-8899-aabbccddeeff"
+_PORTRAIT_IDENTITY = f"gallery/character/1/{_PORTRAIT_IMAGE_ID}.png"
+_DIGEST = "a" * 64
+_NON_BMP = "\U00020BB7"
+
+
+def _ready_artwork(url=None):
+    return {
+        "subject_id": "portrait:character:1",
+        "revision": _DIGEST,
+        "generation_subject": "portrait:character:1",
+        "generation_state": "done",
+        "attempts": [
+            {
+                "type": "image",
+                "source_id": f"portrait.default:{_PORTRAIT_IMAGE_ID}",
+                "rank": 30,
+                "resource": {
+                    "resource_id": _PORTRAIT_IDENTITY,
+                    "version": _DIGEST,
+                    "url": f"/art/{_PORTRAIT_IDENTITY}" if url is None else url,
+                    "origin": "runtime",
+                    "geometry": {
+                        "image_size": {"width": 4, "height": 4},
+                        "face_rect": {"x": 0.35, "y": 0.02, "w": 0.28, "h": 0.16},
+                        "stage": {"scale": 1, "x": 0, "y": 0},
+                        "aspect_ratio": "3:4",
+                    },
+                },
+            }
+        ],
+        "terminal": {
+            "kind": "alpha_mask",
+            "source_id": "portrait.alpha:man",
+            "rank": 100,
+            "resource": {
+                "resource_id": "defaults/man.webp",
+                "version": _DIGEST,
+                "url": "/art/defaults/man.webp",
+                "origin": "silhouette",
+                "geometry": {
+                    "image_size": None,
+                    "face_rect": {"x": 0.35, "y": 0.02, "w": 0.28, "h": 0.16},
+                    "stage": None,
+                    "aspect_ratio": "3:4",
+                },
+            },
+        },
+        "retention_sources": [],
+    }
+
+
+_PORTRAIT_VALID = (
+    ("empty", {"status": "empty"}),
+    ("pending", {"status": "pending"}),
+    ("ready", {"status": "ready", "artwork": _ready_artwork()}),
+    ("failed", {"status": "failed", "reason": "肖像繪製失敗，請再試一次。"}),
+    ("unavailable", {"status": "unavailable", "reason": "繪圖服務目前無法使用。"}),
+    ("reason at the code-point bound", {"status": "failed", "reason": _NON_BMP * 512}),
+)
+
+_PORTRAIT_INVALID = (
+    ("null portrait", None),
+    ("string portrait", "ready"),
+    ("list portrait", []),
+    ("missing status", {}),
+    ("unknown status", {"status": "done"}),
+    ("non-string status", {"status": 1}),
+    ("empty with extra field", {"status": "empty", "extra": 1}),
+    ("empty with reason", {"status": "empty", "reason": "x"}),
+    ("empty with null artwork", {"status": "empty", "artwork": None}),
+    ("pending with artwork", {"status": "pending", "artwork": _ready_artwork()}),
+    ("ready without artwork", {"status": "ready"}),
+    ("ready with null artwork", {"status": "ready", "artwork": None}),
+    ("ready with malformed artwork", {"status": "ready", "artwork": {}}),
+    ("ready with an off-origin URL", {"status": "ready", "artwork": _ready_artwork("https://evil.example/x.png")}),
+    ("ready with a script URL", {"status": "ready", "artwork": _ready_artwork("javascript:alert(1)")}),
+    ("ready with reason", {"status": "ready", "artwork": _ready_artwork(), "reason": "x"}),
+    ("failed without reason", {"status": "failed"}),
+    ("failed with null reason", {"status": "failed", "reason": None}),
+    ("failed with empty reason", {"status": "failed", "reason": ""}),
+    ("failed with blank reason", {"status": "failed", "reason": "   "}),
+    ("failed with non-text reason", {"status": "failed", "reason": 1}),
+    ("failed with overlong reason", {"status": "failed", "reason": _NON_BMP * 513}),
+    ("failed with artwork", {"status": "failed", "reason": "x", "artwork": _ready_artwork()}),
+    ("unavailable without reason", {"status": "unavailable"}),
+    ("unavailable with blank reason", {"status": "unavailable", "reason": "\n\t "}),
+    ("unavailable with artwork", {"status": "unavailable", "reason": "x", "artwork": _ready_artwork()}),
+)
+
+
+class CreationPortraitValidationTests(unittest.TestCase):
+    """The closed portrait union, state by state and field by field."""
+
+    def setUp(self):
+        _open_t_creation_scope(self)
+        handle = patch(
+            "web.webclient.presentation.creation._validate_affinity",
+            _shipped_race_affinity,
+        )
+        handle.start()
+        self.addCleanup(handle.stop)
+
+    @covers_requirement("webclient-character-creation-ui::creation-portrait-state-is-a-closed-read-only-union")
+    def test_each_state_accepts_exactly_its_fields(self):
+        for label, portrait in _PORTRAIT_VALID:
+            with self.subTest(label=label):
+                validated = validate_creation(_valid_payload(portrait=deepcopy(portrait)))
+                self.assertEqual(validated["portrait"], portrait)
+
+    @covers_requirement("webclient-character-creation-ui::creation-portrait-state-is-a-closed-read-only-union")
+    def test_every_malformed_portrait_rejects_the_whole_panel(self):
+        for label, portrait in _PORTRAIT_INVALID:
+            with self.subTest(label=label):
+                with self.assertRaises(ProtocolValidationError):
+                    validate_creation(_valid_payload(portrait=deepcopy(portrait)))
+        missing = _valid_payload()
+        del missing["portrait"]
+        with self.assertRaises(ProtocolValidationError):
+            validate_creation(missing)
+
+    def test_a_ready_portrait_fits_well_inside_the_unchanged_byte_cap(self):
+        payload = validate_creation(
+            _valid_payload(portrait={"status": "ready", "artwork": _ready_artwork()})
+        )
+        self.assertLess(json_byte_size(payload), MAX_CANONICAL_JSON_BYTES // 4)

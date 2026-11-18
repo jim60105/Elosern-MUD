@@ -1305,7 +1305,8 @@
         "web.webclient.presentation.tests.test_lore_codex_registry_contract",
         "web.webclient.presentation.tests.test_local_map.test_gate_capacity",
         "web.webclient.presentation.tests.test_local_map.test_gateway_resolution",
-        "web.webclient.presentation.tests.test_local_map.test_grid_gateways"
+        "web.webclient.presentation.tests.test_local_map.test_grid_gateways",
+        "web.webclient.presentation.tests.test_creation_panel.test_portrait"
       ]
     },
     {

@@ -43,6 +43,27 @@ from ._support import (
 )
 
 
+def _capture_completions(case):
+    """Record every ``asset_completed`` payload as ``(subject, image)``."""
+    from world.art.signals import asset_completed
+
+    completed = []
+
+    def receiver(sender, **kwargs):
+        payload = {k: v for k, v in kwargs.items() if k != "signal"}
+        # The payload is bounded to exactly the two identity fields.
+        case.assertEqual(set(payload), {"subject_key", "image_id"})
+        completed.append((payload["subject_key"], payload["image_id"]))
+
+    asset_completed.connect(
+        receiver, dispatch_uid="gallery-asset-completed-test", weak=False
+    )
+    case.addCleanup(
+        lambda: asset_completed.disconnect(dispatch_uid="gallery-asset-completed-test")
+    )
+    return completed
+
+
 class GalleryWorkerTests(WorkerStoreIsolation):
     """Per-image gallery jobs published through the worker's settle boundary."""
 
@@ -90,19 +111,11 @@ class GalleryWorkerTests(WorkerStoreIsolation):
         fake.seed = 4242
         from world.art.signals import asset_completed
 
-        completed = []
-        asset_completed.connect(
-            lambda sender, subject_key, **_kwargs: completed.append(subject_key),
-            dispatch_uid="gallery-asset-completed-test",
-            weak=False,
-        )
-        self.addCleanup(
-            lambda: asset_completed.disconnect(dispatch_uid="gallery-asset-completed-test")
-        )
+        completed = _capture_completions(self)
         with self._client(fake):
             drain_synchronous(10)
-        # The targeted panel push still fires for a settled gallery job's subject.
-        self.assertEqual(completed, [self.character.full()])
+        # The targeted panel push fires for the settled job's exact image.
+        self.assertEqual(completed, [(self.character.full(), image_id)])
         identity = f"gallery/character/42/{image_id}.png"
         target = self.root / "gallery" / "character" / "42" / f"{image_id}.png"
         self.assertTrue(target.is_file())
@@ -285,3 +298,90 @@ class GalleryWorkerTests(WorkerStoreIsolation):
             self.assertIsNotNone(record)
             self.assertEqual(record.db.last_error_code, "sd_client_config_error")
             self.assertEqual(gallery_api.cards_for(subject), [])
+
+
+class GalleryCompletionIdentityTests(WorkerStoreIsolation):
+    """Each applied settlement notifies exactly its subject and image."""
+
+    _FIRST = "dddddddd-4444-4444-8444-444444444444"
+    _SECOND = "eeeeeeee-5555-4555-8555-555555555555"
+
+    def setUp(self):
+        super().setUp()
+        self.character = self._subject("42", ArtSubjectKind.CHARACTER)
+        self.completed = _capture_completions(self)
+
+    def _job(self, image_id):
+        return enqueue_gallery_job(
+            self.character,
+            "desc",
+            image_id=image_id,
+            binding=None,
+            face_rect=None,
+            requested_fields=[],
+        )
+
+    @covers_requirement("webclient-art-panel::worker-completion-pushes-a-targeted-art-panel-update")
+    def test_a_failed_settlement_notifies_its_image(self):
+        self._job(self._FIRST)
+        failing = FakeSDWebUIClient()
+        failing.fail_every_call(SDError("sd_connection_error", "offline"))
+        with self._client(failing):
+            drain_synchronous(10)
+        self.assertEqual(self.completed, [(self.character.full(), self._FIRST)])
+
+    @covers_requirement("webclient-art-panel::worker-completion-pushes-a-targeted-art-panel-update")
+    def test_two_images_of_one_subject_are_never_merged(self):
+        self._job(self._FIRST)
+        self._job(self._SECOND)
+        with self._client(FakeSDWebUIClient()):
+            drain_synchronous(10)
+        self.assertEqual(
+            sorted(self.completed),
+            sorted([(self.character.full(), self._FIRST), (self.character.full(), self._SECOND)]),
+        )
+
+    @covers_requirement("webclient-art-panel::worker-completion-pushes-a-targeted-art-panel-update")
+    def test_a_client_construction_failure_notifies_every_applied_failure(self):
+        self._job(self._FIRST)
+        self._job(self._SECOND)
+        with patch(
+            "world.art.worker.resolve_sd_client",
+            side_effect=RuntimeError("cannot construct the client"),
+        ):
+            drain_synchronous(10)
+        self.assertEqual(
+            sorted(self.completed),
+            sorted([(self.character.full(), self._FIRST), (self.character.full(), self._SECOND)]),
+        )
+        self.assertEqual(
+            gallery_api.record_for(self.character).db.last_error_code,
+            "sd_client_config_error",
+        )
+
+    def test_a_stale_claim_settles_to_no_completion(self):
+        self._job(self._FIRST)
+        claimed = claim(10)
+        pairs = [
+            (record, self.character, "stale-token", str(record.db_key))
+            for record in claimed
+        ]
+        with self._client(FakeSDWebUIClient()):
+            completions = _run_and_settle_batch(pairs)
+        self.assertEqual(completions, [])
+        with patch(
+            "world.art.worker.resolve_sd_client",
+            side_effect=RuntimeError("cannot construct the client"),
+        ):
+            self.assertEqual(_run_and_settle_batch(pairs), [])
+        self.assertEqual(self.completed, [])
+
+    def test_a_completion_is_a_frozen_two_field_value(self):
+        from dataclasses import FrozenInstanceError, fields
+
+        from world.art.worker import ArtCompletion
+
+        completion = ArtCompletion(subject_key=self.character.full(), image_id=self._FIRST)
+        self.assertEqual([field.name for field in fields(ArtCompletion)], ["subject_key", "image_id"])
+        with self.assertRaises(FrozenInstanceError):
+            completion.image_id = self._SECOND

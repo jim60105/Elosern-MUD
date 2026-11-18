@@ -12,6 +12,7 @@ import {
   CREATION_PANEL_PROPOSAL_SAMPLE,
   CREATION_PANEL_UNAVAILABLE_SAMPLE,
 } from "../../stories/fixtures.js";
+import { CREATION_PORTRAIT_STATES } from "../../stories/fixtures.js";
 import * as fx from "../store/protocol_fixtures.js";
 
 // Payload values referenced from the committed creation sample instead of
@@ -1184,5 +1185,209 @@ describe("CreationPresetWall real-store integration (creation-preset-card-wall)"
     expect(store.view.creationView.stage).not.toBe("confirm");
     expect(host.querySelector('[data-testid="creation-confirm"]')).toBeNull();
     expect(host.querySelector('[data-testid="creation-preset-wall"]')).not.toBeNull();
+  });
+});
+
+
+// -- Portrait publications preserve unsent form state ----------------------
+// (creation-draft-portrait-panel). A matching art settlement republishes a
+// freshly decoded creation panel whose draft object is new but whose saved
+// contents are equal; every unsent edit, the local step and the concept text
+// must survive, while real draft changes, a reset, a save and a new
+// presentation context still synchronize from the server draft.
+const PORTRAIT_SUBRACED = CREATION_PANEL_SAMPLE.custom.races.find((race) => (race.subraces ?? []).length > 0);
+// A wire-valid saved custom draft (a concrete subrace and the race's affinity
+// bound) so the real store validator admits it.
+const SAVED_CUSTOM_PANEL = {
+  ...CREATION_PANEL_CUSTOM_DRAFT_SAMPLE,
+  draft: {
+    ...CREATION_PANEL_CUSTOM_DRAFT_SAMPLE.draft,
+    race: PORTRAIT_SUBRACED.key,
+    subrace: PORTRAIT_SUBRACED.subraces[0],
+    affinity_elements: CREATION_PANEL_CUSTOM_DRAFT_SAMPLE.draft.affinity_elements.slice(0, 1),
+  },
+};
+const SAVED = SAVED_CUSTOM_PANEL.draft;
+
+describe("portrait publications keep the unsent custom form (real store)", () => {
+  let store;
+  let sender;
+  let host;
+  let appWrapper;
+  let revision;
+
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    store = useElosernStore();
+    sender = fx.createFakeSender();
+    store.setSender(sender);
+    revision = 1;
+  });
+
+  afterEach(() => {
+    appWrapper?.unmount();
+    document.body.innerHTML = "";
+    host = null;
+    appWrapper = null;
+    store.$dispose();
+  });
+
+  async function mountWith(panel) {
+    store.beginTransport(1);
+    store.setConnected(true);
+    store.setLoggedIn(true);
+    expect(
+      store.receive(1, "ui_snapshot", [fx.snapshot({ mode: "creation", revision, panels: { creation: structuredClone(panel) } })], {}).accepted,
+    ).toBe(true);
+    host = document.createElement("div");
+    host.id = "elosern-app";
+    document.body.appendChild(host);
+    appWrapper = mount(AppClient, { attachTo: host });
+    await nextTick();
+  }
+
+  async function publish(panel, generation = 1) {
+    revision += 1;
+    expect(
+      store.receive(generation, "ui_update", [fx.update({ mode: "creation", revision, panels: { creation: structuredClone(panel) } })], {}).accepted,
+    ).toBe(true);
+    await nextTick();
+    await nextTick();
+  }
+
+  const field = (testid) => host.querySelector(`[data-testid="${testid}"]`);
+  const overlay = () => field("creation-overlay");
+  const currentStep = () => host.querySelector('[aria-current="step"]')?.getAttribute("data-testid");
+
+  async function edit(testid, value) {
+    await appWrapper.find(`[data-testid="${testid}"]`).setValue(value);
+  }
+
+  // The unsent local edits across all three steps plus the concept field.
+  const EDITS = {
+    "creation-field-displayName": "本地未送出的名字",
+    "creation-field-apparentAge": "41",
+    "creation-background": "本地改寫的背景。",
+    "creation-persona-habit": "本地改寫的習慣。",
+    "creation-field-hp": "9",
+    "creation-field-atk_phys": "5",
+  };
+
+  async function editEverything() {
+    await appWrapper.find('[data-testid="creation-mode-concept"]').trigger("click");
+    await edit("creation-field-concept", "本地概念草稿");
+    await appWrapper.find('[data-testid="creation-mode-custom"]').trigger("click");
+    for (const [testid, value] of Object.entries(EDITS)) {
+      await edit(testid, value);
+    }
+    await appWrapper.find('[data-testid="creation-steps-tab-story"]').trigger("click");
+    expect(currentStep()).toBe("creation-steps-tab-story");
+  }
+
+  async function expectEditsKept() {
+    for (const [testid, value] of Object.entries(EDITS)) {
+      expect(field(testid).value, testid).toBe(value);
+    }
+    expect(overlay().getAttribute("data-mode")).toBe("custom");
+    expect(currentStep()).toBe("creation-steps-tab-story");
+  }
+
+  it("equal-draft pending/ready/failed panels keep every field, the step and the concept", async () => {
+    await mountWith(SAVED_CUSTOM_PANEL);
+    expect(overlay().getAttribute("data-mode")).toBe("custom");
+    await editEverything();
+    for (const state of ["pending", "ready", "failed"]) {
+      await publish({ ...SAVED_CUSTOM_PANEL, portrait: CREATION_PORTRAIT_STATES[state] });
+      expect(store.view.panels.creation.portrait.status).toBe(state);
+      await expectEditsKept();
+    }
+    await appWrapper.find('[data-testid="creation-mode-concept"]').trigger("click");
+    expect(field("creation-field-concept").value).toBe("本地概念草稿");
+  });
+
+  it("a changed saved draft still synchronizes the form", async () => {
+    await mountWith(SAVED_CUSTOM_PANEL);
+    await editEverything();
+    await publish({
+      ...SAVED_CUSTOM_PANEL,
+      portrait: CREATION_PORTRAIT_STATES.pending,
+      draft: { ...SAVED, display_name: "伺服器的新名字" },
+    });
+    expect(field("creation-field-displayName").value).toBe("伺服器的新名字");
+    expect(field("creation-background").value).toBe(SAVED.background);
+    expect(field("creation-field-hp").value).toBe(String(SAVED.allocations.hp));
+  });
+
+  it("a confirmed reset and the next saved draft synchronize again", async () => {
+    await mountWith(SAVED_CUSTOM_PANEL);
+    await editEverything();
+    await publish({ ...SAVED_CUSTOM_PANEL, draft: null });
+    // The very same contents saved again after the reset are a real change.
+    await publish(SAVED_CUSTOM_PANEL);
+    expect(field("creation-field-displayName").value).toBe(SAVED.display_name);
+    expect(field("creation-field-apparentAge").value).toBe(String(SAVED.apparent_age));
+  });
+
+  it("a correlated save adopts the saved draft and later portraits keep it", async () => {
+    await mountWith(SAVED_CUSTOM_PANEL);
+    await editEverything();
+    await appWrapper.find('[data-testid="creation-submit"]').trigger("click");
+    const save = sender.sent.actions.find((action) => action.action_id === "creation.custom");
+    expect(save).toBeTruthy();
+    expect(save.payload.display_name).toBe(EDITS["creation-field-displayName"]);
+    const saved = {
+      ...SAVED_CUSTOM_PANEL,
+      draft: {
+        ...SAVED,
+        display_name: save.payload.display_name,
+        apparent_age: save.payload.apparent_age,
+        background: save.payload.background,
+        allocations: save.payload.allocations,
+        persona: save.payload.persona,
+      },
+    };
+    expect(
+      store.receive(1, "ui_action_result", [fx.actionResult({ request_id: save.request_id, outcome: "success", code: "draft_saved", presentation_revision: revision + 1 })], {}).accepted,
+    ).toBe(true);
+    await publish(saved);
+    // The successful save opens the activation confirmation over the form;
+    // cancelling it returns to the form, which now holds the saved values.
+    expect(field("creation-confirm")).not.toBeNull();
+    store.focusEscape();
+    await nextTick();
+    await nextTick();
+    expect(field("creation-field-displayName").value).toBe(EDITS["creation-field-displayName"]);
+    await publish({ ...saved, portrait: CREATION_PORTRAIT_STATES.ready });
+    expect(field("creation-field-displayName").value).toBe(EDITS["creation-field-displayName"]);
+    expect(field("creation-field-hp").value).toBe(EDITS["creation-field-hp"]);
+  });
+});
+
+describe("the presentation context gates equal-draft synchronization", () => {
+  it("a new context resynchronizes an equal draft; the same context does not", async () => {
+    const wrapper = mount(CreationOverlay, {
+      props: {
+        creation: structuredClone(SAVED_CUSTOM_PANEL),
+        presentationContext: { generation: 1, epoch: "epoch-a" },
+      },
+    });
+    const name = () => wrapper.get('[data-testid="creation-field-displayName"]');
+    await name().setValue("未送出");
+    await wrapper.setProps({
+      creation: { ...structuredClone(SAVED_CUSTOM_PANEL), portrait: CREATION_PORTRAIT_STATES.ready },
+      presentationContext: { generation: 1, epoch: "epoch-a" },
+    });
+    expect(name().element.value).toBe("未送出");
+    await wrapper.setProps({
+      creation: structuredClone(SAVED_CUSTOM_PANEL),
+      presentationContext: { generation: 1, epoch: "epoch-b" },
+    });
+    expect(name().element.value).toBe(SAVED.display_name);
+    await name().setValue("又一次未送出");
+    await wrapper.setProps({
+      creation: structuredClone(SAVED_CUSTOM_PANEL),
+      presentationContext: { generation: 2, epoch: "epoch-b" },
+    });
+    expect(name().element.value).toBe(SAVED.display_name);
   });
 });

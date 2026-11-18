@@ -2068,6 +2068,7 @@ const rootStyle = computed(() => {
       :dispatch="onCreationDispatch"
       :dispatch-state="store.view.dispatch"
       :push-toast="store.pushToast"
+      :presentation-context="{ generation: store.view.generation, epoch: store.view.epoch }"
       @action="onCreationAction"
       @request-reset="onCreationRequestReset"
       @cancel-confirm="onCreationCancelConfirm"

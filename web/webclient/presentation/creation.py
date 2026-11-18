@@ -1,4 +1,4 @@
-"""Exact schema-version-7 ``creation`` panel and presenter (webclient-character-creation-ui).
+"""Exact schema-version-8 ``creation`` panel and presenter (webclient-character-creation-ui).
 
 The presenter serializes the frozen no-mutation creation view owned by
 ``world.rules.creation_wizard`` and validates its own output against the exact
@@ -16,7 +16,8 @@ member (namegen-creation-ui); version 5 renames the ``custom.adult``
 descriptor block to ``custom.age`` and drops the advertised minimums to 0
 (age-range-0-10000); version 6 adds canonical race display names; version 7
 adds each preset card's canonical ``artwork`` descriptor and the custom
-form's ``silhouettes`` lookup table (creation-panel-artwork).
+form's ``silhouettes`` lookup table (creation-panel-artwork); version 8 adds
+the required read-only ``portrait`` state union (creation-draft-portrait-panel).
 
 The payload shape and the exact shared bounds are mirrored by the client
 validator in ``web/static/webclient/js/elosern/protocol.js`` and guarded by a
@@ -47,6 +48,7 @@ from world.art import descriptors
 from world.art.presenter import (
     CREATION_PRESET_SUBJECT_PREFIX,
     CREATION_SILHOUETTE_SUBJECT_PREFIX,
+    draft_portrait_artwork,
     preset_artwork,
     silhouette_table,
 )
@@ -55,6 +57,17 @@ from world.lore.sex import SEX_VALUES
 from world.rules.character_creation import (
     MAX_PERSONA_FIELD_LENGTH,
     max_affinity_elements,
+)
+from world.rules.creation_messages import rejection_message
+from world.rules.creation_portrait import (
+    PORTRAIT_EMPTY,
+    PORTRAIT_FAILED,
+    PORTRAIT_PENDING,
+    PORTRAIT_READY,
+    PORTRAIT_STATE_UNAVAILABLE,
+    PORTRAIT_UNAVAILABLE,
+    DraftPortraitView,
+    read_draft_portrait,
 )
 from world.rules.creation_wizard import (
     CUSTOM_STAGE,
@@ -80,7 +93,9 @@ from world.rules.creation_wizard import (
 # form's ``silhouettes`` lookup table (creation-panel-artwork); the mirrored
 # JS validator moves together, so a stale v6 panel is rejected by the
 # exact-schema gate on both ends.
-CREATION_SCHEMA_VERSION = 7
+# v8 adds the required read-only ``portrait`` state union
+# (creation-draft-portrait-panel); v7 and every other version are rejected.
+CREATION_SCHEMA_VERSION = 8
 
 # Exact shared bounds (design D2) -- must stay equal in the JS validator and to
 # the creation-wizard view-builder caps (webclient-character-creation-ui D2).
@@ -110,6 +125,8 @@ MAX_SILHOUETTES = 16
 # The sex option list mirrors ``SEX_VALUES`` exactly (at most one entry per
 # member); the ceiling is a structural bound that must never bind real data.
 MAX_SEX_OPTIONS = 8
+# The portrait ``reason`` bound: nonblank server-owned prose, in code points.
+MAX_PORTRAIT_REASON_CODE_POINTS = 512
 # The exact eight lore element choices and their Chinese labels. The bound
 # mapping (human 2 / beastfolk 1 / elf 0) is derived from the deterministic
 # ``max_affinity_elements`` so the panel cannot drift from custom creation.
@@ -841,6 +858,42 @@ def _validate_proposal(value: Any) -> dict[str, Any]:
     return checked
 
 
+# The exact closed portrait union: each status's required keys (``status`` is
+# always required; nothing else is ever optional or nullable).
+_PORTRAIT_FIELDS = {
+    PORTRAIT_EMPTY: {"status"},
+    PORTRAIT_PENDING: {"status"},
+    PORTRAIT_READY: {"status", "artwork"},
+    PORTRAIT_FAILED: {"status", "reason"},
+    PORTRAIT_UNAVAILABLE: {"status", "reason"},
+}
+
+
+def _validate_portrait(value: Any) -> dict[str, Any]:
+    """Validate the required read-only portrait state union exactly.
+
+    ``empty``/``pending`` carry only ``status``; ``ready`` carries exactly a
+    canonical ``artwork`` descriptor; ``failed``/``unavailable`` carry exactly
+    a nonblank ``reason`` of at most ``MAX_PORTRAIT_REASON_CODE_POINTS`` code
+    points. A missing/null value, an unknown status, an extra or missing key
+    and a null artwork or reason all reject the whole panel.
+    """
+    if not isinstance(value, dict):
+        raise ProtocolValidationError("portrait must be an object")
+    status = value.get("status")
+    if not isinstance(status, str) or status not in _PORTRAIT_FIELDS:
+        raise ProtocolValidationError("portrait status is not a known state")
+    _require_exact_fields(value, "portrait", _PORTRAIT_FIELDS[status], {})
+    if status == PORTRAIT_READY:
+        return {"status": status, "artwork": validate_artwork(value["artwork"])}
+    if status in (PORTRAIT_FAILED, PORTRAIT_UNAVAILABLE):
+        reason = _require_str(value, "reason", maximum=MAX_PORTRAIT_REASON_CODE_POINTS)
+        if not reason.strip():
+            raise ProtocolValidationError("portrait reason must be non-empty")
+        return {"status": status, "reason": reason}
+    return {"status": status}
+
+
 def validate_creation(payload: Any) -> dict[str, Any]:
     """Validate one exact available ``creation`` payload.
 
@@ -850,7 +903,7 @@ def validate_creation(payload: Any) -> dict[str, Any]:
     _require_exact_fields(
         payload,
         "creation panel",
-        {"schema_version", "available", "kind", "draft", "presets", "custom"},
+        {"schema_version", "available", "kind", "draft", "presets", "custom", "portrait"},
         {"proposal": "optional"},
     )
     if _require_int(
@@ -877,6 +930,8 @@ def validate_creation(payload: Any) -> dict[str, Any]:
                 f"preset {card['key']} references non-existent race {card['race']}"
             )
 
+    portrait = _validate_portrait(payload["portrait"])
+
     result: dict[str, Any] = {
         "schema_version": CREATION_SCHEMA_VERSION,
         "available": True,
@@ -884,6 +939,7 @@ def validate_creation(payload: Any) -> dict[str, Any]:
         "draft": draft,
         "presets": presets,
         "custom": custom,
+        "portrait": portrait,
     }
     if "proposal" in payload:
         # The proposal key is present only while the session slot holds a
@@ -1046,11 +1102,37 @@ def _serialize_proposal(proposal: ProposalSnapshot | None) -> dict[str, Any] | N
     return proposal.as_dict()
 
 
+def _serialize_portrait(portrait: DraftPortraitView) -> dict[str, Any]:
+    """Project the immutable portrait read onto its exact wire state.
+
+    ``ready`` builds the exact-card descriptor through the art presenter; a
+    card that stopped being presentable between the read and the build (a
+    vanished file) degrades to the safe ``unavailable`` state rather than an
+    invented image or a silent empty slot.
+    """
+    if portrait.status == PORTRAIT_READY:
+        artwork = None
+        if portrait.subject is not None and portrait.card is not None:
+            artwork = draft_portrait_artwork(
+                portrait.subject, dict(portrait.card), portrait.fallback_key
+            )
+        if artwork is None:
+            return {
+                "status": PORTRAIT_UNAVAILABLE,
+                "reason": rejection_message(PORTRAIT_STATE_UNAVAILABLE),
+            }
+        return {"status": PORTRAIT_READY, "artwork": artwork}
+    if portrait.status in (PORTRAIT_FAILED, PORTRAIT_UNAVAILABLE):
+        return {"status": portrait.status, "reason": portrait.reason}
+    return {"status": portrait.status}
+
+
 def _serialize(
     view: CreationView,
     proposal: ProposalSnapshot | None = None,
     *,
     actor_identity: str,
+    portrait: DraftPortraitView,
 ) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "schema_version": CREATION_SCHEMA_VERSION,
@@ -1059,6 +1141,7 @@ def _serialize(
         "draft": _serialize_draft(view.draft),
         "presets": [_serialize_preset_card(card) for card in view.presets],
         "custom": _serialize_custom(view.custom, actor_identity),
+        "portrait": _serialize_portrait(portrait),
     }
     if proposal is not None:
         # The proposal key ships only while the session slot holds a snapshot
@@ -1079,7 +1162,12 @@ def creation_presenter(context: PresentationContext) -> dict[str, Any]:
         raise PanelUnavailableError
     view = read_creation_view(actor)
     return validate_creation(
-        _serialize(view, context.proposal, actor_identity=str(actor.pk))
+        _serialize(
+            view,
+            context.proposal,
+            actor_identity=str(actor.pk),
+            portrait=read_draft_portrait(actor),
+        )
     )
 
 
@@ -1102,6 +1190,7 @@ __all__ = [
     "MAX_LABEL_CODE_POINTS",
     "MAX_NAME_LENGTH",
     "MAX_PRESET_KEY_CODE_POINTS",
+    "MAX_PORTRAIT_REASON_CODE_POINTS",
     "MAX_PRESETS",
     "MAX_PROFILES",
     "MAX_PROPOSAL_NAME_CODE_POINTS",
