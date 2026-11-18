@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import time
 
+from tools.spec_traceability import covers_requirement
+
 from .browser_base import ui_scale
 from .browser_helpers import sent_action_count, store_state, wait_for_store_state
 from .creation_portrait_support import (
@@ -27,6 +29,7 @@ from .creation_portrait_support import (
 class CreationPortraitJourneys(CreationPortraitBrowserTest):
     # -- journeys -------------------------------------------------------------
 
+    @covers_requirement("webclient-character-creation-ui::creation-portrait-controls-use-committed-state-and-the-shared-drawer")
     def test_generate_while_editing(self):
         page = self._open_custom()
         page.fill('[data-testid="creation-field-displayName"]', "編輯中的名字")
@@ -155,6 +158,7 @@ class CreationPortraitJourneys(CreationPortraitBrowserTest):
         self.assertEqual(len(self.control.run("cards")["image_ids"]), 1)
         self.assertEqual(sent_action_count(page, GENERATE), 2)
 
+    @covers_requirement("webclient-character-creation-ui::creation-portrait-controls-use-committed-state-and-the-shared-drawer")
     def test_offline_refusal_and_explicit_retry(self):
         page = self._open_custom()
         self.control.set(probe="fail")
