@@ -14,5 +14,5 @@
 
 ## 3. Integrated acceptance
 
-- [ ] 3.1 Run focused Vitest and browser commands in design, `pnpm run build-storybook`, `pnpm run showcase-coverage` and `uv run --locked python -m tools.contract_gate` once after integration. Expect passing stories/coverage/registered tests, no page-level horizontal overflow, no wall-clock assertion and no weakened gate.
-- [ ] 3.2 Run `openspec validate creation-draft-portrait --strict` and record concrete test-to-delta-scenario evidence; all warnings fail. Preserve the prerequisite schema/version and ownership contracts rather than adding another panel cutover or compatibility shim.
+- [x] 3.1 Run focused Vitest and browser commands in design, `pnpm run build-storybook`, `pnpm run showcase-coverage` and `uv run --locked python -m tools.contract_gate` once after integration. Expect passing stories/coverage/registered tests, no page-level horizontal overflow, no wall-clock assertion and no weakened gate.
+- [x] 3.2 Run `openspec validate creation-draft-portrait --strict` and record concrete test-to-delta-scenario evidence; all warnings fail. Preserve the prerequisite schema/version and ownership contracts rather than adding another panel cutover or compatibility shim.
