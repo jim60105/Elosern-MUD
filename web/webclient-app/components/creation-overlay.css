@@ -55,8 +55,8 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: var(--sp-4);
-  padding: var(--sp-4) var(--sp-8) 0;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-8) 0;
   min-height: 0;
   min-width: 0;
 }
@@ -75,14 +75,29 @@
   grid-template-columns: calc(300px * var(--ui-scale)) minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
   gap: calc(var(--sp-6) * 2);
-  padding-bottom: var(--sp-4);
+  padding-bottom: var(--sp-3);
 }
 
-/* The custom and concept pages pool their light behind the left column. */
-.creation-overlay[data-mode="custom"],
-.creation-overlay[data-mode="concept"] {
-  background: radial-gradient(ellipse 34% 70% at 12% 50%, var(--gold-glow), transparent 70%), var(--ink-950);
+/* The custom and concept pages pool their light behind the left column; the
+   pool is anchored to that column, not the viewport, so it stays behind the
+   portrait/guide at every width. */
+.creation-overlay__custom,
+.creation-overlay__concept { position: relative; isolation: isolate; }
+.creation-overlay__custom::before,
+.creation-overlay__concept::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  top: -10%;
+  bottom: -10%;
+  left: calc(-150px * var(--ui-scale));
+  width: calc(600px * var(--ui-scale));
+  background: radial-gradient(closest-side, var(--gold-glow), transparent);
+  pointer-events: none;
 }
+/* The concept grid is centred: its guide column starts half the track sum
+   (340 + 48 + 860 = 1248) left of centre. */
+.creation-overlay__concept::before { left: calc(50% - 624px * var(--ui-scale) - 130px * var(--ui-scale)); }
 
 /* Concept mode (design §8): the guide column beside the concept field. */
 .creation-overlay__concept {
@@ -145,11 +160,14 @@
   flex-wrap: wrap;
   gap: var(--sp-3);
   margin: auto calc(-1 * var(--sp-8)) 0;
-  padding: var(--sp-4) var(--sp-8);
+  padding: var(--sp-3) var(--sp-8);
   background: var(--ink-900);
   border-top: 1px solid var(--band-edge);
 }
 .creation-overlay__footer .ui-btn--primary { margin-left: auto; min-width: calc(160px * var(--ui-scale)); }
+/* The local validation message rides the footer between 重設 and the
+   primary action, so an error never costs the step page its height. */
+.creation-overlay__footer .creation-form-message { flex: 1 1 0; min-width: 0; max-height: none; margin-left: var(--sp-3); }
 .creation-overlay__keys {
   display: flex;
   flex-wrap: wrap;
@@ -174,13 +192,6 @@
 .creation-confirm { align-self: center; box-sizing: border-box; width: min(100%, 640px * var(--ui-scale)); min-height: 0; overflow: auto; margin-block: auto; display: flex; flex-direction: column; gap: var(--sp-6); padding: var(--sp-8); border-top: 1px solid var(--gold-500); background: var(--panel); }
 .creation-confirm-title { color: var(--paper-50); font: var(--text-xl) / 1.8 var(--f-serif); overflow-wrap: anywhere; }
 .creation-confirm-actions { display: flex; flex-wrap: wrap; gap: var(--sp-3); }
-
-@media (max-height: 800px) {
-  .creation-overlay__header { padding-block: var(--sp-3); }
-  .creation-overlay__body { gap: var(--sp-3); padding-top: var(--sp-3); }
-  .creation-overlay__custom { padding-bottom: var(--sp-3); }
-  .creation-overlay__footer { padding-block: var(--sp-3); }
-}
 
 /* Browser zoom/narrow-window fallback, not a separate mobile workflow. */
 @media (max-width: 1000px) {

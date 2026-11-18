@@ -239,8 +239,8 @@ function submitCustom() {
           </section>
         </div>
 
-        <p v-if="formMessage" id="creation-form-message" class="creation-form-message" role="alert" data-testid="creation-form-message">{{ formMessage }}</p>
-        <!-- Outside the steps: errors and actions stay reachable on every step. -->
+        <!-- Outside the steps: the local form message sits beside the
+             confirmation that raised it, reachable on every step. -->
         <footer class="creation-overlay__footer">
           <button
             type="button"
@@ -250,6 +250,7 @@ function submitCustom() {
           >
             重設
           </button>
+          <p v-if="formMessage" id="creation-form-message" class="creation-form-message" role="alert" data-testid="creation-form-message">{{ formMessage }}</p>
           <!-- Preset mode's primary action lives on the expanded card; the
                footer names the wall's keys instead (design §4). -->
           <p v-if="mode === 'preset'" class="creation-overlay__keys" data-testid="creation-preset-keys">

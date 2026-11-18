@@ -9,7 +9,7 @@
 ## 2. Concept extraction
 
 - [x] 2.1 Add `CreationConceptGuide.vue`, proposal-presence indicators and identity-step completion navigation in the existing proposal path. Extend `concept_fill_navigation.test.js` for omitted fields, zero values, unchanged revisions/remounts, pending pin, review prompt and one toast. Expected state is no concept text copied into a portrait prompt and no autosave.
-- [ ] 2.2 Split component CSS, remove obsolete simultaneous-region layout and update real overlay stories for every step, error, guide state and empty slot; register new components. Update the frontend developer guide and produce this change’s human-reviewed `visual-review.md` for approved §§6/8/11. No test asserts questions, copy, shipped data or literal markup.
+- [x] 2.2 Split component CSS, remove obsolete simultaneous-region layout and update real overlay stories for every step, error, guide state and empty slot; register new components. Update the frontend developer guide and produce this change’s human-reviewed `visual-review.md` for approved §§6/8/11. No test asserts questions, copy, shipped data or literal markup.
 
 ## 3. Integration acceptance
 

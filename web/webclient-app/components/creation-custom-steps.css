@@ -4,7 +4,7 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--sp-4);
+  gap: var(--sp-3);
 }
 
 .creation-proposal-review {
@@ -120,8 +120,8 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-content: start;
-  gap: var(--sp-4) var(--sp-6);
-  padding: var(--sp-5) var(--sp-6);
+  gap: var(--sp-3) var(--sp-6);
+  padding: var(--sp-4) var(--sp-6);
   background: var(--panel);
   border-top: 1px solid var(--band-edge-dim);
   animation: creation-step-in var(--motion-reveal) var(--ease-enter);
@@ -189,7 +189,8 @@
   border-color: var(--gold-500);
   box-shadow: var(--focus);
 }
-.creation-steps [aria-invalid="true"]:is(input, select, textarea) { border-color: var(--seal-500); }
+.creation-steps [aria-invalid="true"]:is(input, select, textarea),
+.creation-steps [aria-invalid="true"]:is(input, select, textarea):focus-visible { border-color: var(--seal-500); }
 .creation-field :disabled { color: var(--paper-500); cursor: wait; }
 
 /* Story: hint and affinity across, then the four texts as a 2 x 2 grid. */
@@ -270,11 +271,6 @@
 /* -- Previous / next ------------------------------------------------------- */
 .creation-steps__nav { flex: none; display: flex; align-items: center; gap: var(--sp-3); }
 .creation-steps__next { margin-left: auto; min-width: calc(200px * var(--ui-scale)); }
-
-@media (max-height: 800px) {
-  .creation-steps { gap: var(--sp-3); }
-  .creation-steps__page { padding-block: var(--sp-4); gap: var(--sp-3) var(--sp-6); }
-}
 
 @media (max-width: 1000px) {
   .creation-steps__pages { overflow: visible; }
