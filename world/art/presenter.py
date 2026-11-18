@@ -628,6 +628,62 @@ def silhouette_table(
     return entries
 
 
+def draft_portrait_artwork(
+    subject: ArtSubject, card: dict, fallback_key: str
+) -> dict | None:
+    """The canonical descriptor of one pending character's exact draft card.
+
+    The narrow authorized draft-art read (creation-draft-portrait-panel): the
+    caller (``world.rules.creation_portrait.read_draft_portrait``) has already
+    validated the rule-owned receipt, so this resolves ONLY that card on the
+    character's own subject — never another subject, never an official or
+    unrelated card, and no canonical-age eligibility call (canonical identity
+    is still unset during creation). The descriptor carries exactly one
+    runtime image attempt at the default position, the subject's ordinary
+    recorded generation truth, the receipt's alpha terminal and no retention.
+    ``None`` when the card is no longer presentable or the fallback key is
+    outside the closed vocabulary. A pure read: nothing is created or written.
+    """
+    if not isinstance(card, dict) or not isinstance(card.get("image_id"), str):
+        return None
+    try:
+        validate_fallback_key(fallback_key, "draft portrait receipt")
+    except ValueError:  # observability: ignore R2: an unusable receipt key is the caller's unavailable state
+        return None
+    if not isinstance(fallback_key, str):
+        return None
+    identity = validated_card_identity(subject, card)
+    if identity is None:
+        return None
+    record = gallery_record_for(subject)
+    generation_subject, generation_state = _generation_facts(
+        subject,
+        True,
+        record is not None and bool(record.db.last_error_code),
+    )
+    source_id, rank = _slot_source("default", card["image_id"])
+    return descriptors.descriptor(
+        subject_id=subject.full(),
+        generation_subject=generation_subject,
+        generation_state=generation_state,
+        attempts=[
+            descriptors.image_attempt(
+                source_id,
+                rank,
+                descriptors.resource(
+                    identity,
+                    descriptors.identity_version(identity),
+                    media_url_for(identity),
+                    descriptors.ORIGIN_RUNTIME,
+                    geometry_payload=_card_geometry(subject, card),
+                ),
+            )
+        ],
+        terminal_payload=_creation_alpha_terminal(fallback_key),
+        retention_sources=[],
+    )
+
+
 def _enumerate_portrait(subject: ArtSubject, entity=None) -> _PortraitEnumeration:
     """Walk one subject's portrait chain ONCE and project it canonically.
 

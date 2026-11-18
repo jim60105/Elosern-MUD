@@ -44,13 +44,14 @@ var CREATION_SEX_VALUES = C.CREATION_SEX_VALUES;
 var CREATION_MAX_SEX_OPTIONS = C.CREATION_MAX_SEX_OPTIONS;
 var CREATION_SCHEMA_VERSION = C.CREATION_SCHEMA_VERSION;
 var CREATION_MAX_SILHOUETTES = C.CREATION_MAX_SILHOUETTES;
+var CREATION_MAX_PORTRAIT_REASON = C.CREATION_MAX_PORTRAIT_REASON;
 var CREATION_MAX_AFFINITY_ELEMENTS = C.CREATION_MAX_AFFINITY_ELEMENTS;
 var CREATION_AFFINITY_ELEMENTS = C.CREATION_AFFINITY_ELEMENTS;
 var CREATION_AFFINITY_RACES = C.CREATION_AFFINITY_RACES;
 var CREATION_AFFINITY_MAXIMUMS = C.CREATION_AFFINITY_MAXIMUMS;
 
 // ---------------------------------------------------------------------------
-// creation panel v7 validator (mirror of web.webclient.presentation.creation).
+// creation panel v8 validator (mirror of web.webclient.presentation.creation).
 // ---------------------------------------------------------------------------
 
 function validateCreationPreviewArtworkSemantics(value, field) {
@@ -742,11 +743,43 @@ function validateCreationProposal(value) {
   return checked;
 }
 
+// The exact closed portrait union (mirror of _PORTRAIT_FIELDS): each status's
+// required keys; nothing is optional or nullable.
+var CREATION_PORTRAIT_FIELDS = {
+  empty: ["status"],
+  pending: ["status"],
+  ready: ["status", "artwork"],
+  failed: ["status", "reason"],
+  unavailable: ["status", "reason"],
+};
+
+function validateCreationPortrait(value) {
+  if (!isPlainObject(value)) {
+    throw new Error("portrait must be an object");
+  }
+  var status = value.status;
+  if (typeof status !== "string" || !Object.prototype.hasOwnProperty.call(CREATION_PORTRAIT_FIELDS, status)) {
+    throw new Error("portrait status is not a known state");
+  }
+  requireExactFields(value, "portrait", CREATION_PORTRAIT_FIELDS[status], []);
+  if (status === "ready") {
+    return { status: status, artwork: artwork.validateArtwork(value.artwork) };
+  }
+  if (status === "failed" || status === "unavailable") {
+    var reason = requireString(value.reason, "reason", CREATION_MAX_PORTRAIT_REASON);
+    if (reason.trim() === "") {
+      throw new Error("portrait reason must be non-empty");
+    }
+    return { status: status, reason: reason };
+  }
+  return { status: status };
+}
+
 function validateCreationPanel(payload) {
   requireExactFields(
     payload,
     "creation panel",
-    ["schema_version", "available", "kind", "draft", "presets", "custom"],
+    ["schema_version", "available", "kind", "draft", "presets", "custom", "portrait"],
     ["proposal"]
   );
   requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
@@ -772,6 +805,7 @@ function validateCreationPanel(payload) {
     }
   }
   var draft = validateCreationDraft(payload.draft);
+  var portrait = validateCreationPortrait(payload.portrait);
   var result = {
     schema_version: CREATION_SCHEMA_VERSION,
     available: true,
@@ -779,6 +813,7 @@ function validateCreationPanel(payload) {
     draft: draft,
     presets: payload.presets,
     custom: payload.custom,
+    portrait: portrait,
   };
   // The proposal key ships only while the session slot holds a proposal;
   // a null value is never legal (the presenter omits the key).
@@ -796,6 +831,7 @@ function validateCreationPanel(payload) {
 
 module.exports = {
   validateCreationPanel: validateCreationPanel,
+  validateCreationPortrait: validateCreationPortrait,
   validateCreationPersona: validateCreationPersona,
   validateCreationProposal: validateCreationProposal,
 };

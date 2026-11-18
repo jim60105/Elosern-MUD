@@ -106,10 +106,11 @@ function validCreationPanel(overrides) {
   }));
   return deepMerge(
     {
-      schema_version: 7,
+      schema_version: 8,
       available: true,
       kind: "creation",
       draft: null,
+      portrait: { status: "empty" },
       presets: [
         {
           key: T_PRESET_A,
@@ -214,7 +215,7 @@ test("accepts a valid creation panel and the common unavailable form", () => {
       "creation",
       Protocol.PANEL_ALLOWLIST.creation,
       {
-        schema_version: 7,
+        schema_version: 8,
         available: false,
         reason: { code: "creation_unavailable", message: "角色建立畫面目前無法顯示" },
       }
@@ -233,6 +234,9 @@ test("creation panel rejects malformed and unknown-node fields", () => {
   assert.throws(() => Protocol.validateCreationPanel(validCreationPanel({ schema_version: 5 })));
   // v6 is the pre-artwork version: the exact gate rejects it.
   assert.throws(() => Protocol.validateCreationPanel(validCreationPanel({ schema_version: 6 })));
+  // v7 is the pre-portrait version: the exact gate rejects it.
+  assert.throws(() => Protocol.validateCreationPanel(validCreationPanel({ schema_version: 7 })));
+  assert.throws(() => Protocol.validateCreationPanel(validCreationPanel({ schema_version: 9 })));
   assert.throws(() => Protocol.validateCreationPanel(validCreationPanel({ schema_version: 2 })));
   const badDraft = validCreationPanel({ draft: { mode: "preset", stage: "custom_filled", preset_key: "x" } });
   assert.throws(() => Protocol.validateCreationPanel(badDraft));
@@ -288,7 +292,7 @@ test("creation panel v5 carries the draft persona, sex, and the proposal slot", 
   };
   const payload = validCreationPanel({ draft: customDraft, proposal });
   const validated = Protocol.validateCreationPanel(payload);
-  assert.equal(validated.schema_version, 7);
+  assert.equal(validated.schema_version, 8);
   assert.equal(validated.draft.sex, "other");
   assert.deepEqual(validated.draft.persona, customDraft.persona);
   assert.deepEqual(validated.proposal, proposal);
@@ -556,9 +560,9 @@ test("custom.sex mirrors the server vocabulary and the draft gate requires it", 
   );
 });
 
-test("creation v7 carries preset artwork and the custom silhouette table", () => {
+test("creation v8 carries preset artwork and the custom silhouette table", () => {
   const validated = Protocol.validateCreationPanel(validCreationPanel());
-  assert.equal(validated.schema_version, 7);
+  assert.equal(validated.schema_version, 8);
   const card = validated.presets[0];
   assert.equal(card.artwork.subject_id, "creation:preset:" + T_PRESET_A);
   assert.equal(card.artwork.attempts.length, 1);
@@ -754,6 +758,11 @@ test("creation panel rejects malformed silhouette tables", () => {
 test("a structurally maximal realistic creation payload fits the envelope", () => {
   const payload = validCreationPanel();
   assert.ok(Protocol.jsonByteSize(payload) < Protocol.MAX_CANONICAL_JSON_BYTES / 4);
+  // A ready portrait descriptor stays well inside the unchanged byte cap.
+  const ready = validCreationPanel();
+  ready.portrait = { status: "ready", artwork: readyPortraitArtwork() };
+  assert.ok(Protocol.jsonByteSize(ready) < Protocol.MAX_CANONICAL_JSON_BYTES / 4);
+  assert.doesNotThrow(() => Protocol.validateCreationPanel(ready));
 });
 
 test("creation payload maximizing every string field fails the byte gate", () => {
@@ -804,10 +813,11 @@ test("creation payload maximizing every string field fails the byte gate", () =>
     (key) => Object.assign({}, affinityElement, { key })
   );
   const payload = {
-    schema_version: 7,
+    schema_version: 8,
     available: true,
     kind: "creation",
     draft: null,
+    portrait: { status: "failed", reason: "x".repeat(Protocol.CREATION_MAX_PORTRAIT_REASON) },
     presets: Array(Protocol.CREATION_MAX_PRESETS).fill(Object.assign({}, card)),
     custom: {
       name: { min_length: 1, max_length: 64 },
@@ -837,7 +847,7 @@ test("creation payload maximizing every string field fails the byte gate", () =>
 });
 
 test("creation is in the production panel allowlist and a bad panel rejects atomically", () => {
-  assert.equal(Protocol.PANEL_ALLOWLIST.creation, 7);
+  assert.equal(Protocol.PANEL_ALLOWLIST.creation, 8);
   const envelope = {
     protocol_version: 1,
     presentation_epoch: VALID_EPOCH,
@@ -855,10 +865,147 @@ test("creation is in the production panel allowlist and a bad panel rejects atom
   assert.equal(store.getState().phase, "awaiting_initial_snapshot");
 });
 
-test("the Storybook creation fixture validates against schema 7", async () => {
+test("the Storybook creation fixture validates against schema 8", async () => {
   const { CREATION_PANEL_SAMPLE } = await import(
     "../../../../webclient-app/stories/fixtures/creation_panels.js"
   );
   assert.doesNotThrow(() => Protocol.validateCreationPanel(CREATION_PANEL_SAMPLE));
 });
 
+
+// ---------------------------------------------------------------------------
+// creation v8 portrait union (creation-draft-portrait-panel). The matrix is
+// mirrored exactly by the Python presenter validator's
+// test_validation_core.CreationPortraitValidationTests.
+// ---------------------------------------------------------------------------
+
+const PORTRAIT_IMAGE_ID = "0b1c2d3e-4f50-4617-8899-aabbccddeeff";
+const PORTRAIT_IDENTITY = "gallery/character/1/" + PORTRAIT_IMAGE_ID + ".png";
+
+function readyPortraitArtwork(url) {
+  return {
+    subject_id: "portrait:character:1",
+    revision: CREATION_DIGEST,
+    generation_subject: "portrait:character:1",
+    generation_state: "done",
+    attempts: [
+      {
+        type: "image",
+        source_id: "portrait.default:" + PORTRAIT_IMAGE_ID,
+        rank: 30,
+        resource: {
+          resource_id: PORTRAIT_IDENTITY,
+          version: CREATION_DIGEST,
+          url: url === undefined ? "/art/" + PORTRAIT_IDENTITY : url,
+          origin: "runtime",
+          geometry: {
+            image_size: { width: 4, height: 4 },
+            face_rect: { x: 0.35, y: 0.02, w: 0.28, h: 0.16 },
+            stage: { scale: 1, x: 0, y: 0 },
+            aspect_ratio: "3:4",
+          },
+        },
+      },
+    ],
+    terminal: {
+      kind: "alpha_mask",
+      source_id: "portrait.alpha:man",
+      rank: 100,
+      resource: {
+        resource_id: "defaults/man.webp",
+        version: CREATION_DIGEST,
+        url: "/art/defaults/man.webp",
+        origin: "silhouette",
+        geometry: {
+          image_size: null,
+          face_rect: { x: 0.35, y: 0.02, w: 0.28, h: 0.16 },
+          stage: null,
+          aspect_ratio: "3:4",
+        },
+      },
+    },
+    retention_sources: [],
+  };
+}
+
+const NON_BMP = "\u{20BB7}";
+
+const PORTRAIT_VALID = [
+  ["empty", { status: "empty" }],
+  ["pending", { status: "pending" }],
+  ["ready", { status: "ready", artwork: readyPortraitArtwork() }],
+  ["failed", { status: "failed", reason: "肖像繪製失敗，請再試一次。" }],
+  ["unavailable", { status: "unavailable", reason: "繪圖服務目前無法使用。" }],
+  ["reason at the code-point bound", { status: "failed", reason: NON_BMP.repeat(512) }],
+];
+
+const PORTRAIT_INVALID = [
+  ["null portrait", null],
+  ["string portrait", "ready"],
+  ["list portrait", []],
+  ["missing status", {}],
+  ["unknown status", { status: "done" }],
+  ["non-string status", { status: 1 }],
+  ["empty with extra field", { status: "empty", extra: 1 }],
+  ["empty with reason", { status: "empty", reason: "x" }],
+  ["empty with null artwork", { status: "empty", artwork: null }],
+  ["pending with artwork", { status: "pending", artwork: readyPortraitArtwork() }],
+  ["ready without artwork", { status: "ready" }],
+  ["ready with null artwork", { status: "ready", artwork: null }],
+  ["ready with malformed artwork", { status: "ready", artwork: {} }],
+  ["ready with an off-origin URL", { status: "ready", artwork: readyPortraitArtwork("https://evil.example/x.png") }],
+  ["ready with a script URL", { status: "ready", artwork: readyPortraitArtwork("javascript:alert(1)") }],
+  ["ready with reason", { status: "ready", artwork: readyPortraitArtwork(), reason: "x" }],
+  ["failed without reason", { status: "failed" }],
+  ["failed with null reason", { status: "failed", reason: null }],
+  ["failed with empty reason", { status: "failed", reason: "" }],
+  ["failed with blank reason", { status: "failed", reason: "   " }],
+  ["failed with non-text reason", { status: "failed", reason: 1 }],
+  ["failed with overlong reason", { status: "failed", reason: NON_BMP.repeat(513) }],
+  ["failed with artwork", { status: "failed", reason: "x", artwork: readyPortraitArtwork() }],
+  ["unavailable without reason", { status: "unavailable" }],
+  ["unavailable with blank reason", { status: "unavailable", reason: "\n\t " }],
+  ["unavailable with artwork", { status: "unavailable", reason: "x", artwork: readyPortraitArtwork() }],
+];
+
+test("creation v8 accepts exactly the closed portrait union", () => {
+  for (const [label, portrait] of PORTRAIT_VALID) {
+    const panel = validCreationPanel();
+    panel.portrait = portrait;
+    const validated = Protocol.validateCreationPanel(panel);
+    assert.deepEqual(validated.portrait, portrait, label);
+  }
+});
+
+test("creation v8 rejects every malformed portrait state", () => {
+  for (const [label, portrait] of PORTRAIT_INVALID) {
+    const panel = validCreationPanel();
+    panel.portrait = portrait;
+    assert.throws(() => Protocol.validateCreationPanel(panel), undefined, label);
+  }
+  const missing = validCreationPanel();
+  delete missing.portrait;
+  assert.throws(() => Protocol.validateCreationPanel(missing), undefined, "missing portrait");
+});
+
+test("the unavailable creation form carries no portrait", () => {
+  assert.throws(() =>
+    Protocol.validatePanel("creation", Protocol.PANEL_ALLOWLIST.creation, {
+      schema_version: 8,
+      available: false,
+      reason: { code: "creation_unavailable", message: "角色建立畫面目前無法顯示" },
+      portrait: { status: "empty" },
+    })
+  );
+});
+
+test("the story portrait fixtures validate inside a schema-8 panel", async () => {
+  const { CREATION_PANEL_SAMPLE, CREATION_PORTRAIT_STATES } = await import(
+    "../../../../webclient-app/stories/fixtures/creation_panels.js"
+  );
+  for (const portrait of Object.values(CREATION_PORTRAIT_STATES)) {
+    assert.doesNotThrow(() =>
+      Protocol.validateCreationPanel({ ...CREATION_PANEL_SAMPLE, portrait })
+    );
+  }
+});

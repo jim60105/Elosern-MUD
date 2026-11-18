@@ -137,6 +137,32 @@ def gallery_job_in_flight(subject: ArtSubject) -> bool:
         return _gallery_job_in_flight_locked(subject)
 
 
+def gallery_image_pending(subject: ArtSubject, image_id: str) -> bool:
+    """True when the exact requested image of ``subject`` is still live work.
+
+    A read of the one job record keyed by ``(subject, image_id)``: pending or
+    in progress and naming exactly this subject. Used by read-only presenters
+    that already hold the requested image id, so no subject-wide scan is
+    needed; nothing here claims, settles or creates a record.
+    """
+    if gallery_api._canonical_uuid_text(image_id) is None:
+        return False
+    with queue_lock:
+        record = (
+            GalleryJobRecord.objects.filter(db_key=gallery_record_key(subject, image_id))
+            .order_by("pk")
+            .first()
+        )
+        return bool(
+            record is not None
+            and is_gallery_job(record)
+            and record.db.kind == subject.kind.value
+            and record.db.subject_key == subject.key
+            and record.db.gallery_image_id == image_id
+            and record.db.status in (ArtAssetStatus.PENDING, ArtAssetStatus.IN_PROGRESS)
+        )
+
+
 def source_hash(description: str) -> str:
     """Deterministic sha256 of the canonical subject description."""
     return hashlib.sha256(description.encode("utf-8")).hexdigest()

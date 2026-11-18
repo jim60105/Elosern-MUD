@@ -1,11 +1,12 @@
 // Story fixture slices: see stories/fixtures.js (facade) for the public surface.
 
 // B5 (webclient-vue-06-showcase-overlays): full-overlays fixtures. The
-// `creation` panel (schema v7) mirrors web/webclient/presentation/creation.py
+// `creation` panel (schema v8) mirrors web/webclient/presentation/creation.py
 // exactly: presets (at most 8 cards), the custom descriptor (name/age
 // bounds, races, subraces, profiles, affinity, sex, silhouettes), and the optional saved
 // wizard draft (preset/custom + background + affinity + persona + sex) plus
-// the optional transient concept proposal slot. The age
+// the optional transient concept proposal slot, and the required read-only
+// `portrait` state union (empty here; CREATION_PORTRAIT_* below). The age
 // bounds advertise the 0 minimum on BOTH age and apparent_age (the
 // deterministic age bounds gate, webclient-character-creation-ui).
 const ELEMENTS = [
@@ -85,10 +86,11 @@ function creationSilhouettes() {
 }
 
 export const CREATION_PANEL_SAMPLE = {
-  schema_version: 7,
+  schema_version: 8,
   available: true,
   kind: "creation",
   draft: null,
+  portrait: { status: "empty" },
   presets: [
     {
       key: "preset_wandering_blade",
@@ -252,6 +254,47 @@ export const CREATION_PANEL_CUSTOM_DRAFT_SAMPLE = {
   },
 };
 
+// The read-only draft portrait states (creation-draft-portrait-panel): the
+// closed `portrait` union the server reconstructs from its receipt, gallery
+// job/card/error and cached service verdict. A ready state carries the exact
+// generated card as one runtime image attempt plus the alpha terminal; the
+// failed/unavailable reasons are server-owned prose rendered verbatim.
+const CREATION_PORTRAIT_IMAGE_ID = "0b1c2d3e-4f50-4617-8899-aabbccddeeff";
+const CREATION_PORTRAIT_IDENTITY = `gallery/character/1/${CREATION_PORTRAIT_IMAGE_ID}.png`;
+
+export const CREATION_PORTRAIT_READY_ARTWORK = {
+  ...creationAlphaArtwork("portrait:character:1", "man"),
+  generation_subject: "portrait:character:1",
+  generation_state: "done",
+  attempts: [
+    {
+      type: "image",
+      source_id: "portrait.default:" + CREATION_PORTRAIT_IMAGE_ID,
+      rank: 30,
+      resource: {
+        resource_id: CREATION_PORTRAIT_IDENTITY,
+        version: CREATION_DIGEST,
+        url: "/art/" + CREATION_PORTRAIT_IDENTITY,
+        origin: "runtime",
+        geometry: {
+          image_size: { width: 832, height: 1216 },
+          face_rect: { x: 0.35, y: 0.02, w: 0.28, h: 0.16 },
+          stage: { scale: 1, x: 0, y: 0 },
+          aspect_ratio: "3:4",
+        },
+      },
+    },
+  ],
+};
+
+export const CREATION_PORTRAIT_STATES = {
+  empty: { status: "empty" },
+  pending: { status: "pending" },
+  ready: { status: "ready", artwork: CREATION_PORTRAIT_READY_ARTWORK },
+  failed: { status: "failed", reason: "肖像繪製失敗，請再試一次。" },
+  unavailable: { status: "unavailable", reason: "繪圖服務目前無法使用，請稍後再試一次。" },
+};
+
 // The session-transient concept proposal slot (retool-concept-transient-fill
 // D1): the optional top-level key a same-session panel carries after a
 // concept apply, with the exact five-key shape including a revision number.
@@ -299,7 +342,7 @@ export const CREATION_PANEL_PROPOSAL_TRANSIENT_SAMPLE = {
 // The `creation` panel unavailable form (registry-owned reason, the common
 // unavailable envelope).
 export const CREATION_PANEL_UNAVAILABLE_SAMPLE = {
-  schema_version: 7,
+  schema_version: 8,
   available: false,
   reason: { code: "creation_unavailable", message: "角色創建目前無法顯示" },
 };

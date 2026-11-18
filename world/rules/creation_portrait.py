@@ -31,17 +31,27 @@ serialization while this admission holds it.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from types import MappingProxyType
+from typing import Any, Mapping
 
 from django.db import transaction
 
 from world.art import connectivity
-from world.art.gallery import cards_for
+from world.art.fallback_keys import validate_fallback_key
+from world.art.gallery import _canonical_uuid_text, cards_for
+from world.art.gallery import record_for as gallery_record_for
+from world.art.gallery_match import validated_card_identity
 from world.art.gallery_fallback import band_key_for
 from world.art.gallery_prompt import GalleryPromptError, validate_custom_prompt
-from world.art.queue import _gallery_job_in_flight_locked
+from world.art.queue import _gallery_job_in_flight_locked, gallery_image_pending
 from world.art.service import request_gallery_image, serialized_gallery_mutation
-from world.art.subjects import DraftPortraitValues, named_character_subject
+from world.art.subjects import (
+    ArtSubject,
+    ArtSubjectError,
+    DraftPortraitValues,
+    character_subject_for,
+    named_character_subject,
+)
 from world.rules.character_creation import ensure_player_portrait_policy
 from world.rules.creation_identity import (
     CharacterCreationError,
@@ -277,11 +287,176 @@ def request_draft_portrait(
     return admission
 
 
+# ---------------------------------------------------------------------------
+# Read-only portrait state (creation-draft-portrait-panel).
+# ---------------------------------------------------------------------------
+
+#: The closed portrait status vocabulary the creation panel serializes.
+PORTRAIT_EMPTY = "empty"
+PORTRAIT_PENDING = "pending"
+PORTRAIT_READY = "ready"
+PORTRAIT_FAILED = "failed"
+PORTRAIT_UNAVAILABLE = "unavailable"
+PORTRAIT_STATUSES = (
+    PORTRAIT_EMPTY,
+    PORTRAIT_PENDING,
+    PORTRAIT_READY,
+    PORTRAIT_FAILED,
+    PORTRAIT_UNAVAILABLE,
+)
+
+#: Stable reason codes of the two rules-owned portrait states that carry a
+#: reason without a service verdict (``creation_messages`` owns their prose).
+PORTRAIT_GENERATION_FAILED = "portrait_generation_failed"
+PORTRAIT_STATE_UNAVAILABLE = "portrait_state_unavailable"
+
+
+@dataclass(frozen=True)
+class DraftPortraitView:
+    """One immutable read of a pending character's draft portrait state.
+
+    ``card`` (a read-only mapping) and ``fallback_key`` are carried only for
+    ``ready``, so the presenter can build the exact-card descriptor without a
+    second state read; ``reason`` is carried only for ``failed`` and
+    ``unavailable``. Nothing here is a live object reference.
+    """
+
+    status: str
+    subject: ArtSubject | None = None
+    card: Mapping[str, Any] | None = None
+    fallback_key: str | None = None
+    reason: str | None = None
+
+
+def _unavailable(reason_code: str) -> DraftPortraitView:
+    return DraftPortraitView(
+        status=PORTRAIT_UNAVAILABLE, reason=rejection_message(reason_code)
+    )
+
+
+def _authorized_receipt(character: Any) -> tuple[ArtSubject, dict] | None:
+    """The character's own subject and its validated receipt, or ``None``.
+
+    Valid means the bounded version-1 receipt with a canonical image id, a
+    canonical-or-null retained id and a closed-vocabulary fallback key;
+    authorized means the character's named portrait policy names exactly its
+    own ``portrait:character:<pk>`` subject (the policy the admission
+    established). Anything else is unusable and is never guessed around.
+    """
+    receipt = _prior_receipt(character)
+    if receipt is None:
+        return None
+    if _canonical_uuid_text(receipt["image_id"]) is None:
+        return None
+    retained = receipt["retained_image_id"]
+    if retained is not None and _canonical_uuid_text(retained) is None:
+        return None
+    try:
+        validate_fallback_key(receipt["fallback_key"], "creation portrait receipt")
+        own = named_character_subject(character)
+        policy_subject = character_subject_for(character)
+    except (ValueError, ArtSubjectError):  # observability: ignore R2: an unusable receipt is the specified unavailable state
+        return None
+    if policy_subject is None or policy_subject.full() != own.full():
+        return None
+    return own, receipt
+
+
+def read_draft_portrait(character: Any) -> DraftPortraitView:
+    """The current read-only portrait state of one pending character.
+
+    A pure immutable read of the rule-owned receipt, the exact job/card/error
+    facts of the character's own subject and the cached service verdict:
+    it never creates a policy, receipt, record, cache entry or job and never
+    probes. Precedence (design "State reader and descriptor"):
+
+    1. a present but malformed or unauthorized receipt -> ``unavailable``;
+    2. the receipt's latest admitted job still live -> ``pending``;
+    3. a CURRENT failed service verdict -> ``unavailable`` with its reason;
+    4. the latest image settled into a presentable card -> ``ready``;
+    5. a recorded generation error for the latest request -> ``failed``;
+    6. otherwise (no receipt, no remaining work/card/error) -> ``empty``.
+
+    Service unavailability is a transient projection: it hides neither the
+    stored card nor the admitted job, so a refreshed healthy/unknown verdict
+    renders the same card ready again. A retained older card is never shown
+    for a pending or failed latest request.
+    """
+    stored = character.db.creation_portrait if hasattr(character, "db") else None
+    authorized = None
+    if stored is not None:
+        authorized = _authorized_receipt(character)
+        if authorized is None:
+            return _unavailable(PORTRAIT_STATE_UNAVAILABLE)
+    if authorized is not None:
+        subject, receipt = authorized
+        if gallery_image_pending(subject, receipt["image_id"]):
+            return DraftPortraitView(status=PORTRAIT_PENDING, subject=subject)
+    availability = read_portrait_service_availability()
+    if not availability.available:
+        return DraftPortraitView(
+            status=PORTRAIT_UNAVAILABLE, reason=availability.reason
+        )
+    if authorized is None:
+        return DraftPortraitView(status=PORTRAIT_EMPTY)
+    subject, receipt = authorized
+    for card in cards_for(subject):
+        if card.get("image_id") != receipt["image_id"]:
+            continue
+        if validated_card_identity(subject, card) is None:
+            break
+        return DraftPortraitView(
+            status=PORTRAIT_READY,
+            subject=subject,
+            card=MappingProxyType(dict(card)),
+            fallback_key=receipt["fallback_key"],
+        )
+    record = gallery_record_for(subject)
+    if record is not None and record.db.last_error_code:
+        return DraftPortraitView(
+            status=PORTRAIT_FAILED,
+            subject=subject,
+            reason=rejection_message(PORTRAIT_GENERATION_FAILED),
+        )
+    return DraftPortraitView(status=PORTRAIT_EMPTY, subject=subject)
+
+
+def receipt_owns_image(character: Any, subject_key: object, image_id: object) -> bool:
+    """True when a pending character's CURRENT receipt owns this completion.
+
+    The creation-qualification fact the completion push needs: the actor is
+    still creation-pending, its validated receipt names exactly the completed
+    image, and the completed subject is the character's own named subject. An
+    older or canceled request's image, a foreign subject and an unusable
+    receipt never qualify. A pure read.
+    """
+    if not bool(getattr(character, "creation_pending", False)):
+        return False
+    if not isinstance(subject_key, str) or not isinstance(image_id, str):
+        return False
+    authorized = _authorized_receipt(character)
+    if authorized is None:
+        return False
+    subject, receipt = authorized
+    return subject.full() == subject_key and receipt["image_id"] == image_id
+
+
 __all__ = [
     "CREATION_PORTRAIT_ATTRIBUTE",
     "CREATION_PORTRAIT_VERSION",
     "DraftPortraitAdmission",
     "DraftPortraitRequest",
+    "DraftPortraitView",
+    "PORTRAIT_EMPTY",
+    "PORTRAIT_FAILED",
+    "PORTRAIT_GENERATION_FAILED",
+    "PORTRAIT_PENDING",
+    "PORTRAIT_READY",
+    "PORTRAIT_STATE_UNAVAILABLE",
+    "PORTRAIT_STATUSES",
+    "PORTRAIT_UNAVAILABLE",
+    "read_draft_portrait",
+    "receipt_owns_image",
     "PORTRAIT_SERVICE_UNAVAILABLE",
     "PortraitInFlight",
     "PortraitServiceAvailability",

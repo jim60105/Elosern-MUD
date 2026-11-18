@@ -3,7 +3,7 @@ from tools.spec_traceability import covers_requirement
 from copy import deepcopy
 import unittest
 from unittest.mock import patch
-from web.webclient.presentation.creation import AFFINITY_ELEMENT_KEYS, AGE_MAXIMUM, AGE_MINIMUM, APPARENT_AGE_MAXIMUM, APPARENT_AGE_MINIMUM, CREATION_SCHEMA_VERSION, CreationPanelError, MAX_BACKGROUND_CODE_POINTS, MAX_DESCRIPTION_CODE_POINTS, MAX_DISPLAY_NAME_CODE_POINTS, MAX_EMPHASIS_CODE_POINTS, MAX_EXPLANATION_CODE_POINTS, MAX_LABEL_CODE_POINTS, MAX_NAME_LENGTH, MAX_PRESET_KEY_CODE_POINTS, MAX_PRESETS, MAX_PROFILES, MAX_RACES, MAX_RACE_KEY_CODE_POINTS, MAX_SPECIALTY_CODE_POINTS, MAX_SUBRACES, MAX_SUBRACE_KEY_CODE_POINTS, validate_creation
+from web.webclient.presentation.creation import AFFINITY_ELEMENT_KEYS, AGE_MAXIMUM, AGE_MINIMUM, APPARENT_AGE_MAXIMUM, APPARENT_AGE_MINIMUM, CREATION_SCHEMA_VERSION, CreationPanelError, MAX_BACKGROUND_CODE_POINTS, MAX_DESCRIPTION_CODE_POINTS, MAX_DISPLAY_NAME_CODE_POINTS, MAX_EMPHASIS_CODE_POINTS, MAX_PORTRAIT_REASON_CODE_POINTS, MAX_EXPLANATION_CODE_POINTS, MAX_LABEL_CODE_POINTS, MAX_NAME_LENGTH, MAX_PRESET_KEY_CODE_POINTS, MAX_PRESETS, MAX_PROFILES, MAX_RACES, MAX_RACE_KEY_CODE_POINTS, MAX_SPECIALTY_CODE_POINTS, MAX_SUBRACES, MAX_SUBRACE_KEY_CODE_POINTS, validate_creation
 from web.webclient.presentation.protocol import MAX_CANONICAL_JSON_BYTES, json_byte_size
 from world.art.presenter import preset_artwork, silhouette_table
 from world.rules.character_creation import max_affinity_elements
@@ -244,6 +244,10 @@ class CreationPanelValidationTests(unittest.TestCase):
             "available": True,
             "kind": "creation",
             "draft": None,
+            "portrait": {
+                "status": "failed",
+                "reason": "x" * MAX_PORTRAIT_REASON_CODE_POINTS,
+            },
             "presets": [dict(card) for _ in range(MAX_PRESETS)],
             "custom": {
                 "name": {"min_length": 1, "max_length": MAX_NAME_LENGTH},
