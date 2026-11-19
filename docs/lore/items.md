@@ -2,7 +2,7 @@
 
 本文件是「世界觀設定」分類下的物品專篇，統整伊洛瑟恩大陸目前已知的所有物品資料，供劇情撰寫、任務設計與物品資料落地時共同參照。閱讀本文前建議先讀過[世界觀總覽](/lore/overview)與[魔法技能體系](/lore/magic-system)，物品的產地、效果與定價都建立在那兩篇的地理、種族與魔法設定之上。
 
-與 `docs/development/adding-items.md` 不同，本文記錄的是「這件物品在世界觀裡是什麼」的設定真相，不是資料落地的操作步驟；兩篇文件描述的是同一套資料模型，前者負責意義、後者負責流程。本文所列的物品已全部登錄為 `world/lore/items/` 套件中的 `ITEM_REGISTRY`，流通側的成交價、庫存與補貨量則落地於 `world/rules/rulebook/commerce/`。本文仍是物品資料的世界觀設計來源，之後落地或調整程式碼資料時，應以本文為準，不能反過來拿現有程式碼限制本文的內容。
+與 `docs/development/adding-items.md` 不同，本文記錄的是「這件物品在世界觀裡是什麼」的設定真相，不是資料落地的操作步驟；兩篇文件描述的是同一套資料模型，前者負責意義、後者負責流程。本文所列的物品已全部登錄在 `content/items/` 的作者目錄（由 `world/lore/items/` 的 `ITEM_REGISTRY` 載入），流通側的成交價、庫存與補貨量則落地於 `world/rules/rulebook/commerce/`。本文仍是物品資料的世界觀設計來源，之後落地或調整程式碼資料時，應以本文為準，不能反過來拿現有程式碼限制本文的內容。
 
 所有標示為「設計參考值」的數字，都是尚未經過遊戲測試調校的世界觀合理值，正式數值以落地時的確定性 rulebook（`world/rules/rulebook/*.yaml`）為準，兩者不一致時不需要回頭改動本文去遷就實作。
 
@@ -40,10 +40,10 @@
 | 形狀 | 欄位組合 | 適用類別 |
 | --- | --- | --- |
 | 可使用 | `use_mechanics = { consumable, combat_allowed }`（使用「做什麼」由使用效果規則表依物品 `key` 宣告，見第六層） | 藥劑、性玩具（可用型） |
-| 可裝備 | `equipment_slot` + `modifier_key`（必須成對出現，且 `modifier_key` 的值必須等於物品自己的 `key`） | 武器、防具、飾品、性玩具（配戴型） |
+| 可裝備 | `equipment_slot` + 同一列的 `equipment_effects`（無效果裝備寫 `{}`；效果以物品自己的 `key` 綁定） | 武器、防具、飾品、性玩具（配戴型） |
 | 純觀察 | 兩者皆無，只能持有、檢視、買賣 | 食物、工具、素材、雜物、多數信物 |
 
-`equipment_slot` 的封閉詞彙是主手 `weapon_main`、副手 `weapon_off`、護甲 `armor`、飾品 `accessory`（飾品槽共用五件上限）。`modifier_key` 是每件已註冊裝備各自專屬的鍵，全大陸目前已命名的裝備鍵見下方各分類表。
+`equipment_slot` 的封閉詞彙是主手 `weapon_main`、副手 `weapon_off`、護甲 `armor`、飾品 `accessory`（飾品槽共用五件上限）。每件裝備的專屬效果住在它自己的作者列上，以物品 `key` 綁定，沒有第二個識別鍵。
 
 ### 第四層：貨幣與價格帶
 
@@ -76,7 +76,7 @@
 
 ### 第六層：使用效果欄位（item_effects）
 
-可使用物品的 `use_mechanics` 只聲明「能否使用、使用是否消耗、能否在戰鬥中使用」三件事；使用「做什麼」是一組有序的型別化效果條目，以物品 `key` 為鍵存放在使用效果規則表（`world/rules/rulebook/item_effects.yaml`），由 `world/rules/item_effects.py` 的載入器驗證。
+可使用物品的 `use_mechanics` 聲明「能否使用、使用是否消耗、能否在戰鬥中使用」，並在同一列以 `effects` 寫下使用「做什麼」的有序型別化效果；`world/rules/item_effects.py` 的載入器驗證這些條目並建立以物品 `key` 為鍵的執行期 profile。非戰鬥使用耗時是共用設定，住在 `world/rules/rulebook/item_effects.yaml`。
 
 | 欄位 | 說明 |
 | --- | --- |
@@ -113,7 +113,7 @@ items:
 
 ### 第七層：裝備效果欄位（equipment_effects）與稀有度預算
 
-裝備的數值不存放在物品清單，由 `modifier_key` 綁定到裝備效果規則表的一筆條目。
+裝備的數值不存放在物品身份本身，而是由同一列的 `equipment_effects` 綁定到該物品 `key` 的執行期效果條目；共用的稀有度預算表住在 `world/rules/rulebook/equipment_effects.yaml`。
 
 | 欄位 | 封閉詞彙／型別 | 說明 |
 | --- | --- | --- |

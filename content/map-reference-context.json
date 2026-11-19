@@ -256,7 +256,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "2197933daa750cec7a8ea52f8d59434c3c1c6d799876553e0aafc769bedd1fd1",
+  "fingerprint": "297bb2a6c534a39851ec26f9b21fe6b79f0261170b8fd645d5482f531709c174",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -16477,7 +16477,7 @@
     "world/lore/guild.py": "37916eb09dfff1fdcd6b7ab5376a27b5c492e1c322dacd200bdc4cec46299e72",
     "world/lore/guild_adventurers.py": "424b60250ec79a70ffacc2b492f27c3a1d7ba385c4f7806f20ea40c9153ad5d7",
     "world/lore/items/__init__.py": "be7f3c63d321a42521c7c164bedb258cc60e20a79e666f2bdce5c02ca42cecc7",
-    "world/lore/items/assembly.py": "3509d112d766b8bf9ab287c05c972877ec5b377973a548854056db92fdd03dc5",
+    "world/lore/items/assembly.py": "1c75f50db78e3a7668938f30458aff1271e2c033c6f68e7ada323e646ec4a724",
     "world/lore/items/vocab.py": "b39747b899cb23d9bc96aac502cb1fc445e826841c1ca191ea055f213fed6fc3",
     "world/lore/magic.py": "f1ae1ffe5f9c9ffba58ac9ea78f80618c80d1ef2d763c7e3b545e7bf8af27dc8",
     "world/lore/map_districts.py": "5a3e96fa284cf4ecaa3bb1590f4080405a13c98164b402c4a275336a88c71039",
@@ -16675,7 +16675,7 @@
     "world/rules/displayed_stats.py": "b4194b8dfbaa52db5191b4ddd523b028620cf07c47b3540261f4896bf5ded765",
     "world/rules/economy.py": "b0ea993cc8b404f5e8458b07c26e08ddeea858caefc20495061529e78ef76845",
     "world/rules/equipment.py": "366f7c6baeae222b56fcaebc36361a77485fc26313642d567b1b880d70487caf",
-    "world/rules/equipment_effects.py": "1501d504ee407b573ec06fedf1587c475acf7d59458e34b281b4335efdfd6018",
+    "world/rules/equipment_effects.py": "03442fc4166b8f1e7dd692c1ad4218d00ce2ab8d63f3ede7936870caa026da60",
     "world/rules/event_log.py": "fc92123fe7ac5f1b2d12202cbf1f372d9c7e7958af90fe580778fea9b757e3aa",
     "world/rules/exam_schedule_holds.py": "d52a96c326f2289617147fbb3167b5442ad43922f4a893f7ef63f825b829f814",
     "world/rules/fatigue.py": "e5e31b3afba4849a0c802fd0b66417e5f626ece3a338979895aa31aff72014e3",
@@ -16698,7 +16698,7 @@
     "world/rules/guild_offers.py": "de0a3a9a9fc752a84278108b05409b6103c9fa227eac135c4f1459a98c0636bc",
     "world/rules/human_guild_hosts.py": "2be249c00fd11ae83a0b4ac50839d954f482eb67253a3d6c2a9643df811233df",
     "world/rules/identity.py": "8e8d7425529c3fcd9c7efec8a99c3bfccee4d29a0f8da094b26d47f6667fb9aa",
-    "world/rules/item_effects.py": "5f2007b0d0673d5943985ebe9ad897d4f767f6596ab29c990e6ae6154c884c73",
+    "world/rules/item_effects.py": "ee8facd5fb896b09f695ef3712e5ea3e5f6f5f14d5cc2ff8679c43dd7902ce85",
     "world/rules/items/__init__.py": "184b90e6f20a67389238f8731471ac03d1aac89be2d9caab646eee0fbbef531c",
     "world/rules/items/contracts.py": "ec691a1aed98d58a60a46745fa7c55924a8af0381245da599b7a95138df08b88",
     "world/rules/items/journal.py": "9411848cf28a1bfffd63970b9f997c61a6b320053f4407f32b7df24a8eb192f1",
