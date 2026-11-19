@@ -24,8 +24,8 @@ def _npc_persona_fixture(character, account=None) -> None:
     from world.rules.character_creation import (
         CharacterCreationRequest,
         activate_player_character,
-        resolve_starting_profile,
     )
+    from world.rules.starting_policy import resolve_starting_profile
 
     npc = create_object(NPC, key=NPC_NAME, location=character.location)
     npc.components.add(ScriptedDialogue.create(npc, dialogue_key=SYNTH_DIALOGUE_TABLE_KEY))
@@ -91,12 +91,14 @@ def _npc_persona_fixture(character, account=None) -> None:
                 SHIPPED_BASE_RACE,
                 SHIPPED_BASE_SUBRACE,
             )
-            profile = resolve_starting_profile(SHIPPED_BASE_RACE, SHIPPED_BASE_SUBRACE)
+            profile = resolve_starting_profile(
+                SHIPPED_BASE_RACE, SHIPPED_BASE_SUBRACE, mode="custom"
+            )
             rem = profile.budget
             allocs = {}
-            for k, (l, u) in profile.bounds:
-                val = min(u - l, rem)
-                allocs[k] = val
+            for axis in profile.axes:
+                val = min(axis.point_cap, rem)
+                allocs[axis.axis] = val
                 rem -= val
             req = CharacterCreationRequest(
                 mode="custom",

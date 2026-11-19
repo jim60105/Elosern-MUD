@@ -557,5 +557,47 @@ class CreationPanelPresenterTests(EvenniaTest):
             self.assertIn(f":{other.pk}:{entry['sex']}:", entry["artwork"]["subject_id"])
 
 
+    @covers_requirement(
+        "player-stat-allocation::creation-surfaces-use-the-selected-allocation-policy"
+    )
+    def test_a_superseded_elf_draft_ships_as_unallocated(self):
+        from world.tests.synthetic_data import SYNTH_RACES, make_subrace, synthetic_registries
+
+        elf = replace(SYNTH_RACES[_T_RACE], key="elf", allowed_sexes=("female",))
+        branch = make_subrace("t_moonspun_kin", race_key="elf")
+        with synthetic_registries(
+            "races", "subraces", extra={"races": {"elf": elf}, "subraces": {branch.key: branch}}
+        ):
+            self.character.creation_draft = {
+                "version": 3,
+                "mode": "custom",
+                "stage": "custom_filled",
+                "display_name": "舊精靈",
+                "age": 320,
+                "apparent_age": 20,
+                "race": "elf",
+                "subrace": branch.key,
+                "allocations": {
+                    "hp": 0, "mp": 0, "sp": 0,
+                    "atk_phys": 20, "agility": 20, "defense": 20,
+                    "magic_power": 0,
+                },
+                "background": "舊林地的守望者",
+                "persona": None,
+                "sex": "female",
+            }
+            stored = dict(self.character.creation_draft)
+            payload = self._render()
+        # The panel is schema-valid and the draft reports the reallocation
+        # stage with no points, while every other value is retained.
+        self.assertEqual(payload["draft"]["stage"], "custom_needs_allocation")
+        self.assertIsNone(payload["draft"]["allocations"])
+        self.assertEqual(payload["draft"]["display_name"], "舊精靈")
+        self.assertEqual(payload["draft"]["background"], "舊林地的守望者")
+        self.assertEqual(payload["draft"]["sex"], "female")
+        self.assertNotIn("allocation_policy_version", payload["draft"])
+        self.assertEqual(dict(self.character.creation_draft), stored)
+
+
 if __name__ == "__main__":
     unittest.main()

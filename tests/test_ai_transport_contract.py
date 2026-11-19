@@ -44,7 +44,17 @@ FORBIDDEN_FRAGMENTS = ("ollama", "llm_client", "world.ai")
 # covers this module's own import surface — the scan is a direct-import prefix
 # check by design; any future module claiming the exemption must show the same
 # side-effect-free property, and the claim itself is the review point.
-READ_ONLY_RULE_MODULES = ("world.quests.characterization", "world.rules.namegen")
+# ``world.rules.starting_policy`` is the single starting-allocation policy
+# (elf-starting-stat-budget): immutable-lore arithmetic plus the pure identity
+# seam (``world.rules.creation_identity`` / ``world.rules.identity``, both of
+# which only read the lore registries). It holds no database handle, no
+# typeclass and no Evennia import, so the generative proposal validator reads
+# the same policy activation enforces instead of duplicating the arithmetic.
+READ_ONLY_RULE_MODULES = (
+    "world.quests.characterization",
+    "world.rules.namegen",
+    "world.rules.starting_policy",
+)
 
 DETERMINISTIC_PACKAGES = ("world/rules", "world/maps", "world/quests", "world/art", "commands")
 
@@ -178,12 +188,16 @@ class AiTransportBoundaryTests(unittest.TestCase):
                 self.assertNotIn("from socket", source)
 
     @covers_requirement("scenario-director::the-scenario-director-name-inspiration-reads-the-namegen-rule-layer-without-crossing-the-single-writer-boundary")
-    def test_read_only_allowlist_is_exactly_the_two_pure_rule_modules(self):
+    def test_read_only_allowlist_is_exactly_the_pure_rule_modules(self):
         # The delta contract is "exactly", not "contains": every future
         # widening of the exemption table has to pass (and show up in) here.
         self.assertEqual(
             READ_ONLY_RULE_MODULES,
-            ("world.quests.characterization", "world.rules.namegen"),
+            (
+                "world.quests.characterization",
+                "world.rules.namegen",
+                "world.rules.starting_policy",
+            ),
         )
 
     @covers_requirement("scenario-director::the-scenario-director-name-inspiration-reads-the-namegen-rule-layer-without-crossing-the-single-writer-boundary")

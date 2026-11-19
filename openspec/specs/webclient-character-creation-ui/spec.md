@@ -31,7 +31,7 @@ Themed creation selects and checkboxes SHALL preserve native keyboard/IME behavi
 - **THEN** the existing revision-gated custom-form fill and confirmation flow remain unchanged by layout
 
 ### Requirement: The creation panel is an exact read-only creation-mode panel
-The production presentation registry SHALL register `creation` schema version 8. Its available
+The production presentation registry SHALL register `creation` schema version 9. Its available
 payload SHALL contain exactly `schema_version`, `available`, `kind`, `draft`, `presets`, `custom`, `portrait`,
 and the optional `proposal`; `available` SHALL be true and `kind` SHALL be `creation`. The whole
 panel SHALL use the registered common unavailable form outside `creation` mode and when the global
@@ -39,7 +39,7 @@ prerequisite fails.
 
 #### Scenario: A pending character receives the creation panel
 - **WHEN** a puppeted WebClient session with `creation_pending` true receives a full snapshot
-- **THEN** `creation` reports `available` true, `kind` `creation`, schema version 8, the preset
+- **THEN** `creation` reports `available` true, `kind` `creation`, schema version 9, the preset
   cards, the custom-form descriptor, and the current server-persisted draft while a before/after
   comparison of canonical game state is unchanged
 
@@ -56,13 +56,13 @@ prerequisite fails.
   import-schema field is exposed
 
 #### Scenario: A stale schema version is rejected
-- **WHEN** a `creation` panel payload declares `schema_version` 7, 6, 5, 4, 3, 2, or any version other than 8
+- **WHEN** a `creation` panel payload declares a `schema_version` other than 9
 - **THEN** exact-schema validation rejects it on both the presenter and the mirrored browser
   validator rather than accepting a stale shape
 
 #### Scenario: Schema version ships as the integer 6
 - **WHEN** an available `creation` panel payload ships
-- **THEN** `schema_version` carries the integer 8
+- **THEN** `schema_version` carries the integer 9
 
 #### Scenario: The proposal key mirrors the transient session proposal
 - **WHEN** the authenticated session holds a transient concept proposal
@@ -139,9 +139,14 @@ The presenter SHALL derive bounded, exact-shape preset cards and custom controls
 - **WHEN** the `custom.profiles` list ships
 - **THEN** it contains at most 16 entries, one per race/subrace combination, each with exactly
   `race`, `subrace` (null or a key), `budget`, and `axes`; each axis contains exactly `axis`,
-  `label`, `explanation`, `minimum`, and `maximum`, with `axis` from `hp`, `mp`, `sp`, `atk_phys`,
-  `agility`, `defense`, or `magic_power`, integer `budget`/`minimum`/`maximum` within
+  `label`, `explanation`, `minimum`, `maximum`, `point_cap`, and `value_at_cap`, with `axis` from `hp`, `mp`, `sp`, `atk_phys`,
+  `agility`, `defense`, or `magic_power`, integer `budget`/`minimum`/`maximum`/`point_cap`/`value_at_cap` within
   JavaScript-safe range, and the seven-axis set matching `resolve_starting_profile`
+
+#### Scenario: Point bounds are independent of lore bounds
+- **WHEN** either exact validator reads an axis
+- **THEN** it requires a nonnegative `point_cap` and a `value_at_cap` within `minimum` and `maximum`, equal to `minimum` for zero cap
+- **AND** preview interpolates from `minimum` to `value_at_cap` with half-up rounding before subrace modifiers
 
 #### Scenario: The affinity map carries race maxima and element choices
 - **WHEN** the `custom.affinity` map ships
@@ -212,7 +217,7 @@ The deterministic core SHALL provide a creation-wizard draft service that is the
   `subrace`, the `allocations` (one entry per `ALLOCATABLE_AXES` axis), the optional
   `affinity_elements` (bounded by the race-dependent maximum, elf `none`), an optional bounded
   `background` text, a required nullable `persona` block (`personality`, `life_story`, `habit`
-  bounded text fields) accepted only through the custom-save payload, and the accepted `sex`
+  bounded text fields) accepted only through the custom-save payload, and the accepted `sex`; a newly saved custom elf draft also stores `allocation_policy_version: 1`
 
 #### Scenario: An unknown sex member is rejected at save time
 - **WHEN** a custom draft saves with a `sex` that names a member outside `SEX_VALUES`, or a
@@ -256,6 +261,16 @@ The deterministic core SHALL provide a creation-wizard draft service that is the
 - **THEN** the draft sets no canonical identity attributes, traits, or `creation_pending` on the
   character, and the canonical identity attributes, the trait set, and any previously validated
   draft remain unchanged
+
+#### Scenario: Superseded elf allocation resumes incomplete
+- **WHEN** an otherwise valid stored custom elf draft lacks the current allocation policy marker
+- **THEN** the read-only panel carries the same custom draft fields with stage `custom_needs_allocation` and `allocations: null`, never exposing the storage marker
+- **AND** the browser resumes at allocation with confirmation blocked and the other fields and portrait retained
+- **AND** activation without a new save is rejected even before presentation and with a matching fingerprint
+
+#### Scenario: Fresh allocation restores confirmation
+- **WHEN** the player saves a complete valid allocation after resuming
+- **THEN** the server returns `custom_filled` with the accepted seven points and the new draft may be explicitly confirmed
 
 ### Requirement: Creation actions are exact, allowlisted, and server-authoritative
 The production action registry SHALL register exactly `creation.preset`, `creation.custom`, `creation.concept`, `creation.roll_name`, `creation.activate`, `creation.reset`, and `creation.portrait.generate` for the creation surface. No adapter SHALL assign `.db`, traits, identity attributes, or `creation_pending` directly, and no action SHALL route an action ID or payload through the text command parser.
@@ -530,7 +545,7 @@ pop exactly one menu level without discarding the saved server wizard draft.
 
 #### Scenario: The allocation briefing renders before the fields
 - **WHEN** the custom form renders race and subrace with a resolvable profile
-- **THEN** it displays the profile budget, the seven-axis count, each axis's 0–span range,
+- **THEN** it displays the profile budget, the seven-axis count, each axis's zero-through-point-cap range,
   and the rule that the total must equal the budget above the allocation inputs
 
 #### Scenario: Form action buttons respond to pointer clicks
@@ -592,7 +607,7 @@ pop exactly one menu level without discarding the saved server wizard draft.
 #### Scenario: The custom form fields beyond the keyboard map
 - **WHEN** the custom form renders
 - **THEN** it displays an allocation briefing (total budget, seven-axis count, each axis's
-  0–span, and the sum-must-equal-budget rule) above the allocation fields
+  zero-through-point-cap, and the sum-must-equal-budget rule) above the allocation fields
 - **AND** it provides a bounded optional background text field
 - **AND** it renders a sex `<select>` directly below the display-name field whose options come
   verbatim from `custom.sex` (no browser-side label literals, the `DEFAULT_SEX` key preselected

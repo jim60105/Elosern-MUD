@@ -18,7 +18,10 @@ export function useCreationOverlay(props, emit) {
   const custom = useCreationCustom(props, form, emit);
   // The custom form's local step (registers no watcher), created before the
   // proposal group so a fresh concept apply can land on the first step.
-  const steps = useCreationSteps({ errorFields: custom.formErrorFields });
+  const steps = useCreationSteps({
+    errorFields: custom.formErrorFields,
+    needsAllocation: form.needsAllocation,
+  });
   const proposal = useCreationProposal(props, form, custom, steps);
   const dispatch = useCreationDispatch(props, form, emit);
   const stage = useCreationStage(props, form, emit, { rollPending: dispatch.rollPending });

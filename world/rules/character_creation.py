@@ -10,14 +10,13 @@ from django.db import transaction
 from world.imports.schema import MAX_ENTITY_KEY_LENGTH
 from world.lore.elements import ELEMENT_REGISTRY
 from world.lore.player_presets import PLAYER_PRESET_REGISTRY, PlayerPreset
-from world.lore.races import RACE_REGISTRY, SUBRACE_REGISTRY, StatModifiers
+from world.lore.races import SUBRACE_REGISTRY
 from world.lore.sex import DEFAULT_SEX
 from world.lore.starting_kits import SUBRACE_STARTING_KIT_REGISTRY
 from world.observability import log_info, log_warn
 from world.rules import start_location
 from world.rules.creation_identity import (
     CharacterCreationError,
-    resolve_race_and_subrace,
     validate_age,
     validate_sex,
 )
@@ -32,9 +31,15 @@ from world.rules.surfaces import (
     snapshot_attributes,
     snapshot_traits,
 )
-from world.rules.traits import GAUGE_KEYS, STATIC_KEYS, trait_config_for_values
-
-ALLOCATABLE_AXES = GAUGE_KEYS + STATIC_KEYS
+from world.rules.starting_policy import (
+    ALLOCATABLE_AXES,
+    CUSTOM_MODE,
+    PRESET_MODE,
+    PHYSICAL_AXES,
+    StartingProfile,
+    resolve_starting_profile,
+)
+from world.rules.traits import trait_config_for_values
 _CREATION_ATTRIBUTE_KEYS = (
     "age", "apparent_age", "race", "subrace", "creation_pending",
     "skill_proficiency", "skills", "skill_grants", "equipment",
@@ -179,20 +184,6 @@ MAX_PERSONA_FIELD_LENGTH = 600
 
 
 @dataclass(frozen=True)
-class StartingProfile:
-    """Raw allocation bounds plus post-allocation static modifiers."""
-
-    race: str
-    subrace: str | None
-    bounds: tuple[tuple[str, tuple[int, int]], ...]
-    static_modifiers: StatModifiers
-    budget: int
-
-    def bounds_dict(self) -> dict[str, tuple[int, int]]:
-        return dict(self.bounds)
-
-
-@dataclass(frozen=True)
 class CharacterCreationRequest:
     """Fully specified custom or preset activation input."""
 
@@ -235,24 +226,6 @@ class _ValidatedCreation:
     nation: str | None = None
 
 
-def resolve_starting_profile(race_key: str, subrace_key: str | None = None) -> StartingProfile:
-    """Resolve player allocation bounds entirely from immutable lore."""
-    race_key, subrace_key = resolve_race_and_subrace(race_key, subrace_key)
-    race = RACE_REGISTRY[race_key]
-    subrace = SUBRACE_REGISTRY[subrace_key] if subrace_key else None
-
-    bounds = {key: getattr(race.vital_baseline, key) for key in GAUGE_KEYS}
-    bounds.update({key: getattr(race.static_baseline, key) for key in STATIC_KEYS})
-    if subrace and subrace.vital_overrides:
-        bounds.update(subrace.vital_overrides)
-    modifiers = subrace.static_modifiers if subrace else StatModifiers()
-    budget = sum(upper - lower for lower, upper in bounds.values()) // 2
-    return StartingProfile(
-        race_key, subrace_key, tuple((key, bounds[key]) for key in ALLOCATABLE_AXES),
-        modifiers, budget,
-    )
-
-
 def _validate_name(value: Any) -> str:
     if not isinstance(value, str):
         raise CharacterCreationError("display name must be text")
@@ -273,13 +246,15 @@ def _validate_name(value: Any) -> str:
 def _validate_allocations(profile: StartingProfile, allocations: Any) -> dict[str, int]:
     if not isinstance(allocations, Mapping) or set(allocations) != set(ALLOCATABLE_AXES):
         raise CharacterCreationError("allocations must contain exactly the seven starting axes")
-    bounds = profile.bounds_dict()
+    axes = profile.axes_dict()
     checked: dict[str, int] = {}
     for key in ALLOCATABLE_AXES:
         value = allocations[key]
-        span = bounds[key][1] - bounds[key][0]
-        if type(value) is not int or not 0 <= value <= span:
-            raise CharacterCreationError(f"allocation for {key} must be an integer from 0 to {span}")
+        point_cap = axes[key].point_cap
+        if type(value) is not int or not 0 <= value <= point_cap:
+            raise CharacterCreationError(
+                f"allocation for {key} must be an integer from 0 to {point_cap}"
+            )
         checked[key] = value
     if sum(checked.values()) != profile.budget:
         raise CharacterCreationError(f"allocations must sum exactly to {profile.budget}")
@@ -287,18 +262,19 @@ def _validate_allocations(profile: StartingProfile, allocations: Any) -> dict[st
 
 
 def _resolve_values(profile: StartingProfile, allocations: Any) -> dict[str, int]:
-    """Compute final trait values from one profile plus one raw allocation map.
+    """Compute final trait values from one profile plus one allocation map.
 
-    The single bounds-plus-allocation-plus-modifier implementation every
-    consumer shares: lower bound plus allocation, then the subrace static
-    modifiers, then the pinned guild counter. Allocation validation is part of
-    the computation because the preset registry's span/budget guarantees live
-    in a CI test, not an import-time validator.
+    The single points-to-values-plus-modifier implementation every consumer
+    shares: the profile's own per-axis conversion (raw increment, or the custom
+    elf's magic interpolation), then the subrace static modifiers, then the
+    pinned guild counter. Allocation validation is part of the computation
+    because the preset registry's cap/budget guarantees live in a CI test, not
+    an import-time validator.
     """
     checked = _validate_allocations(profile, allocations)
-    bounds = profile.bounds_dict()
-    values = {key: bounds[key][0] + checked[key] for key in ALLOCATABLE_AXES}
-    for key in STATIC_KEYS:
+    axes = profile.axes_dict()
+    values = {key: axes[key].value_for(checked[key]) for key in ALLOCATABLE_AXES}
+    for key in PHYSICAL_AXES:
         # Subrace static modifiers cover the three physical axes only; the
         # fourth axis (magic_power) is allocable but modifier-free (D-A5).
         values[key] = round(
@@ -318,7 +294,7 @@ def resolve_preset_values(preset: PlayerPreset) -> dict[str, int]:
     and no write. The returned mapping is a fresh caller-owned dict per call.
     """
     return _resolve_values(
-        resolve_starting_profile(preset.race, preset.subrace),
+        resolve_starting_profile(preset.race, preset.subrace, mode=PRESET_MODE),
         preset.allocation_dict(),
     )
 
@@ -429,7 +405,9 @@ def preflight_character_creation(
         # player inputs through the same single arithmetic helper.
         values = resolve_preset_values(preset)
     else:
-        values = _resolve_values(resolve_starting_profile(race, subrace), allocations)
+        values = _resolve_values(
+            resolve_starting_profile(race, subrace, mode=CUSTOM_MODE), allocations
+        )
     if request.mode == "custom":
         # Custom-mode affinity is race-bounded player input (D4): an elf
         # rejects any player-supplied set, and the race-dependent bound

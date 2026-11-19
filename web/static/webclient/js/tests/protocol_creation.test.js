@@ -103,10 +103,12 @@ function validCreationPanel(overrides) {
     explanation: "測試說明",
     minimum: 0,
     maximum: 100,
+    point_cap: 100,
+    value_at_cap: 100,
   }));
   return deepMerge(
     {
-      schema_version: 8,
+      schema_version: 9,
       available: true,
       kind: "creation",
       draft: null,
@@ -215,7 +217,7 @@ test("accepts a valid creation panel and the common unavailable form", () => {
       "creation",
       Protocol.PANEL_ALLOWLIST.creation,
       {
-        schema_version: 8,
+        schema_version: 9,
         available: false,
         reason: { code: "creation_unavailable", message: "角色建立畫面目前無法顯示" },
       }
@@ -236,7 +238,8 @@ test("creation panel rejects malformed and unknown-node fields", () => {
   assert.throws(() => Protocol.validateCreationPanel(validCreationPanel({ schema_version: 6 })));
   // v7 is the pre-portrait version: the exact gate rejects it.
   assert.throws(() => Protocol.validateCreationPanel(validCreationPanel({ schema_version: 7 })));
-  assert.throws(() => Protocol.validateCreationPanel(validCreationPanel({ schema_version: 9 })));
+  // v8 is the pre-point-policy version: the exact gate rejects it too.
+  assert.throws(() => Protocol.validateCreationPanel(validCreationPanel({ schema_version: 8 })));
   assert.throws(() => Protocol.validateCreationPanel(validCreationPanel({ schema_version: 2 })));
   const badDraft = validCreationPanel({ draft: { mode: "preset", stage: "custom_filled", preset_key: "x" } });
   assert.throws(() => Protocol.validateCreationPanel(badDraft));
@@ -249,6 +252,77 @@ test("creation panel rejects malformed and unknown-node fields", () => {
   const wrongAxes = validCreationPanel();
   wrongAxes.custom.profiles[0].axes = wrongAxes.custom.profiles[0].axes.slice(0, 6);
   assert.throws(() => Protocol.validateCreationPanel(wrongAxes));
+});
+
+test("creation v9 keeps point bounds independent of the lore bounds", () => {
+  const panel = validCreationPanel();
+  const axis = panel.custom.profiles[0].axes[0];
+  // An interpolated axis may reach a value inside its lore band.
+  panel.custom.profiles[0].axes[0] = Object.assign({}, axis, {
+    minimum: 100,
+    maximum: 900,
+    point_cap: 75,
+    value_at_cap: 200,
+  });
+  assert.doesNotThrow(() => Protocol.validateCreationPanel(panel));
+
+  for (const [label, patch] of [
+    ["missing point cap", { point_cap: undefined }],
+    ["negative point cap", { point_cap: -1 }],
+    ["value above the lore maximum", { value_at_cap: 901 }],
+    ["value below the lore minimum", { value_at_cap: 99 }],
+    ["zero cap away from the floor", { point_cap: 0 }],
+  ]) {
+    const broken = validCreationPanel();
+    const entry = Object.assign({}, broken.custom.profiles[0].axes[0], {
+      minimum: 100,
+      maximum: 900,
+      point_cap: 75,
+      value_at_cap: 200,
+    }, patch);
+    if (patch.point_cap === undefined) delete entry.point_cap;
+    broken.custom.profiles[0].axes[0] = entry;
+    assert.throws(() => Protocol.validateCreationPanel(broken), undefined, label);
+  }
+});
+
+test("creation v9 reports a superseded elf allocation as unallocated", () => {
+  const draft = {
+    mode: "custom",
+    stage: "custom_needs_allocation",
+    display_name: "新角色",
+    age: 20,
+    apparent_age: 20,
+    race: "elf",
+    subrace: T_SR_LEAF,
+    allocations: null,
+    background: null,
+    affinity_elements: [],
+    sex: "female",
+    persona: null,
+  };
+  const validated = Protocol.validateCreationPanel(
+    validCreationPanel({ draft })
+  );
+  assert.equal(validated.draft.stage, "custom_needs_allocation");
+  assert.equal(validated.draft.allocations, null);
+  // The stage and the allocation slot are one exact pair.
+  assert.throws(() =>
+    Protocol.validateCreationPanel(
+      validCreationPanel({
+        draft: Object.assign({}, draft, {
+          allocations: { hp: 0, mp: 0, sp: 0, atk_phys: 0, agility: 0, defense: 0, magic_power: 75 },
+        }),
+      })
+    )
+  );
+  assert.throws(() =>
+    Protocol.validateCreationPanel(
+      validCreationPanel({
+        draft: Object.assign({}, draft, { stage: "custom_filled" }),
+      })
+    )
+  );
 });
 
 test("creation panel enforces race display_name_zh and preset race reference", () => {
@@ -292,7 +366,7 @@ test("creation panel v5 carries the draft persona, sex, and the proposal slot", 
   };
   const payload = validCreationPanel({ draft: customDraft, proposal });
   const validated = Protocol.validateCreationPanel(payload);
-  assert.equal(validated.schema_version, 8);
+  assert.equal(validated.schema_version, 9);
   assert.equal(validated.draft.sex, "other");
   assert.deepEqual(validated.draft.persona, customDraft.persona);
   assert.deepEqual(validated.proposal, proposal);
@@ -562,7 +636,7 @@ test("custom.sex mirrors the server vocabulary and the draft gate requires it", 
 
 test("creation v8 carries preset artwork and the custom silhouette table", () => {
   const validated = Protocol.validateCreationPanel(validCreationPanel());
-  assert.equal(validated.schema_version, 8);
+  assert.equal(validated.schema_version, 9);
   const card = validated.presets[0];
   assert.equal(card.artwork.subject_id, "creation:preset:" + T_PRESET_A);
   assert.equal(card.artwork.attempts.length, 1);
@@ -773,6 +847,8 @@ test("creation payload maximizing every string field fails the byte gate", () =>
     explanation: huge,
     minimum: 0,
     maximum: 10000,
+    point_cap: 10000,
+    value_at_cap: 10000,
   }));
   const card = {
     key: "p".repeat(Protocol.CREATION_MAX_PRESET_KEY),
@@ -813,7 +889,7 @@ test("creation payload maximizing every string field fails the byte gate", () =>
     (key) => Object.assign({}, affinityElement, { key })
   );
   const payload = {
-    schema_version: 8,
+    schema_version: 9,
     available: true,
     kind: "creation",
     draft: null,
@@ -847,7 +923,7 @@ test("creation payload maximizing every string field fails the byte gate", () =>
 });
 
 test("creation is in the production panel allowlist and a bad panel rejects atomically", () => {
-  assert.equal(Protocol.PANEL_ALLOWLIST.creation, 8);
+  assert.equal(Protocol.PANEL_ALLOWLIST.creation, 9);
   const envelope = {
     protocol_version: 1,
     presentation_epoch: VALID_EPOCH,
@@ -865,7 +941,7 @@ test("creation is in the production panel allowlist and a bad panel rejects atom
   assert.equal(store.getState().phase, "awaiting_initial_snapshot");
 });
 
-test("the Storybook creation fixture validates against schema 8", async () => {
+test("the Storybook creation fixture validates against schema 9", async () => {
   const { CREATION_PANEL_SAMPLE } = await import(
     "../../../../webclient-app/stories/fixtures/creation_panels.js"
   );
@@ -991,7 +1067,7 @@ test("creation v8 rejects every malformed portrait state", () => {
 test("the unavailable creation form carries no portrait", () => {
   assert.throws(() =>
     Protocol.validatePanel("creation", Protocol.PANEL_ALLOWLIST.creation, {
-      schema_version: 8,
+      schema_version: 9,
       available: false,
       reason: { code: "creation_unavailable", message: "角色建立畫面目前無法顯示" },
       portrait: { status: "empty" },
@@ -999,7 +1075,7 @@ test("the unavailable creation form carries no portrait", () => {
   );
 });
 
-test("the story portrait fixtures validate inside a schema-8 panel", async () => {
+test("the story portrait fixtures validate inside a schema-9 panel", async () => {
   const { CREATION_PANEL_SAMPLE, CREATION_PORTRAIT_STATES } = await import(
     "../../../../webclient-app/stories/fixtures/creation_panels.js"
   );

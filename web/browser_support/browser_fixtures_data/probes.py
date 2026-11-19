@@ -62,19 +62,19 @@ def synth_concept_proposal_values() -> dict:
     registry symbol-refs there).
     """
     from world.lore.races import RACE_REGISTRY, SUBRACE_REGISTRY
-    from world.rules.character_creation import resolve_starting_profile
+    from world.rules.starting_policy import CUSTOM_MODE, resolve_starting_profile
     from world.skills.registry import SKILL_REGISTRY
 
     race_key = next(iter(RACE_REGISTRY))
     subrace_key = next(
         key for key, sub in SUBRACE_REGISTRY.items() if sub.race_key == race_key
     )
-    profile = resolve_starting_profile(race_key, subrace_key)
+    profile = resolve_starting_profile(race_key, subrace_key, mode=CUSTOM_MODE)
     remaining = profile.budget
     allocations: dict[str, int] = {}
-    for axis, (lower, upper) in profile.bounds:
-        value = min(upper - lower, remaining)
-        allocations[axis] = value
+    for axis in profile.axes:
+        value = min(axis.point_cap, remaining)
+        allocations[axis.axis] = value
         remaining -= value
     if remaining != 0:
         raise AssertionError("starting profile budget exceeds allocatable spans")

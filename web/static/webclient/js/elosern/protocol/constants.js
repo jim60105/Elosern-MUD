@@ -349,6 +349,11 @@ var CREATION_MAX_CONCEPT = 500;
 var CREATION_AXES = ["hp", "mp", "sp", "atk_phys", "agility", "defense", "magic_power"];
 var CREATION_PRESET_STAGE = "preset_selected";
 var CREATION_CUSTOM_STAGE = "custom_filled";
+// A custom draft whose stored allocation predates the shipped allocation
+// policy resumes as an allocation the player must redo: the server projects
+// the stored draft under this stage with `allocations: null` and never
+// exposes the storage marker.
+var CREATION_NEEDS_ALLOCATION_STAGE = "custom_needs_allocation";
 // The exact wire persona block keys (the three prose fields).
 var CREATION_PERSONA_KEYS = ["personality", "life_story", "habit"];
 // The sex vocabulary mirror (world/lore/sex.py). Keys only -- the option
@@ -380,7 +385,9 @@ var CREATION_MAX_SILHOUETTES = 16;
 // form's silhouettes lookup table (creation-panel-artwork).
 // v8 adds the required read-only `portrait` state union
 // (creation-draft-portrait-panel); v7 and every other version are rejected.
-var CREATION_SCHEMA_VERSION = 8;
+// v9 adds each allocation axis's `point_cap`/`value_at_cap` and the
+// `custom_needs_allocation` draft stage (elf-starting-stat-budget).
+var CREATION_SCHEMA_VERSION = 9;
 // The portrait reason bound in code points (mirror of
 // MAX_PORTRAIT_REASON_CODE_POINTS) and the closed status vocabulary.
 var CREATION_MAX_PORTRAIT_REASON = 512;
@@ -601,7 +608,7 @@ var PANEL_ALLOWLIST = {
   item_holdings: ITEM_HOLDINGS_SCHEMA_VERSION,
   objectives: 1,
   services: SERVICES_SCHEMA_VERSION,
-  creation: 8,
+  creation: 9,
   exploration: 7,
   character: 9,
   lineage: 2,
@@ -808,6 +815,7 @@ module.exports = {
   CREATION_AXES: CREATION_AXES,
   CREATION_PRESET_STAGE: CREATION_PRESET_STAGE,
   CREATION_CUSTOM_STAGE: CREATION_CUSTOM_STAGE,
+  CREATION_NEEDS_ALLOCATION_STAGE: CREATION_NEEDS_ALLOCATION_STAGE,
   CREATION_PERSONA_KEYS: CREATION_PERSONA_KEYS,
   CREATION_SEX_VALUES: CREATION_SEX_VALUES,
   CREATION_SEX_DEFAULT: CREATION_SEX_DEFAULT,

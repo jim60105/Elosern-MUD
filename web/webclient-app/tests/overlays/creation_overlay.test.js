@@ -61,11 +61,11 @@ describe("CreationOverlay (B5 overlays family)", () => {
     expect(down.attributes("disabled")).toBeDefined();
     await up.trigger("click");
     expect(input.element.value).toBe(String(axis.minimum + 1));
-    await input.setValue(axis.maximum);
+    await input.setValue(axis.point_cap);
     expect(up.attributes("disabled")).toBeDefined();
     await down.trigger("click");
-    expect(input.element.value).toBe(String(axis.maximum - 1));
-    for (const invalid of ["", axis.minimum - 1, axis.maximum + 1, 0.5]) {
+    expect(input.element.value).toBe(String(axis.point_cap - 1));
+    for (const invalid of ["", axis.minimum - 1, axis.point_cap + 1, 0.5]) {
       await input.setValue(invalid);
       expect(up.attributes("disabled")).toBeDefined();
       expect(down.attributes("disabled")).toBeDefined();
@@ -75,15 +75,18 @@ describe("CreationOverlay (B5 overlays family)", () => {
       expect(lastAction(wrapper, "creation.custom")).toBeNull();
       expect(wrapper.get('[data-testid="creation-form-message"]').attributes("role")).toBe("alert");
     }
-    // Preview clipping cannot normalize a submitted value: an over-bound axis
-    // with a balancing decrement still reaches the existing server validator.
-    await input.setValue(axis.maximum + 1);
+    // An out-of-cap axis is refused locally with its own message; no amount of
+    // balancing elsewhere ships a point value the server would reject.
+    await input.setValue(axis.point_cap + 1);
     const other = CREATION_PANEL_SAMPLE.custom.profiles[0].axes[1];
     await wrapper.get(`[data-testid="creation-field-${other.axis}"]`).setValue(
       CREATION_PANEL_CUSTOM_DRAFT_SAMPLE.draft.allocations[other.axis] - 1,
     );
     await wrapper.get('[data-testid="creation-submit"]').trigger("click");
-    expect(lastAction(wrapper, "creation.custom").payload.allocations[axis.axis]).toBe(axis.maximum + 1);
+    expect(lastAction(wrapper, "creation.custom")).toBeNull();
+    expect(wrapper.get('[data-testid="creation-form-message"]').text()).toContain(
+      `0–${axis.point_cap}`,
+    );
     wrapper.unmount();
   });
 
@@ -1478,5 +1481,100 @@ describe("the presentation context gates equal-draft synchronization", () => {
       presentationContext: { generation: 2, epoch: "epoch-b" },
     });
     expect(name().element.value).toBe(SAVED.display_name);
+  });
+});
+
+// -- A superseded custom-elf allocation resumes at allocation --------------
+// The server projects a draft written under the old increment policy as
+// `custom_needs_allocation` with no points: the form must reopen on the
+// allocation step, keep every other field, and preview the shipped
+// conversion until a fresh save.
+const STALE_ELF_PANEL = (() => {
+  const panel = structuredClone(CREATION_PANEL_SAMPLE);
+  const profile = panel.custom.profiles.find((entry) => entry.race === "elf");
+  profile.budget = 75;
+  profile.axes = profile.axes.map((axis) => {
+    if (axis.axis === "magic_power") {
+      return { ...axis, minimum: 100, maximum: 900, point_cap: 75, value_at_cap: 200 };
+    }
+    if (["hp", "mp", "sp"].includes(axis.axis)) {
+      return { ...axis, minimum: 500, maximum: 500, point_cap: 0, value_at_cap: 500 };
+    }
+    return { ...axis, minimum: 70, maximum: 95, point_cap: 25, value_at_cap: 95 };
+  });
+  panel.draft = {
+    mode: "custom",
+    stage: "custom_needs_allocation",
+    display_name: "舊精靈",
+    age: 320,
+    apparent_age: 20,
+    race: "elf",
+    subrace: null,
+    allocations: null,
+    background: "舊林地的守望者",
+    affinity_elements: [],
+    persona: { personality: "沉靜", life_story: "在舊林長大", habit: "夜裡巡林" },
+    sex: "female",
+  };
+  return panel;
+})();
+
+describe("a superseded custom-elf draft resumes needing a fresh allocation", () => {
+  it("opens at allocation, keeps the other fields, and previews the policy", async () => {
+    const wrapper = mount(CreationOverlay, {
+      props: { creation: structuredClone(STALE_ELF_PANEL) },
+      attachTo: document.body,
+    });
+    await nextTick();
+    const tid = (id) => `[data-testid="${id}"]`;
+    // The allocation step is presented with an explicit reallocation notice
+    // and no confirmation screen.
+    expect(wrapper.get(tid("creation-steps-panel-allocation")).isVisible()).toBe(true);
+    expect(wrapper.find(tid("creation-needs-allocation")).exists()).toBe(true);
+    expect(wrapper.find(tid("creation-confirm")).exists()).toBe(false);
+    // Identity, prose, and portrait inputs keep the server values; the points
+    // start empty rather than reinterpreting the stored ones.
+    expect(wrapper.get(tid("creation-field-displayName")).element.value).toBe("舊精靈");
+    expect(wrapper.get(tid("creation-field-age")).element.value).toBe("320");
+    expect(wrapper.get(tid("creation-background")).element.value).toBe("舊林地的守望者");
+    expect(wrapper.get(tid("creation-persona-habit")).element.value).toBe("夜裡巡林");
+    expect(wrapper.get(tid("creation-field-atk_phys")).element.value).toBe("0");
+    // The preview is the pre-modifier policy conversion at both endpoints.
+    expect(wrapper.get(tid("creation-preview-hp")).text()).toContain("500");
+    expect(wrapper.get(tid("creation-preview-atk_phys")).text()).toContain("70");
+    expect(wrapper.get(tid("creation-preview-magic_power")).text()).toContain("100");
+    await wrapper.get(tid("creation-field-magic_power")).setValue(75);
+    expect(wrapper.get(tid("creation-preview-magic_power")).text()).toContain("200");
+    // A mixed spend rounds the same way activation does: 100 + 37/75 of the
+    // 100-unit span lands on 149.33, so the preview shows 149.
+    await wrapper.get(tid("creation-field-magic_power")).setValue(37);
+    expect(wrapper.get(tid("creation-preview-magic_power")).text()).toContain("149");
+    await wrapper.get(tid("creation-field-magic_power")).setValue(0);
+    await wrapper.get(tid("creation-field-atk_phys")).setValue(25);
+    expect(wrapper.get(tid("creation-preview-atk_phys")).text()).toContain("95");
+    wrapper.unmount();
+  });
+
+  it("a fresh complete allocation submits the seven points and nothing else", async () => {
+    const wrapper = mount(CreationOverlay, {
+      props: {
+        creation: { ...structuredClone(STALE_ELF_PANEL), portrait: CREATION_PORTRAIT_STATES.ready },
+      },
+      attachTo: document.body,
+    });
+    await nextTick();
+    const tid = (id) => `[data-testid="${id}"]`;
+    await wrapper.get(tid("creation-field-atk_phys")).setValue(25);
+    await wrapper.get(tid("creation-field-agility")).setValue(25);
+    await wrapper.get(tid("creation-field-defense")).setValue(25);
+    await wrapper.get(tid("creation-submit")).trigger("click");
+    const actions = wrapper.emitted("action") ?? [];
+    const submitted = actions.filter(([action]) => action.action_id === "creation.custom");
+    expect(submitted).toHaveLength(1);
+    expect(submitted[0][0].payload.allocations).toEqual({
+      hp: 0, mp: 0, sp: 0, atk_phys: 25, agility: 25, defense: 25, magic_power: 0,
+    });
+    expect(submitted[0][0].payload).not.toHaveProperty("allocation_policy_version");
+    wrapper.unmount();
   });
 });

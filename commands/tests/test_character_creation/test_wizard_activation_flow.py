@@ -225,6 +225,44 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertIn("屬性親和", joined)
         self.assertIn("背景設定", joined)
 
+    @covers_requirement(
+        "player-stat-allocation::creation-surfaces-use-the-selected-allocation-policy"
+    )
+    def test_the_custom_elf_briefing_explains_the_magic_conversion(self):
+        from world.rules.starting_policy import CUSTOM_MODE, resolve_starting_profile
+
+        profile = resolve_starting_profile("elf", _ELF_BRANCH.key, mode=CUSTOM_MODE)
+        magic = profile.axes_dict()["magic_power"]
+        self.assertNotEqual(magic.value_at_cap - magic.minimum, magic.point_cap)
+
+        command = CmdCharacter()
+        command.caller = self.char1
+        command.account = self.account
+        command.args = "create"
+        original_msg = self.char1.msg
+        message_mock = Mock()
+        self.char1.msg = message_mock
+        try:
+            generator = command.func()
+            replies = [
+                # An elf picks no affinity elements, so the wizard skips that
+                # prompt and the reply stack carries no affinity line.
+                "自訂精靈", "20", "20", "elf", _ELF_BRANCH.key,
+                *_balanced_replies("elf", _ELF_BRANCH.key), "",
+            ]
+            prompts = [next(generator)]
+            for reply in replies:
+                prompts.append(generator.send(reply))
+        finally:
+            self.char1.msg = original_msg
+        joined = "".join(prompts) + "".join(_messages(message_mock))
+        # The briefing names the point cap, the resulting value, and that the
+        # conversion is not one point per stat unit.
+        self.assertIn(f"配點 0–{magic.point_cap}", joined)
+        self.assertIn(f"{magic.point_cap} 點換算為 {magic.value_at_cap}", joined)
+        self.assertIn("每點換算值不同", joined)
+        self.assertIn(f"可用點數 {profile.budget}", joined)
+
     def test_custom_wizard_rejects_an_empty_or_unknown_subrace(self):
         for subrace in ("", "none", "t_unregistered_branch"):
             with self.subTest(subrace=subrace):

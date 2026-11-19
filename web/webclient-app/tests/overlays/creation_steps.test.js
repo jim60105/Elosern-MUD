@@ -136,11 +136,11 @@ describe("CreationCustomSteps: remaining points on the rail", () => {
     mountDraft();
     const axis = DRAFT_PROFILE.axes[0];
     await openStep("allocation");
-    await wrapper.get(tid(`creation-field-${axis.axis}`)).setValue(axis.maximum + 5);
-    const expected = DRAFT_PROFILE.budget - (sum(DRAFT.allocations) - DRAFT.allocations[axis.axis] + axis.maximum + 5);
+    await wrapper.get(tid(`creation-field-${axis.axis}`)).setValue(axis.point_cap + 5);
+    const expected = DRAFT_PROFILE.budget - (sum(DRAFT.allocations) - DRAFT.allocations[axis.axis] + axis.point_cap + 5);
     expect(expected).toBeLessThan(0);
     expect(remaining()).toBe(String(expected));
-    expect(wrapper.get(tid(`creation-field-${axis.axis}`)).element.value).toBe(String(axis.maximum + 5));
+    expect(wrapper.get(tid(`creation-field-${axis.axis}`)).element.value).toBe(String(axis.point_cap + 5));
   });
 
   it("follows the selected server profile, and shows absence without one", async () => {
@@ -200,43 +200,43 @@ describe("CreationCustomSteps: errors open the first invalid field's step", () =
     expect(flagged("allocation")).toBe(true);
   });
 
-  it("a native constraint failure is revealed and focused, and the existing pipeline still runs unchanged", async () => {
+  it("an out-of-cap value is reported and focused, and nothing ships", async () => {
     mountDraft();
     const [over, balance] = DRAFT_PROFILE.axes.filter((axis) => DRAFT.allocations[axis.axis] > axis.minimum).slice(-2);
     await openStep("allocation");
-    await wrapper.get(tid(`creation-field-${over.axis}`)).setValue(over.maximum + 1);
-    const delta = over.maximum + 1 - DRAFT.allocations[over.axis];
+    await wrapper.get(tid(`creation-field-${over.axis}`)).setValue(over.point_cap + 1);
+    const delta = over.point_cap + 1 - DRAFT.allocations[over.axis];
     await wrapper.get(tid(`creation-field-${balance.axis}`)).setValue(DRAFT.allocations[balance.axis] - delta);
     await openStep("identity");
     await submit();
-    // The budget balances, so the existing pipeline sends exactly as before:
-    // the server stays the authority for the over-bound axis.
-    expect(actions("creation.custom")).toHaveLength(1);
-    expect(actions("creation.custom")[0][0].payload.allocations[over.axis]).toBe(over.maximum + 1);
+    // The cap is a server-declared bound: the form refuses locally rather than
+    // shipping a point value activation would reject.
+    expect(actions("creation.custom")).toHaveLength(0);
     expect(visibleStep()).toEqual(["allocation"]);
     const input = wrapper.get(tid(`creation-field-${over.axis}`));
     expect(document.activeElement).toBe(input.element);
     expect(input.attributes("aria-invalid")).toBe("true");
     expect(flagged("allocation")).toBe(true);
+    expect(wrapper.get("#creation-form-message").text()).toContain(`0–${over.point_cap}`);
   });
 
-  it("chooses the earliest field in display order when several are reported", async () => {
+  it("opens the allocation step for an out-of-cap value even with a persona gap", async () => {
     mountDraft();
     const [over, balance] = DRAFT_PROFILE.axes.filter((axis) => DRAFT.allocations[axis.axis] > axis.minimum).slice(-2);
     await openStep("allocation");
-    // A native failure on the allocation step (budget still balanced) and a
-    // persona gap on the story step: the story field comes first.
-    await wrapper.get(tid(`creation-field-${over.axis}`)).setValue(over.maximum + 1);
-    const delta = over.maximum + 1 - DRAFT.allocations[over.axis];
+    // The out-of-cap gate runs with the allocation gates (before the persona
+    // gate), so the allocation field is the reported one: an over-cap point
+    // value is never sent, whatever the rest of the form holds.
+    await wrapper.get(tid(`creation-field-${over.axis}`)).setValue(over.point_cap + 1);
+    const delta = over.point_cap + 1 - DRAFT.allocations[over.axis];
     await wrapper.get(tid(`creation-field-${balance.axis}`)).setValue(DRAFT.allocations[balance.axis] - delta);
     await openStep("story");
     await wrapper.get(tid("creation-persona-habit")).setValue("");
     await openStep("allocation");
     await submit();
     expect(actions("creation.custom")).toHaveLength(0);
-    expect(visibleStep()).toEqual(["story"]);
-    expect(document.activeElement).toBe(wrapper.get(tid("creation-persona-habit")).element);
-    expect(flagged("story")).toBe(true);
+    expect(visibleStep()).toEqual(["allocation"]);
+    expect(document.activeElement).toBe(wrapper.get(tid(`creation-field-${over.axis}`)).element);
     expect(flagged("allocation")).toBe(true);
   });
 

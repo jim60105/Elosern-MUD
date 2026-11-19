@@ -4,7 +4,7 @@
 // presentation state: it never enters the draft and never sends an action.
 // Validation stays in use-creation-custom.js; this group only says WHERE an
 // error the existing pipeline reported is displayed.
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { ALLOCATION_AXES } from "./use-creation-form.js";
 
 export const STEPS = Object.freeze([
@@ -37,12 +37,24 @@ export function stepOfField(field) {
   return FIELD_STEP[field] ?? null;
 }
 
-export function useCreationSteps({ errorFields }) {
+export function useCreationSteps({ errorFields, needsAllocation }) {
   const currentStep = ref(STEP_KEYS[0]);
   const stepIndex = computed(() => STEP_KEYS.indexOf(currentStep.value));
 
   function goToStep(key) {
     if (STEP_KEYS.includes(key)) currentStep.value = key;
+  }
+
+  // A resumed draft whose allocation was superseded opens on the allocation
+  // step: that is the only field set the player must redo before confirmation.
+  if (needsAllocation) {
+    watch(
+      needsAllocation,
+      (stale) => {
+        if (stale) goToStep("allocation");
+      },
+      { immediate: true },
+    );
   }
 
   function previousStep() {

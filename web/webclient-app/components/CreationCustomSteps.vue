@@ -45,6 +45,8 @@ const {
   currentProfile,
   allocationTotal,
   budgetBriefing,
+  allocationPreview,
+  needsAllocation,
   formErrorFields,
   reviewPrompt,
   onRaceChange,
@@ -99,8 +101,8 @@ function fieldAttrs(field, describedBy = null) {
 function canStep(axis, direction) {
   const value = allocations[axis.axis];
   return Number.isInteger(value)
-    && value >= axis.minimum && value <= axis.maximum
-    && value + direction >= axis.minimum && value + direction <= axis.maximum;
+    && value >= 0 && value <= axis.point_cap
+    && value + direction >= 0 && value + direction <= axis.point_cap;
 }
 
 function stepAllocation(axis, direction) {
@@ -109,9 +111,9 @@ function stepAllocation(axis, direction) {
 
 function allocationFraction(axis) {
   const value = allocations[axis.axis];
-  const span = axis.maximum - axis.minimum;
+  const span = axis.point_cap;
   return Number.isFinite(value) && span > 0
-    ? Math.max(0, Math.min(1, (value - axis.minimum) / span))
+    ? Math.max(0, Math.min(1, value / span))
     : 0;
 }
 
@@ -370,21 +372,27 @@ defineExpose({ submit });
           </p>
           <p v-if="budgetBriefing" class="creation-budget-briefing" data-testid="creation-budget-briefing">{{ budgetBriefing }}</p>
           <p v-else class="creation-steps__hint">目前尚無對應的能力配置資料。</p>
+          <p v-if="needsAllocation" class="creation-budget-briefing" role="status" data-testid="creation-needs-allocation">
+            先前的配點已不再適用，請重新配點並儲存，才能確認建立角色。
+          </p>
         </div>
         <div class="creation-allocations">
           <div v-for="ax in currentProfile?.axes" :key="ax.axis" class="creation-allocation">
             <label :for="`creation-allocation-${ax.axis}`" class="creation-allocation__label">{{ ax.label }}</label>
-            <p :id="`creation-axis-help-${ax.axis}`" class="creation-allocation__help">{{ ax.explanation }} ‧ {{ ax.minimum }}–{{ ax.maximum }}</p>
+            <p :id="`creation-axis-help-${ax.axis}`" class="creation-allocation__help">{{ ax.explanation }} ‧ 配點 0–{{ ax.point_cap }}</p>
             <div class="creation-stepper">
               <button type="button" class="ui-icon-btn" :aria-label="`減少${ax.label}`"
                 :data-testid="`creation-step-${ax.axis}-down`" :disabled="!canStep(ax, -1)" @click="stepAllocation(ax, -1)">−</button>
-              <input :id="`creation-allocation-${ax.axis}`" type="number" :min="ax.minimum" :max="ax.maximum"
+              <input :id="`creation-allocation-${ax.axis}`" type="number" min="0" :max="ax.point_cap"
                 v-bind="fieldAttrs(`allocations.${ax.axis}`, `creation-axis-help-${ax.axis}`)"
                 v-model.number="allocations[ax.axis]" :data-testid="`creation-field-${ax.axis}`" />
               <button type="button" class="ui-icon-btn" :aria-label="`增加${ax.label}`"
                 :data-testid="`creation-step-${ax.axis}-up`" :disabled="!canStep(ax, 1)" @click="stepAllocation(ax, 1)">+</button>
             </div>
             <div class="creation-allocation__bar" aria-hidden="true"><span :style="{ transform: `scaleX(${allocationFraction(ax)})` }"></span></div>
+            <p class="creation-allocation__help" :data-testid="`creation-preview-${ax.axis}`">
+              預覽值 {{ allocationPreview.find((entry) => entry.axis === ax.axis)?.value ?? ax.minimum }}
+            </p>
           </div>
         </div>
       </section>

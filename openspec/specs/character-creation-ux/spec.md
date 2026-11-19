@@ -18,32 +18,23 @@ string literals in the command.
   allocation-emphasis one-liner, and a background one-liner drawn from registry data
 
 ### Requirement: Custom creation mode explains its prompts
-When a pending player chooses custom creation, the game SHALL present each prompt with explanatory
-text: what the requested race represents, which subraces exist for the chosen race, what the
-allocation axes mean, and the allocation budget and sum rules — in addition to the existing input
-validation messages. The custom flow SHALL also collect an optional bounded background (flavor)
-text through a dedicated prompt.
+The custom text flow SHALL explain races, compatible subraces, each allocation axis, point caps and the exact total, and SHALL collect an optional bounded background through a dedicated prompt.
 
 #### Scenario: Custom prompts carry explanations
 - **WHEN** a pending player runs `character create`
-- **THEN** the race prompt explains the race options and each allocation prompt explains what that
-  axis affects
+- **THEN** race options and each allocation axis are explained
 
 #### Scenario: The subrace prompt lists every available subrace
-- **WHEN** a pending player chooses a race in `character create` and reaches the subrace prompt
-- **THEN** the prompt lists every registered subrace of that race with its display name (and
-  specialty), and no "none"/empty selection is offered
+- **WHEN** the player selects a race
+- **THEN** the wizard lists every compatible subrace with its display name and specialty and offers no empty selection
 
 #### Scenario: The allocation briefing precedes the allocation step
-- **WHEN** a pending player has chosen race and subrace in `character create` and is about to enter
-  the seven allocation values
-- **THEN** before the first allocation input the game states the total budget, the seven-axis count,
-  each axis's 0–span range, and the rule that the sum must equal the budget
+- **WHEN** the player is about to enter allocations
+- **THEN** the wizard explains the seven-axis input, selected budget, per-axis point caps, exact sum, and any conversion that differs from one point per stat unit
 
 #### Scenario: The custom flow collects an optional background
-- **WHEN** a pending player completes race, subrace, and allocations in `character create`
-- **THEN** the wizard presents a bounded background (flavor-text) prompt that the player may fill
-  or leave blank, and the accepted value is carried into activation
+- **WHEN** the player finishes allocating
+- **THEN** the wizard prompts for bounded optional background text and carries accepted input into activation
 
 ### Requirement: The character creation restyle does not change activation semantics
 The presentational restyle SHALL NOT alter the preset/custom activation logic, the age-range
@@ -169,4 +160,3 @@ no wizard draft.
 - **WHEN** `character concept` runs with the LLM offline
 - **THEN** the command SHALL return the stable unavailable message and the ordinary preset/custom
   flows SHALL remain fully usable
-

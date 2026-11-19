@@ -144,17 +144,15 @@ def await_result(d):
 
 
 def _in_band_allocations(race_key: str, subrace_key: str) -> dict[str, int]:
-    """Spend a race's full budget with every allocation inside its band span
-    (allocations count points above each axis's band floor)."""
-    from world.ai.character_creation import _allocation_budget, _race_bands
+    """Spend a profile's full budget with every allocation inside its cap."""
+    from world.rules.starting_policy import CUSTOM_MODE, resolve_starting_profile
 
-    bands = _race_bands(race_key, subrace_key)
-    remaining = _allocation_budget(race_key, subrace_key)
+    profile = resolve_starting_profile(race_key, subrace_key, mode=CUSTOM_MODE)
+    remaining = profile.budget
     allocations: dict[str, int] = {}
-    for axis in ALLOCATABLE_AXES:
-        span = bands[axis][1] - bands[axis][0]
-        take = min(span, remaining)
-        allocations[axis] = take
+    for axis in profile.axes:
+        take = min(axis.point_cap, remaining)
+        allocations[axis.axis] = take
         remaining -= take
     assert remaining == 0
     return allocations
@@ -221,13 +219,15 @@ class CharacterCreationPromptTests(unittest.TestCase):
     @covers_requirement(
         "generative-character-concept::proposals-are-validated-deterministically-against-the-registries",
         "generative-character-concept::the-concept-prompt-requests-the-expanded-blueprint-and-the-race-affinity-bound",
+        "generative-character-concept::concept-generation-receives-the-custom-allocation-policy",
     )
-    def test_race_catalog_carries_only_the_annotated_affinity_numbers(self):
+    def test_race_catalog_carries_only_policy_numbers_and_affinity_bounds(self):
         import re
 
         catalog = build_race_catalog()
-        # The single sanctioned numbers are the per-race affinity input bounds
-        # annotated on every race entry; no other mechanical number appears.
+        # The only sanctioned numbers are the leading allocation-policy block
+        # (the exact budget and point caps of every selectable pair) and the
+        # per-race affinity input bounds; no other mechanical number appears.
         layer = importlib.import_module("world.ai" + ".character_creation")
         bounds = getattr(layer, "_AFFINITY" + "_INPUT_BOUNDS")
 
@@ -236,7 +236,18 @@ class CharacterCreationPromptTests(unittest.TestCase):
             self.assertIn(
                 f"{race_key}（{description}，親附上限：{bound}）", catalog
             )
-        stripped = re.sub(r"，親附上限：\d+）", "", catalog)
+        policy_block, _, remainder = catalog.partition("\n種族：")
+        from world.rules.starting_policy import CUSTOM_MODE, resolve_starting_profile
+
+        for subrace_key, subrace in _subraces().items():
+            profile = resolve_starting_profile(
+                subrace.race_key, subrace_key, mode=CUSTOM_MODE
+            )
+            caps = ",".join(
+                str(profile.axes_dict()[axis].point_cap) for axis in ALLOCATABLE_AXES
+            )
+            self.assertIn(f"{subrace_key}：{profile.budget}｜{caps}", policy_block)
+        stripped = re.sub(r"，親附上限：\d+）", "", remainder)
         self.assertEqual(re.findall(r"\d", stripped), [])
 
     @covers_requirement(
@@ -433,16 +444,16 @@ class CharacterCreationProposalTests(unittest.TestCase):
     @covers_requirement("generative-character-concept::proposals-are-validated-deterministically-against-the-registries")
     def test_out_of_band_allocations_are_rejected_and_retried(self):
         client = FakeLLMClient()
-        # One past the widest live band span: no axis may exceed its race
-        # band, whichever row the default race resolves to.
-        from world.ai.character_creation import _race_bands
+        # One past the widest live point cap: no axis may exceed the selected
+        # profile's cap, whichever row the default race resolves to.
+        from world.rules.starting_policy import CUSTOM_MODE, resolve_starting_profile
 
-        bands = _race_bands(_default_race(), _default_subrace())
-        widest_axis = max(
-            bands, key=lambda axis: bands[axis][1] - bands[axis][0]
-        )
+        policy = resolve_starting_profile(
+            _default_race(), _default_subrace(), mode=CUSTOM_MODE
+        ).axes_dict()
+        widest_axis = max(ALLOCATABLE_AXES, key=lambda axis: policy[axis].point_cap)
         over_band = {axis: 0 for axis in ALLOCATABLE_AXES}
-        over_band[widest_axis] = bands[widest_axis][1] - bands[widest_axis][0] + 1
+        over_band[widest_axis] = policy[widest_axis].point_cap + 1
         client.add_response(
             lambda d: len(d.messages) == 2,
             _proposal_text(allocations=over_band),
@@ -456,15 +467,17 @@ class CharacterCreationProposalTests(unittest.TestCase):
     def test_budget_mismatch_is_rejected(self):
         client = FakeLLMClient()
         # The exact in-band spending with one extra unit on an axis that still
-        # has band room: the totals stop matching without tripping a band.
-        from world.ai.character_creation import _race_bands
+        # has cap room: the totals stop matching without tripping a cap.
+        from world.rules.starting_policy import CUSTOM_MODE, resolve_starting_profile
 
-        bands = _race_bands(_default_race(), _default_subrace())
+        policy = resolve_starting_profile(
+            _default_race(), _default_subrace(), mode=CUSTOM_MODE
+        ).axes_dict()
         skewed = _in_band_allocations(_default_race(), _default_subrace())
         spare_axis = next(
             axis
             for axis in ALLOCATABLE_AXES
-            if skewed[axis] < bands[axis][1] - bands[axis][0]
+            if skewed[axis] < policy[axis].point_cap
         )
         skewed[spare_axis] += 1
         client.add_response(
@@ -632,19 +645,18 @@ class CharacterCreationProposalTests(unittest.TestCase):
 
 
 class AllocationParityTests(unittest.TestCase):
-    """The layer's registry-derived bands/budget must match the preflight's.
+    """The layer's admission must match the shared custom policy exactly.
 
-    The layer cannot import ``world.rules`` (transport-boundary contract), so
-    the band arithmetic is re-derived from the same lore registries. This test
-    pins every race/subrace combination against the authoritative
-    ``resolve_starting_profile`` so a future registry or rules change cannot
-    make the layer accept a proposal the activation preflight would reject.
+    The layer reads the same pure policy module activation uses (the
+    transport-boundary contract admits it), so this test pins that the
+    validator accepts the policy's exact budget and caps for every
+    race/subrace pair and refuses one unit past either bound.
     """
 
     @covers_requirement("generative-character-concept::proposals-are-validated-deterministically-against-the-registries")
-    def test_bands_and_budget_match_the_deterministic_preflight_for_every_profile(self):
-        from world.ai.character_creation import _allocation_budget, _race_bands
-        from world.rules.character_creation import resolve_starting_profile
+    def test_caps_and_budget_match_the_deterministic_preflight_for_every_profile(self):
+        from world.ai.character_creation import _validate_allocations
+        from world.rules.starting_policy import CUSTOM_MODE, resolve_starting_profile
 
         for race_key in _races():
             subrace_keys = [
@@ -653,15 +665,43 @@ class AllocationParityTests(unittest.TestCase):
             ]
             for subrace_key in subrace_keys:
                 with self.subTest(race=race_key, subrace=subrace_key):
-                    profile = resolve_starting_profile(race_key, subrace_key)
-                    self.assertEqual(
-                        _race_bands(race_key, subrace_key),
-                        profile.bounds_dict(),
+                    profile = resolve_starting_profile(
+                        race_key, subrace_key, mode=CUSTOM_MODE
                     )
+                    allocations = _in_band_allocations(race_key, subrace_key)
                     self.assertEqual(
-                        _allocation_budget(race_key, subrace_key),
-                        profile.budget,
+                        _validate_allocations(
+                            {
+                                "race_key": race_key,
+                                "subrace_key": subrace_key,
+                                "allocations": allocations,
+                            }
+                        ),
+                        [],
                     )
+                    for axis in profile.axes:
+                        if axis.point_cap == 0:
+                            continue
+                        over = dict(allocations)
+                        over[axis.axis] += 1
+                        messages = " ".join(
+                            _validate_allocations(
+                                {
+                                    "race_key": race_key,
+                                    "subrace_key": subrace_key,
+                                    "allocations": over,
+                                }
+                            )
+                        )
+                        if allocations[axis.axis] == axis.point_cap:
+                            self.assertIn(
+                                f"must be an integer from 0 to {axis.point_cap}",
+                                messages,
+                            )
+                        else:
+                            self.assertIn(
+                                f"allocation budget {profile.budget}", messages
+                            )
 
 
 class TransientFillParityTests(unittest.TestCase):

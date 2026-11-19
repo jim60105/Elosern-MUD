@@ -38,7 +38,6 @@ from world.rules.character_creation import (
     activate_player_character,
     max_affinity_elements,
     preflight_character_creation,
-    resolve_starting_profile,
     restore_activation_placement,
     validate_affinity_elements,
 )
@@ -49,6 +48,11 @@ from world.rules.creation_portrait import (
     draft_portrait_mutation,
     restore_draft_portrait_state,
     snapshot_draft_portrait_state,
+)
+from world.rules.starting_policy import (
+    CUSTOM_MODE,
+    ELF_RACE_KEY,
+    resolve_starting_profile,
 )
 from world.rules.surfaces import (
     restore_attributes,
@@ -69,6 +73,17 @@ from world.rules.surfaces import (
 DRAFT_VERSION = 3
 PRESET_STAGE = "preset_selected"
 CUSTOM_STAGE = "custom_filled"
+# The read-only projection of a custom draft that predates the current
+# allocation policy: the stored points are not points under the shipped
+# conversion, so the draft resumes as an allocation that must be redone. The
+# stage exists only on the wire and in the normalized read; the storage format's
+# stage stays ``CUSTOM_STAGE`` and the draft version does not move.
+CUSTOM_NEEDS_ALLOCATION_STAGE = "custom_needs_allocation"
+# The accepted custom-allocation policy marker a stored custom draft carries
+# once the player has allocated under the current policy. Storage-only: the
+# normalizer never exposes it.
+ALLOCATION_POLICY_VERSION_KEY = "allocation_policy_version"
+ALLOCATION_POLICY_VERSION = 1
 
 # Presentation bounds shared with the wire presenter (web.webclient.
 # presentation.creation) and the JS validator; the registries today are far
@@ -176,6 +191,8 @@ class AllocationAxisView:
     explanation: str
     minimum: int
     maximum: int
+    point_cap: int
+    value_at_cap: int
 
 
 @dataclass(frozen=True)
@@ -259,16 +276,18 @@ class CreationView:
 
 
 def _axis_views(race_key: str, subrace_key: str | None) -> tuple[AllocationAxisView, ...]:
-    profile = resolve_starting_profile(race_key, subrace_key)
+    profile = resolve_starting_profile(race_key, subrace_key, mode=CUSTOM_MODE)
     views: list[AllocationAxisView] = []
-    for axis, (lower, upper) in profile.bounds:
+    for axis in profile.axes:
         views.append(
             AllocationAxisView(
-                axis=axis,
-                label=ALLOCATION_AXIS_LABELS.get(axis, axis),
-                explanation=ALLOCATION_AXIS_EXPLANATIONS.get(axis, ""),
-                minimum=0,
-                maximum=upper - lower,
+                axis=axis.axis,
+                label=ALLOCATION_AXIS_LABELS.get(axis.axis, axis.axis),
+                explanation=ALLOCATION_AXIS_EXPLANATIONS.get(axis.axis, ""),
+                minimum=axis.minimum,
+                maximum=axis.maximum,
+                point_cap=axis.point_cap,
+                value_at_cap=axis.value_at_cap,
             )
         )
     return tuple(views)
@@ -316,7 +335,7 @@ def _profiles() -> tuple[ProfileView, ...]:
             key for key, subrace in SUBRACE_REGISTRY.items() if subrace.race_key == race_key
         )
         for subrace_key in subrace_keys:
-            profile = resolve_starting_profile(race_key, subrace_key)
+            profile = resolve_starting_profile(race_key, subrace_key, mode=CUSTOM_MODE)
             profiles.append(
                 ProfileView(
                     race=race_key,
@@ -484,6 +503,13 @@ def _normalize_draft(storage: Any) -> dict[str, Any] | None:
     advertised range, unknown or incompatible race/subrace, malformed
     allocations, malformed persona block) is treated as corrupt and degrades
     only the draft slot so the creation panel stays schema-valid.
+
+    A structurally valid custom elf draft whose stored allocations predate the
+    current allocation policy projects as :data:`CUSTOM_NEEDS_ALLOCATION_STAGE`
+    with ``allocations: None``: its stored integers are not points under the
+    shipped conversion, so they are never offered back as an accepted answer.
+    Every other field (and the separate portrait state) is retained, the
+    storage marker never reaches the returned shape, and nothing is written.
     """
     if not isinstance(storage, Mapping) or storage.get("version") != DRAFT_VERSION:
         return None
@@ -562,6 +588,15 @@ def _normalize_draft(storage: Any) -> dict[str, Any] | None:
         if sex not in SEX_VALUES:
             return None
         normalized["sex"] = sex
+        marker = storage.get(ALLOCATION_POLICY_VERSION_KEY)
+        # The marker is the exact accepted version: `True` and `1.0` compare
+        # equal to 1, so only a real int of the current version may keep the
+        # stored points activatable.
+        if storage["race"] == ELF_RACE_KEY and (
+            type(marker) is not int or marker != ALLOCATION_POLICY_VERSION
+        ):
+            normalized["stage"] = CUSTOM_NEEDS_ALLOCATION_STAGE
+            normalized["allocations"] = None
         return normalized
     return None
 
@@ -599,9 +634,10 @@ def draft_fingerprint(character: Any) -> str:
 def _request_from_draft(draft: dict[str, Any]) -> CharacterCreationRequest:
     if draft["mode"] == "preset":
         return CharacterCreationRequest(mode="preset", preset_key=draft["preset_key"])
-    if draft["mode"] != "custom":
+    if draft["mode"] != "custom" or draft.get("stage") != CUSTOM_STAGE:
         # Only the two live stages can activate; anything else is an
-        # incomplete draft.
+        # incomplete draft (including a superseded custom-elf allocation that
+        # must be re-entered and saved before it can be confirmed).
         raise CharacterCreationError("creation draft is incomplete")
     return CharacterCreationRequest(
         mode="custom",
@@ -681,6 +717,11 @@ def save_custom_draft(
         storage["affinity_elements"] = list(validated.affinity_elements)
     if validated.background is not None:
         storage["background"] = validated.background
+    if validated.race == ELF_RACE_KEY:
+        # The accepted custom-elf allocation carries the policy marker: an
+        # earlier draft's points are never reinterpreted under the new
+        # conversion.
+        storage[ALLOCATION_POLICY_VERSION_KEY] = ALLOCATION_POLICY_VERSION
     _write_draft(character, storage)
     return read_draft(character)
 
@@ -733,6 +774,26 @@ def reset_creation_draft(account: Any, character: Any) -> None:
             raise
 
 
+def _admissible_activation(
+    character: Any,
+) -> tuple[dict[str, Any], CharacterCreationRequest]:
+    """Return the normalized draft and its request, or reject the activation.
+
+    Pure and write-free: the pending re-check, the stored draft, and the
+    activatable stage are decided here, so a superseded or incomplete draft is
+    refused before any mutation snapshot, portrait serialization, or
+    transaction is entered.
+    """
+    if not bool(getattr(character, "creation_pending", False)):
+        # A character activated between render and submit is rejected as
+        # already complete regardless of whether a stale draft remains.
+        raise CharacterCreationError("character creation is already complete")
+    draft = read_draft(character)
+    if draft is None:
+        raise CharacterCreationError("no creation draft saved")
+    return draft, _request_from_draft(draft)
+
+
 def activate_draft(
     account: Any,
     character: Any,
@@ -767,7 +828,13 @@ def activate_draft(
     draft portrait disposition itself (custom keeps, preset discards) is
     applied inside ``activate_player_character``; this owner restores the
     gallery caches when the outer commit fails.
+
+    The pending/draft/stage admission is decided once BEFORE any mutation
+    snapshot or portrait serialization is entered (so an incomplete draft is
+    refused with no write at all, fingerprint match or not) and re-decided
+    inside the transaction against committed state.
     """
+    _admissible_activation(character)
     with draft_portrait_mutation(character) as unit:
         old_key = character.key
         attribute_snapshots = snapshot_attributes(
@@ -778,15 +845,7 @@ def activate_draft(
         origin = character.location
         try:
             with transaction.atomic():
-                if not bool(getattr(character, "creation_pending", False)):
-                    # A character activated between render and submit is
-                    # rejected as already complete regardless of whether a
-                    # stale draft remains.
-                    raise CharacterCreationError("character creation is already complete")
-                draft = read_draft(character)
-                if draft is None:
-                    raise CharacterCreationError("no creation draft saved")
-                request = _request_from_draft(draft)
+                draft, request = _admissible_activation(character)
                 preflight_character_creation(account, character, request)
                 persona = draft.get("persona")
                 result = activate_player_character(
@@ -822,6 +881,7 @@ __all__ = [
     "AllocationAxisView",
     "CreationView",
     "CustomFormView",
+    "CUSTOM_NEEDS_ALLOCATION_STAGE",
     "CUSTOM_STAGE",
     "DRAFT_VERSION",
     "MAX_PRESETS",

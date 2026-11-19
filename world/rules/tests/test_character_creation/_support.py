@@ -58,13 +58,21 @@ def _race_key() -> str:
     return "t_duskmari"
 
 
-def balanced_allocations(race: str, subrace: str | None = None) -> dict[str, int]:
-    profile = resolve_starting_profile(race, subrace)
+def balanced_allocations(
+    race: str, subrace: str | None = None, *, mode: str = "custom"
+) -> dict[str, int]:
+    """Spend a profile's exact budget on its leading axes first.
+
+    ``mode`` names the policy under test: custom activation uses the custom
+    policy, a preset card (and the companion/builder consumers of
+    ``resolve_preset_values``) uses the raw-increment preset policy.
+    """
+    profile = resolve_starting_profile(race, subrace, mode=mode)
     remaining = profile.budget
     result = {key: 0 for key in ALLOCATABLE_AXES}
-    for key, (lower, upper) in profile.bounds:
-        value = min(upper - lower, remaining)
-        result[key] = value
+    for axis in profile.axes:
+        value = min(axis.point_cap, remaining)
+        result[axis.axis] = value
         remaining -= value
     if remaining:
         raise AssertionError("profile budget exceeds total spans")

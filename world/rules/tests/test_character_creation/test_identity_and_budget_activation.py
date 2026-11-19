@@ -131,10 +131,10 @@ class CharacterActivationTests(EvenniaTest):
         )
         # magic_power is static-band-floor + allocation: derived from the
         # scoped race row, never a pinned shipped number.
-        profile = resolve_starting_profile(race_key)
+        profile = resolve_starting_profile(race_key, mode="custom")
         self.assertEqual(
             result.magic_power,
-            profile.bounds_dict()["magic_power"][0]
+            profile.axes_dict()["magic_power"].minimum
             + self.request().allocations["magic_power"],
         )
         self.assertEqual(self.character.key, "新角色")
@@ -164,19 +164,23 @@ class CharacterActivationTests(EvenniaTest):
                 race=_race_key(), subrace=modified.key, allocations=allocations
             )
             checked = preflight_character_creation(self.account, self.character, request)
-            profile = resolve_starting_profile(_race_key(), modified.key)
-            bounds = profile.bounds_dict()
+            profile = resolve_starting_profile(_race_key(), modified.key, mode="custom")
+            axes = profile.axes_dict()
             for key in ("atk_phys", "agility", "defense"):
-                raw = bounds[key][0] + allocations[key]
+                raw = axes[key].value_for(allocations[key])
                 expected = round(raw * (1 + getattr(profile.static_modifiers, key)))
                 self.assertEqual(checked.values[key], expected)
 
     def test_under_and_over_budget_rejections_are_non_mutating(self):
         valid = balanced_allocations(_race_key())
-        bounds = resolve_starting_profile(_race_key()).bounds_dict()
+        axes = resolve_starting_profile(_race_key(), mode="custom").axes_dict()
         for delta in (-1, 1):
             allocations = dict(valid)
-            key = next(key for key in ALLOCATABLE_AXES if 0 <= allocations[key] + delta <= bounds[key][1] - bounds[key][0])
+            key = next(
+                key
+                for key in ALLOCATABLE_AXES
+                if 0 <= allocations[key] + delta <= axes[key].point_cap
+            )
             allocations[key] += delta
             with self.subTest(delta=delta), self.assertRaises(CharacterCreationError):
                 activate_player_character(
@@ -241,7 +245,9 @@ class CharacterActivationTests(EvenniaTest):
         values = dict(
             key=key, display_name=f"合成{key}", age=20, apparent_age=20,
             race=race_key, subrace=subrace_key,
-            allocations=tuple(balanced_allocations(race_key, subrace_key).items()),
+            allocations=tuple(
+                balanced_allocations(race_key, subrace_key, mode="preset").items()
+            ),
             emphasis="測試", sex="female",
         )
         values.update(overrides)

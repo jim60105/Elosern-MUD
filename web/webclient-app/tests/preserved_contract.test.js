@@ -132,11 +132,11 @@ describe("H1 preserved DOM contract (design D6)", () => {
     return table;
   }
 
-  // A minimal valid `creation` panel (the exact schema v8 shape the
+  // A minimal valid `creation` panel (the exact schema v9 shape the
   // protocol validator accepts — a slotless panel carries no proposal key).
   function creationPanel() {
     return {
-      schema_version: 8,
+      schema_version: 9,
       available: true,
       kind: "creation",
       draft: null,
@@ -173,13 +173,13 @@ describe("H1 preserved DOM contract (design D6)", () => {
             subrace: null,
             budget: 60,
             axes: [
-              { axis: "hp", label: "生命", explanation: "生命上限", minimum: 0, maximum: 100 },
-              { axis: "mp", label: "魔力", explanation: "魔力上限", minimum: 0, maximum: 100 },
-              { axis: "sp", label: "耐力", explanation: "耐力上限", minimum: 0, maximum: 100 },
-              { axis: "atk_phys", label: "攻擊", explanation: "物理攻擊", minimum: 0, maximum: 100 },
-              { axis: "agility", label: "敏捷", explanation: "敏捷", minimum: 0, maximum: 100 },
-              { axis: "defense", label: "防禦", explanation: "防禦力", minimum: 0, maximum: 100 },
-              { axis: "magic_power", label: "魔法攻擊", explanation: "魔法傷害", minimum: 0, maximum: 100 },
+              { axis: "hp", label: "生命", explanation: "生命上限", minimum: 0, maximum: 100, point_cap: 100, value_at_cap: 100 },
+              { axis: "mp", label: "魔力", explanation: "魔力上限", minimum: 0, maximum: 100, point_cap: 100, value_at_cap: 100 },
+              { axis: "sp", label: "耐力", explanation: "耐力上限", minimum: 0, maximum: 100, point_cap: 100, value_at_cap: 100 },
+              { axis: "atk_phys", label: "攻擊", explanation: "物理攻擊", minimum: 0, maximum: 100, point_cap: 100, value_at_cap: 100 },
+              { axis: "agility", label: "敏捷", explanation: "敏捷", minimum: 0, maximum: 100, point_cap: 100, value_at_cap: 100 },
+              { axis: "defense", label: "防禦", explanation: "防禦力", minimum: 0, maximum: 100, point_cap: 100, value_at_cap: 100 },
+              { axis: "magic_power", label: "魔法攻擊", explanation: "魔法傷害", minimum: 0, maximum: 100, point_cap: 100, value_at_cap: 100 },
             ],
           },
         ],

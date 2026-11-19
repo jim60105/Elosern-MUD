@@ -39,6 +39,7 @@ var CREATION_MAX_EXPLANATION = C.CREATION_MAX_EXPLANATION;
 var CREATION_AXES = C.CREATION_AXES;
 var CREATION_PRESET_STAGE = C.CREATION_PRESET_STAGE;
 var CREATION_CUSTOM_STAGE = C.CREATION_CUSTOM_STAGE;
+var CREATION_NEEDS_ALLOCATION_STAGE = C.CREATION_NEEDS_ALLOCATION_STAGE;
 var CREATION_PERSONA_KEYS = C.CREATION_PERSONA_KEYS;
 var CREATION_SEX_VALUES = C.CREATION_SEX_VALUES;
 var CREATION_MAX_SEX_OPTIONS = C.CREATION_MAX_SEX_OPTIONS;
@@ -225,7 +226,7 @@ function validateCreationAxis(value) {
   requireExactFields(
     value,
     "allocation axis",
-    ["axis", "label", "explanation", "minimum", "maximum"],
+    ["axis", "label", "explanation", "minimum", "maximum", "point_cap", "value_at_cap"],
     []
   );
   var axis = validateIdentifier(value.axis, "axis");
@@ -238,6 +239,17 @@ function validateCreationAxis(value) {
   var maximum = requireInt(value.maximum, "maximum", 0, MAX_SAFE_INTEGER);
   if (minimum > maximum) {
     throw new Error("axis minimum must not exceed maximum");
+  }
+  // Point bounds are independent of the lore bounds the axis advertises: a
+  // fixed gauge admits no points and stays at its floor, while an interpolated
+  // axis (the custom elf's magic power) reaches value_at_cap inside its band.
+  requireInt(value.point_cap, "point_cap", 0, MAX_SAFE_INTEGER);
+  var valueAtCap = requireInt(value.value_at_cap, "value_at_cap", 0, MAX_SAFE_INTEGER);
+  if (valueAtCap < minimum || valueAtCap > maximum) {
+    throw new Error("axis value_at_cap must lie within its lore bounds");
+  }
+  if (value.point_cap === 0 && valueAtCap !== minimum) {
+    throw new Error("axis value_at_cap must equal minimum for a zero cap");
   }
   return value;
 }
@@ -588,8 +600,17 @@ function validateCreationDraft(value) {
       ["mode", "stage", "display_name", "age", "apparent_age", "race", "subrace", "allocations", "background", "affinity_elements", "persona", "sex"],
       []
     );
-    if (value.stage !== CREATION_CUSTOM_STAGE) {
+    if (
+      value.stage !== CREATION_CUSTOM_STAGE &&
+      value.stage !== CREATION_NEEDS_ALLOCATION_STAGE
+    ) {
       throw new Error("unsupported custom draft stage");
+    }
+    // The stage and the allocation slot are one exact pair: only a draft
+    // whose allocation policy was superseded reports no points.
+    var staleAllocation = value.stage === CREATION_NEEDS_ALLOCATION_STAGE;
+    if (staleAllocation !== (value.allocations === null)) {
+      throw new Error("custom draft stage and allocations do not pair");
     }
     requireString(value.display_name, "display_name", CREATION_MAX_DISPLAY_NAME);
     requireInt(value.age, "age", CREATION_AGE_MINIMUM, CREATION_AGE_MAXIMUM);
@@ -621,13 +642,13 @@ function validateCreationDraft(value) {
     }
     return {
       mode: "custom",
-      stage: CREATION_CUSTOM_STAGE,
+      stage: value.stage,
       display_name: value.display_name,
       age: value.age,
       apparent_age: value.apparent_age,
       race: race,
       subrace: subrace,
-      allocations: validateCreationDraftAllocations(value),
+      allocations: staleAllocation ? null : validateCreationDraftAllocations(value),
       background: background,
       affinity_elements: validateCreationDraftAffinity(value.affinity_elements, race),
       persona: validateCreationPersona(value.persona),

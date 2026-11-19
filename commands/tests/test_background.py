@@ -45,12 +45,12 @@ _SCOPE_LOGICALS = (
 
 
 def _balanced_allocations(race: str, subrace: str | None = None) -> dict[str, int]:
-    profile = resolve_starting_profile(race, subrace)
+    profile = resolve_starting_profile(race, subrace, mode="custom")
     remaining = profile.budget
     result: dict[str, int] = {}
-    for key, (lower, upper) in profile.bounds:
-        value = min(upper - lower, remaining)
-        result[key] = value
+    for axis in profile.axes:
+        value = min(axis.point_cap, remaining)
+        result[axis.axis] = value
         remaining -= value
     return result
 
@@ -134,10 +134,10 @@ class BackgroundCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         # the last axis receives 0 points and rests on its profile floor —
         # read back from the patched profile, never a pinned number.
         profile = resolve_starting_profile(
-            next(iter(SYNTH_RACES)), next(iter(SYNTH_SUBRACES))
+            next(iter(SYNTH_RACES)), next(iter(SYNTH_SUBRACES)), mode="custom"
         )
-        last_axis, (floor, _cap) = profile.bounds[-1]
-        self.assertEqual(self.char1.traits[last_axis].value, floor)
+        last_axis = profile.axes[-1]
+        self.assertEqual(self.char1.traits[last_axis.axis].value, last_axis.minimum)
 
     def test_works_without_a_persona_record(self):
         self.char1.attributes.remove("persona")

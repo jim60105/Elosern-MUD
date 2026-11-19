@@ -5,7 +5,7 @@
 本文假設你已讀過：
 
 - `world/lore/player_presets.py`（registry、資料類別結構與全部載入期驗證器）
-- `world/rules/character_creation.py`（配點邊界解析 `resolve_starting_profile()` 與啟動流程）
+- `world/rules/starting_policy.py`（配點政策解析 `resolve_starting_profile()`）與 `world/rules/character_creation.py`（啟動流程）
 - `openspec/specs/player-character-creation/spec.md`（建立路徑的現行契約）
 - 已落地的範例：registry 現行八張卡，含互相宣告的雙胞胎 `yuka_darknight`／`yuna_darknight`
 
@@ -43,7 +43,7 @@
 | 自訂建立 | 同樣是 `allocations`，由玩家逐軸輸入 | `preflight_character_creation()` 即時驗證 | [角色建立與匯入](/gm/characters) 下半部 |
 | JSON 匯入卡 | 絕對 `stats`（直接給最終值） | `CHARACTER_SCHEMA_V1` 結構與語意驗證 | [角色建立與匯入](/gm/characters) 上半部 |
 
-模板為何宣告**配點**而匯入卡宣告**絕對數值**？配點邊界與預算由 `resolve_starting_profile(race_key, subrace_key)` 完全從不可變 lore 推導：七軸上下界取自種族的 `vital_baseline`／`static_baseline`，亞種的 `vital_overrides` 可以覆寫邊界，預算則是各軸跨度總和除以二無條件捨去（`sum(span) // 2`）。卡宣告的是「花多少預算」，啟動時 `_resolve_values()` 才把配點換算成絕對值（下界加配點，再乘上亞種對三個物理軸的靜態修正；`magic_power` 可配但無修正，啟動後 `guild_merit` 釘 0）。若模板直接寫絕對值，種族魔力帶一改，卡的實際價值就悄悄漂移；宣告配點讓同設定檔的每張卡付出同一個預算，價值由規則層機械性保證。匯入卡走的是另一套機制：它是內容作者與 NPC 的路徑，沒有預算算術，`disguised_stats` 的鍵必須是 `stats` 子集之類的規則是匯入路徑專屬，模板路徑無法照抄（模板宣告配點，沒有絕對 `stats` 可比）。
+模板為何宣告**配點**而匯入卡宣告**絕對數值**？配點政策由 `resolve_starting_profile(race_key, subrace_key, mode=...)` 完全從不可變 lore 推導：七軸上下界取自種族的 `vital_baseline`／`static_baseline`，亞種的 `vital_overrides` 可以覆寫邊界。`mode` 必須明講，因為兩條路徑的政策不同。**模板卡**（以及非精靈的自訂建立）走每點一單位的政策（`mode="preset"`）：各軸點數上限就是該軸跨度，預算是各軸跨度總和除以二無條件捨去（`sum(span) // 2`）。**精靈的自訂建立**走 `mode="custom"` 的專屬政策：生命、魔力、體力三軸不可配點，三個物理軸仍每點一單位，預算等於三個物理軸跨度之和（出廠值 75），`magic_power` 的點數上限等於該預算，並在套用亞種修正前由 lore 下限內插到建立上限 200。卡宣告的是「花多少預算」，啟動時 `_resolve_values()` 才把配點換算成絕對值（再乘上亞種對三個物理軸的靜態修正；`magic_power` 可配但無修正，啟動後 `guild_merit` 釘 0）。若模板直接寫絕對值，種族魔力帶一改，卡的實際價值就悄悄漂移；宣告配點讓同設定檔的每張卡付出同一個預算，價值由規則層機械性保證。匯入卡走的是另一套機制：它是內容作者與 NPC 的路徑，沒有預算算術，`disguised_stats` 的鍵必須是 `stats` 子集之類的規則是匯入路徑專屬，模板路徑無法照抄（模板宣告配點，沒有絕對 `stats` 可比）。
 
 ### 開局位置
 
@@ -53,8 +53,8 @@
 
 ## 2. 事前決定：寫卡之前要回答的四個問題
 
-1. 種族與亞種選哪個？`race` 必須在 `RACE_REGISTRY`、`subrace` 必須在 `SUBRACE_REGISTRY` 且屬於該種族，每張模板卡都必須帶亞種（沒有「無亞種」卡）。先用 `resolve_starting_profile()` 看清這個配對的預算與邊界。卡上的 `sex` 也受 `RACE_REGISTRY[race].allowed_sexes` 限制：精靈只有 `female`，精靈卡宣告 `male` 或 `other` 會在載入期被 `_validate_preset_sex` 拒收，因此種族與性別要一起決定。
-2. 配點怎麼分？預算由設定檔決定（人類設定檔目前是 224），七軸各在 0～跨度內取，總和不許差一。`allocations` 記的是**對該軸下限的增量，不是最終值**：啟動時最終值 = 該軸下界 + 配點，物理三軸（`atk_phys`／`agility`／`defense`）再乘上亞種的靜態修正，`magic_power` 可配但無修正（成長重設計 D-A5 已刪除種族平均取樣器，因此魔力仍完全由作者手寫決定）。作者不要把配點當成絕對值：精靈卡寫 `("magic_power", 377)`，開局實際魔力是 477。
+1. 種族與亞種選哪個？`race` 必須在 `RACE_REGISTRY`、`subrace` 必須在 `SUBRACE_REGISTRY` 且屬於該種族，每張模板卡都必須帶亞種（沒有「無亞種」卡）。先用 `resolve_starting_profile(race, subrace, mode="preset")` 看清這個配對的預算與各軸點數上限。卡上的 `sex` 也受 `RACE_REGISTRY[race].allowed_sexes` 限制：精靈只有 `female`，精靈卡宣告 `male` 或 `other` 會在載入期被 `_validate_preset_sex` 拒收，因此種族與性別要一起決定。
+2. 配點怎麼分？預算由設定檔決定（人類模板設定檔目前是 224），七軸各在 0～該軸點數上限內取，總和不許差一。模板卡一律使用 `mode="preset"` 的每點一單位政策；只有精靈的**自訂**建立使用內插政策，兩者不可混用。`allocations` 記的是**對該軸下限的增量，不是最終值**：啟動時最終值 = 該軸下界 + 配點，物理三軸（`atk_phys`／`agility`／`defense`）再乘上亞種的靜態修正，`magic_power` 可配但無修正（成長重設計 D-A5 已刪除種族平均取樣器，因此魔力仍完全由作者手寫決定）。作者不要把配點當成絕對值：精靈卡寫 `("magic_power", 377)`，開局實際魔力是 477。
 3. 技能組牽涉哪些血脈前置？宣告的 kit 在啟動時由 `lineage_ownership_closure()` 補齊前置鏈、再由 `seed_lineage_proficiency()` 把未滿足的前置邊播到恰好達標。作者只需宣告核心技能，前置交給閉包；要改變某條邊的練習值，才需要 `skill_proficiency`。技能若宣告必要種族能力 `can_use_divine_arts`，種族設定檔就必須提供該能力，否則載入時拒絕。
 4. 這張卡需不需要隱藏身分層與夥伴？`persona` 的 `identity` 有公開／隱秘兩層，隱秘層供 PersonaStore 渲染；`starting_companions` 的每筆指向夥伴**自己**的 registry 卡，所以夥伴得先作為一張可選卡存在（雙胞胎互宣告就是這個形）。
 
@@ -67,10 +67,10 @@
 不要發明預算。先算出這個種族亞種設定檔的邊界：
 
 ```python
-from world.rules.character_creation import resolve_starting_profile
-profile = resolve_starting_profile("human", "human_plains")
-print(profile.budget)   # 目前人類為 224
-print(profile.bounds)   # 七軸各 (下界, 上界)
+from world.rules.starting_policy import resolve_starting_profile
+profile = resolve_starting_profile("human", "human_plains", mode="preset")
+print(profile.budget)        # 目前人類模板為 224
+print(profile.axes_dict())   # 七軸各自的 Lore 下界、Lore 上界、點數上限與上限對應值
 ```
 
 `allocations` 的每一項是 `("軸名", 值)` 成對，值取 0～該軸跨度，七軸必須齊全。

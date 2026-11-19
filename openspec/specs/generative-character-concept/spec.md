@@ -64,13 +64,12 @@ display name and both ages through the existing prompts, and activates through t
 The `character_creation` layer SHALL emit proposals shaped
 `{race_key, subrace_key, allocations, suggested_skills, persona{personality, life_story, habit}}`
 plus five optional transient-fill fields `display_name`, `age`, `apparent_age`, `background`, and
-`affinity_elements`. Every proposal SHALL be validated deterministically against the registries
-before any presentation or activation proceeds, and every structural failure is a
-whole-proposal validation failure.
+`affinity_elements`. Every proposal SHALL pass deterministic registry and custom allocation policy
+validation before presentation or activation. A structural failure SHALL reject the whole proposal.
 
 #### Scenario: A valid proposal passes and guides the flow
 - **WHEN** the layer returns a proposal whose keys all resolve in the registries and whose
-  allocations lie inside the race's bands
+  allocations satisfy the selected custom profile
 - **THEN** the proposal is accepted, its summary is presented, and no registration or activation
   state changes yet
 
@@ -83,7 +82,7 @@ whole-proposal validation failure.
 - **THEN** the proposal is retried with the named validation error and never proceeds
 
 #### Scenario: Out-of-band allocations are rejected
-- **WHEN** the proposal's allocations exceed the race's allowed bands
+- **WHEN** the proposal violates a selected axis point cap or the exact custom budget
 - **THEN** the proposal is rejected with a named error and nothing proceeds
 
 #### Scenario: An invalid persona rejects the whole proposal
@@ -129,8 +128,7 @@ whole-proposal validation failure.
 - **WHEN** a proposal is validated
 - **THEN** the checks are: `race_key` exists in the lore registry; `subrace_key` is a registered
   subrace belonging to that race (a null, missing, or incompatible subrace is a whole-proposal
-  failure, since every race has at least one subrace); `allocations` fall within that race's
-  bands and sum to the race budget; every `suggested_skills` key exists in the skill registry;
+  failure, since every race has at least one subrace); `allocations` respect the selected custom profile's point caps and exact budget; every `suggested_skills` key exists in the skill registry;
   and `persona` contains exactly the three text fields with bounded lengths
 
 #### Scenario: An out-of-bounds transient fill is normalised in place
@@ -159,6 +157,14 @@ whole-proposal validation failure.
 - **THEN** the proposal is retried with the error appended and, on exhaustion, degrades to the
   stable unavailable message; no partial proposal (for example race accepted but persona
   discarded) ever proceeds
+
+#### Scenario: A proposed elf allocation travels unchanged
+- **WHEN** a valid custom elf proposal passes the guarded layer
+- **THEN** WebClient transient fill and Telnet continuation both use the same seven point values without creating a saved draft
+
+#### Scenario: Retry feedback uses the selected profile
+- **WHEN** a proposal with valid identity exceeds a point cap or misses the exact budget
+- **THEN** the named validation error reports the applicable cap or budget from the same profile used by activation
 
 ### Requirement: The character_creation layer is registered in the guardrail with retry and degrade
 `world/ai/` SHALL register a `character_creation` layer in the guardrail with an output jsonschema,
@@ -236,3 +242,10 @@ listed bound and must be empty for an elf, and SHALL bound `background` to 600 c
 - **THEN** it states no age-range constraint and does not otherwise instruct the model about the
   0..10000 bounds — age enforcement is server-side clamping — and carries no age-related
   instruction beyond naming the field
+
+### Requirement: Concept generation receives the custom allocation policy
+The bounded race catalog SHALL expose the custom profile's point caps and exact budget for each selectable race and subrace.
+
+#### Scenario: Policy data is rendered from the resolver
+- **WHEN** the concept race catalog renders for synthetic race and subrace profiles
+- **THEN** each listed profile's caps and budget match the custom resolver without hardcoded values in the prompt
