@@ -55,7 +55,7 @@ Work only in the files named below. Commands run from the repository root. Befor
 
 ## 5. Integration check
 
-- [ ] 5.1 Run `pnpm exec vitest run web/webclient-app/tests/overlays web/webclient-app/tests/preserved_contract.test.js` and `pnpm run build`. Both must pass. Confirm that `git status --short` lists only the files named in this task list plus this change's `tasks.md`.
+- [x] 5.1 Run `pnpm exec vitest run web/webclient-app/tests/overlays web/webclient-app/tests/preserved_contract.test.js` and `pnpm run build`. Both must pass. Confirm that `git status --short` lists only the files named in this task list plus this change's `tasks.md`.
 
 ## Workflow follow-up
 
