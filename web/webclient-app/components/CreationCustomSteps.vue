@@ -110,14 +110,6 @@ function stepAllocation(axis, direction) {
   if (canStep(axis, direction)) allocations[axis.axis] += direction;
 }
 
-function allocationFraction(axis) {
-  const value = allocations[axis.axis];
-  const span = axis.point_cap;
-  return Number.isFinite(value) && span > 0
-    ? Math.max(0, Math.min(1, value / span))
-    : 0;
-}
-
 function fieldElements() {
   return root.value ? [...root.value.querySelectorAll("[data-creation-field]")] : [];
 }
@@ -379,7 +371,7 @@ defineExpose({ submit });
         </div>
         <div class="creation-allocations">
           <div v-for="ax in currentProfile?.axes" :key="ax.axis" class="creation-allocation">
-            <label :for="`creation-allocation-${ax.axis}`" class="creation-allocation__label">{{ ax.label }}</label>
+            <label :id="`creation-allocation-label-${ax.axis}`" :for="`creation-allocation-${ax.axis}`" class="creation-allocation__label">{{ ax.label }}</label>
             <p :id="`creation-axis-help-${ax.axis}`" class="creation-allocation__help">{{ ax.explanation }} ‧ 配點 {{ formatPointRange(0, ax.point_cap) }}</p>
             <div class="creation-stepper">
               <button type="button" class="ui-icon-btn" :aria-label="`減少${ax.label}`"
@@ -390,7 +382,22 @@ defineExpose({ submit });
               <button type="button" class="ui-icon-btn" :aria-label="`增加${ax.label}`"
                 :data-testid="`creation-step-${ax.axis}-up`" :disabled="!canStep(ax, 1)" @click="stepAllocation(ax, 1)">+</button>
             </div>
-            <div class="creation-allocation__bar" aria-hidden="true"><span :style="{ transform: `scaleX(${allocationFraction(ax)})` }"></span></div>
+            <!-- Keyed by the cap: a cap and value change in one render would
+                 otherwise clamp the value to the old max (v-model runs first). -->
+            <input
+              :id="`creation-slider-${ax.axis}`"
+              :key="`${ax.axis}:${ax.point_cap}`"
+              type="range"
+              class="creation-allocation__slider"
+              min="0"
+              :max="ax.point_cap"
+              step="1"
+              :aria-labelledby="`creation-allocation-label-${ax.axis}`"
+              v-bind="fieldAttrs(`allocations.${ax.axis}`, `creation-axis-help-${ax.axis}`)"
+              :disabled="ax.point_cap === 0"
+              v-model.number="allocations[ax.axis]"
+              :data-testid="`creation-slider-${ax.axis}`"
+            />
             <p class="creation-allocation__help" :data-testid="`creation-preview-${ax.axis}`">
               預覽值 {{ allocationPreview.find((entry) => entry.axis === ax.axis)?.value ?? ax.minimum }}
             </p>

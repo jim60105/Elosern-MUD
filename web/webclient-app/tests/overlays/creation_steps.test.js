@@ -277,6 +277,81 @@ describe("CreationCustomSteps: point ranges", () => {
   });
 });
 
+describe("CreationCustomSteps: allocation slider", () => {
+  const field = (axis) => wrapper.get(tid(`creation-field-${axis}`));
+  const slider = (axis) => wrapper.get(tid(`creation-slider-${axis}`));
+  const capped = DRAFT_PROFILE.axes.find((axis) => axis.point_cap > 0);
+
+  it("spans zero to the point cap in steps of one, after the number field", async () => {
+    mountDraft();
+    await openStep("allocation");
+    for (const axis of DRAFT_PROFILE.axes) {
+      const range = slider(axis.axis);
+      expect(range.attributes("type")).toBe("range");
+      expect(range.attributes("min")).toBe("0");
+      expect(range.attributes("max")).toBe(String(axis.point_cap));
+      expect(range.attributes("step")).toBe("1");
+      const order = field(axis.axis).element.compareDocumentPosition(range.element);
+      expect(order & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
+  });
+
+  it("keeps the slider and the number field on the same value", async () => {
+    mountDraft();
+    await openStep("allocation");
+    const draftValue = DRAFT.allocations[capped.axis];
+    const viaSlider = draftValue === 0 ? 1 : draftValue - 1;
+    await slider(capped.axis).setValue(viaSlider);
+    expect(field(capped.axis).element.value).toBe(String(viaSlider));
+    const viaField = viaSlider === 0 ? 1 : viaSlider - 1;
+    await field(capped.axis).setValue(viaField);
+    expect(slider(capped.axis).element.value).toBe(String(viaField));
+  });
+
+  it("submits the slider value as the allocation", async () => {
+    mountDraft();
+    await openStep("allocation");
+    const lower = DRAFT_PROFILE.axes.find((axis) => DRAFT.allocations[axis.axis] > 0);
+    const raise = DRAFT_PROFILE.axes.find((axis) => axis !== lower && DRAFT.allocations[axis.axis] < axis.point_cap);
+    expect(sum(DRAFT.allocations)).toBe(DRAFT_PROFILE.budget);
+    await slider(lower.axis).setValue(DRAFT.allocations[lower.axis] - 1);
+    await slider(raise.axis).setValue(DRAFT.allocations[raise.axis] + 1);
+    await submit();
+    const sent = actions("creation.custom");
+    expect(sent).toHaveLength(1);
+    expect(sent[0][0].payload.allocations[lower.axis]).toBe(Number(slider(lower.axis).element.value));
+    expect(sent[0][0].payload.allocations[raise.axis]).toBe(Number(slider(raise.axis).element.value));
+    expect(sent[0][0].payload.allocations[lower.axis]).toBe(DRAFT.allocations[lower.axis] - 1);
+  });
+
+  it("never clamps the slider to the remaining budget", async () => {
+    mountDraft();
+    await openStep("allocation");
+    const remaining = Number(wrapper.get(tid("creation-steps-remaining")).attributes("data-remaining"));
+    const axis = DRAFT_PROFILE.axes.find((entry) => entry.point_cap > remaining);
+    expect(axis).toBeDefined();
+    expect(slider(axis.axis).attributes("max")).toBe(String(axis.point_cap));
+  });
+
+  it("follows a bound and value change made in the same render", async () => {
+    const panel = structuredClone(PANEL);
+    const profile = panel.custom.profiles.find((p) => p.race === OTHER_PLAIN.key);
+    const target = profile.axes.find((axis) => axis.axis === capped.axis);
+    const newCap = capped.point_cap + 2;
+    target.point_cap = newCap;
+    target.maximum = Math.max(target.maximum, target.minimum + newCap);
+    target.value_at_cap = target.maximum;
+    mountDraft(panel);
+    await openStep("allocation");
+    wrapper.get(tid("creation-race")).setValue(OTHER_PLAIN.key);
+    field(capped.axis).setValue(newCap);
+    await nextTick();
+    await nextTick();
+    expect(slider(capped.axis).attributes("max")).toBe(String(newCap));
+    expect(slider(capped.axis).element.value).toBe(String(newCap));
+  });
+});
+
 describe("CreationPortraitSlot: the persistent empty portrait", () => {
   const slot = () => wrapper.findComponent(CreationPortraitSlot);
 
