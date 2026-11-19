@@ -14,6 +14,7 @@
 // before and after running the existing `confirmCustom` unchanged.
 import { computed, nextTick, ref } from "vue";
 import { STEPS, stepOfField } from "../composables/use-creation-steps.js";
+import { formatPointRange } from "../composables/use-creation-custom.js";
 
 const props = defineProps({
   // The useCreationOverlay binding object (a plain object of refs, computeds
@@ -379,7 +380,7 @@ defineExpose({ submit });
         <div class="creation-allocations">
           <div v-for="ax in currentProfile?.axes" :key="ax.axis" class="creation-allocation">
             <label :for="`creation-allocation-${ax.axis}`" class="creation-allocation__label">{{ ax.label }}</label>
-            <p :id="`creation-axis-help-${ax.axis}`" class="creation-allocation__help">{{ ax.explanation }} ‧ 配點 0–{{ ax.point_cap }}</p>
+            <p :id="`creation-axis-help-${ax.axis}`" class="creation-allocation__help">{{ ax.explanation }} ‧ 配點 {{ formatPointRange(0, ax.point_cap) }}</p>
             <div class="creation-stepper">
               <button type="button" class="ui-icon-btn" :aria-label="`減少${ax.label}`"
                 :data-testid="`creation-step-${ax.axis}-down`" :disabled="!canStep(ax, -1)" @click="stepAllocation(ax, -1)">−</button>

@@ -12,6 +12,11 @@ import { computed, ref } from "vue";
 // tests/overlays/creation_overlay.test.js.
 const ACTION_RESULT_FALLBACK_MESSAGE = "動作未生效，請重試或返回上層。";
 
+// Every allocation point range in the custom form reads `low~high`.
+export function formatPointRange(low, high) {
+  return `${low}~${high}`;
+}
+
 export function useCreationCustom(props, form, emit) {
   const {
     custom,
@@ -70,7 +75,7 @@ export function useCreationCustom(props, form, emit) {
   const budgetBriefing = computed(() => {
     const profile = currentProfile.value;
     if (!profile) return "";
-    const ranges = profile.axes.map((a) => `${a.label} 0-${a.point_cap}`).join(" ‧ ");
+    const ranges = profile.axes.map((a) => `${a.label} ${formatPointRange(0, a.point_cap)}`).join(" ‧ ");
     const conversions = profile.axes
       .filter((a) => a.point_cap > 0 && a.value_at_cap - a.minimum !== a.point_cap)
       .map((a) => `${a.label} ${a.point_cap} 點換算為 ${a.value_at_cap}（起點 ${a.minimum}）`);
@@ -198,7 +203,7 @@ export function useCreationCustom(props, form, emit) {
       if (outOfCap) {
         // A point value outside the server-declared cap is rejected here with
         // its own field; the server revalidates the exact budget anyway.
-        capError.value = `${outOfCap.label} 配點需為 0–${outOfCap.point_cap} 的整數`;
+        capError.value = `${outOfCap.label} 配點需為 ${formatPointRange(0, outOfCap.point_cap)} 的整數`;
         formErrorFields.value = [`allocations.${outOfCap.axis}`];
         return;
       }

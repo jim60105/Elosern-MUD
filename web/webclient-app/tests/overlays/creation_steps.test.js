@@ -217,7 +217,7 @@ describe("CreationCustomSteps: errors open the first invalid field's step", () =
     expect(document.activeElement).toBe(input.element);
     expect(input.attributes("aria-invalid")).toBe("true");
     expect(flagged("allocation")).toBe(true);
-    expect(wrapper.get("#creation-form-message").text()).toContain(`0–${over.point_cap}`);
+    expect(wrapper.get("#creation-form-message").text()).toContain(`0~${over.point_cap}`);
   });
 
   it("opens the allocation step for an out-of-cap value even with a persona gap", async () => {
@@ -259,6 +259,21 @@ describe("CreationCustomSteps: errors open the first invalid field's step", () =
     await wrapper.get(tid("creation-subrace")).setValue(SUBRACED.subraces[0]);
     expect(flagged("identity")).toBe(false);
     expect(wrapper.get(tid("creation-subrace")).attributes("aria-invalid")).toBeUndefined();
+  });
+});
+
+describe("CreationCustomSteps: point ranges", () => {
+  it("renders every axis point range with a tilde", async () => {
+    mountDraft();
+    await openStep("allocation");
+    for (const axis of DRAFT_PROFILE.axes) {
+      const help = wrapper.get(`#creation-axis-help-${axis.axis}`).text();
+      expect(help).toContain(`0~${axis.point_cap}`);
+      expect(help).not.toMatch(/0[-–]\d/);
+    }
+    const briefing = wrapper.get(tid("creation-budget-briefing")).text();
+    expect(briefing).toContain(`0~${DRAFT_PROFILE.axes[0].point_cap}`);
+    expect(briefing).not.toMatch(/0[-–]\d/);
   });
 });
 
