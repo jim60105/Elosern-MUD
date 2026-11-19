@@ -352,6 +352,106 @@ describe("CreationCustomSteps: allocation slider", () => {
   });
 });
 
+// A synthetic zero-cap axis on the story panel: the matching profiles (or all
+// of them) get `point_cap: 0` with `value_at_cap` at the axis minimum. With
+// `balanceBudget`, each changed profile's budget becomes the draft's sum over
+// its other axes, so a draft with the axis at zero can confirm unchanged.
+function zeroCapPanel(axisKey, { race, subrace, draftValue, balanceBudget = false } = {}) {
+  const panel = structuredClone(PANEL);
+  const scoped = race !== undefined || subrace !== undefined;
+  for (const profile of panel.custom.profiles) {
+    if (scoped && (profile.race !== race || (profile.subrace ?? null) !== (subrace ?? null))) continue;
+    const axis = profile.axes.find((entry) => entry.axis === axisKey);
+    axis.point_cap = 0;
+    axis.value_at_cap = axis.minimum;
+    if (balanceBudget) {
+      profile.budget = profile.axes
+        .filter((entry) => entry.axis !== axisKey)
+        .reduce((total, entry) => total + panel.draft.allocations[entry.axis], 0);
+    }
+  }
+  if (draftValue !== undefined) panel.draft.allocations[axisKey] = draftValue;
+  return panel;
+}
+
+describe("CreationCustomSteps: zero-cap axes lock", () => {
+  const AXIS = DRAFT_PROFILE.axes.find((axis) => axis.point_cap > 0).axis;
+  const field = (axis) => wrapper.get(tid(`creation-field-${axis}`));
+  const slider = (axis) => wrapper.get(tid(`creation-slider-${axis}`));
+  const row = (axis) => field(axis).element.closest(".creation-allocation");
+  const disabled = (id) => wrapper.get(tid(id)).attributes("disabled") !== undefined;
+
+  it("locks every control of a zero-cap axis at zero and still submits zero", async () => {
+    mountDraft(zeroCapPanel(AXIS, { draftValue: 0, balanceBudget: true }));
+    await openStep("allocation");
+    for (const id of [`creation-field-${AXIS}`, `creation-slider-${AXIS}`, `creation-step-${AXIS}-up`, `creation-step-${AXIS}-down`]) {
+      expect(disabled(id)).toBe(true);
+    }
+    expect(row(AXIS).getAttribute("data-locked")).toBe("true");
+    await submit();
+    const sent = actions("creation.custom");
+    expect(sent).toHaveLength(1);
+    expect(sent[0][0].payload.allocations[AXIS]).toBe(0);
+  });
+
+  it("a race change zeroes and locks the new profile's zero-cap axis", async () => {
+    mountDraft(zeroCapPanel(AXIS, { race: OTHER_PLAIN.key }));
+    expect(DRAFT.allocations[AXIS]).toBeGreaterThan(0);
+    await wrapper.get(tid("creation-race")).setValue(OTHER_PLAIN.key);
+    await openStep("allocation");
+    expect(field(AXIS).element.value).toBe("0");
+    expect(row(AXIS).getAttribute("data-locked")).toBe("true");
+    expect(disabled(`creation-field-${AXIS}`)).toBe(true);
+  });
+
+  it("a subrace change zeroes and locks the new profile's zero-cap axis", async () => {
+    const sub = SUBRACED.subraces[0];
+    mountDraft(zeroCapPanel(AXIS, { race: SUBRACED.key, subrace: sub }));
+    await openStep("allocation");
+    await field(AXIS).setValue(1);
+    await openStep("identity");
+    await wrapper.get(tid("creation-race")).setValue(SUBRACED.key);
+    await wrapper.get(tid("creation-subrace")).setValue(sub);
+    await openStep("allocation");
+    expect(field(AXIS).element.value).toBe("0");
+    expect(row(AXIS).getAttribute("data-locked")).toBe("true");
+  });
+
+  it("a stale non-zero value stays correctable and locks once cleared and left", async () => {
+    mountDraft(zeroCapPanel(AXIS, { draftValue: 1 }));
+    await openStep("allocation");
+    expect(disabled(`creation-field-${AXIS}`)).toBe(false);
+    expect(disabled(`creation-slider-${AXIS}`)).toBe(true);
+    expect(row(AXIS).getAttribute("data-locked")).toBeNull();
+    await submit();
+    expect(actions("creation.custom")).toHaveLength(0);
+    expect(document.activeElement).toBe(field(AXIS).element);
+    expect(wrapper.get("#creation-form-message").text()).toContain("0~0");
+    await field(AXIS).trigger("focus");
+    await field(AXIS).setValue(0);
+    expect(disabled(`creation-field-${AXIS}`)).toBe(false);
+    await field(AXIS).trigger("blur");
+    expect(disabled(`creation-field-${AXIS}`)).toBe(true);
+    expect(row(AXIS).getAttribute("data-locked")).toBe("true");
+  });
+
+  it("a budget mismatch skips a locked first axis", async () => {
+    const first = DRAFT_PROFILE.axes[0].axis;
+    const panel = zeroCapPanel(first, { draftValue: 0 });
+    const profile = panel.custom.profiles.find((p) => p.race === DRAFT.race && (p.subrace ?? null) === (DRAFT.subrace ?? null));
+    const target = profile.axes.find((axis) => axis.point_cap > 0).axis;
+    const other = profile.axes.find((axis) => axis.axis !== first && axis.axis !== target && axis.point_cap > 0).axis;
+    mountDraft(panel);
+    await openStep("allocation");
+    await field(other).setValue(panel.draft.allocations[other] === 0 ? 1 : panel.draft.allocations[other] - 1);
+    await openStep("identity");
+    await submit();
+    expect(actions("creation.custom")).toHaveLength(0);
+    expect(document.activeElement).toBe(field(target).element);
+    expect(field(target).attributes("aria-invalid")).toBe("true");
+  });
+});
+
 describe("CreationPortraitSlot: the persistent empty portrait", () => {
   const slot = () => wrapper.findComponent(CreationPortraitSlot);
 

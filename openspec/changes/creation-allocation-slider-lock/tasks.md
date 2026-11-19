@@ -22,7 +22,7 @@ Work only in the files named below. Commands run from the repository root. Befor
 
 ## 3. Zero-cap lock and profile-change clearing (design D3)
 
-- [ ] 3.1 In `use-creation-custom.js`, add `clearZeroCapAllocations()` (verbatim from design D3) and call it as the last statement of `onRaceChange()`. Add `onSubraceChange()`, which calls it, and return `onSubraceChange` from `useCreationCustom`. In `CreationCustomSteps.vue`:
+- [x] 3.1 In `use-creation-custom.js`, add `clearZeroCapAllocations()` (verbatim from design D3) and call it as the last statement of `onRaceChange()`. Add `onSubraceChange()`, which calls it, and return `onSubraceChange` from `useCreationCustom`. In `CreationCustomSteps.vue`:
   - Destructure `onSubraceChange` from `props.form`.
   - Add `@change="onSubraceChange"` to the subrace `<select>`.
   - Add the D3 `editingAxis` ref and `isLocked(axis)` function.
@@ -31,7 +31,7 @@ Work only in the files named below. Commands run from the repository root. Befor
   - Bind `:data-locked="isLocked(ax) ? 'true' : null"` on each `.creation-allocation` row.
 
   The slider's `:disabled="ax.point_cap === 0"` from 2.1 stays. Verify that `grep -n "onSubraceChange" web/webclient-app/composables/use-creation-custom.js web/webclient-app/components/CreationCustomSteps.vue` shows the definition, the return entry, the destructure and the binding.
-- [ ] 3.2 In `creation_steps.test.js`, add a helper `zeroCapPanel(axisKey, { race, subrace, draftValue })`. It returns a `structuredClone(PANEL)` in which the profiles matching the given race and subrace (or every profile when both are omitted) get `point_cap: 0` and `value_at_cap: <that axis's minimum>` for `axisKey`. When `draftValue` is given, it also sets `draft.allocations[axisKey] = draftValue`. Pick `axisKey` as the first `DRAFT_PROFILE.axes` entry with `point_cap > 0`; never hard-code an axis or race. Add these tests:
+- [x] 3.2 In `creation_steps.test.js`, add a helper `zeroCapPanel(axisKey, { race, subrace, draftValue })`. It returns a `structuredClone(PANEL)` in which the profiles matching the given race and subrace (or every profile when both are omitted) get `point_cap: 0` and `value_at_cap: <that axis's minimum>` for `axisKey`. When `draftValue` is given, it also sets `draft.allocations[axisKey] = draftValue`. Pick `axisKey` as the first `DRAFT_PROFILE.axes` entry with `point_cap > 0`; never hard-code an axis or race. Add these tests:
   - (a) With `zeroCapPanel(axisKey, { draftValue: 0 })`, the axis number field, slider and both steppers are disabled, and the row has `data-locked="true"`. After balancing the other axes to the budget and submitting, the payload carries `allocations[axisKey] === 0`.
   - (b) Race change: use a panel in which only `OTHER_PLAIN`'s profile has the zero cap, with a non-zero draft value on `axisKey`. `setValue(OTHER_PLAIN.key)` on `creation-race`, then assert that the number field value is `"0"` and the row is locked.
   - (c) Subrace change: use a panel in which only the profile for `SUBRACED.key` and `SUBRACED.subraces[0]` has the zero cap (the story fixture ships that profile). Set a non-zero value on `axisKey` first, select `SUBRACED.key`, then select `SUBRACED.subraces[0]` (if the form already shows that race and subrace, first select a different subrace so a real `change` fires), and assert that the value is zeroed and the row locked.

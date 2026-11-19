@@ -159,6 +159,21 @@ export function useCreationCustom(props, form, emit) {
     const max = affinityMax.value;
     const keys = [...affinitySelected.value];
     if (keys.length > max) affinitySelected.value = new Set(keys.slice(0, max));
+    clearZeroCapAllocations();
+  }
+
+  // A user-driven profile change zeroes the new profile's zero-cap axes so they
+  // lock at once. Draft sync and proposal fill never call this.
+  function clearZeroCapAllocations() {
+    const profile = currentProfile.value;
+    if (!profile) return;
+    for (const axis of profile.axes) {
+      if (axis.point_cap === 0) allocations[axis.axis] = 0;
+    }
+  }
+
+  function onSubraceChange() {
+    clearZeroCapAllocations();
   }
 
   function toggleAffinity(elementKey) {
@@ -210,8 +225,10 @@ export function useCreationCustom(props, form, emit) {
     }
     if (profile && allocationTotal.value !== profile.budget) {
       budgetError.value = true;
-      // The budget is a sum, so the error lands on the first displayed axis.
-      formErrorFields.value = profile.axes?.[0] ? [`allocations.${profile.axes[0].axis}`] : [];
+      // The budget is a sum, so the error lands on the first displayed axis
+      // that can take points (a locked zero-cap field cannot take focus).
+      const target = profile.axes?.find((axis) => axis.point_cap > 0) ?? profile.axes?.[0];
+      formErrorFields.value = target ? [`allocations.${target.axis}`] : [];
       return;
     }
     // Persona local validation is all-empty-or-all-filled (design D5): a
@@ -283,6 +300,7 @@ export function useCreationCustom(props, form, emit) {
     formErrorFields,
     resultMessage,
     onRaceChange,
+    onSubraceChange,
     toggleAffinity,
     confirmCustom,
   };
