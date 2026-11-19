@@ -300,7 +300,7 @@ def _validate_card_artwork(row, selected):
         raise ProtocolValidationError("the exact original must carry its stored geometry")
 
 
-def _validate_official_artwork(row):
+def _validate_official_artwork(row, selected):
     """One official row's descriptor: its exact official candidate, plus named faults.
 
     The candidate names the row's own catalog identity at the fingerprint route
@@ -310,10 +310,17 @@ def _validate_official_artwork(row):
     shares its candidate's source/rank and precedes it, and a declared-default
     fault names the refused declared identity — so a substituted default is
     attributable without tainting a healthy sibling.
+
+    The terminal is the selected subject's own fallback, exactly as on a card
+    row: an alpha mask for a portrait subject, the archetype's bundled image
+    (or none) for a scene, which has no silhouette.
     """
     descriptor = row["artwork"]
     artwork_wire.validate_artwork(descriptor)
-    _validate_gallery_terminal(descriptor["terminal"])
+    if selected.kind is ArtSubjectKind.SCENE:
+        _validate_scene_terminal(descriptor["terminal"], selected)
+    else:
+        _validate_gallery_terminal(descriptor["terminal"])
     source = descriptors.gallery_official_source_id(row["identity"])
     # Exactly ONE image candidate overall, and it must be this row's own exact
     # identity: a second candidate (from any source) would let a substitute
@@ -335,7 +342,7 @@ def _validate_official_artwork(row):
         raise ProtocolValidationError("the official candidate carries its fitted rectangle and no stage")
 
 
-def _validate_official_entries(entries):
+def _validate_official_entries(entries, selected):
     """Exactly the official-row list: shape, bounds, vocabulary, uniqueness."""
     if not isinstance(entries, list) or len(entries) > GALLERY_MAX_OFFICIAL_ENTRIES:
         raise ProtocolValidationError("invalid official entries")
@@ -352,7 +359,7 @@ def _validate_official_entries(entries):
         if identity in identities:
             raise ProtocolValidationError("duplicate official identity")
         identities.add(identity)
-        _validate_official_artwork(row)
+        _validate_official_artwork(row, selected)
         for flag in ("is_current", "is_catalog_default"):
             if type(row[flag]) is not bool:
                 raise ProtocolValidationError("official row flags must be booleans")
@@ -382,7 +389,7 @@ def _validate_card_facts(payload, capability, selected):
         _validate_equipment(payload["equipment_summary"])
     elif payload["equipment_summary"] is not None:
         raise ProtocolValidationError("unsupported equipment summary")
-    _validate_official_entries(payload["official_entries"])
+    _validate_official_entries(payload["official_entries"], selected)
     cards = payload["cards"]
     if not isinstance(cards, list) or len(cards) > MAX_LIST_ITEMS:
         raise ProtocolValidationError("invalid cards")

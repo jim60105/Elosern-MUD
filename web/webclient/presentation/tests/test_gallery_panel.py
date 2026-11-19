@@ -389,6 +389,39 @@ def scene_card_row(number=1):
     }
 
 
+def scene_official_row(identity=f"scene/{_SCENE_KEY}/a.png"):
+    """One scene archetype's official image row, its fallback the bundled scene."""
+    source = descriptors.gallery_official_source_id(identity)
+    return {
+        "identity": identity,
+        "artwork": descriptors.descriptor(
+            subject_id=(
+                f"{_digest(_SCENE_SUBJECT)}:"
+                f"{descriptors.identity_version(identity)[:36]}"
+            ),
+            generation_subject=_SCENE_SUBJECT,
+            generation_state="missing",
+            attempts=[descriptors.image_attempt(
+                source, descriptors.GALLERY_RANK_ORIGINAL,
+                descriptors.resource(
+                    identity, _OFFICIAL_FINGERPRINT,
+                    f"/art/official/{_OFFICIAL_FINGERPRINT}/{identity}",
+                    descriptors.ORIGIN_OFFICIAL,
+                    geometry_payload=descriptors.geometry(
+                        image_size=dict(_SCENE_SIZE), face_rect=dict(_RECT),
+                        aspect_ratio="3:4",
+                    ),
+                ),
+            )],
+            terminal_payload=scene_terminal(),
+            retention_sources=[
+                descriptors.retention_source(source, _digest(f"retention:{identity}"))
+            ],
+        ),
+        "is_current": False, "is_catalog_default": True,
+    }
+
+
 def scene_payload():
     """File-local synthetic version-4 scene panel: one entered scene with its card."""
     payload = payload_v4()
@@ -899,6 +932,10 @@ process.stdout.write(JSON.stringify(results));
                 groups=[], selected=None, description=None, cards=[], capabilities=None,
             )
 
+        def alpha_official(p):
+            p.update(official_entries=[scene_official_row()])
+            p["official_entries"][0]["artwork"]["terminal"] = alpha_terminal()
+
         add("no card yet", lambda p: p.update(cards=[]), True)
         add("no description", lambda p: p.update(description=None), True)
         add("nothing entered", empty_scene, True)
@@ -913,12 +950,17 @@ process.stdout.write(JSON.stringify(results));
         add("scene original with a face rectangle", lambda p: scene_candidate(p)["geometry"].update(face_rect=dict(_RECT)))
         add("scene original with a stage", lambda p: scene_candidate(p)["geometry"].update(stage=dict(_STAGE)))
         add("scene original without a size", lambda p: scene_candidate(p)["geometry"].update(image_size=None))
+        add("scene official row", lambda p: p.update(official_entries=[scene_official_row()]), True)
+        add("alpha terminal on a scene official row", alpha_official)
         add("face chip on a scene card", lambda p: p["cards"][0].update(chips=["預設臉框", "目前預設"]))
         add("default chip missing", lambda p: p["cards"][0].update(chips=[]))
         add("selection not a gallery kind", lambda p: p.update(selected="scene:"))
         # The scene terminal and geometry rules never apply to a portrait card.
         cases.append(("scene terminal on a portrait card", v4_case(
             lambda p: p["cards"][0]["artwork"].update(terminal=scene_terminal())
+        ), False))
+        cases.append(("scene terminal on a portrait official row", v4_case(
+            lambda p: p.update(official_entries=[scene_official_row()])
         ), False))
         cases.append(("portrait card without a face chip", v4_case(
             lambda p: p["cards"][0].update(chips=["目前預設"])

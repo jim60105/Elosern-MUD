@@ -281,11 +281,14 @@ function validateGalleryCardArtwork(row, selected) {
 // One official row's descriptor: its exact official candidate plus the
 // retained startup faults the source facts recorded. The candidate names the
 // row's own catalog identity at the fingerprint route, carrying the admitted
-// decoded size and fitted rectangle and no stage.
-function validateGalleryOfficialArtwork(row) {
+// decoded size and fitted rectangle and no stage. The terminal is the selected
+// subject's own fallback, exactly as on a card row: an alpha mask for a
+// portrait subject, the archetype's bundled image (or none) for a scene.
+function validateGalleryOfficialArtwork(row, selected) {
   var descriptor = row.artwork;
   artwork.validateArtwork(descriptor);
-  validateGalleryTerminal(descriptor.terminal);
+  if (selected.kind === "scene") validateGallerySceneTerminal(descriptor.terminal, selected);
+  else validateGalleryTerminal(descriptor.terminal);
   var source = artwork.SOURCE_PREFIX.official + row.identity;
   // Exactly ONE image candidate overall, and it must be this row's own exact
   // identity: a second candidate (from any source) would let a substitute
@@ -314,7 +317,7 @@ function validateGalleryOfficialArtwork(row) {
 
 // Exactly the official-row list: shape, bounds, vocabulary, uniqueness, and
 // the at-most-one current/catalog-default invariant.
-function validateGalleryOfficialEntries(value) {
+function validateGalleryOfficialEntries(value, selected) {
   if (!Array.isArray(value) || value.length > GALLERY_MAX_OFFICIAL_ENTRIES) {
     throw new Error("invalid official entries");
   }
@@ -327,7 +330,7 @@ function validateGalleryOfficialEntries(value) {
     );
     if (identities.has(identity)) throw new Error("duplicate official identity");
     identities.add(identity);
-    validateGalleryOfficialArtwork(row);
+    validateGalleryOfficialArtwork(row, selected);
     requireBool(row.is_current, "is_current");
     requireBool(row.is_catalog_default, "is_catalog_default");
     currents += row.is_current ? 1 : 0;
@@ -485,7 +488,7 @@ function validateGalleryCapabilities(capability, fields) {
 function validateGalleryCardFacts(payload, capability, selected) {
   if (capability.supports_bindings) validateGalleryEquipment(payload.equipment_summary);
   else if (payload.equipment_summary !== null) throw new Error("unsupported equipment summary");
-  validateGalleryOfficialEntries(payload.official_entries);
+  validateGalleryOfficialEntries(payload.official_entries, selected);
   if (!Array.isArray(payload.cards) || payload.cards.length > MAX_LIST_ITEMS) throw new Error("invalid cards");
   var byId = new Map(), previous = Infinity;
   var counts = { defaults: 0, pending: 0, failed: 0 };
