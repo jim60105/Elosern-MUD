@@ -284,7 +284,8 @@
 .creation-allocation__slider:disabled { color: var(--paper-500); cursor: not-allowed; opacity: 0.55; }
 .creation-allocation[data-locked="true"] .creation-allocation__label { color: var(--paper-500); }
 
-/* -- Slider skin: an ink groove, a gold progress run and a gold diamond
+/* -- Slider skin: an ink groove, a gold progress run ending under the thumb
+   centre (--fill is the 0..1 share of the cap) and a gold diamond
    thumb (the theme's mark shape). Locked sliders swap the groove for a dashed
    one and dim the thumb, so the state never rests on colour alone. ------- */
 .creation-allocation__slider {
@@ -299,7 +300,8 @@
   height: var(--slider-track);
   border-radius: var(--slider-track);
   background:
-    linear-gradient(90deg, var(--gold-600), var(--gold-400)) 0 0 / var(--fill, 0%) 100% no-repeat,
+    linear-gradient(90deg, var(--gold-600), var(--gold-400)) 0 0 /
+      calc(var(--slider-thumb) / 2 + (100% - var(--slider-thumb)) * var(--fill, 0)) 100% no-repeat,
     var(--ink-700);
 }
 .creation-allocation__slider::-moz-range-track {

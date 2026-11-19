@@ -117,7 +117,7 @@ function stepAllocation(axis, direction) {
 function sliderFill(axis) {
   const value = Number(allocations[axis.axis]);
   const share = axis.point_cap > 0 && Number.isFinite(value) ? value / axis.point_cap : 0;
-  return `${Math.max(0, Math.min(1, share)) * 100}%`;
+  return Math.max(0, Math.min(1, share));
 }
 
 // A zero-cap axis admits no points. It locks only while its value is already
