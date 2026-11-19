@@ -595,6 +595,9 @@ class ItemProvenanceApiTest(GmTestCase):
     def _detail(self, key: str) -> dict:
         return self.assert_ok_envelope(self.developer.get(f"{REGISTRY}/items/{key}"))
 
+    @covers_requirement(
+        "gm-world-data::item-detail-identifies-the-file-that-supplied-the-loaded-row"
+    )
     def test_two_loaded_rows_report_their_own_files_and_keep_references(self):
         alpha = self._detail("t_prov_alpha")
         beta = self._detail("t_prov_beta")
@@ -614,6 +617,9 @@ class ItemProvenanceApiTest(GmTestCase):
         self.assertTrue(price_links[0]["exists"])
         self.assertEqual(price_links[0]["label"], "合成價格帶")
 
+    @covers_requirement(
+        "gm-world-data::item-detail-identifies-the-file-that-supplied-the-loaded-row"
+    )
     def test_a_disk_move_does_not_change_loaded_provenance(self):
         repository_root = Path(__file__).resolve().parents[3]
         (repository_root / "tmp").mkdir(exist_ok=True)
@@ -634,6 +640,9 @@ class ItemProvenanceApiTest(GmTestCase):
             detail["source_path"], moved.relative_to(repository_root).as_posix()
         )
 
+    @covers_requirement(
+        "gm-world-data::item-detail-identifies-the-file-that-supplied-the-loaded-row"
+    )
     def test_the_loaded_shipped_catalog_names_exact_content_paths(self):
         # The loaded provenance snapshot (not disk) names the exact authored
         # files for rows from at least two different slices.

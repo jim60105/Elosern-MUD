@@ -3,8 +3,7 @@
 Behavior tests for the ADDED ``lore-item-catalog`` requirement: the manifest
 defines the authored order, every slice is typed and closed, and malformed or
 escaping documents are rejected with a named source before a candidate is
-published. No requirement annotation is attached here until archive sync
-creates the canonical requirement ID.
+published.
 """
 
 from __future__ import annotations
@@ -16,6 +15,7 @@ from pathlib import Path
 import yaml
 
 from world.lore.items import ItemCatalogError, load_item_catalog
+from tools.spec_traceability import covers_requirement
 
 
 def _row(key: str, **overrides) -> dict:
@@ -71,6 +71,9 @@ class CatalogCase(unittest.TestCase):
 
 
 class AuthoringOrderTests(CatalogCase):
+    @covers_requirement(
+        "lore-item-catalog::the-item-catalog-has-one-ordered-declarative-source"
+    )
     def test_declared_file_and_row_order_is_preserved(self):
         root = self.catalog(
             {
@@ -82,6 +85,9 @@ class AuthoringOrderTests(CatalogCase):
         catalog = load_item_catalog(root)
         self.assertEqual(list(catalog.definitions), ["t_order_b", "t_order_a", "t_order_c"])
 
+    @covers_requirement(
+        "lore-item-catalog::the-item-catalog-has-one-ordered-declarative-source"
+    )
     def test_sources_name_the_declaring_file(self):
         root = self.catalog(
             {"zeta.yaml": [_row("t_order_d")], "alpha.yaml": [_row("t_order_e")]},
@@ -93,12 +99,18 @@ class AuthoringOrderTests(CatalogCase):
 
 
 class RejectionTests(CatalogCase):
+    @covers_requirement(
+        "lore-item-catalog::the-item-catalog-has-one-ordered-declarative-source"
+    )
     def test_duplicate_item_key_across_files_is_rejected(self):
         root = self.catalog(
             {"one.yaml": [_row("t_dup_key")], "two.yaml": [_row("t_dup_key")]}
         )
         self.assert_rejected(root, "repeats the item key")
 
+    @covers_requirement(
+        "lore-item-catalog::the-item-catalog-has-one-ordered-declarative-source"
+    )
     def test_duplicate_yaml_mapping_key_is_rejected(self):
         root = self.catalog({"one.yaml": [_row("t_yaml_key")]})
         (root / "one.yaml").write_text(
@@ -108,22 +120,34 @@ class RejectionTests(CatalogCase):
         )
         self.assert_rejected(root, "duplicate YAML mapping key")
 
+    @covers_requirement(
+        "lore-item-catalog::the-item-catalog-has-one-ordered-declarative-source"
+    )
     def test_undeclared_yaml_file_is_rejected(self):
         root = self.catalog({"one.yaml": [_row("t_declared")]})
         (root / "stray.yaml").write_text("items: []\n", encoding="utf-8")
         self.assert_rejected(root, "undeclared item catalog files")
 
+    @covers_requirement(
+        "lore-item-catalog::the-item-catalog-has-one-ordered-declarative-source"
+    )
     def test_unknown_row_field_is_rejected(self):
         self.assert_rejected(
             self.catalog({"one.yaml": [_row("t_unknown", modifier_key="t_unknown")]}),
             "unknown fields",
         )
 
+    @covers_requirement(
+        "lore-item-catalog::the-item-catalog-has-one-ordered-declarative-source"
+    )
     def test_colon_in_key_is_rejected(self):
         self.assert_rejected(
             self.catalog({"one.yaml": [_row("t:bad")]}), "must match"
         )
 
+    @covers_requirement(
+        "lore-item-catalog::the-item-catalog-has-one-ordered-declarative-source"
+    )
     def test_equipment_effects_without_slot_is_rejected(self):
         self.assert_rejected(
             self.catalog(
@@ -132,6 +156,9 @@ class RejectionTests(CatalogCase):
             "without an equipment slot",
         )
 
+    @covers_requirement(
+        "lore-item-catalog::the-item-catalog-has-one-ordered-declarative-source"
+    )
     def test_slot_without_equipment_effects_is_rejected(self):
         self.assert_rejected(
             self.catalog(
@@ -140,6 +167,9 @@ class RejectionTests(CatalogCase):
             "without equipment_effects",
         )
 
+    @covers_requirement(
+        "lore-item-catalog::the-item-catalog-has-one-ordered-declarative-source"
+    )
     def test_symlink_outside_the_catalog_is_rejected(self):
         root = self.catalog({"one.yaml": [_row("t_symlink")]})
         outside = Path(tempfile.mkdtemp())

@@ -5,62 +5,66 @@ Closed-vocabulary, budget-validated equipment-effect rulebook with a total one-t
 ## Requirements
 
 ### Requirement: Equipment items bind one-to-one to a closed effect identity
-Every registered item that declares an `EquipmentSlot` SHALL also declare exactly one `EquipmentModifierKey` from the closed registry vocabulary, and every `EquipmentModifierKey` SHALL be bound by at most one registered item. A one-to-one binding SHALL be total in both directions: every registered equipment key SHALL have exactly one entry in the equipment-effect rulebook, and every rulebook entry SHALL name exactly one registered equipment key.
+Each item with an equipment slot SHALL carry exactly one inline equipment-effect mapping, bound by its own item key. Non-equipment items SHALL NOT carry that mapping. An effect mapping MAY be explicitly empty for equipment with no effects.
 
 #### Scenario: Equipment without an effect binding fails validation
-- **WHEN** an equipment-slot item definition carries no registered modifier key, or the rulebook lacks the entry for a registered equipment key
-- **THEN** validation fails at registry construction or rulebook load and the game never starts with a partially bound roster
+- **WHEN** a row declares an equipment slot but omits its effect mapping or sets it to null
+- **THEN** validation fails before the game starts, identifying the item and field
 
 #### Scenario: Non-equipment items reject effect keys
-- **WHEN** a usable-item or inspect-only item definition declares an `EquipmentModifierKey`
-- **THEN** registry construction fails before the item can be presented
+- **WHEN** a usable item declares an equipment-effect mapping
+- **THEN** validation fails before the game starts
 
 #### Scenario: Duplicate modifier bindings fail the load
-- **WHEN** two registered equipment definitions declare the same modifier key, or two equipment definitions otherwise collapse to one rulebook entry
-- **THEN** the equipment-effect rulebook load fails on the triple bijection (equipment key ↔ modifier key ↔ entry)
+- **WHEN** an equipment row repeats its effect mapping key
+- **THEN** validation rejects the duplicate rather than applying either mapping
 
 #### Scenario: Utility equipment declares an explicit empty binding
-- **WHEN** a registered accessory exists purely for utility (for example `storage_pouch`)
-- **THEN** it is bound to a rulebook entry with an explicitly empty effect set rather than exempted from the bijection
+- **WHEN** a utility item with an equipment slot declares an empty effect mapping
+- **THEN** it can be equipped and supplies no adjustments, immunities, or attached buffs
 
 #### Scenario: Slotless items reject modifier keys
-- **WHEN** an item without an equipment slot declares a modifier key
-- **THEN** registry construction fails on the declaration
+- **WHEN** an inspect-only item declares `equipment_effects` or the retired `modifier_key` field
+- **THEN** validation rejects the slotless row
 
 #### Scenario: Unbound keys, orphaned entries, and duplicate bindings fail the load
-- **WHEN** registry construction or rulebook loading encounters an unbound key, an orphaned entry, or a duplicated binding
-- **THEN** the construction or load fails
+- **WHEN** a shared equipment budget file declares an independent effect entry for a missing item
+- **THEN** the budget file is rejected rather than accepting a second source of equipment effects
+
+#### Scenario: Effects resolve by each equipped item's own identity
+- **WHEN** two otherwise equivalent items declare different effects and each is worn in turn
+- **THEN** each applies its own effect, without a second identity declaration or effects borrowed from the other item
 
 ### Requirement: The equipment-effect rulebook validates a closed schema at load time
-The equipment-effect rulebook SHALL be loaded through one validated loader that is idempotent on reload and accepts a path override for tests. Each entry SHALL contain only the closed vocabulary enumerated below. Malformed entries SHALL fail the load with a named error; the loader SHALL NOT repair, clamp, or silently drop deviating data.
+The equipment-effect loader SHALL validate inline records and shared budgets through one deterministic validation path with injectable sources. Malformed records SHALL fail with a named source diagnostic and SHALL NOT be repaired, clamped, or silently dropped.
 
 #### Scenario: Out-of-vocabulary field is rejected
-- **WHEN** a rulebook entry contains any field or adjustment key outside the closed vocabulary
-- **THEN** the load raises the named rulebook error and nothing loads
+- **WHEN** an equipment-effect record carries an unknown field or adjustment key
+- **THEN** validation rejects the candidate and identifies the item and invalid field
 
 #### Scenario: The closed entry vocabulary
-- **WHEN** a rulebook entry is validated
-- **THEN** it may contain only `adjustments` restricted to `atk_phys`, `defense`, `magic_power`, `agility`, `mp_cost`, `sp_cost`, `pleasure_gain`, and `heal_gain`; plus `gauge_caps`, `immune`, `attached_buffs`, `exposure_bias`, and optional weapon-only `weapon_damage_multiplier`
+- **WHEN** equipment effects are validated
+- **THEN** supported fields are `adjustments` restricted to `atk_phys`, `defense`, `magic_power`, `agility`, `mp_cost`, `sp_cost`, `pleasure_gain`, and `heal_gain`; `gauge_caps`, `immune`, `attached_buffs`, `exposure_bias`, and optional weapon-only `weapon_damage_multiplier`
 
 #### Scenario: Percent-shaped fields reject flat values
-- **WHEN** an `mp_cost` adjustment is authored as a flat integer or an `atk_phys` adjustment as a percent string
-- **THEN** the load fails, keeping the flat/percent kinds unambiguous for later consumer changes
+- **WHEN** an `mp_cost` adjustment gives a flat integer
+- **THEN** validation rejects the record
 
 #### Scenario: Adjustment fields accept only signed integers or signed percent strings
-- **WHEN** an `atk_phys`, `defense`, `magic_power`, or `agility` adjustment carries any other value shape
-- **THEN** the load fails with the named rulebook error
+- **WHEN** a flat `atk_phys`, `defense`, or `magic_power` adjustment or a flat or percent `agility` adjustment is declared
+- **THEN** validation accepts in-budget integers for the flat fields and either permitted shape for `agility`; it rejects percent strings for the flat fields and unsupported shapes for `agility`
 
 #### Scenario: Percent-only fields accept signed percent strings only
-- **WHEN** an `mp_cost`, `sp_cost`, `pleasure_gain`, or `heal_gain` adjustment carries any value shape other than a signed percent string
-- **THEN** the load fails with the named rulebook error
+- **WHEN** an `mp_cost`, `sp_cost`, `pleasure_gain`, or `heal_gain` adjustment is not a signed percent string
+- **THEN** validation rejects the record
 
 #### Scenario: Gauge caps are positive integers over the gauge vocabulary
-- **WHEN** `gauge_caps` names a gauge outside `hp`/`mp`/`sp` or carries a value that is not a positive integer
-- **THEN** the load fails with the named rulebook error
+- **WHEN** a gauge cap names a key outside `hp`, `mp`, or `sp`, or has a non-positive or non-integer value
+- **THEN** validation rejects the record
 
 #### Scenario: Buff lists and exposure bias are typed
 - **WHEN** `immune` or `attached_buffs` is not a list of buff keys, or `exposure_bias` is not a signed integer
-- **THEN** the load fails with the named rulebook error
+- **THEN** validation rejects the record
 
 ### Requirement: Per-rarity budgets mechanically bound every authored value
 The rulebook SHALL carry a budgets table keyed by the item's registered rarity with separate ceilings for flat values, combat percents (`agility`, `mp_cost`, `sp_cost`), soft percents (`pleasure_gain`, `heal_gain`), `exposure_bias`, positive-only `gauge_caps`, and a finite `weapon_multiplier` ceiling of at least 1.0. The loader SHALL reject any entry exceeding its rarity's column ceiling (absolute value for signed adjustments; directly for weapon multipliers).
