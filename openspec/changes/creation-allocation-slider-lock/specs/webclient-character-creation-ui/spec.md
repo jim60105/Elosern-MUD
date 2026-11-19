@@ -27,6 +27,10 @@ Themed creation selects and checkboxes SHALL preserve native keyboard/IME behavi
 - **WHEN** a player selects a race or subrace whose resolved profile gives an axis a point cap of zero while that axis holds a non-zero value
 - **THEN** the axis value becomes zero and its controls are locked
 
+#### Scenario: A budget mismatch never targets a locked axis
+- **WHEN** the first profile axis is a locked zero-cap axis and the allocation total differs from the budget on confirm
+- **THEN** the budget error is reported on, and focuses, the number field of the first axis whose point cap is above zero
+
 #### Scenario: A stale value on a zero-cap axis stays correctable
-- **WHEN** a zero-cap axis holds a non-zero value that did not come from a race or subrace change
+- **WHEN** a zero-cap axis holds a non-zero value, for example from a resumed draft
 - **THEN** its number field stays enabled, the row is not marked locked, and confirming reports the existing out-of-cap error on that axis's number field

@@ -80,10 +80,15 @@ Add this to the SFC script:
 ```js
 // A zero-cap axis admits no points. It locks only while its value is already
 // zero, so a stale non-zero value stays correctable through the number field.
+// The axis whose number field holds focus never locks mid-edit (clearing a
+// stale value to 0 must not drop keyboard/IME focus); it locks on blur.
+const editingAxis = ref(null);
 function isLocked(axis) {
-  return axis.point_cap === 0 && allocations[axis.axis] === 0;
+  return axis.point_cap === 0 && allocations[axis.axis] === 0 && editingAxis.value !== axis.axis;
 }
 ```
+
+The number input also gets `@focus="editingAxis = ax.axis"` and `@blur="editingAxis = null"` (`ref` is already imported from `vue`).
 
 - Number input: add `:disabled="isLocked(ax)"`.
 - Slider: `:disabled="ax.point_cap === 0"`. A `0..0` slider can never express a correction.
@@ -105,6 +110,15 @@ function clearZeroCapAllocations() {
 ```
 
 Call `clearZeroCapAllocations()` as the last statement of `onRaceChange()`. Add `function onSubraceChange() { clearZeroCapAllocations(); }`. In the SFC, destructure `onSubraceChange` from `props.form` and bind `@change="onSubraceChange"` on the subrace `<select data-testid="creation-subrace">`. These handlers run on user `change` events after `v-model` updates the ref, the same ordering `onRaceChange` already relies on. Because they are user input, it is correct that they mark `formTouched`.
+
+Budget-error target: in `confirmCustom`, the budget-mismatch branch currently sets `formErrorFields.value = profile.axes?.[0] ? [...] : []`. Change it to target the first axis with `point_cap > 0`, falling back to `axes[0]` only when none exists:
+
+```js
+const target = profile.axes?.find((axis) => axis.point_cap > 0) ?? profile.axes?.[0];
+formErrorFields.value = target ? [`allocations.${target.axis}`] : [];
+```
+
+Otherwise a profile whose first axis is zero-cap would point the error at a disabled field that cannot take focus.
 
 Alternatives rejected:
 - Disabling whenever `point_cap === 0`. A stale non-zero value would then be stuck behind a disabled field that `confirmCustom` points at.
@@ -133,7 +147,8 @@ Add no new text, so the 16px floor is unaffected.
 
 ## Risks / Trade-offs
 
-- [The slider row is taller than the 3px bar, so the allocation step may overflow `.creation-steps__pages` at 1451x790] → Run the viewport browser test. If its "allocation" no-scroll assertion fails, change the `.creation-allocations` `gap` from `var(--sp-4) calc(var(--sp-6) * 2)` to `var(--sp-3) calc(var(--sp-6) * 2)`. If it still fails, also lower the slider `height` to `calc(16px * var(--ui-scale))`. Do not weaken the assertion.
+- [The slider row is taller than the 3px bar, so the allocation step may overflow `.creation-steps__pages` at 1451x790] → Run the viewport browser test. If its "allocation" no-scroll assertion fails, change the `.creation-allocations` `gap` from `var(--sp-4) calc(var(--sp-6) * 2)` to `var(--sp-3) calc(var(--sp-6) * 2)`. If it still fails, also lower the slider `height` to `calc(16px * var(--ui-scale))`. If it still fails, set the preview `<p>`'s top margin to `0` by adding a `.creation-allocation__preview { margin-top: 0; }` class on that paragraph. Record the measured overflow (`scrollHeight - clientHeight`) in the apply report at each step. Do not weaken the assertion.
+- [When `point_cap` and the model change in the same render (race change or draft resume), the DOM could clamp the slider value to the old `max`] → The template lists `:max` before `v-model`. Task 2.2(e) tests this case. If that test fails, add `:key="`${ax.axis}:${ax.point_cap}`"` to the slider so it is recreated with the new bound.
 - [The slider shows a clamped position while the number field holds an out-of-range or empty value] → Accepted. The number field stays the source of truth, and the existing out-of-cap error path reports the value.
 - [A resumed draft or proposal fill could carry a non-zero value on a zero-cap axis] → The server validates both against the same profile, so this should not happen. If it does, D3 keeps the number field enabled.
 - [`inject_update` rejects a panel that is not schema-valid] → The browser test copies the live panel and changes only `point_cap`/`value_at_cap` on one axis, keeping `value_at_cap == minimum` as the decoder requires for zero cap. A rejection raises immediately, so the failure is loud.
