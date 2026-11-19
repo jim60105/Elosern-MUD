@@ -58,7 +58,8 @@
         "world.rules.tests.test_combat_modifiers",
         "world.rules.tests.test_combat_modifiers_matched",
         "world.rules.tests.test_combat_modifiers_self_arming",
-        "world.rules.tests.test_combat_party"
+        "world.rules.tests.test_combat_party",
+        "world.rules.tests.test_character_creation.test_elf_starting_policy"
       ]
     },
     {

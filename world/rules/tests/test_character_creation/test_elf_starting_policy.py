@@ -128,40 +128,66 @@ class StartingAxisConversionTests(unittest.TestCase):
         self.assertLessEqual(max(values), 200)
 
 
-class ShippedProfilePolicyTests(unittest.TestCase):
+class ProfilePolicyTests(unittest.TestCase):
+    """The two policies on one kit row, with no shipped band pinned."""
+
+    def _scope(self, physical=(70, 95), magic=(100, 900)):
+        race = _synthetic_elf(physical=physical, magic=magic)
+        subrace = _elf_subrace()
+        return race, subrace, _elf_scope(race, subrace)
+
     def test_a_custom_elf_spends_its_three_physical_spans(self):
-        profile = resolve_starting_profile("elf", "fionnen", mode="custom")
+        race, subrace, scope = self._scope()
+        span = 95 - 70
+        with scope:
+            profile = resolve_starting_profile("elf", subrace.key, mode="custom")
         axes = profile.axes_dict()
-        self.assertEqual(profile.budget, 75)
+        self.assertEqual(profile.budget, span * 3)
         self.assertEqual([axis.axis for axis in profile.axes], list(ALLOCATABLE_AXES))
         for gauge in ("hp", "mp", "sp"):
             self.assertEqual(axes[gauge].point_cap, 0)
             self.assertEqual(axes[gauge].value_at_cap, axes[gauge].minimum)
         for physical in ("atk_phys", "agility", "defense"):
-            self.assertEqual(axes[physical].point_cap, 25)
+            self.assertEqual(axes[physical].point_cap, span)
             self.assertEqual(axes[physical].value_at_cap, 95)
-        self.assertEqual(axes["magic_power"].point_cap, 75)
+        self.assertEqual(axes["magic_power"].point_cap, span * 3)
         self.assertEqual(
             axes["magic_power"].value_at_cap, ELF_CUSTOM_MAGIC_CREATION_CAP
         )
 
     def test_an_elf_preset_keeps_the_raw_increment_policy(self):
-        profile = resolve_starting_profile("elf", "fionnen", mode="preset")
-        axes = profile.axes_dict()
-        self.assertEqual(profile.budget, 437)
-        for axis in ALLOCATABLE_AXES:
-            self.assertEqual(axes[axis].point_cap, axes[axis].maximum - axes[axis].minimum)
-            self.assertEqual(axes[axis].value_at_cap, axes[axis].maximum)
+        _, subrace, scope = self._scope()
+        with scope:
+            profile = resolve_starting_profile("elf", subrace.key, mode="preset")
+            axes = profile.axes_dict()
+            spans = {
+                axis.axis: axis.maximum - axis.minimum for axis in profile.axes
+            }
+            # A preset spends one point per stat unit up to the lore ceiling,
+            # against the floor-of-half-spans budget.
+            self.assertEqual(profile.budget, sum(spans.values()) // 2)
+            for axis in ALLOCATABLE_AXES:
+                self.assertEqual(axes[axis].point_cap, spans[axis])
+                self.assertEqual(axes[axis].value_at_cap, axes[axis].maximum)
 
     def test_a_non_elf_custom_profile_keeps_the_raw_increment_policy(self):
-        custom = resolve_starting_profile("human", "human_plains", mode="custom")
-        preset = resolve_starting_profile("human", "human_plains", mode="preset")
+        race = replace(_synthetic_elf(physical=(10, 20)), key="t_elfkin")
+        subrace = replace(_elf_subrace(), race_key=race.key)
+        # Any race other than the elf key is not the custom-elf policy: both
+        # modes must produce the same raw-increment axes there.
+        with synthetic_registries(
+            "races", "subraces", extra={"races": {race.key: race}, "subraces": {subrace.key: subrace}}
+        ):
+            custom = resolve_starting_profile(race.key, subrace.key, mode="custom")
+            preset = resolve_starting_profile(race.key, subrace.key, mode="preset")
         self.assertEqual(custom.budget, preset.budget)
         self.assertEqual(custom.axes, preset.axes)
 
     def test_an_unknown_mode_is_refused(self):
-        with self.assertRaises(ValueError):
-            resolve_starting_profile("human", "human_plains", mode="casual")
+        race = _synthetic_elf()
+        subrace = _elf_subrace()
+        with _elf_scope(race, subrace), self.assertRaises(ValueError):
+            resolve_starting_profile("elf", subrace.key, mode="casual")
 
 
 class SyntheticElfPolicyTests(unittest.TestCase):
