@@ -100,7 +100,7 @@ items:
         defense: 1
 ```
 
-載入器會拒絕：重複的列 key、重複的 YAML mapping key、檔案層級的未知欄位、錯誤型別（`sellable` 必須是 bool、`schema_version` 必須是整數 1）、不合文法的 key、沒有槽卻寫 `equipment_effects`、有槽卻漏寫 `equipment_effects`、以及同時宣告使用與裝備機制。錯誤訊息會指出檔案、列位置／key 與欄位。
+載入器會拒絕：重複的列 key、重複的 YAML mapping key、檔案層級的未知欄位、錯誤型別（`sellable` 必須是 bool、`schema_version` 必須是整數 1）、不合文法的 key、沒有槽卻寫 `equipment_effects`、有槽卻漏寫 `equipment_effects`、以及同時宣告使用與裝備機制。manifest 或任何分檔若是符號連結（即使指向目錄內另一個檔案）也會被拒絕；目錄本身則先解析為真實路徑，與地圖編輯器的 confinement 一致。錯誤訊息會指出檔案、列位置／key 與欄位。
 
 `ItemDefinition` 的 `__post_init__` 另外驗證：`presentation` 的三個封閉列舉、摘要非空且不超過 128 字元、單行純文字、不含 `<`、不含 URL、不含 emoji；`guild_property` 必須是 bool 且不可同時 `sellable`；`liturgical_role` 必須是封閉列舉且只出現在裝備物品。
 
@@ -240,6 +240,13 @@ uv run --locked --env-file=.env.evennia-test evennia test --settings test_settin
 ```sh
 uv run --locked python -m tools.spec_traceability check
 uv run --locked python -m tools.contract_gate --change <change>
+```
+
+只要動到 `content/items/` 的任何 YAML，`content/map-reference-context.json` 的相依指紋就會失效。改完目錄後重新產生並提交：
+
+```sh
+uv run --locked python -m tools.map_reference_context
+uv run --locked python -m tools.map_reference_context --check
 ```
 
 測試裡的數值角色分成三類：**通用完整性**驗證 schema、身份與參照、槽位、稀有度預算與價格帶歸屬，不比對具體數值；**共用合成機制**用受控的 file-local 合成宣告驗證算式結果；**代表性整合冒煙**讀取現行宣告當輸入，觀察另一個消費端的結果。價格、庫存、調整與效果量級都住在資料裡，測試只驗證關係與接線。

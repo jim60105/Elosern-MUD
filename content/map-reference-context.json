@@ -256,7 +256,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "297bb2a6c534a39851ec26f9b21fe6b79f0261170b8fd645d5482f531709c174",
+  "fingerprint": "8d920ce0ef911200038d11912d711526addf91e04c5b713640dd1d217a8c9692",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -16477,7 +16477,7 @@
     "world/lore/guild.py": "37916eb09dfff1fdcd6b7ab5376a27b5c492e1c322dacd200bdc4cec46299e72",
     "world/lore/guild_adventurers.py": "424b60250ec79a70ffacc2b492f27c3a1d7ba385c4f7806f20ea40c9153ad5d7",
     "world/lore/items/__init__.py": "be7f3c63d321a42521c7c164bedb258cc60e20a79e666f2bdce5c02ca42cecc7",
-    "world/lore/items/assembly.py": "1c75f50db78e3a7668938f30458aff1271e2c033c6f68e7ada323e646ec4a724",
+    "world/lore/items/assembly.py": "96711a9799e66fda25989eaa7c3006c36374792794ff88d1ea77136bd61fa134",
     "world/lore/items/vocab.py": "b39747b899cb23d9bc96aac502cb1fc445e826841c1ca191ea055f213fed6fc3",
     "world/lore/magic.py": "f1ae1ffe5f9c9ffba58ac9ea78f80618c80d1ef2d763c7e3b545e7bf8af27dc8",
     "world/lore/map_districts.py": "5a3e96fa284cf4ecaa3bb1590f4080405a13c98164b402c4a275336a88c71039",

@@ -95,12 +95,19 @@ def _display_path(path: Path) -> str:
         return str(path)
 
 
+def _entry_display(root: Path, name: str) -> str:
+    """Name one catalog entry without following its final symbolic link."""
+    return f"{_display_path(root)}/{name}"
+
+
 def _resolve_contained(path: Path, root: Path, where: str) -> Path:
     """Resolve ``path`` and require it to stay inside the catalog directory.
 
     ``Path.is_file()`` follows symlinks, so a declared slice could otherwise
-    point at an external file and break the single-source boundary. The
-    resolved target must live under the resolved catalog root.
+    point at an external file and break the single-source boundary. Catalog
+    entries that are symbolic links are refused before this check; the
+    resolved target must still live under the resolved catalog root as
+    defence in depth.
     """
     try:
         resolved = path.resolve()
@@ -120,7 +127,14 @@ def _unique_key_loader(source: str):
             seen: set[Any] = set()
             for key_node, _ in node.value:
                 key = self.construct_object(key_node, deep=deep)
-                if key in seen:
+                try:
+                    duplicate = key in seen
+                except TypeError:
+                    raise ItemCatalogError(
+                        f"{source}: unhashable YAML mapping key {key!r} at line "
+                        f"{key_node.start_mark.line + 1}"
+                    ) from None
+                if duplicate:
                     raise ItemCatalogError(
                         f"{source}: duplicate YAML mapping key {key!r} at line "
                         f"{key_node.start_mark.line + 1}"
@@ -135,6 +149,8 @@ def _read_yaml(path: Path) -> Any:
     source = _display_path(path)
     try:
         text = path.read_text(encoding="utf-8")
+    except UnicodeDecodeError as error:
+        raise ItemCatalogError(f"{source}: is not valid UTF-8 ({error})") from None
     except OSError as error:
         raise ItemCatalogError(f"{source}: cannot be read ({error})") from None
     try:
@@ -187,12 +203,19 @@ def _require_enum(vocabulary: Any, value: Any, where: str) -> Any:
 def _parse_presentation(value: Any, where: str) -> ItemPresentation:
     mapping = _require_mapping(value, where)
     _require_fields(mapping, _PRESENTATION_FIELDS, _PRESENTATION_FIELDS, where)
-    return ItemPresentation(
-        kind=_require_enum(ItemKind, mapping["kind"], f"{where}.kind"),
-        icon_key=_require_enum(ItemIconKey, mapping["icon_key"], f"{where}.icon_key"),
-        rarity=_require_enum(ItemRarity, mapping["rarity"], f"{where}.rarity"),
-        summary_zh=_require_string(mapping["summary_zh"], f"{where}.summary_zh"),
-    )
+    kind = _require_enum(ItemKind, mapping["kind"], f"{where}.kind")
+    icon_key = _require_enum(ItemIconKey, mapping["icon_key"], f"{where}.icon_key")
+    rarity = _require_enum(ItemRarity, mapping["rarity"], f"{where}.rarity")
+    summary_zh = _require_string(mapping["summary_zh"], f"{where}.summary_zh")
+    try:
+        return ItemPresentation(
+            kind=kind,
+            icon_key=icon_key,
+            rarity=rarity,
+            summary_zh=summary_zh,
+        )
+    except ValueError as error:
+        raise ItemCatalogError(f"{where}: {error}") from None
 
 
 def _parse_use_mechanics(value: Any, where: str) -> tuple[ItemUseMechanics, list[dict[str, Any]]]:
@@ -305,7 +328,14 @@ def load_item_catalog(directory: Path | None = None) -> ItemCatalog:
     root = Path(directory) if directory is not None else CATALOG_DIRECTORY
     root = root.resolve()
     manifest_path = root / CATALOG_FILENAME
-    if not root.is_dir() or not manifest_path.is_file():
+    if not root.is_dir():
+        raise ItemCatalogError(f"{_display_path(manifest_path)}: catalog manifest is missing")
+    if manifest_path.is_symlink():
+        raise ItemCatalogError(
+            f"{_entry_display(root, CATALOG_FILENAME)}: is a symbolic link; "
+            "item catalog entries must be regular files"
+        )
+    if not manifest_path.is_file():
         raise ItemCatalogError(f"{_display_path(manifest_path)}: catalog manifest is missing")
     _resolve_contained(manifest_path, root, _display_path(manifest_path))
 
@@ -361,6 +391,11 @@ def load_item_catalog(directory: Path | None = None) -> ItemCatalog:
 
     for name in names:
         path = root / name
+        if path.is_symlink():
+            raise ItemCatalogError(
+                f"{_entry_display(root, name)}: is a symbolic link; "
+                "item catalog entries must be regular files"
+            )
         if not path.is_file():
             raise ItemCatalogError(f"{_display_path(path)}: not a readable regular file")
         _resolve_contained(path, root, _display_path(path))

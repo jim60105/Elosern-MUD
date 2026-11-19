@@ -11,7 +11,8 @@
    "index": 1,
    "name": "top-level-1",
    "labels": [
-    "tests.test_evennia_test_guard"
+    "tests.test_evennia_test_guard",
+    "tests.test_item_catalog_startup_smoke"
    ]
   },
   {

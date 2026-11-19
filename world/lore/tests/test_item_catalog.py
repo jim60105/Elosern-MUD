@@ -170,7 +170,7 @@ class RejectionTests(CatalogCase):
     @covers_requirement(
         "lore-item-catalog::the-item-catalog-has-one-ordered-declarative-source"
     )
-    def test_symlink_outside_the_catalog_is_rejected(self):
+    def test_symlink_slice_outside_the_catalog_is_rejected(self):
         root = self.catalog({"one.yaml": [_row("t_symlink")]})
         outside = Path(tempfile.mkdtemp())
         self.addCleanup(__import__("shutil").rmtree, outside, True)
@@ -178,7 +178,57 @@ class RejectionTests(CatalogCase):
         target.write_text("items: []\n", encoding="utf-8")
         (root / "one.yaml").unlink()
         (root / "one.yaml").symlink_to(target)
-        self.assert_rejected(root, "outside the item catalog directory")
+        self.assert_rejected(root, "one.yaml: is a symbolic link")
+
+    def test_symlink_slice_inside_the_catalog_is_rejected(self):
+        root = self.catalog({"one.yaml": [_row("t_inside_link")]})
+        (root / "one.yaml").unlink()
+        (root / "one.yaml").symlink_to(root / "catalog.yaml")
+        self.assert_rejected(root, "one.yaml: is a symbolic link")
+
+    def test_symlink_manifest_is_rejected(self):
+        root = self.catalog({"one.yaml": [_row("t_link_manifest")]})
+        manifest = root / "catalog.yaml"
+        real_manifest = root / "real_manifest.yaml"
+        manifest.rename(real_manifest)
+        manifest.symlink_to(real_manifest)
+        self.assert_rejected(root, "catalog.yaml: is a symbolic link")
+
+    def test_invalid_summary_names_the_file_row_and_field(self):
+        root = self.catalog(
+            {"one.yaml": [_row("t_bad_summary", presentation={
+                "kind": "misc",
+                "icon_key": "misc",
+                "rarity": "common",
+                "summary_zh": "含有 <markup> 的摘要。",
+            })]}
+        )
+        with self.assertRaises(ItemCatalogError) as caught:
+            load_item_catalog(root)
+        message = str(caught.exception)
+        self.assertIn("one.yaml.items[1].presentation", message)
+        self.assertIn("summary_zh", message)
+
+    def test_invalid_utf8_names_the_source(self):
+        root = self.catalog({"one.yaml": [_row("t_bad_utf8")]})
+        (root / "one.yaml").write_bytes(b"items: [\xff\xfe]\n")
+        with self.assertRaises(ItemCatalogError) as caught:
+            load_item_catalog(root)
+        message = str(caught.exception)
+        self.assertIn("one.yaml", message)
+        self.assertIn("UTF-8", message)
+
+    def test_unhashable_mapping_key_names_the_source_and_line(self):
+        root = self.catalog({"one.yaml": [_row("t_unhashable")]})
+        (root / "one.yaml").write_text(
+            "items: []\n? [sequence, key]\n: 1\n",
+            encoding="utf-8",
+        )
+        with self.assertRaises(ItemCatalogError) as caught:
+            load_item_catalog(root)
+        message = str(caught.exception)
+        self.assertIn("one.yaml: unhashable YAML mapping key", message)
+        self.assertIn("line 2", message)
 
 
 if __name__ == "__main__":
