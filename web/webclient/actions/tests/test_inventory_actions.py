@@ -56,7 +56,7 @@ from world.rules.tests._combat_session_helpers import (
     live_item_effect_profiles,
     open_synthetic_scope,
 )
-from world.tests.synthetic_data import SYNTH_ITEMS
+from world.tests.synthetic_data import SYNTH_EQUIPMENT_EFFECT_RULES, SYNTH_ITEMS
 
 # Kit identities (items+prices scope; the price rows ride along so the kit
 # rows' price-table keys resolve):
@@ -81,7 +81,15 @@ def _ring_rows() -> dict[str, ItemDefinition]:
     return rows
 
 
-_SCOPE_EXTRA = {"items": {**SYNTH_ITEMS, **_ring_rows()}}
+_RING_ROWS = _ring_rows()
+# Every slotted row resolves its own key in the equipment rule map, so the six
+# probe rings carry the kit's explicit no-adjustment weapon profile.
+_PLAIN_RULE = SYNTH_EQUIPMENT_EFFECT_RULES["t_cinder_dirk"]
+
+_SCOPE_EXTRA = {
+    "items": {**SYNTH_ITEMS, **_RING_ROWS},
+    "equipment_effect_rules": {key: _PLAIN_RULE for key in _RING_ROWS},
+}
 
 
 class InventoryActionBase(EvenniaTestCase):

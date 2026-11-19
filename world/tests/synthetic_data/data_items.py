@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from types import MappingProxyType
 
 from world.lore.economy import PriceEntry
@@ -24,10 +25,14 @@ from world.rules.item_effects import (
 from world.rules.equipment_effects import EquipmentEffectRule
 
 
-def _empty_rule(*, exposure_bias: int = 0) -> EquipmentEffectRule:
-    """One explicit no-adjustment equipment rule for a synthetic row."""
+def _synthetic_rule(
+    *,
+    adjustments: Mapping[str, int | str] | None = None,
+    exposure_bias: int = 0,
+) -> EquipmentEffectRule:
+    """One explicit equipment rule for a synthetic row; no caps or buffs."""
     return EquipmentEffectRule(
-        adjustments=MappingProxyType({}),
+        adjustments=MappingProxyType(dict(adjustments or {})),
         gauge_caps=MappingProxyType({}),
         immune=(),
         attached_buffs=(),
@@ -102,8 +107,8 @@ SYNTH_ITEMS: dict[str, ItemDefinition] = {
     ),
     # A second main-hand row: the party-management acceptance fixture holds
     # one of these beside the equipped knife so the real equipment toggle has
-    # a distinct replacement to show. Both rows carry their own empty rule and
-    # share the one synthetic weapon price band.
+    # a distinct replacement to show. It carries its own empty rule and shares
+    # the one synthetic weapon price band with the knife.
     "t_cinder_dirk": ItemDefinition(
         key="t_cinder_dirk",
         display_name_zh="燼微短刃",
@@ -177,12 +182,16 @@ SYNTH_ITEMS: dict[str, ItemDefinition] = {
 #: The dedicated effect half of every slotted kit row, keyed by the kit item's
 #: own key. The kit patches EQUIPMENT_EFFECT_RULES with this map in the same
 #: scope as the item registry, so worn synthetic gear resolves its own rule
-#: without borrowing a shipped item's binding.
+#: without borrowing a shipped item's binding. The main-hand row carries the
+#: shared caster-style profile (a flat magic-power layer and a percent casting
+#: cost reduction) every presented-cost and stat-layer consumer reads.
 SYNTH_EQUIPMENT_EFFECT_RULES: dict[str, EquipmentEffectRule] = {
-    "t_thorn_knife": _empty_rule(),
-    "t_cinder_dirk": _empty_rule(),
-    "t_veil_charm": _empty_rule(exposure_bias=1),
-    "t_exam_armor": _empty_rule(),
+    "t_thorn_knife": _synthetic_rule(
+        adjustments={"magic_power": 4, "mp_cost": "-5%"}
+    ),
+    "t_cinder_dirk": _synthetic_rule(),
+    "t_veil_charm": _synthetic_rule(exposure_bias=1),
+    "t_exam_armor": _synthetic_rule(),
 }
 
 # The rulebook-side half of every usable kit row: settlement resolves an
