@@ -83,7 +83,6 @@ _ANY_TOPIC = f"{_TABLE_KEY}.either"
 _EXPOSURE_BOUND = 2
 _EXPOSURE_BASELINE = EXPOSURE_LEVELS[_EXPOSURE_BOUND - 1]
 _EXPOSURE_BASELINE_ORDINAL = _EXPOSURE_BOUND - 1
-_WORN_MODIFIER_KEY = _WORN_ITEM.modifier_key
 
 
 def _scene(scene_id: str, host_text: str) -> Scene:
@@ -689,14 +688,13 @@ class DialoguePhysicalConditionTests(EvenniaTest):
         item = SimpleNamespace(
             key=_WORN_KEY,
             equipment_slot=EquipmentSlot.WEAPON_MAIN,
-            modifier_key=_WORN_MODIFIER_KEY,
             display_name_zh="合成磨損護符",
         )
         with patch.dict("world.rules.equipment.ITEM_REGISTRY", {_WORN_KEY: item}), patch.dict(
             "world.rules.equipment_effects.ITEM_REGISTRY", {_WORN_KEY: item}
         ), patch.dict(
             "world.rules.equipment_effects.EQUIPMENT_EFFECT_RULES",
-            {_WORN_MODIFIER_KEY: _exposure_rule()},
+            {_WORN_KEY: _exposure_rule()},
         ):
             self.char1.db.equipment = {**_empty_equipment(), "weapon_main": _WORN_KEY}
             self.assertTrue(evaluate_condition(condition, self._context()))

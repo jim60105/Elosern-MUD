@@ -41,7 +41,7 @@ from ._equipment_rulebook_probes import (
 
 # The shipped row that attaches a buff, plus its attached definition — read
 # from the rulebook, never hardcoded (fail-fast on ambiguity).
-_ATTACHED_MODIFIER, _ATTACHED_ROW = attached_buffs_rule()
+_, _ATTACHED_ROW = attached_buffs_rule()
 _REGEN_BUFF = _ATTACHED_ROW.attached_buffs[0]
 
 # Two further rows (the distinct hp gauge-cap rows) patched to attach the
@@ -64,19 +64,23 @@ _ACCESSORY = make_item(
     "t_herb_satchel",
     display_name_zh="合成藥草囊",
     equipment_slot=EquipmentSlot.ACCESSORY,
-    modifier_key=_ATTACHED_MODIFIER,
 )
 _ARMOR_HEAVY = make_item(
     "t_plate_harness",
     display_name_zh="合成重甲背具",
     equipment_slot=EquipmentSlot.ARMOR,
-    modifier_key=_ARMOR_CAP_KEYS[1],
 )
 _ARMOR_LIGHT = make_item(
     "t_quilted_jacket",
     display_name_zh="合成棉裡外衣",
     equipment_slot=EquipmentSlot.ARMOR,
-    modifier_key=_ARMOR_CAP_KEYS[0],
+)
+_ACCESSORY_RULE = _ATTACHED_ROW
+_ARMOR_HEAVY_RULE = replace(
+    rule_for(_ARMOR_CAP_KEYS[1]), attached_buffs=(_REGEN_BUFF,)
+)
+_ARMOR_LIGHT_RULE = replace(
+    rule_for(_ARMOR_CAP_KEYS[0]), attached_buffs=(_REGEN_BUFF,)
 )
 _ATTACHED_ITEMS = (_ACCESSORY, _ARMOR_HEAVY, _ARMOR_LIGHT)
 
@@ -96,8 +100,9 @@ class _AttachedBuffScope(EvenniaTestCase):
             self, "items", extra={"items": {d.key: d for d in _ATTACHED_ITEMS}}
         )
         deviant = {
-            cap_key: replace(rule_for(cap_key), attached_buffs=(_REGEN_BUFF,))
-            for cap_key in _ARMOR_CAP_KEYS
+            _ACCESSORY.key: _ACCESSORY_RULE,
+            _ARMOR_HEAVY.key: _ARMOR_HEAVY_RULE,
+            _ARMOR_LIGHT.key: _ARMOR_LIGHT_RULE,
         }
         patcher = patch.dict(
             "world.rules.equipment_effects.EQUIPMENT_EFFECT_RULES", deviant

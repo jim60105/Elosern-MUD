@@ -24,7 +24,6 @@ from evennia.utils.test_resources import EvenniaTestCase
 from tools.spec_traceability import covers_requirement
 from typeclasses.characters import PlayerCharacter
 from world.skills.equipment import EquipmentSlot
-from world.lore.items import EquipmentModifierKey
 from world.rules import combat
 from world.rules.buffs import apply_buff
 from world.rules.combat_modifiers import adjusted_agility, evaluate_combat_modifiers
@@ -137,43 +136,38 @@ _DISPLAY_ROWS = {
     )
 }
 
-# Gear rows. The closed shipped modifier enum cannot gain members, so the
-# kit items borrow members positionally at runtime (never named as literals
-# or attributes); the invented effect table below is the only source their
-# rows resolve through while the context is open. Index 0 is the kit item's
-# own borrowed member, so gear rows take the next five.
-_BORROWED_KEYS = tuple(EquipmentModifierKey)[1:6]
-_BULWARK_KEY, _HUSK_KEY, _GLINT_KEY, _BEADS_KEY, _FANG_KEY = _BORROWED_KEYS
 _BULWARK_SHIELD = make_item(
     "t_bulwark_shell",
     display_name_zh="合成城殼鎧",
     equipment_slot=EquipmentSlot.ARMOR,
-    modifier_key=_BULWARK_KEY,
 )
 _HUSK_VEST = make_item(
     "t_husk_vest",
     display_name_zh="合成殼甲衣",
     equipment_slot=EquipmentSlot.ARMOR,
-    modifier_key=_HUSK_KEY,
 )
 _GLINT_FOCUS = make_item(
     "t_glint_focus",
     display_name_zh="合成微光飾符",
     equipment_slot=EquipmentSlot.ACCESSORY,
-    modifier_key=_GLINT_KEY,
 )
 _BEAD_WARD = make_item(
     "t_warbeads_ward",
     display_name_zh="合成戰珠護符",
     equipment_slot=EquipmentSlot.ACCESSORY,
-    modifier_key=_BEADS_KEY,
 )
 _FANG_BLADE = make_item(
     "t_fang_blade",
     display_name_zh="合成毒牙短刃",
     equipment_slot=EquipmentSlot.WEAPON_MAIN,
-    modifier_key=_FANG_KEY,
 )
+# Each gear row's own key binds its rule; the invented effect table below is
+# the only source the rows resolve through while the context is open.
+_BULWARK_KEY = _BULWARK_SHIELD.key
+_HUSK_KEY = _HUSK_VEST.key
+_GLINT_KEY = _GLINT_FOCUS.key
+_BEADS_KEY = _BEAD_WARD.key
+_FANG_KEY = _FANG_BLADE.key
 _BULWARK_RULE = EquipmentEffectRule(
     adjustments={"atk_phys": -2, "agility": "-10%", "magic_power": 3},
     gauge_caps={"hp": 15},
@@ -764,14 +758,10 @@ class EquipmentEffectTableTests(EvenniaTestCase):
             )
 
     @covers_requirement("character-breakdown-view::breakdown-read-model-decomposes-each-panel-stat-by-source")
-    def test_unbound_modifier_key_resolves_none(self):
-        # A closed-enum member with no row in the (invented) table stays the
-        # sanctioned "no rulebook entry" answer, never a KeyError.
-        unbound = next(
-            member
-            for member in EquipmentModifierKey
-            if member not in _EQUIPMENT_RULES
-        )
+    def test_unbound_item_key_resolves_none(self):
+        # A key with no row in the (invented) table stays the sanctioned
+        # "no rulebook entry" answer, never a KeyError.
+        unbound = "t_unbound_gear"
         with _synthetic_tables():
             self.assertIsNone(equipment_modifier_layers(unbound))
 

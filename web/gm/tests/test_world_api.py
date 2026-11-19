@@ -16,6 +16,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shutil
 import socket
 import tempfile
 from dataclasses import dataclass, field
@@ -510,3 +511,149 @@ class AccessAndBoundaryTest(WorldApiTestCase):
             self.assert_ok_envelope(client.post(RELOAD, HTTP_X_CSRFTOKEN=token))
         self.assertEqual((self._source_digest(), self._row_counts()), before)
         self.assertEqual({spec.name: dict(spec.loader()) for spec in INDEX}, snapshot)
+
+
+class ItemProvenanceApiTest(GmTestCase):
+    """The items detail reports the loaded row's own source file.
+
+    The real ``items`` registry specification stays in the index; only the
+    loaded catalog views are injected, so the assertion covers the shipped
+    wiring without naming shipped rows.
+    """
+
+    def setUp(self):
+        super().setUp()
+        from world.lore.economy import PriceEntry
+        from world.lore.items import ItemDefinition, ItemIconKey, ItemKind
+        from world.lore.items import ItemPresentation, ItemRarity
+
+        from world.lore.items import ITEM_SOURCES
+
+        self._production_sources = dict(ITEM_SOURCES)
+        self._alpha = "content/items/alpha.yaml"
+        self._beta = "content/items/beta.yaml"
+
+        def row(key: str, label: str) -> ItemDefinition:
+            return ItemDefinition(
+                key=key,
+                display_name_zh=label,
+                price_table_key="t_prov_price",
+                sellable=True,
+                presentation=ItemPresentation(
+                    kind=ItemKind.MISC,
+                    icon_key=ItemIconKey.MISC,
+                    rarity=ItemRarity.COMMON,
+                    summary_zh=f"{label}的合成摘要。",
+                ),
+            )
+
+        patches = (
+            mock.patch.dict(
+                "world.lore.items.ITEM_REGISTRY",
+                {
+                    "t_prov_alpha": row("t_prov_alpha", "合成來源甲"),
+                    "t_prov_beta": row("t_prov_beta", "合成來源乙"),
+                },
+                clear=True,
+            ),
+            mock.patch.dict(
+                "world.lore.items.ITEM_SOURCES",
+                {
+                    "t_prov_alpha": self._alpha,
+                    "t_prov_beta": self._beta,
+                },
+                clear=True,
+            ),
+            mock.patch.dict(
+                "world.lore.economy.PRICE_TABLE",
+                {
+                    "t_prov_price": PriceEntry(
+                        "t_prov_price", "合成價格帶", 1, 2, "Synthetic band."
+                    )
+                },
+                clear=True,
+            ),
+        )
+        for patcher in patches:
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        # Keep the REAL items and prices specifications, without the
+        # map-world-owned registries a detail reference walk would otherwise
+        # need to publish.
+        real_specs = tuple(
+            spec
+            for spec in registry_index.REGISTRY_INDEX
+            if spec.name in {"items", "prices"}
+        )
+        index_patch = mock.patch.object(registry_index, "REGISTRY_INDEX", real_specs)
+        index_patch.start()
+        self.addCleanup(index_patch.stop)
+        registry_index._cached.cache_clear()
+        self.addCleanup(registry_index._cached.cache_clear)
+        self.developer = self.client_for("developer")
+
+    def _detail(self, key: str) -> dict:
+        return self.assert_ok_envelope(self.developer.get(f"{REGISTRY}/items/{key}"))
+
+    @covers_requirement(
+        "gm-world-data::item-detail-identifies-the-file-that-supplied-the-loaded-row"
+    )
+    def test_two_loaded_rows_report_their_own_files_and_keep_references(self):
+        alpha = self._detail("t_prov_alpha")
+        beta = self._detail("t_prov_beta")
+        self.assertEqual(alpha["source_path"], self._alpha)
+        self.assertEqual(beta["source_path"], self._beta)
+        self.assertNotEqual(alpha["source_path"], beta["source_path"])
+        # The registry/list provenance still identifies the catalog directory.
+        self.assertEqual(alpha["registry"]["source_path"], "content/items/")
+        price_links = [
+            item
+            for item in alpha["references"]
+            if item["field_path"] == "price_table_key"
+        ]
+        self.assertEqual(len(price_links), 1)
+        self.assertEqual(price_links[0]["registry"], "prices")
+        self.assertEqual(price_links[0]["key"], "t_prov_price")
+        self.assertTrue(price_links[0]["exists"])
+        self.assertEqual(price_links[0]["label"], "合成價格帶")
+
+    @covers_requirement(
+        "gm-world-data::item-detail-identifies-the-file-that-supplied-the-loaded-row"
+    )
+    def test_a_disk_move_does_not_change_loaded_provenance(self):
+        repository_root = Path(__file__).resolve().parents[3]
+        (repository_root / "tmp").mkdir(exist_ok=True)
+        root = Path(tempfile.mkdtemp(dir=repository_root / "tmp"))
+        self.addCleanup(shutil.rmtree, root, True)
+        beta = root / "beta.yaml"
+        beta.write_text("items: []\n", encoding="utf-8")
+        relative = beta.relative_to(repository_root).as_posix()
+        with mock.patch.dict(
+            "world.lore.items.ITEM_SOURCES", {"t_prov_beta": relative}
+        ):
+            registry_index._cached.cache_clear()
+            moved = beta.with_name("moved.yaml")
+            beta.rename(moved)
+            detail = self._detail("t_prov_beta")
+        self.assertEqual(detail["source_path"], relative)
+        self.assertNotEqual(
+            detail["source_path"], moved.relative_to(repository_root).as_posix()
+        )
+
+    @covers_requirement(
+        "gm-world-data::item-detail-identifies-the-file-that-supplied-the-loaded-row"
+    )
+    def test_the_loaded_shipped_catalog_names_exact_content_paths(self):
+        # The loaded provenance snapshot (not disk) names the exact authored
+        # files for rows from at least two different slices.
+        content_paths = sorted(
+            {
+                path
+                for path in self._production_sources.values()
+                if path.startswith("content/items/")
+            }
+        )
+        self.assertGreaterEqual(len(content_paths), 2)
+        self.assertNotEqual(content_paths[0], content_paths[1])
+        for key, path in self._production_sources.items():
+            self.assertTrue(path.startswith("content/items/"), key)

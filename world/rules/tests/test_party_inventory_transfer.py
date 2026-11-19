@@ -14,7 +14,7 @@ from tools.spec_traceability import covers_requirement
 from typeclasses.characters import PlayerCharacter
 from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
-from world.lore.items import EquipmentModifierKey
+from world.rules.equipment_effects import EquipmentEffectRule
 from world.quests import runtime as quest_runtime
 from world.quests.definitions import QuestStage
 from world.quests.runtime import read_records
@@ -64,7 +64,6 @@ _BLADE = make_item(
     display_name_zh="測試長劍",
     sellable=False,
     equipment_slot=EquipmentSlot.WEAPON_MAIN,
-    modifier_key=EquipmentModifierKey.PLAIN_SWORD,
 )
 _SEAL = make_item(
     "t_transfer_seal", display_name_zh="測試徽記", sellable=False, guild_property=True
@@ -85,7 +84,10 @@ class PartyTransferTestCase(EvenniaTestCase):
             extra={
                 "items": {
                     row.key: row for row in (_POTION, _BLADE, _SEAL, _REWARD)
-                }
+                },
+                "equipment_effect_rules": {
+                    _BLADE.key: EquipmentEffectRule({}, {}, (), (), 0)
+                },
             },
         )
         scope.__enter__()

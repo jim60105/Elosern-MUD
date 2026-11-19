@@ -1,19 +1,21 @@
 """Validated equipment-effect rulebook (add-equipment-effect-rulebook D1-D4).
 
 One entry per registered equipment item, keyed by the item key, holding the
-closed field vocabulary of the parent design (§5/§6). The lore registry owns
-identity (the ``EquipmentModifierKey`` binding); this rulebook owns every
-magnitude. The loader mirrors ``world.rules.items.load_item_effect_rules``:
+closed field vocabulary of the parent design (§5/§6). Each entry is authored
+on its own item row in ``content/items/`` as the row's dedicated
+``equipment_effects`` mapping; the lore registry owns identity and this loader
+owns every magnitude. The loader mirrors ``world.rules.item_effects``:
 
 - a single ``load_equipment_effect_rules`` with a path override for deviant
-  rulebook tests, idempotent ``reload_equipment_effect_rules`` re-validation;
+  shared-budget tests and injectable candidate inputs,
+  idempotent ``reload_equipment_effect_rules`` re-validation;
 - closed vocabularies everywhere (entry fields, adjustment fields, gauge
   targets, budget rarities and columns) — unknown keys fail the load;
 - per-column budgets keyed by the item's registry rarity, consulted ONLY at
   load time; rarity is never read by any runtime resolution path;
-- the triple bijection equipment key ↔ modifier key ↔ rulebook entry,
-  validated over an injectable registry so duplicate-binding rejection is
-  testable without mutating production data;
+- the one-to-one binding between each slotted registry item and its inline
+  entry, validated over an injectable candidate so orphaned, missing, or
+  non-equipment entries are testable without mutating production data;
 - ``immune`` / ``attached_buffs`` keys must resolve in the buff rulebook, and
   one entry may never immunise a buff it also attaches.
 
@@ -40,8 +42,9 @@ from typing import Any, Mapping
 import yaml
 
 from world.lore.items import (
+    ITEM_EQUIPMENT_EFFECT_INPUTS,
     ITEM_REGISTRY,
-    EquipmentModifierKey,
+    ITEM_SOURCES,
     ItemDefinition,
     ItemRarity,
     LiturgicalRole,
@@ -194,7 +197,7 @@ def _validate_budgets(raw: Any) -> dict[str, dict[str, int | float]]:
     unknown = set(raw) - _BUDGET_RARITIES
     if unknown:
         raise EquipmentEffectsRulebookError(
-            f"budgets name unknown rarities: {sorted(unknown)}"
+            f"budgets name unknown rarities: {sorted(map(str, unknown))}"
         )
     missing = _BUDGET_RARITIES - set(raw)
     if missing:
@@ -202,7 +205,7 @@ def _validate_budgets(raw: Any) -> dict[str, dict[str, int | float]]:
             f"budgets are missing rarities: {sorted(missing)}"
         )
     budgets: dict[str, dict[str, int | float]] = {}
-    for rarity in sorted(raw):
+    for rarity in sorted(raw, key=str):
         columns = raw[rarity]
         if not isinstance(columns, dict):
             raise EquipmentEffectsRulebookError(
@@ -211,7 +214,7 @@ def _validate_budgets(raw: Any) -> dict[str, dict[str, int | float]]:
         unknown = set(columns) - _BUDGET_COLUMNS
         if unknown:
             raise EquipmentEffectsRulebookError(
-                f"budgets.{rarity} name unknown columns: {sorted(unknown)}"
+                f"budgets.{rarity} name unknown columns: {sorted(map(str, unknown))}"
             )
         missing = _BUDGET_COLUMNS - set(columns)
         if missing:
@@ -255,7 +258,8 @@ def _validate_entry(
     unknown = set(raw) - _ENTRY_FIELDS
     if unknown:
         raise EquipmentEffectsRulebookError(
-            f"effects.{item_key} contains unknown fields: {sorted(unknown)}"
+            f"effects.{item_key} contains unknown fields: "
+            f"{sorted(map(str, unknown))}"
         )
 
     ceilings = budgets[rarity]
@@ -271,9 +275,9 @@ def _validate_entry(
     if unknown:
         raise EquipmentEffectsRulebookError(
             f"effects.{item_key}.adjustments contain unknown fields: "
-            f"{sorted(unknown)}"
+            f"{sorted(map(str, unknown))}"
         )
-    for field in sorted(raw_adjustments):
+    for field in sorted(raw_adjustments, key=str):
         value = raw_adjustments[field]
         if field in _PERCENT_FIELDS:
             magnitude = _require_percent(value, f"effects.{item_key}.{field}")
@@ -313,10 +317,11 @@ def _validate_entry(
     unknown = set(raw_caps) - _GAUGE_TARGETS
     if unknown:
         raise EquipmentEffectsRulebookError(
-            f"effects.{item_key}.gauge_caps target unknown gauges: {sorted(unknown)}"
+            f"effects.{item_key}.gauge_caps target unknown gauges: "
+            f"{sorted(map(str, unknown))}"
         )
     gauge_caps: dict[str, int] = {}
-    for target in sorted(raw_caps):
+    for target in sorted(raw_caps, key=str):
         cap = _require_int(
             raw_caps[target],
             f"effects.{item_key}.gauge_caps.{target}",
@@ -438,7 +443,8 @@ def _signed_percent_magnitude(value: str) -> int:
 
 def validate_church_doctrine(
     registry: Mapping[str, ItemDefinition],
-    rules: Mapping[EquipmentModifierKey, EquipmentEffectRule],
+    rules: Mapping[str, EquipmentEffectRule],
+    sources: Mapping[str, str] | None = None,
 ) -> None:
     """Validate every item-lore liturgical role against its loaded entry.
 
@@ -458,36 +464,39 @@ def validate_church_doctrine(
         role = definition.liturgical_role
         if role is None:
             continue
-        rule = rules.get(definition.modifier_key)
+        where = f"church item {item_key!r}"
+        if sources and item_key in sources:
+            where = f"{sources[item_key]}: {where}"
+        rule = rules.get(item_key)
         if rule is None:
             raise EquipmentEffectsRulebookError(
-                f"church item {item_key!r} declares liturgical role "
+                f"{where} declares liturgical role "
                 f"{role.value!r} but binds no loaded effect entry"
             )
         if rule.exposure_bias < 0:
             raise EquipmentEffectsRulebookError(
-                f"church item {item_key!r} role {role.value!r} carries negative "
+                f"{where} role {role.value!r} carries negative "
                 f"exposure_bias {rule.exposure_bias}: the canon of exposure is "
                 "never suppressed"
             )
         pleasure = rule.adjustments.get("pleasure_gain")
         if pleasure is None:
             raise EquipmentEffectsRulebookError(
-                f"church item {item_key!r} role {role.value!r} declares no "
+                f"{where} role {role.value!r} declares no "
                 "pleasure_gain: the canon requires an explicit non-negative "
                 "pleasure term"
             )
         pleasure_magnitude = _signed_percent_magnitude(pleasure)  # type: ignore[arg-type]
         if pleasure_magnitude < 0:
             raise EquipmentEffectsRulebookError(
-                f"church item {item_key!r} role {role.value!r} carries negative "
+                f"{where} role {role.value!r} carries negative "
                 f"pleasure_gain {pleasure!r}: the canon of joy is never "
                 "suppressed"
             )
         if role is LiturgicalRole.SANCTUARY_DEVICE:
             if pleasure_magnitude == 0:
                 raise EquipmentEffectsRulebookError(
-                    f"church item {item_key!r} role {role.value!r} carries no "
+                    f"{where} role {role.value!r} carries no "
                     "positive pleasure_gain: a sanctuary device ministers by "
                     "positive pleasure alone"
                 )
@@ -495,13 +504,13 @@ def validate_church_doctrine(
         heal = rule.adjustments.get("heal_gain")
         if heal is not None and _signed_percent_magnitude(heal) < 0:  # type: ignore[arg-type]
             raise EquipmentEffectsRulebookError(
-                f"church item {item_key!r} role {role.value!r} carries negative "
+                f"{where} role {role.value!r} carries negative "
                 f"heal_gain {heal!r}: the canon of healing is never inverted"
             )
         offers_healing = heal is not None and _signed_percent_magnitude(heal) > 0
         if not offers_healing and not rule.immune:
             raise EquipmentEffectsRulebookError(
-                f"church item {item_key!r} role {role.value!r} offers neither "
+                f"{where} role {role.value!r} offers neither "
                 "positive heal_gain nor an immunity: a vestment or emblem must "
                 "carry the light's healing or its ward"
             )
@@ -510,104 +519,75 @@ def validate_church_doctrine(
 def validate_equipment_effect_rules(
     document: Any,
     registry: Mapping[str, ItemDefinition],
+    equipment_effect_inputs: Mapping[str, Any],
     buff_definitions: Mapping[str, BuffDefinition],
-) -> dict[EquipmentModifierKey, EquipmentEffectRule]:
-    """Validate a parsed rulebook document against an equipment registry.
+    sources: Mapping[str, str] | None = None,
+) -> dict[str, EquipmentEffectRule]:
+    """Validate the shared budgets and every equipment row's inline effects.
 
-    Registry and buff-definition mapping are injectable so rejection tests
-    (including the duplicate-binding case, unreachable through the production
-    dict) run against synthetic registries without mutating
-    ``ITEM_REGISTRY``. Budget lookup uses each entry key's registry rarity; an
-    override document can therefore never redefine rarity semantics. The
-    definition mapping backs the immune/attached reference checks and the P3
-    gauge-bound guard for attached buffs.
+    ``equipment_effect_inputs`` carries the raw ``equipment_effects`` mapping
+    authored on each slotted item row in ``content/items/``. It must align
+    one-to-one with the registry's slotted keys: a missing mapping leaves an
+    equipment item uneffectual, an entry for a non-equipment row is a second
+    source of equipment effects, and both fail before gameplay. Registry, raw
+    inputs, and buff definitions are injectable so rejection tests run against
+    synthetic candidates without mutating ``ITEM_REGISTRY``. Budget lookup uses
+    each entry key's registry rarity; an override document can therefore never
+    redefine rarity semantics. The definition mapping backs the immune/attached
+    reference checks and the P3 gauge-bound guard for attached buffs.
     """
     if not isinstance(document, dict):
         raise EquipmentEffectsRulebookError(
             f"rulebook must be a mapping, got {document!r}"
         )
-    unknown = set(document) - {"budgets", "effects"}
-    if unknown:
+    if set(document) != {"budgets"}:
         raise EquipmentEffectsRulebookError(
-            f"rulebook contains unknown top-level keys: {sorted(unknown)}"
-        )
-    if set(document) != {"budgets", "effects"}:
-        raise EquipmentEffectsRulebookError(
-            "rulebook must carry exactly the 'budgets' and 'effects' keys, "
-            f"got {sorted(document)}"
+            "rulebook must carry exactly the 'budgets' key, "
+            f"got {sorted(document, key=str)}"
         )
     budgets = _validate_budgets(document["budgets"])
-    raw_effects = document["effects"]
-    if not isinstance(raw_effects, dict):
+    if not isinstance(equipment_effect_inputs, Mapping):
         raise EquipmentEffectsRulebookError(
-            f"effects must be a mapping, got {raw_effects!r}"
+            f"equipment effect inputs must be a mapping, got {equipment_effect_inputs!r}"
         )
-
-    # Triple bijection: equipment item key ↔ modifier key ↔ entry key.
-    bindings: dict[EquipmentModifierKey, list[str]] = {}
-    for item_key, definition in registry.items():
-        if definition.equipment_slot is None:
-            if definition.modifier_key is not None:
-                raise EquipmentEffectsRulebookError(
-                    f"item {item_key!r} is not equipment but binds "
-                    f"{definition.modifier_key!r}"
-                )
-            continue
-        if definition.modifier_key is None:
-            raise EquipmentEffectsRulebookError(
-                f"equipment item {item_key!r} has no modifier key"
-            )
-        # Identity is enforced at load, not construction: the constructor
-        # accepts any canonical enum member so test fixtures may reuse one
-        # (design.md D-policy), but a REGISTERED item may not borrow another
-        # item's binding — that would hijack the other item's effects (and
-        # its budget row) once consumers arrive.
-        if definition.modifier_key.value != item_key:
-            raise EquipmentEffectsRulebookError(
-                f"equipment item {item_key!r} binds {definition.modifier_key!r} "
-                f"whose value {definition.modifier_key.value!r} is not its own key"
-            )
-        bindings.setdefault(definition.modifier_key, []).append(item_key)
-    collapsed = {
-        key.value: sorted(owners)
-        for key, owners in bindings.items()
-        if len(owners) > 1
+    sources = sources or {}
+    slotted = {
+        item_key
+        for item_key, definition in registry.items()
+        if definition.equipment_slot is not None
     }
-    if collapsed:
-        raise EquipmentEffectsRulebookError(
-            f"modifier keys bound by more than one equipment item: {collapsed}"
-        )
-    bound_keys = set(bindings)
-    entry_keys = set(raw_effects)
-    unbound = sorted(bound_keys - entry_keys, key=str)
-    if unbound:
-        raise EquipmentEffectsRulebookError(
-            f"equipment modifier keys without a rulebook entry: {unbound}"
-        )
-    orphaned = sorted(entry_keys - bound_keys, key=str)
+    orphaned = sorted(map(str, set(equipment_effect_inputs) - slotted))
     if orphaned:
         raise EquipmentEffectsRulebookError(
-            f"rulebook entries without an equipment binding: {orphaned}"
+            f"equipment effect entries without an equipment row: {orphaned}"
+        )
+    unbound = sorted(map(str, slotted - set(equipment_effect_inputs)))
+    if unbound:
+        raise EquipmentEffectsRulebookError(
+            f"equipment rows without an inline effect mapping: {unbound}"
         )
 
-    rules: dict[EquipmentModifierKey, EquipmentEffectRule] = {}
-    for modifier_key in bound_keys:
-        item_key = bindings[modifier_key][0]
+    rules: dict[str, EquipmentEffectRule] = {}
+    for item_key in sorted(slotted):
         definition = registry[item_key]
         rarity = definition.presentation.rarity.value
-        rules[modifier_key] = _validate_entry(
-            item_key,
-            raw_effects[modifier_key.value],
-            budgets,
-            rarity,
-            buff_definitions,
-            definition=definition,
-        )
-    ordered = {key: rules[key] for key in sorted(rules, key=str)}
+        where = sources.get(item_key, f"items.{item_key}")
+        try:
+            rules[item_key] = _validate_entry(
+                item_key,
+                equipment_effect_inputs[item_key],
+                budgets,
+                rarity,
+                buff_definitions,
+                definition=definition,
+            )
+        except EquipmentEffectsRulebookError as error:
+            raise EquipmentEffectsRulebookError(f"{where}: {error}") from None
+    ordered = {key: rules[key] for key in sorted(rules)}
     # The Church-of-Light doctrine rides the same load: role membership is
     # item lore, so this pass can only confirm the authored entries honour
     # the roles the items declare -- it can never be edited out of the entries.
-    validate_church_doctrine(registry, ordered)
+    validate_church_doctrine(registry, ordered, sources)
     return ordered
 
 
@@ -619,7 +599,9 @@ _equipped = {
 
 # The canonical registry projection used by every production load: equipment
 # definitions only, built once from the live registry.
-_PRODUCTION_EQUIPMENT: Mapping[str, ItemDefinition] = MappingProxyType(_equipped)
+_PRODUCTION_REGISTRY: Mapping[str, ItemDefinition] = MappingProxyType(
+    dict(ITEM_REGISTRY)
+)
 # The canonical buff-definition projection for production loads: the
 # validator checks immune/attached references and the P3 gauge-bound guard
 # against the same definitions every gameplay read uses.
@@ -651,25 +633,55 @@ class _UniqueKeyLoader(yaml.SafeLoader):
 
 def load_equipment_effect_rules(
     path: Path | None = None,
-) -> dict[EquipmentModifierKey, EquipmentEffectRule]:
-    """Validate the canonical equipment-effect rulebook, or an override copy.
+    registry: Mapping[str, ItemDefinition] | None = None,
+    equipment_effect_inputs: Mapping[str, Any] | None = None,
+    buff_definitions: Mapping[str, BuffDefinition] | None = None,
+    sources: Mapping[str, str] | None = None,
+) -> dict[str, EquipmentEffectRule]:
+    """Validate the shared budgets and the production inline effects.
 
-    An override path replaces rulebook DATA only; rarity and bindings still
-    come from the live registry, so a deviant table can never redefine
-    identity semantics. Fails loud with
-    ``EquipmentEffectsRulebookError`` on any deviation.
+    Defaults to the canonical shared settings file, the live item registry, the
+    live inline equipment inputs and provenance, and the live buff definitions.
+    An override path replaces shared budget DATA only; every parameter is
+    injectable so tests exercise a temporary catalog without touching shipped
+    content. Fails loud with ``EquipmentEffectsRulebookError`` on any deviation.
     """
     source = _RULEBOOK_PATH if path is None else path
-    document = yaml.load(source.read_text(encoding="utf-8"), Loader=_UniqueKeyLoader)
-    return validate_equipment_effect_rules(
-        document, _PRODUCTION_EQUIPMENT, _PRODUCTION_BUFF_DEFINITIONS
-    )
+    try:
+        document = yaml.load(
+            source.read_text(encoding="utf-8"), Loader=_UniqueKeyLoader
+        )
+    except EquipmentEffectsRulebookError as error:
+        raise EquipmentEffectsRulebookError(f"{source.name}: {error}") from None
+    if registry is None:
+        registry = _PRODUCTION_REGISTRY
+        if equipment_effect_inputs is None:
+            equipment_effect_inputs = ITEM_EQUIPMENT_EFFECT_INPUTS
+        if sources is None:
+            sources = ITEM_SOURCES
+    if buff_definitions is None:
+        buff_definitions = _PRODUCTION_BUFF_DEFINITIONS
+    if equipment_effect_inputs is None:
+        equipment_effect_inputs = {}
+    try:
+        return validate_equipment_effect_rules(
+            document, registry, equipment_effect_inputs, buff_definitions, sources
+        )
+    except EquipmentEffectsRulebookError as error:
+        raise EquipmentEffectsRulebookError(f"{source.name}: {error}") from None
 
 
 _loaded = load_equipment_effect_rules()
 
-# Immutable equipment-effect rulebook keyed by the closed registry vocabulary.
-EQUIPMENT_EFFECT_RULES: dict[EquipmentModifierKey, EquipmentEffectRule] = _loaded
+#: The live equipment-effect map, keyed by the item key. Every consumer reads
+#: this dict object; ``reload_equipment_effect_rules`` refreshes it in place so
+#: scoped synthetic override closures keep restoring the same object.
+EQUIPMENT_EFFECT_RULES: dict[str, EquipmentEffectRule] = _loaded
+
+#: Import-time validation completed for the production candidate. The startup
+#: gate calls :func:`ensure_equipment_effect_rules_validated`, which never
+#: rereads an already validated catalog.
+_validation_complete = True
 
 
 # The bundle vocabulary this change activates. ``pleasure_gain`` /
@@ -697,17 +709,16 @@ def _worn_item_keys(equipment: Mapping) -> list[str]:
 def _worn_rules_for(equipment: Mapping) -> list[EquipmentEffectRule]:
     """Resolve one normalized equipment mapping to its loaded effect rules.
 
-    A registry-validated mapping only ever holds equipment keys with bound
-    modifier keys (the normalization checks registry membership and slot
-    fit), so every lookup resolves.
+    A registry-validated mapping only ever holds equipment keys (the
+    normalization checks registry membership and slot fit), and every slotted
+    registry row carries its own inline entry, so every lookup resolves.
     """
     rules: list[EquipmentEffectRule] = []
     for item_key in _worn_item_keys(equipment):
-        definition = ITEM_REGISTRY[item_key]
-        modifier_key = definition.modifier_key
-        if modifier_key is None:  # pragma: no cover - registry invariant
-            continue
-        rules.append(EQUIPMENT_EFFECT_RULES[modifier_key])
+        # Fail closed exactly like the previous lookup: a key outside the live
+        # registry still raises instead of silently contributing nothing.
+        _ = ITEM_REGISTRY[item_key]
+        rules.append(EQUIPMENT_EFFECT_RULES[item_key])
     return rules
 
 
@@ -803,21 +814,45 @@ def equipment_gauge_caps(entity: Any) -> Mapping[str, int]:
     return equipment_gauge_caps_for(equipment)
 
 
-def reload_equipment_effect_rules(path: Path | None = None) -> None:
-    """Re-validate and re-mirror the rulebook (idempotent startup sync)."""
-    global EQUIPMENT_EFFECT_RULES
-    EQUIPMENT_EFFECT_RULES = load_equipment_effect_rules(path)
+def reload_equipment_effect_rules(
+    path: Path | None = None,
+    registry: Mapping[str, ItemDefinition] | None = None,
+    equipment_effect_inputs: Mapping[str, Any] | None = None,
+    buff_definitions: Mapping[str, BuffDefinition] | None = None,
+    sources: Mapping[str, str] | None = None,
+) -> None:
+    """Re-validate and refresh the live map in place (idempotent sync)."""
+    global _validation_complete
+    loaded = load_equipment_effect_rules(
+        path, registry, equipment_effect_inputs, buff_definitions, sources
+    )
+    EQUIPMENT_EFFECT_RULES.clear()
+    EQUIPMENT_EFFECT_RULES.update(loaded)
+    _validation_complete = True
 
-def equipment_modifier_layers(modifier_key: Any) -> Mapping[str, tuple[str, int]] | None:
-    """Break one modifier key into per-stat named-layer contributions.
+
+def ensure_equipment_effect_rules_validated() -> None:
+    """Complete equipment-effect validation for production (idempotent).
+
+    Importing this module already validates the production catalog; the startup
+    gate calls this marker so a cold-import rejection is impossible to miss and
+    an already validated catalog is never reread or revalidated.
+    """
+    if _validation_complete:
+        return
+    reload_equipment_effect_rules()
+
+
+def equipment_modifier_layers(item_key: Any) -> Mapping[str, tuple[str, int]] | None:
+    """Break one item key's loaded rule into per-stat named-layer contributions.
 
     The sanctioned single-source surface for the stat-breakdown read model:
     returns ``stat_key -> (kind, amount)`` for one loaded rule — ``flat`` for
     authored integer adjustments and gauge caps, ``pct`` for authored agility
-    percent strings — or ``None`` when the modifier key has no rulebook
-    entry. Zero contributions are omitted. Pure and read-only.
+    percent strings — or ``None`` when the item key has no rulebook entry.
+    Zero contributions are omitted. Pure and read-only.
     """
-    rule = EQUIPMENT_EFFECT_RULES.get(modifier_key)
+    rule = EQUIPMENT_EFFECT_RULES.get(item_key)
     if rule is None:
         return None
     layers: dict[str, tuple[str, int]] = {}
@@ -865,9 +900,9 @@ def equipment_immune_buff_keys(entity: Any) -> frozenset[str]:
     immune: set[str] = set()
     for item_key in worn_item_keys(entity):
         definition = ITEM_REGISTRY.get(item_key)
-        if definition is None or definition.modifier_key is None:
+        if definition is None:
             continue
-        rule = EQUIPMENT_EFFECT_RULES.get(definition.modifier_key)
+        rule = EQUIPMENT_EFFECT_RULES.get(item_key)
         if rule is not None:
             immune.update(rule.immune)
     return frozenset(immune)
@@ -904,13 +939,13 @@ def equipment_weapon_multiplier(entity: Any) -> float:
         defn = ITEM_REGISTRY.get(main_key)
         if defn is None or defn.equipment_slot not in (EquipmentSlot.WEAPON_MAIN, EquipmentSlot.WEAPON_OFF):
             return 1.0
-        rule = EQUIPMENT_EFFECT_RULES.get(defn.modifier_key)
+        rule = EQUIPMENT_EFFECT_RULES.get(main_key)
         return float(rule.weapon_damage_multiplier) if rule is not None else 1.0
     off_key = equipment.get("weapon_off")
     if off_key is not None:
         defn = ITEM_REGISTRY.get(off_key)
         if defn is not None and defn.equipment_slot in (EquipmentSlot.WEAPON_MAIN, EquipmentSlot.WEAPON_OFF):
-            rule = EQUIPMENT_EFFECT_RULES.get(defn.modifier_key)
+            rule = EQUIPMENT_EFFECT_RULES.get(off_key)
             return float(rule.weapon_damage_multiplier) if rule is not None else 1.0
     return 1.0
 
@@ -993,9 +1028,9 @@ def attached_buff_instances(
 
     def collect(item_key: str) -> None:
         definition = ITEM_REGISTRY.get(item_key)
-        if definition is None or definition.modifier_key is None:
+        if definition is None:
             return
-        rule = EQUIPMENT_EFFECT_RULES.get(definition.modifier_key)
+        rule = EQUIPMENT_EFFECT_RULES.get(item_key)
         if rule is None or not rule.attached_buffs:
             return
         for buff_key in rule.attached_buffs:
@@ -1019,7 +1054,7 @@ def declared_attachment(instance_key: str) -> tuple[str, str] | None:
     definition = ITEM_REGISTRY.get(item_key)
     if definition is None or definition.equipment_slot is None:
         return None
-    rule = EQUIPMENT_EFFECT_RULES.get(definition.modifier_key)
+    rule = EQUIPMENT_EFFECT_RULES.get(item_key)
     if rule is None or buff_key not in rule.attached_buffs:
         return None
     return buff_key, item_key
@@ -1034,7 +1069,7 @@ def condition_equipment_inputs(
     for item_key in _worn_item_keys(equipment):
         definition = ITEM_REGISTRY[item_key]
         labels[item_key] = definition.display_name_zh
-        rule = EQUIPMENT_EFFECT_RULES.get(definition.modifier_key)
+        rule = EQUIPMENT_EFFECT_RULES.get(item_key)
         if rule is not None and rule.exposure_bias:
             biases[item_key] = rule.exposure_bias
     return labels, biases
@@ -1081,9 +1116,9 @@ def equipment_adjustment_text(item_key: str) -> str:
     keys, and entries with nothing displayable all return ``""``.
     """
     definition = ITEM_REGISTRY.get(item_key)
-    if definition is None or definition.modifier_key is None:
+    if definition is None:
         return ""
-    rule = EQUIPMENT_EFFECT_RULES.get(definition.modifier_key)
+    rule = EQUIPMENT_EFFECT_RULES.get(item_key)
     if rule is None:
         return ""
     segments: list[str] = []

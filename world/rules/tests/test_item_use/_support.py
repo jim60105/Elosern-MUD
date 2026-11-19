@@ -201,8 +201,10 @@ _WARDEN = make_item(
     _WARDEN_KEY,
     display_name_zh="合成守護吊飾",
     equipment_slot=EquipmentSlot.ACCESSORY,
-    modifier_key=immune_to_key("poisoned"),
 )
+# Resolved at import, while the shipped rulebook is the live table: a scoped
+# item swap replaces the equipment-rule map with the kit's own keys.
+_WARDEN_RULE = rule_for(immune_to_key("poisoned"))
 
 
 _MULTI_PROFILE = ItemEffectProfile(
@@ -338,3 +340,6 @@ class _MultiEffectTestCase(_ItemUseTestCase):
         super().setUp()
         live_item_registry().update(_SCOPE_MULTI_ITEMS)
         live_item_effect_profiles().update(_SCOPE_MULTI_PROFILES)
+        from world.rules.equipment_effects import EQUIPMENT_EFFECT_RULES
+
+        EQUIPMENT_EFFECT_RULES[_WARDEN_KEY] = _WARDEN_RULE

@@ -1,0 +1,204 @@
+# Item catalogue slice: core items.
+# Each row authors its own definition and its dedicated effects.
+items:
+  - key: meal
+    display_name_zh: 普通餐食
+    price_table_key: meal
+    sellable: true
+    presentation:
+      kind: food
+      icon_key: food
+      rarity: common
+      summary_zh: 供旅人充飢的普通餐食。
+  - key: healing_potion
+    display_name_zh: 治療藥水
+    price_table_key: potion
+    sellable: true
+    presentation:
+      kind: potion
+      icon_key: potion
+      rarity: rare
+      summary_zh: 盛裝於小瓶中的治療藥水。
+    use_mechanics:
+      consumable: true
+      combat_allowed: true
+      effects:
+        - stat: hp
+          amount: 40
+  - key: plain_sword
+    display_name_zh: 普通劍
+    price_table_key: plain_sword
+    sellable: true
+    presentation:
+      kind: weapon
+      icon_key: weapon
+      rarity: common
+      summary_zh: 鍛鐵打造的普通劍。
+    equipment_slot: weapon_main
+    equipment_effects:
+      adjustments:
+        atk_phys: 2
+      weapon_damage_multiplier: 1.05
+  - key: iron_dagger
+    display_name_zh: 鐵短刀
+    price_table_key: mundane_weapon
+    sellable: true
+    presentation:
+      kind: weapon
+      icon_key: weapon
+      rarity: common
+      summary_zh: 王國鍛坊量產的輕便副手短刀。
+    equipment_slot: weapon_off
+    equipment_effects:
+      adjustments:
+        atk_phys: 1
+      weapon_damage_multiplier: 1.05
+  - key: hunting_throwing_axe
+    display_name_zh: 狩獵擲斧
+    price_table_key: mundane_weapon
+    sellable: true
+    presentation:
+      kind: weapon
+      icon_key: weapon
+      rarity: common
+      summary_zh: 獸王國獵手常用的短柄擲斧。
+    equipment_slot: weapon_off
+    equipment_effects:
+      adjustments:
+        atk_phys: 2
+        agility: -1
+      weapon_damage_multiplier: 1.05
+  - key: hunters_longbow
+    display_name_zh: 獵手長弓
+    price_table_key: mundane_weapon
+    sellable: true
+    presentation:
+      kind: weapon
+      icon_key: weapon
+      rarity: uncommon
+      summary_zh: 以獸王國獸材層壓製成的獵用長弓。
+    equipment_slot: weapon_main
+    equipment_effects:
+      adjustments:
+        atk_phys: 4
+        agility: 2
+      weapon_damage_multiplier: 1.1
+  - key: apprentice_focus_staff
+    display_name_zh: 見習術師法杖
+    price_table_key: mundane_weapon
+    sellable: true
+    presentation:
+      kind: tool
+      icon_key: tool
+      rarity: uncommon
+      summary_zh: 帝國魔法學院見習生使用的導魔長杖。
+    equipment_slot: weapon_main
+    equipment_effects:
+      adjustments:
+        magic_power: 4
+        mp_cost: -5%
+      weapon_damage_multiplier: 1.0
+  - key: knight_blade
+    display_name_zh: 騎士制式長劍
+    price_table_key: mundane_weapon
+    sellable: true
+    presentation:
+      kind: weapon
+      icon_key: weapon
+      rarity: uncommon
+      summary_zh: 王國騎士團制式長劍，劍身鍛造紮實。
+    equipment_slot: weapon_main
+    equipment_effects:
+      adjustments:
+        atk_phys: 5
+        defense: 1
+      weapon_damage_multiplier: 1.12
+  - key: wooden_club
+    display_name_zh: 木製棍棒
+    price_table_key: mundane_weapon
+    sellable: true
+    presentation:
+      kind: weapon
+      icon_key: weapon
+      rarity: common
+      summary_zh: 農具房改製的硬木棍棒。
+    equipment_slot: weapon_main
+    equipment_effects:
+      adjustments:
+        atk_phys: 3
+        agility: -2
+      weapon_damage_multiplier: 1.05
+  - key: gilded_saber
+    display_name_zh: 鍍金軍刀
+    price_table_key: mundane_weapon
+    sellable: true
+    presentation:
+      kind: weapon
+      icon_key: weapon
+      rarity: uncommon
+      summary_zh: 貴族隨身佩戴的鍍金細軍刀。
+    equipment_slot: weapon_main
+    equipment_effects:
+      adjustments:
+        atk_phys: 5
+      weapon_damage_multiplier: 1.1
+  - key: great_axe
+    display_name_zh: 雙手巨斧
+    price_table_key: mundane_weapon
+    sellable: true
+    presentation:
+      kind: weapon
+      icon_key: weapon
+      rarity: uncommon
+      summary_zh: 獸人戰士慣用的沉重雙手巨斧。
+    equipment_slot: weapon_main
+    equipment_effects:
+      adjustments:
+        atk_phys: 6
+        agility: -8%
+      weapon_damage_multiplier: 1.12
+  - key: ashen_scimitar
+    display_name_zh: 灰燼彎刀
+    price_table_key: mundane_weapon
+    sellable: true
+    presentation:
+      kind: weapon
+      icon_key: weapon
+      rarity: uncommon
+      summary_zh: 精靈在餘燼之火中鍛成的彎刀。
+    equipment_slot: weapon_main
+    equipment_effects:
+      adjustments:
+        atk_phys: 4
+        agility: 2
+      weapon_damage_multiplier: 1.1
+  - key: steel_fang_dagger
+    display_name_zh: 鋼牙短刀
+    price_table_key: mundane_weapon
+    sellable: true
+    presentation:
+      kind: weapon
+      icon_key: weapon
+      rarity: uncommon
+      summary_zh: 獸人獵手慣用的銳利主手短刀。
+    equipment_slot: weapon_main
+    equipment_effects:
+      adjustments:
+        atk_phys: 4
+        agility: 2
+      weapon_damage_multiplier: 1.1
+  - key: magic_sword
+    display_name_zh: 魔導長劍
+    price_table_key: magic_weapon
+    sellable: true
+    presentation:
+      kind: weapon
+      icon_key: weapon
+      rarity: epic
+      summary_zh: 附魔師把元素精萃注入劍身的魔導劍。
+    equipment_slot: weapon_main
+    equipment_effects:
+      adjustments:
+        atk_phys: 8
+        magic_power: 6
+      weapon_damage_multiplier: 1.2

@@ -7,7 +7,12 @@ from collections.abc import Callable, Iterator, Mapping
 from world.lore.magic import MagicTier
 
 from world.tests.synthetic_data.vocab import _synth_elements
-from world.tests.synthetic_data.data_items import SYNTH_ITEMS, SYNTH_ITEM_EFFECT_PROFILES, SYNTH_PRICES
+from world.tests.synthetic_data.data_items import (
+    SYNTH_EQUIPMENT_EFFECT_RULES,
+    SYNTH_ITEMS,
+    SYNTH_ITEM_EFFECT_PROFILES,
+    SYNTH_PRICES,
+)
 from world.tests.synthetic_data.data_skills import SYNTH_ACTS, SYNTH_MP_COST_TIERS, SYNTH_SKILLS
 from world.tests.synthetic_data.data_characters import (
     SYNTH_MONSTER_TIERS,
@@ -63,6 +68,7 @@ def _content_by_logical() -> dict[str, Callable[[], Mapping[str, object]]]:
     return {
         "items": lambda: SYNTH_ITEMS,
         "item_effect_profiles": lambda: SYNTH_ITEM_EFFECT_PROFILES,
+        "equipment_effect_rules": lambda: SYNTH_EQUIPMENT_EFFECT_RULES,
         "skills": lambda: SYNTH_SKILLS,
         "races": lambda: SYNTH_RACES,
         "static_tiers": lambda: SYNTH_STATIC_TIERS,
@@ -142,6 +148,10 @@ def _synth_sync_capture() -> dict[str, Mapping[str, object]]:
 REGISTRY_TARGETS: dict[str, tuple[str, str]] = {
     "items": ("world.lore.items", "ITEM" + "_REGISTRY"),
     "item_effect_profiles": ("world.rules.item_effects", "ITEM" + "_EFFECT_PROFILES"),
+    "equipment_effect_rules": (
+        "world.rules.equipment_effects",
+        "EQUIPMENT_EFFECT" + "_RULES",
+    ),
     "skills": ("world.skills.registry", "SKILL" + "_REGISTRY"),
     "races": ("world.lore.races", "RACE" + "_REGISTRY"),
     "static_tiers": ("world.lore.races", "STATIC_TIER" + "_REGISTRY"),
@@ -239,6 +249,9 @@ _TARGET_DEPENDENCIES: dict[str, tuple[str, ...]] = {
     # The rulebook-side profiles belong to the same usable-item closure: a
     # scoped item registry must carry its scoped profiles with it.
     "item_effect_profiles": ("items",),
+    # Equipment rules are the second half of every slotted row: a scoped item
+    # registry must carry its scoped equipment rules with it.
+    "equipment_effect_rules": ("items",),
     # The sync capture's content factories read module-level catalogs, so no
     # target must be patched before the capture dict itself is swapped.
     "lore_sync": (),

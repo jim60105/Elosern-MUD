@@ -255,13 +255,10 @@ def _worn_gear(assembly: _Assembly) -> list[tuple[int, str, Any, Any]]:
             raise StatusQueryError(f"worn equipment {item_key!r} is not registry-declared")
         if not definition.display_name_zh:
             raise StatusQueryError(f"equipment {item_key!r} has no display name")
-        modifier_key = definition.modifier_key
-        if modifier_key is None:
-            continue
-        layers = equipment_modifier_layers(modifier_key)
+        layers = equipment_modifier_layers(item_key)
         if layers is None:  # pragma: no cover - loader/registry cross invariant
             raise StatusQueryError(
-                f"equipment {item_key!r} effect rule {modifier_key!r} is missing"
+                f"equipment {item_key!r} effect rule is missing"
             )
         resolved.append((slot_index[slot], item_key, definition, layers))
     resolved.sort(key=lambda entry: (entry[0], entry[1]))

@@ -1,0 +1,219 @@
+# Item catalogue slice: inspect only codex.
+# Each row authors its own definition and its dedicated effects.
+items:
+  - key: kingdom_rye_hardtack
+    display_name_zh: 王國黑麥硬麵包
+    price_table_key: meal
+    sellable: true
+    presentation:
+      kind: food
+      icon_key: food
+      rarity: common
+      summary_zh: 礦工下坑必帶的黑麥硬麵包，耐嚼且扛餓。
+  - key: adventurer_field_ration
+    display_name_zh: 冒險者攜行口糧
+    price_table_key: meal
+    sellable: true
+    presentation:
+      kind: food
+      icon_key: food
+      rarity: common
+      summary_zh: 公會統一配發的壓縮口糧，D 級以下的常見配給。
+  - key: imperial_candied_fruit
+    display_name_zh: 帝國蜜漬果乾
+    price_table_key: specialty_food
+    sellable: true
+    presentation:
+      kind: food
+      icon_key: food
+      rarity: common
+      summary_zh: 東南港口特產的蜜漬水果乾，耐放又香甜。
+  - key: beastfolk_smoked_jerky
+    display_name_zh: 獸王國燻獸肉乾
+    price_table_key: specialty_food
+    sellable: true
+    presentation:
+      kind: food
+      icon_key: food
+      rarity: common
+      summary_zh: 高地獵手以獵物燻製而成的肉乾，蛋白質豐富。
+  - key: harbor_lobster_bisque
+    display_name_zh: 東南港灣龍蝦濃湯
+    price_table_key: specialty_food
+    sellable: true
+    presentation:
+      kind: food
+      icon_key: food
+      rarity: common
+      summary_zh: 港口城市貴族餐廳的招牌濃湯，滋味濃郁。
+  - key: elven_candied_blossom
+    display_name_zh: 精靈蜜漬花蕊
+    price_table_key: specialty_food
+    sellable: true
+    presentation:
+      kind: food
+      icon_key: food
+      rarity: rare
+      summary_zh: 少量流入人類社會的精靈花蕊蜜餞，甜而不膩。
+  - key: miners_bracing_broth
+    display_name_zh: 王國礦工提神湯
+    price_table_key: potion
+    sellable: true
+    presentation:
+      kind: potion
+      icon_key: potion
+      rarity: common
+      summary_zh: 礦工下坑前灌下的辛辣提神湯，效果全憑意志力。
+  - key: beastfolk_herbal_salve
+    display_name_zh: 獸王國藥草膏
+    price_table_key: potion
+    sellable: true
+    presentation:
+      kind: potion
+      icon_key: potion
+      rarity: common
+      summary_zh: 部族薩滿以高地藥草熬製的敷膏，外用居多。
+  - key: passion_draught
+    display_name_zh: 迷情藥
+    price_table_key: potion
+    sellable: true
+    presentation:
+      kind: potion
+      icon_key: potion
+      rarity: uncommon
+      summary_zh: 黑市流傳的催情酊劑，〔飾品〕迷情絲頸環就是浸過這類藥劑製成的；效力溫和，可被意志壓制。
+  - key: spirit_dew
+    display_name_zh: 靈露
+    price_table_key: material
+    sellable: true
+    presentation:
+      kind: potion
+      icon_key: potion
+      rarity: epic
+      summary_zh: 以鮮活精靈體液為藥引，低溫蒸餾出的金色藥劑，以極強的催情效力聞名；傳聞飲下者會在高潮般的熱浪中親眼看著自己的傷口合攏。
+  - key: elven_tear
+    display_name_zh: 精靈之淚
+    price_table_key: material
+    sellable: true
+    presentation:
+      kind: potion
+      icon_key: potion
+      rarity: epic
+      summary_zh: 精靈情緒激動時分泌的稀罕淚珠，鍊金師視為頂級藥引。
+  - key: enchanted_compass
+    display_name_zh: 附魔羅盤
+    price_table_key: tool
+    sellable: true
+    presentation:
+      kind: tool
+      icon_key: tool
+      rarity: uncommon
+      summary_zh: 內嵌小型魔力晶片的羅盤，在迷宮中仍能指出「地表方向」。
+  - key: dungeon_flare_talisman
+    display_name_zh: 迷宮探照符
+    price_table_key: tool
+    sellable: true
+    presentation:
+      kind: tool
+      icon_key: tool
+      rarity: uncommon
+      summary_zh: 一次性符紙，撕開後照亮周遭一小段時間，深層迷宮探索必備。
+  - key: beastfolk_signal_conch
+    display_name_zh: 通訊法螺
+    price_table_key: tool
+    sellable: true
+    presentation:
+      kind: tool
+      icon_key: tool
+      rarity: rare
+      summary_zh: 灌注風屬性魔力後可傳遞短距離語音的巨型海螺。
+  - key: camp_ward_kit
+    display_name_zh: 露營魔導具
+    price_table_key: tool
+    sellable: true
+    presentation:
+      kind: tool
+      icon_key: tool
+      rarity: uncommon
+      summary_zh: 展開後形成小型結界帳篷，隔絕野外的風雨與蟲獸。
+  - key: goblin_ear
+    display_name_zh: 哥布林耳朵
+    price_table_key: material
+    sellable: true
+    presentation:
+      kind: material
+      icon_key: material
+      rarity: common
+      summary_zh: 公會討伐任務常見的證明物，一對耳朵換一份微薄報酬。
+  - key: slime_residue
+    display_name_zh: 史萊姆黏液
+    price_table_key: material
+    sellable: true
+    presentation:
+      kind: material
+      icon_key: material
+      rarity: common
+      summary_zh: 黏稠且帶弱酸性的史萊姆殘留物，煉金坊常見原料。
+  - key: earth_drake_scale
+    display_name_zh: 地龍鱗片
+    price_table_key: material
+    sellable: true
+    presentation:
+      kind: material
+      icon_key: material
+      rarity: rare
+      summary_zh: 地龍蛻下的或討伐後取得的鱗片，質地堅硬耐熱。
+  - key: troll_fang
+    display_name_zh: 巨魔尖牙
+    price_table_key: material
+    sellable: true
+    presentation:
+      kind: material
+      icon_key: material
+      rarity: epic
+      summary_zh: 高階魔獸巨魔的犬齒，質地近乎精鋼。
+  - key: elven_essence
+    display_name_zh: 精靈體液
+    price_table_key: material
+    sellable: true
+    presentation:
+      kind: material
+      icon_key: material
+      rarity: epic
+      summary_zh: 以鎖魔玻璃瓶封存的鮮活精靈體液，蘊含強大魔力與極強催情效力的液態素材；生命力一旦消散就淪為凡液，只有具備保鮮手段的鍊金師敢經手，視為珍寶。
+  - key: ancient_dragon_heart
+    display_name_zh: 古龍心臟
+    price_table_key: material
+    sellable: true
+    presentation:
+      kind: material
+      icon_key: material
+      rarity: legendary
+      summary_zh: 傳說中古龍的心臟，據信是製作神代等級魔法道具的唯一材料，全大陸未有交易紀錄。
+  - key: family_crest_token
+    display_name_zh: 家族信物
+    price_table_key: relic
+    sellable: false
+    presentation:
+      kind: misc
+      icon_key: misc
+      rarity: uncommon
+      summary_zh: 由家族長輩傳下、刻有家紋或圖騰的小型物件，通常是任務或劇情的身分線索。
+  - key: ancient_mystery_key
+    display_name_zh: 謎樣的古老鑰匙
+    price_table_key: relic
+    sellable: false
+    presentation:
+      kind: misc
+      icon_key: misc
+      rarity: rare
+      summary_zh: 造型古樸、無法辨識鎖孔用途的鑰匙，據信與某座已知或未知的迷宮有關。
+  - key: elven_child_toy
+    display_name_zh: 精靈的簡陋玩具
+    price_table_key: relic
+    sellable: false
+    presentation:
+      kind: misc
+      icon_key: misc
+      rarity: common
+      summary_zh: 精靈孩童隨手製作的簡陋玩具。若被外人拾獲，通常代表附近有精靈幼體活動；精靈幼體對其他種族十分危險，因為他們不擅控制力道，也不分是非。

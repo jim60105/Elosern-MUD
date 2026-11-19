@@ -64,6 +64,11 @@ class synthetic_registries(ContextDecorator):
         # carries its rulebook-side profiles automatically.
         if "items" in names and "item_effect_profiles" not in names:
             names.append("item_effect_profiles")
+        # Equipment closure: worn gear resolves its own key in the equipment
+        # rule map, so a scoped item registry must carry scoped equipment
+        # rules with it or the first wear raises on a missing key.
+        if "items" in names and "equipment_effect_rules" not in names:
+            names.append("equipment_effect_rules")
         if include_sync_capture:
             if "lore_sync" not in names:
                 names.append("lore_sync")

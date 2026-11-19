@@ -33,11 +33,11 @@ from world.rules.equipment_effects import (
 from world.rules.status_display import ConditionDisplay
 from world.tests.synthetic_data import make_item, synthetic_registries
 
-from ._equipment_rulebook_probes import unique_rule, rule_for
+from ._equipment_rulebook_probes import unique_rule
 
-# One borrowed rulebook row (fail-fast unique probe) provides the modifier
-# key the synthetic gear binds to; its shipped values are replaced per test.
-_PROBE_MODIFIER, _PROBE_RULE = unique_rule(
+# One shipped rulebook row (fail-fast unique probe) provides a feature-complete
+# rule shape; each synthetic gear row binds its own key to a copy of it.
+_, _PROBE_RULE = unique_rule(
     "attached_buffs", lambda rule: bool(rule.attached_buffs)
 )
 
@@ -53,7 +53,6 @@ _PROSE_ITEM = make_item(
     display_name_zh="琉璃合成盾",
     price_table_key="t_ironbite_steel",
     equipment_slot=EquipmentSlot.ARMOR,
-    modifier_key=_PROBE_MODIFIER,
 )
 _NON_EQUIPMENT = make_item("t_wick_lantern", display_name_zh="合成燭燈")
 _BLADE = make_item(
@@ -61,29 +60,29 @@ _BLADE = make_item(
     display_name_zh="配戴合成刃",
     price_table_key="t_ironbite_steel",
     equipment_slot=EquipmentSlot.WEAPON_MAIN,
-    modifier_key=_PROBE_MODIFIER,
 )
 _CHARM = make_item(
     "t_worn_charm",
     display_name_zh="配戴合成吊飾",
     equipment_slot=EquipmentSlot.ACCESSORY,
-    modifier_key=_PROBE_MODIFIER,
 )
+_RULE_KEYS = (_PROSE_ITEM.key, _BLADE.key, _CHARM.key)
 _SCOPE_EXTRA = {
     "items": {
         _PROSE_ITEM.key: _PROSE_ITEM,
         _NON_EQUIPMENT.key: _NON_EQUIPMENT,
         _BLADE.key: _BLADE,
         _CHARM.key: _CHARM,
-    }
+    },
+    "equipment_effect_rules": {key: _PROBE_RULE for key in _RULE_KEYS},
 }
 
 
 def _patch_rule(rule: EquipmentEffectRule):
-    """Swap the borrowed row's rule for one constructed here."""
+    """Swap each synthetic gear row's rule for one constructed here."""
     return patch.dict(
         "world.rules.equipment_effects.EQUIPMENT_EFFECT_RULES",
-        {_PROBE_MODIFIER: rule},
+        {key: rule for key in _RULE_KEYS},
     )
 
 

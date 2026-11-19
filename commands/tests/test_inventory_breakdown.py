@@ -34,21 +34,17 @@ from world.rules.tests.combat_fixtures import BattlefieldIsolation
 from typeclasses.npcs import NPC
 from world.tests.synthetic_data import make_item, synthetic_registries
 
-# One borrowed rulebook row (fail-fast unique probe) supplies the modifier
-# key the synthetic gear binds to; its rule is replaced with locally authored
-# values for the duration of each test.
-_PROBE_MODIFIER, _PROBE_RULE = unique_rule(
+# One shipped rulebook row (fail-fast unique probe) supplies a rule shape; the
+# synthetic gear binds its own key to a locally authored copy of it.
+_, _PROBE_RULE = unique_rule(
     "attached_buffs", lambda rule: bool(rule.attached_buffs)
 )
 
-# Kit-factory gear bound to the PROBED modifier (the shared kit row binds the
-# enum's first member, which is a different rulebook row).
 _GEAR = make_item(
     "t_bulwark_vest",
     display_name_zh="岩背合成背心",
     price_table_key="t_ironbite_steel",
     equipment_slot=EquipmentSlot.ARMOR,
-    modifier_key=_PROBE_MODIFIER,
 )
 _GEAR_KEY = _GEAR.key
 _GEAR_DISPLAY = _GEAR.display_name_zh
@@ -78,7 +74,7 @@ class InventoryBreakdownHeaderTests(BattlefieldIsolation, EvenniaCommandTest):
         scope.__enter__()
         self.addCleanup(scope.__exit__, None, None, None)
         rule_patch = patch.dict(
-            equipment_effects.EQUIPMENT_EFFECT_RULES, {_PROBE_MODIFIER: _GEAR_RULE}
+            equipment_effects.EQUIPMENT_EFFECT_RULES, {_GEAR_KEY: _GEAR_RULE}
         )
         rule_patch.start()
         self.addCleanup(rule_patch.stop)

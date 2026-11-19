@@ -69,7 +69,6 @@ from world.rules.equipment import (
     plan_inventory_delta,
     toggle_equipment,
 )
-from world.rules.equipment_effects import EQUIPMENT_EFFECT_RULES
 from world.rules.party import join_party, leave_party
 from world.rules.possession import enter_possession, release_possession
 from world.rules.progression import apply_lineage_auto_seed, award_practice_xp
@@ -108,16 +107,14 @@ _ITEM_KEY = next(
 
 def _exposure_accessory() -> tuple[str, int]:
     """The kit's exposure-bias accessory key and its canonical bias magnitude."""
-    biased = {
-        key
-        for key, rule in EQUIPMENT_EFFECT_RULES.items()
-        if rule.exposure_bias > 0
-    }
+    from world.tests.synthetic_data import SYNTH_EQUIPMENT_EFFECT_RULES
+
     for key, row in SYNTH_ITEMS.items():
         if row.equipment_slot is not EquipmentSlot.ACCESSORY:
             continue
-        if row.modifier_key in biased:
-            return key, int(EQUIPMENT_EFFECT_RULES[row.modifier_key].exposure_bias)
+        rule = SYNTH_EQUIPMENT_EFFECT_RULES.get(key)
+        if rule is not None and rule.exposure_bias > 0:
+            return key, int(rule.exposure_bias)
     raise AssertionError("the synthetic kit declares no exposure-bias accessory")
 
 

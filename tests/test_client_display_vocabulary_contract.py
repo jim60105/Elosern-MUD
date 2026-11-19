@@ -50,7 +50,7 @@ def _frozen_map(path: Path, name: str) -> dict[str, str]:
 
 
 class ClientDisplayVocabularyContractTests(unittest.TestCase):
-    def test_every_combat_modifier_key_has_a_readable_name(self):
+    def test_every_combat_modifier_has_a_readable_name(self):
         rules = yaml.safe_load(
             (REPO_ROOT / "world/rules/rulebook/combat_modifiers.yaml").read_text(
                 encoding="utf-8"

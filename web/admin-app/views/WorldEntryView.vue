@@ -109,7 +109,10 @@ watch(() => [props.registry, props.entryKey], load, { immediate: true });
         <p class="gm-world-entry__type">型別 <code class="gm-mono">{{ state.data.type }}</code></p>
       </header>
 
-      <GmProvenanceNote :path="meta.source_path" variant="loaded" />
+      <GmProvenanceNote
+        :path="state.data.source_path || meta.source_path"
+        variant="loaded"
+      />
 
       <nav class="gm-world-entry__anchors" aria-label="條目區塊">
         <a href="#fields">欄位</a>

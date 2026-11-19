@@ -67,6 +67,7 @@ from ._support import (
     _WORN_KIT_SUBRACE,
     _race_key,
     balanced_allocations,
+    equipment_effect_rows,
 )
 from world.tests.start_room_fixture import stub_start_room
 
@@ -98,6 +99,7 @@ from world.tests.start_room_fixture import stub_start_room
             _NEUTRAL_WEAPON.key: _NEUTRAL_WEAPON,
             _PACK_TRINKET.key: _PACK_TRINKET,
         },
+        "equipment_effect_rules": equipment_effect_rows(),
     },
 )
 @patch.dict(
@@ -337,6 +339,7 @@ class CharacterActivationTests(EvenniaTest):
                     _PLATEMAIL_ROW.key: _PLATEMAIL_ROW,
                     _BEADS_ROW.key: _BEADS_ROW,
                 },
+                "equipment_effect_rules": equipment_effect_rows(),
             },
         ):
             allocations = balanced_allocations(_race_key(), _WORN_KIT_SUBRACE.key)

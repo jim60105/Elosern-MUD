@@ -1,0 +1,55 @@
+# Item catalogue slice: guild accessories.
+# Each row authors its own definition and its dedicated effects.
+items:
+  - key: guild_limit_e
+    display_name_zh: 公會 E 級封印環
+    price_table_key: magic_accessory
+    sellable: false
+    presentation:
+      kind: accessory
+      icon_key: accessory
+      rarity: common
+      summary_zh: 公會保管的封印環，供考官在考核時抑制力量。
+    guild_property: true
+    equipment_slot: accessory
+    equipment_effects:
+      adjustments: {}
+  - key: guild_limit_d
+    display_name_zh: 公會 D 級封印環
+    price_table_key: magic_accessory
+    sellable: false
+    presentation:
+      kind: accessory
+      icon_key: accessory
+      rarity: common
+      summary_zh: 公會保管的封印環，供考官在考核時抑制力量。
+    guild_property: true
+    equipment_slot: accessory
+    equipment_effects:
+      adjustments: {}
+  - key: guild_limit_c
+    display_name_zh: 公會 C 級封印環
+    price_table_key: magic_accessory
+    sellable: false
+    presentation:
+      kind: accessory
+      icon_key: accessory
+      rarity: common
+      summary_zh: 公會保管的封印環，供考官在考核時抑制力量。
+    guild_property: true
+    equipment_slot: accessory
+    equipment_effects:
+      adjustments: {}
+  - key: guild_limit_b
+    display_name_zh: 公會 B 級封印環
+    price_table_key: magic_accessory
+    sellable: false
+    presentation:
+      kind: accessory
+      icon_key: accessory
+      rarity: common
+      summary_zh: 公會保管的封印環，供考官在考核時抑制力量。
+    guild_property: true
+    equipment_slot: accessory
+    equipment_effects:
+      adjustments: {}

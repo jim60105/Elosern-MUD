@@ -13,13 +13,13 @@ from typeclasses.npcs import LLMNPC, NPC
 from typeclasses.rooms import Room
 from typeclasses.exits import Exit
 from world.lore.guild_adventurers import GuildAdventurer, ExamQualification
-from world.lore.items import EquipmentModifierKey
 from world.lore.npc_card import NpcCard, NpcCardIdentity
 from world.lore.npc_profiles.shape import NpcProfile, NpcVoiceLines
 from world.lore.settlements.places import PlaceDefinition, PlaceKind
 from world.rules import human_guild_hosts as hosts, npc_schedules as schedules
 from world.rules.action import ActionRequest, ActionResolver
 from world.rules.combat import Battlefield, BattlefieldActionContext
+from world.rules.equipment_effects import EquipmentEffectRule
 from world.rules.party import is_companion, join_party
 from world.rules.progression import can_use_skill
 from world.skills.registry import SkillKind, SkillPrerequisite
@@ -41,12 +41,15 @@ class PersistentHumanGuildHostTests(EvenniaTest):
                                 prerequisites=(SkillPrerequisite("t_host_root", 5),))
         root = make_skill("t_host_root", effects=[], cost={}, prerequisites=())
         passive = make_skill("t_host_passive", kind=SkillKind.PASSIVE, effects=[], cost={}, prerequisites=())
-        modifier_key = next(iter(EquipmentModifierKey))
-        sword = make_item("t_host_sword", equipment_slot=EquipmentSlot.WEAPON_MAIN, modifier_key=modifier_key)
-        armor = make_item("t_host_armor", equipment_slot=EquipmentSlot.ARMOR, modifier_key=modifier_key)
+        sword = make_item("t_host_sword", equipment_slot=EquipmentSlot.WEAPON_MAIN)
+        armor = make_item("t_host_armor", equipment_slot=EquipmentSlot.ARMOR)
         scope = synthetic_registries("items", "skills", "subraces", extra={
             "skills": {row.key: row for row in (root, self.skill, passive)},
             "items": {row.key: row for row in (sword, armor)},
+            "equipment_effect_rules": {
+                row.key: EquipmentEffectRule({}, {}, (), (), 0)
+                for row in (sword, armor)
+            },
             "subraces": {"t_subrace": make_subrace("t_subrace", race_key="human")},
         })
         scope.__enter__()

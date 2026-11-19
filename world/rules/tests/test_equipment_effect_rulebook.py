@@ -14,6 +14,8 @@ from tools.spec_traceability import covers_requirement
 
 import tempfile
 import unittest
+import shutil
+from copy import deepcopy
 from dataclasses import replace
 from pathlib import Path
 from types import MappingProxyType, SimpleNamespace
@@ -22,11 +24,13 @@ import yaml
 
 from world.lore.economy import PRICE_TABLE
 from world.lore.items import (
+    ITEM_EQUIPMENT_EFFECT_INPUTS,
     ITEM_REGISTRY,
-    EquipmentModifierKey,
+    ITEM_SOURCES,
     ItemDefinition,
     ItemRarity,
     LiturgicalRole,
+    load_item_catalog,
 )
 from world.lore.settlements.shops import SHOP_REGISTRY
 from world.skills.equipment import EquipmentSlot
@@ -36,17 +40,89 @@ from world.rules.equipment_effects import (
     EquipmentEffectRule,
     EquipmentEffectsRulebookError,
     equipment_adjustment_text,
-    load_equipment_effect_rules,
+    load_equipment_effect_rules as _production_loader,
     reload_equipment_effect_rules,
     validate_church_doctrine,
-    validate_equipment_effect_rules,
+    validate_equipment_effect_rules as _production_validate,
 )
 
 _CANONICAL_PATH = Path(__file__).parents[1] / "rulebook" / "equipment_effects.yaml"
 
 
+class _ItemKeyVocabulary:
+    """The retired enum's values as plain item keys (the loader's new key type)."""
+
+    APOTHECARY_BEADS = "apothecary_beads"
+    KNIGHT_PLATEMAIL = "knight_platemail"
+    PLAIN_SWORD = "plain_sword"
+    SISTER_VESTMENTS = "sister_vestments"
+    STORAGE_POUCH = "storage_pouch"
+    WOODEN_CLUB = "wooden_club"
+
+    def __new__(cls, value):
+        return value
+
+    def __iter__(cls):
+        for name in (
+            "APOTHECARY_BEADS",
+            "KNIGHT_PLATEMAIL",
+            "PLAIN_SWORD",
+            "SISTER_VESTMENTS",
+            "STORAGE_POUCH",
+            "WOODEN_CLUB",
+        ):
+            yield getattr(cls, name)
+
+
+EquipmentModifierKey = _ItemKeyVocabulary
+
+
+def load_equipment_effect_rules(
+    path=None,
+    registry=None,
+    equipment_effect_inputs=None,
+    buff_definitions=None,
+    sources=None,
+):
+    """Test adapter: accept the legacy budgets+effects document shape."""
+    if equipment_effect_inputs is None and path is not None:
+        candidate = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
+        if isinstance(candidate, dict) and "effects" in candidate:
+            equipment_effect_inputs = candidate.pop("effects")
+            path = _write_rulebook(candidate)
+    return _production_loader(
+        path,
+        registry=registry,
+        equipment_effect_inputs=equipment_effect_inputs,
+        buff_definitions=buff_definitions,
+        sources=sources,
+    )
+
+
+def validate_equipment_effect_rules(
+    document,
+    registry,
+    buff_definitions,
+    equipment_effect_inputs=None,
+    sources=None,
+):
+    """Test adapter: split a legacy document into budgets and inline effects."""
+    if equipment_effect_inputs is None and isinstance(document, dict):
+        equipment_effect_inputs = document.get("effects", {})
+        document = {key: value for key, value in document.items() if key != "effects"}
+    return _production_validate(
+        document,
+        registry,
+        equipment_effect_inputs or {},
+        buff_definitions,
+        sources,
+    )
+
+
 def _canonical_document() -> dict:
-    return yaml.safe_load(_CANONICAL_PATH.read_text(encoding="utf-8"))
+    document = yaml.safe_load(_CANONICAL_PATH.read_text(encoding="utf-8"))
+    document["effects"] = deepcopy(dict(ITEM_EQUIPMENT_EFFECT_INPUTS))
+    return document
 
 
 def _write_rulebook(document: dict) -> Path:
@@ -54,6 +130,24 @@ def _write_rulebook(document: dict) -> Path:
     yaml.safe_dump(document, handle, allow_unicode=True)
     handle.close()
     return Path(handle.name)
+
+
+def _split_document(document: dict) -> tuple[Path, dict]:
+    """Write the shared budgets and return the inline effects candidate."""
+    effects = document.get("effects", {})
+    budgets = {key: value for key, value in document.items() if key != "effects"}
+    return _write_rulebook(budgets), effects
+
+
+def _load_document(document: dict, registry=None) -> dict:
+    """Load one document, accepting the legacy budgets+effects test shape."""
+    path, effects = _split_document(document)
+    return _production_loader(
+        path,
+        registry=registry,
+        equipment_effect_inputs=effects,
+        buff_definitions=BUFF_DEFINITIONS,
+    )
 
 
 class EquipmentEffectRulebookTests(unittest.TestCase):
@@ -82,7 +176,7 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
         self.assertEqual(
             set(loaded),
             {
-                definition.modifier_key
+                definition.key
                 for definition in ITEM_REGISTRY.values()
                 if definition.equipment_slot is not None
             },
@@ -240,18 +334,27 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
         # the assertion pins the loader's duplicate-key diagnostic: without
         # it, a regressed guard could still "pass" via a later schema error.
         for text in (
-            "budgets: {}\neffects: {}\nbudgets: {}\n",
-            "budgets: {}\neffects:\n"
-            "  wooden_club: {adjustments: {atk_phys: 1}}\n"
-            "  wooden_club: {adjustments: {atk_phys: 2}}\n",
-            "budgets: {}\neffects:\n"
-            "  wooden_club:\n"
-            "    adjustments: {atk_phys: 1, atk_phys: 2}\n",
+            "budgets: {}\nbudgets: {}\n",
+            "budgets:\n  common: {flat: 1, flat: 2}\n",
         ):
             with self.subTest(text=text):
                 with self.assertRaises(EquipmentEffectsRulebookError) as caught:
-                    load_equipment_effect_rules(self._write_raw(text))
+                    _production_loader(self._write_raw(text))
                 self.assertIn("duplicate YAML mapping key", str(caught.exception))
+
+    def test_retired_per_item_section_names_the_shared_file(self):
+        root = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, root, True)
+        source = root / "equipment_effects.yaml"
+        source.write_text(
+            "budgets: {}\neffects:\n  wooden_club: {}\n",
+            encoding="utf-8",
+        )
+        with self.assertRaises(EquipmentEffectsRulebookError) as caught:
+            _production_loader(source)
+        message = str(caught.exception)
+        self.assertIn("equipment_effects.yaml", message)
+        self.assertIn("budgets", message)
 
     # --- budgets ------------------------------------------------------------------
 
@@ -608,31 +711,29 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
     @covers_requirement(
         "equipment-effects::equipment-items-bind-one-to-one-to-a-closed-effect-identity"
     )
-    def test_duplicate_modifier_binding_is_rejected(self):
-        # Borrowing another item's binding is the hijack this guards: the
-        # load-time identity rule (value must equal the item's own key)
-        # rejects it first; the post-loop collapse check remains as
-        # defence in depth. Unreachable through the production dict either
-        # way, so the injectable seam carries the case.
+    def test_unbound_entry_without_a_row_is_rejected(self):
+        # A second effects source for one item is unreachable through the
+        # production candidate (one row owns its entry); the injectable seam
+        # carries the case: an entry with no row is an orphan, never a
+        # second binding.
         registry, document = self._two_entry_setup()
-        registry["iron_shield"] = replace(
-            ITEM_REGISTRY["iron_shield"],
-            modifier_key=EquipmentModifierKey.WOODEN_CLUB,
-        )
-        with self.assertRaises(EquipmentEffectsRulebookError):
+        document["effects"]["synthetic_orphan"] = {"adjustments": {}}
+        with self.assertRaises(EquipmentEffectsRulebookError) as caught:
             self._validate(registry, document)
+        self.assertIn("synthetic_orphan", str(caught.exception))
 
     @covers_requirement(
         "equipment-effects::equipment-items-bind-one-to-one-to-a-closed-effect-identity"
     )
-    def test_non_equipment_with_modifier_key_is_rejected(self):
-        # Construction validation normally bars this shape; the loader
-        # re-checks defensively. A frozen dataclass cannot be replaced into
-        # the shape, so the synthetic registry row is a bare namespace.
+    def test_non_equipment_with_an_inline_entry_is_rejected(self):
+        # A non-equipment row carrying effects is a second source of equipment
+        # effects; the loader rejects it rather than publishing a profile.
         registry, document = self._two_entry_setup()
-        registry["meal"] = SimpleNamespace(equipment_slot=None, modifier_key="meal")
-        with self.assertRaises(EquipmentEffectsRulebookError):
+        registry["meal"] = ITEM_REGISTRY["meal"]
+        document["effects"]["meal"] = {"adjustments": {}}
+        with self.assertRaises(EquipmentEffectsRulebookError) as caught:
             self._validate(registry, document)
+        self.assertIn("meal", str(caught.exception))
 
     @covers_requirement(
         "equipment-effects::per-rarity-budgets-mechanically-bound-every-authored-value"
@@ -697,14 +798,10 @@ class EquipmentRosterCoverageTests(unittest.TestCase):
             for definition in ITEM_REGISTRY.values()
             if definition.equipment_slot is not None
         }
-        enum_values = {member.value for member in EquipmentModifierKey}
-        self.assertEqual(equipment_keys, enum_values)
-        self.assertEqual(enum_values, set(EQUIPMENT_EFFECT_RULES))
-        for member in EquipmentModifierKey:
-            self.assertEqual(member.value, member.name.lower())
+        self.assertEqual(equipment_keys, set(EQUIPMENT_EFFECT_RULES))
         for definition in ITEM_REGISTRY.values():
             if definition.equipment_slot is not None:
-                self.assertEqual(definition.modifier_key.value, definition.key)
+                self.assertIn(definition.key, EQUIPMENT_EFFECT_RULES)
 
     @covers_requirement(
         "equipment-effects::equipment-membership-and-stocking-are-authored-data"
@@ -721,10 +818,9 @@ class EquipmentRosterCoverageTests(unittest.TestCase):
         for key in sorted(registered):
             with self.subTest(item=key):
                 definition = ITEM_REGISTRY[key]
-                self.assertEqual(definition.modifier_key.value, key)
                 self.assertIsInstance(definition.sellable, bool)
                 self.assertIn(definition.price_table_key, PRICE_TABLE)
-                self.assertIn(definition.modifier_key, EQUIPMENT_EFFECT_RULES)
+                self.assertIn(key, EQUIPMENT_EFFECT_RULES)
 
     @covers_requirement(
         "equipment-effects::equipment-membership-and-stocking-are-authored-data"
@@ -750,7 +846,7 @@ class EquipmentRosterCoverageTests(unittest.TestCase):
         for item_key in unstocked:
             with self.subTest(item=item_key):
                 self.assertIn(
-                    ITEM_REGISTRY[item_key].modifier_key, EQUIPMENT_EFFECT_RULES
+                    item_key, EQUIPMENT_EFFECT_RULES
                 )
 
     @covers_requirement(
@@ -1090,12 +1186,14 @@ class ChurchDoctrineTests(unittest.TestCase):
             key="t_synth_vestment",
             liturgical_role=LiturgicalRole.VESTMENT_OR_EMBLEM,
         )
-        # Covered with the shipped rule ...
-        validate_church_doctrine(registry, EQUIPMENT_EFFECT_RULES)
+        # Covered with the shipped rule rebound under the synthetic key ...
+        covered = dict(EQUIPMENT_EFFECT_RULES)
+        covered["t_synth_vestment"] = covered["sister_vestments"]
+        validate_church_doctrine(registry, covered)
         # ... and rejected the moment its own entry breaks the obligation.
-        broken = dict(EQUIPMENT_EFFECT_RULES)
-        broken[EquipmentModifierKey.SISTER_VESTMENTS] = replace(
-            EQUIPMENT_EFFECT_RULES[EquipmentModifierKey.SISTER_VESTMENTS],
+        broken = dict(covered)
+        broken["t_synth_vestment"] = replace(
+            covered["t_synth_vestment"],
             adjustments=MappingProxyType({}),
             immune=(),
         )
@@ -1118,7 +1216,7 @@ class ChurchDoctrineTests(unittest.TestCase):
         rules = {
             key: rule
             for key, rule in EQUIPMENT_EFFECT_RULES.items()
-            if key is not EquipmentModifierKey.SISTER_VESTMENTS
+            if key != EquipmentModifierKey.SISTER_VESTMENTS
         }
         with self.assertRaises(EquipmentEffectsRulebookError) as caught:
             validate_church_doctrine(registry, rules)
@@ -1210,9 +1308,7 @@ class ShippedWeaponFactorContractTests(unittest.TestCase):
                 self.assertLessEqual(factor, budgets["weapon_multiplier"])
                 # The loaded declaration is the authored one, never a default.
                 self.assertEqual(
-                    EQUIPMENT_EFFECT_RULES[
-                        definition.modifier_key
-                    ].weapon_damage_multiplier,
+                    EQUIPMENT_EFFECT_RULES[definition.key].weapon_damage_multiplier,
                     float(factor),
                 )
                 physical = entry.get("adjustments", {}).get("atk_phys", 0) > 0
@@ -1276,11 +1372,11 @@ class MilitaryAuthoringContractTests(unittest.TestCase):
                 with self.subTest(item=key):
                     item = ITEM_REGISTRY[key]
                     self.assertEqual(item.equipment_slot, slot)
-                    self.assertEqual(item.modifier_key.value, key)
+                    self.assertIn(key, EQUIPMENT_EFFECT_RULES)
                     self.assertIsInstance(item.presentation.rarity, ItemRarity)
                     self.assertTrue(item.sellable)
                     adjustments = dict(
-                        EQUIPMENT_EFFECT_RULES[item.modifier_key].adjustments
+                        EQUIPMENT_EFFECT_RULES[key].adjustments
                     )
                     self.assertIn(stat, adjustments)
                     self.assertTrue(
@@ -1401,8 +1497,8 @@ class MilitaryRuntimeSmokeTests(EvenniaTest):
                 self.assertEqual(
                     parse_merchant_stock(merchant)[key], offer.initial_stock - 1
                 )
-            sword_rule = EQUIPMENT_EFFECT_RULES[ITEM_REGISTRY[keys[0]].modifier_key]
-            armor_rule = EQUIPMENT_EFFECT_RULES[ITEM_REGISTRY[keys[1]].modifier_key]
+            sword_rule = EQUIPMENT_EFFECT_RULES[keys[0]]
+            armor_rule = EQUIPMENT_EFFECT_RULES[keys[1]]
             for entity in (player, wearer):
                 entity.db.inventory = list(keys)
                 for key in keys:
@@ -1558,6 +1654,112 @@ class GuildRestrictionAuthoredKitTests(EvenniaTest):
             self.assertFalse(ITEM_REGISTRY[profile.accessory].sellable)
             self.assertTrue(ITEM_REGISTRY[profile.accessory].guild_property)
             self.assertTrue(all(profile.accessory not in shop.offered_item_keys for shop in SHOP_REGISTRY.values()))
+
+
+_APPENDED_EQUIPMENT = {
+    "key": "t_append_harness",
+    "display_name_zh": "合成驗證護甲",
+    "price_table_key": "t_ironbite_steel",
+    "sellable": True,
+    "presentation": {
+        "kind": "armor",
+        "icon_key": "armor",
+        "rarity": "common",
+        "summary_zh": "供作者流程驗證使用的合成護甲。",
+    },
+    "equipment_slot": "armor",
+    "equipment_effects": {"adjustments": {"defense": 2}},
+}
+_CONTROL_EQUIPMENT = {
+    **_APPENDED_EQUIPMENT,
+    "key": "t_append_harness_b",
+    "display_name_zh": "合成驗證護甲乙",
+    "equipment_effects": {"adjustments": {"defense": 3}},
+}
+
+
+def _temp_equipment_catalog() -> Path:
+    """Copy the shipped catalog into a temp dir and append two slotted rows."""
+    root = Path(tempfile.mkdtemp())
+    target = root / "items"
+    shutil.copytree(Path(__file__).resolve().parents[3] / "content" / "items", target)
+    manifest = yaml.safe_load((target / "catalog.yaml").read_text(encoding="utf-8"))
+    listed = target / manifest["files"][0]
+    document = yaml.safe_load(listed.read_text(encoding="utf-8"))
+    document["items"].extend((_APPENDED_EQUIPMENT, _CONTROL_EQUIPMENT))
+    listed.write_text(
+        yaml.safe_dump(document, allow_unicode=True, sort_keys=False),
+        encoding="utf-8",
+    )
+    return target
+
+
+class AppendedEquipmentAcceptanceTests(EvenniaTest):
+    """Task 1.4: a newly authored slotted row applies its own worn effect."""
+
+    @covers_requirement(
+        "equipment-effects::equipment-items-bind-one-to-one-to-a-closed-effect-identity"
+    )
+    def test_appended_rows_load_and_resolve_their_own_worn_effects(self):
+        from evennia.objects.models import ObjectDB
+        from evennia.utils.create import create_object
+        from typeclasses.characters import PlayerCharacter
+        from world.rules.equipment_effects import equipment_adjustments
+        from world.rules.tests._combat_session_helpers import open_synthetic_scope
+
+        root = _temp_equipment_catalog()
+        self.addCleanup(shutil.rmtree, root, True)
+        catalog = load_item_catalog(root)
+        loaded = load_equipment_effect_rules(
+            registry=catalog.definitions,
+            equipment_effect_inputs=catalog.equipment_effect_inputs,
+            sources=catalog.sources,
+        )
+        self.assertEqual(
+            dict(loaded[_APPENDED_EQUIPMENT["key"]].adjustments), {"defense": 2}
+        )
+        self.assertEqual(
+            dict(loaded[_CONTROL_EQUIPMENT["key"]].adjustments), {"defense": 3}
+        )
+        open_synthetic_scope(
+            self,
+            "items",
+            extra={
+                "items": dict(catalog.definitions),
+                "equipment_effect_rules": dict(loaded),
+            },
+        )
+
+        readings = {}
+        for row in (_APPENDED_EQUIPMENT, _CONTROL_EQUIPMENT):
+            actor = create_object(PlayerCharacter, key=f"acceptance {row['key']}")
+            actor.race = "human"
+            actor.apply_race_baseline()
+            legacy = {
+                "weapon_main": None,
+                "weapon_off": None,
+                "armor": row["key"],
+                "accessories": [],
+            }
+            actor.db.equipment = dict(legacy)
+            actor.save()
+            ObjectDB.flush_instance_cache(force=True)
+            fresh = PlayerCharacter.objects.get(pk=actor.pk)
+            self.assertIsNot(fresh, actor)
+            readings[row["key"]] = (
+                dict(equipment_adjustments(fresh)),
+                dict(fresh.db.equipment),
+            )
+        self.assertEqual(readings[_APPENDED_EQUIPMENT["key"]][0]["defense"], 2)
+        self.assertEqual(readings[_CONTROL_EQUIPMENT["key"]][0]["defense"], 3)
+        self.assertEqual(
+            readings[_APPENDED_EQUIPMENT["key"]][1]["armor"],
+            _APPENDED_EQUIPMENT["key"],
+        )
+        self.assertEqual(
+            readings[_CONTROL_EQUIPMENT["key"]][1]["armor"],
+            _CONTROL_EQUIPMENT["key"],
+        )
 
 
 if __name__ == "__main__":

@@ -8,19 +8,19 @@ rulebook that binds an ordered effect list to each usable item key at startup.
 ## Requirements
 
 ### Requirement: A usable item's effects are an ordered list bound by item key
-The item-effect rulebook SHALL bind an ordered list of one or more effects to each usable item, keyed
-by the item's own registry key. The item registry SHALL declare only whether an item is usable and how
-it behaves when used (consumable, combat permission); it SHALL NOT carry any effect identity,
-magnitude, stat, scope, or status name. List order SHALL be application order.
+A usable item SHALL author its non-empty effect list alongside its consumption and combat-use flags. The runtime mechanics flags SHALL remain separate from the effect profile, resolved by the item's own key. List order SHALL be application order and non-combat use time SHALL remain a shared setting.
 
 #### Scenario: A registry definition carries no effect identity
-- **WHEN** a usable item's registry definition is inspected
-- **THEN** it carries a consumable flag and a combat-use permission and nothing that names an effect,
-  a magnitude, a stat, or a status
+- **WHEN** a usable authored row is loaded as a definition and an effect profile
+- **THEN** the use-mechanics view contains its two flags with no separate effect ID or parameters; effect resolution finds the profile by the definition's item key
 
 #### Scenario: One item declares several effects applied in order
-- **WHEN** an item whose rulebook entry lists two effects is used successfully
-- **THEN** both are applied, in the order the list declares
+- **WHEN** a row lists two order-sensitive effects and the item is used successfully
+- **THEN** both apply in authored order for that item
+
+#### Scenario: Item row edits do not select a different use duration
+- **WHEN** two usable items declare different effects
+- **THEN** a successful non-combat use of either charges the same separately configured time cost
 
 ### Requirement: Each effect declares exactly one verb
 Every effect entry SHALL carry exactly one of three verbs: a stat adjustment (a stat name plus a
@@ -87,21 +87,19 @@ status removal SHALL accept either a concrete status definition key or one of th
 - **THEN** rulebook validation fails and the server does not start
 
 ### Requirement: The rulebook and the registry align exactly at startup
-The set of item keys the effect rulebook declares SHALL equal exactly the set of registry keys whose
-definition is usable. An entry for an item that is not usable, or a usable item with no entry, SHALL
-fail validation at startup rather than at first use. Every entry SHALL declare at least one effect.
+All and only usable item rows SHALL contribute a use profile at startup. A missing, empty, or invalid use-effect list on a usable item, or a use-effect list on any other item, SHALL reject the catalog before gameplay.
 
 #### Scenario: An orphan rulebook entry fails startup
-- **WHEN** the rulebook declares effects for an item key whose registry definition is not usable
-- **THEN** validation fails and the server does not start
+- **WHEN** an item that does not declare use mechanics supplies use effects
+- **THEN** validation rejects the item before gameplay
 
 #### Scenario: A usable item with no rulebook entry fails startup
-- **WHEN** a registry definition is usable but the rulebook declares no entry for its key
-- **THEN** validation fails and the server does not start
+- **WHEN** an item declares use mechanics but omits its effect list or sets it to null
+- **THEN** validation rejects the item before gameplay
 
 #### Scenario: An empty effect list fails startup
-- **WHEN** a rulebook entry declares an empty effect list
-- **THEN** validation fails and the server does not start
+- **WHEN** a usable item declares an empty effect list
+- **THEN** validation rejects the item before gameplay
 
 ### Requirement: An effect's scope is fixed by the rulebook and maps to one targeting requirement
 Every effect SHALL declare one scope from the closed vocabulary: the acting entity, one other entity,

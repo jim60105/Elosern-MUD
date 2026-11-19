@@ -22,7 +22,7 @@ from evennia.utils import create
 from evennia.utils.test_resources import EvenniaTest
 from typeclasses.characters import PlayerCharacter
 from typeclasses.npcs import NPC
-from world.lore.items import EquipmentModifierKey, EquipmentSlot
+from world.lore.items import EquipmentSlot
 from world.rules.affinity_config import AffinityConfig, AffinityStage
 from world.rules.buffs import apply_buff
 from world.rules.equipment_effects import EquipmentEffectRule
@@ -376,13 +376,11 @@ _ATTACK_BASE = 20
 #: covers all three layer sources, not only ``skill`` and ``condition``.
 _GEAR_KEY = "t_gm_frac_gear"
 _GEAR_LABEL = "合成護符"
-_GEAR_MODIFIER = tuple(EquipmentModifierKey)[1]
 _GEAR_FLAT = 3
 _GEAR = make_item(
     _GEAR_KEY,
     display_name_zh=_GEAR_LABEL,
     equipment_slot=EquipmentSlot.ACCESSORY,
-    modifier_key=_GEAR_MODIFIER,
 )
 _GEAR_RULE = EquipmentEffectRule(
     adjustments={"defense": _GEAR_FLAT},
@@ -451,7 +449,7 @@ def _open_fractional_scope(case) -> None:
     stack.enter_context(
         patch(
             "world.rules.equipment_effects.EQUIPMENT_EFFECT_RULES",
-            {_GEAR_MODIFIER: _GEAR_RULE},
+            {_GEAR_KEY: _GEAR_RULE},
         )
     )
     stack.enter_context(

@@ -28,7 +28,6 @@ from world.rules.economy import TradeReason
 from world.rules.economy import buy
 from world.rules.economy import parse_merchant_stock
 from world.rules.guild_economy import sync_service_content
-from world.lore.items.vocab import EquipmentModifierKey
 from ._support import (
     ServiceContentIsolation,
     _items,
@@ -369,11 +368,18 @@ class CiaranVillageCommerceTests(ServiceContentIsolation, EvenniaTestCase):
         # per-shop overlap rule depends on it — and the offer row travelled
         # verbatim: the price the collector's shelf carried is the price
         # the adornment-maker's shelf carries.
+        from world.rules.equipment_effects import EQUIPMENT_EFFECT_RULES
+
+        moved_key = next(
+            key
+            for key, rule in EQUIPMENT_EFFECT_RULES.items()
+            if dict(rule.adjustments) == {"pleasure_gain": "+15%", "sp_cost": "-8%"}
+        )
         village_offers = [
             offer
             for config in self._village_shops().values()
             for offer in config.offers
-            if offer.item_key == EquipmentModifierKey.CRESCENT_EARRING.value
+            if offer.item_key == moved_key
         ]
         self.assertEqual(len(village_offers), 1, "village shops disagree on the earring")
         offer = village_offers[0]

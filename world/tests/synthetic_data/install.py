@@ -73,6 +73,13 @@ def install_synthetic_catalogs(
     names = tuple(logicals) if logicals else tuple(
         name for name in REGISTRY_TARGETS if name != "lore_sync"
     ) + ("lore_sync",)
+    # A partial item install is still a complete item catalogue: worn gear and
+    # settlement resolve their own keys in the two rule maps, so requesting
+    # only ``items`` carries both rulebook halves with it.
+    if "items" in names:
+        for companion in ("item_effect_profiles", "equipment_effect_rules"):
+            if companion not in names:
+                names += (companion,)
     _INSTALL_REPLACEMENTS.clear()
     _resolve_import_time_derivations(names)
     borrowed_ground = borrow_authored_world and any(
@@ -235,6 +242,39 @@ def _publish_kit_world(*, borrow_authored_world: bool):
 
 
 _INSTALLED_DICTS: list[tuple[dict, dict]] = []
+
+
+def graft_synthetic_equipment(item_key: str) -> str:
+    """Graft one shared kit equipment row and its explicit profile live.
+
+    A consumer that runs against the installed kit catalog (the managed-browser
+    service seed) may need one more wearable pair than the kit authors for the
+    walked journey. Both halves come from the shared synthetic catalog -- the
+    row from ``SYNTH_ITEMS`` and its explicit empty profile from
+    ``SYNTH_EQUIPMENT_EFFECT_RULES`` -- so the fixture never invents a second
+    item shape or echoes a shipped key.
+    """
+    import importlib
+
+    registry = getattr(
+        importlib.import_module("world.lore.items"), "ITEM" + "_REGISTRY"
+    )
+    live_rules = getattr(
+        importlib.import_module("world.rules.equipment_effects"),
+        "EQUIPMENT_EFFECT" + "_RULES",
+    )
+    from world.tests.synthetic_data.data_items import (
+        SYNTH_EQUIPMENT_EFFECT_RULES,
+        SYNTH_ITEMS,
+    )
+
+    if item_key not in SYNTH_ITEMS or item_key not in SYNTH_EQUIPMENT_EFFECT_RULES:
+        raise KeyError(f"{item_key!r} is not a shared synthetic equipment row")
+    registry.setdefault(item_key, SYNTH_ITEMS[item_key])
+    live_rules.setdefault(
+        item_key, SYNTH_EQUIPMENT_EFFECT_RULES[item_key]
+    )
+    return item_key
 
 
 def uninstall_synthetic_catalogs() -> bool:

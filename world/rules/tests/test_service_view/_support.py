@@ -19,7 +19,6 @@ from typeclasses.components import GuildExamReception, GuildStaff, Merchant
 
 
 from world.lore.items import (
-    EquipmentModifierKey,
     ItemDefinition,
     ItemIconKey,
     ItemKind,

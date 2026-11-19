@@ -10,7 +10,6 @@ from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from world.lore.items import (
-    EquipmentModifierKey,
     ItemDefinition,
     ItemIconKey,
     ItemKind,
@@ -18,7 +17,11 @@ from world.lore.items import (
     ItemRarity,
 )
 from world.rules.equipment import toggle_equipment
-from world.rules.equipment_effects import equipment_adjustments, equipment_pleasure_gain
+from world.rules.equipment_effects import (
+    EquipmentEffectRule,
+    equipment_adjustments,
+    equipment_pleasure_gain,
+)
 from world.skills.equipment import (
     ACCESSORY_MAX_SLOTS,
     EquipmentSlot,
@@ -42,8 +45,22 @@ def _fixture_definition(key: str, slot: EquipmentSlot) -> ItemDefinition:
         sellable=False,
         presentation=replace(_PRESENTATION, kind=ItemKind.WEAPON if slot is EquipmentSlot.WEAPON_MAIN else _PRESENTATION.kind),
         equipment_slot=slot,
-        modifier_key=EquipmentModifierKey.PLAIN_SWORD,
     )
+
+
+_EMPTY_RULE = EquipmentEffectRule({}, {}, (), (), 0)
+#: Fixture rows whose tests observe a specific authored magnitude.
+_FIXTURE_RULES = {
+    "t_unstocked_staff": EquipmentEffectRule(
+        {"atk_phys": 3, "agility": -2}, {}, (), (), 0
+    ),
+    "t_pleasure_ring_a": EquipmentEffectRule(
+        {"pleasure_gain": "+10%"}, {}, (), (), 0
+    ),
+    "t_pleasure_ring_b": EquipmentEffectRule(
+        {"pleasure_gain": "+5%"}, {}, (), (), 0
+    ),
+}
 
 
 def _items(*definitions: ItemDefinition):
@@ -53,7 +70,13 @@ def _items(*definitions: ItemDefinition):
     the scope, so no fixture shadows a shipped item.
     """
     return synthetic_registries(
-        "items", extra={"items": {d.key: d for d in definitions}}
+        "items",
+        extra={
+            "items": {d.key: d for d in definitions},
+            "equipment_effect_rules": {
+                d.key: _FIXTURE_RULES.get(d.key, _EMPTY_RULE) for d in definitions
+            },
+        },
     )
 
 
@@ -205,7 +228,6 @@ class EquipmentHandlerTests(EvenniaTestCase):
             sellable=True,
             presentation=_PRESENTATION,
             equipment_slot=EquipmentSlot.WEAPON_MAIN,
-            modifier_key=EquipmentModifierKey.WOODEN_CLUB,
         )
     )
     def test_unstocked_equipment_item_equips_and_applies_adjustments(self):
@@ -229,7 +251,6 @@ class EquipmentHandlerTests(EvenniaTestCase):
             sellable=True,
             presentation=_PRESENTATION,
             equipment_slot=EquipmentSlot.ACCESSORY,
-            modifier_key=EquipmentModifierKey.PILGRIM_MEDALLION,
         ),
         ItemDefinition(
             key="t_pleasure_ring_b",
@@ -238,7 +259,6 @@ class EquipmentHandlerTests(EvenniaTestCase):
             sellable=True,
             presentation=_PRESENTATION,
             equipment_slot=EquipmentSlot.ACCESSORY,
-            modifier_key=EquipmentModifierKey.SILVER_HAIRPIN,
         ),
     )
     def test_multiple_accessories_with_pleasure_gain_stack_adjustments(self):

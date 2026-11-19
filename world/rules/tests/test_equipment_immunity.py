@@ -44,15 +44,19 @@ _PENDANT = make_item(
     "t_warden_medallion",
     display_name_zh="合成守護吊飾",
     equipment_slot=EquipmentSlot.ACCESSORY,
-    modifier_key=_POISON_IMMUNE_KEY,
 )
 _BROOCH = make_item(
     "t_steadfast_brooch",
     display_name_zh="合成無畏胸針",
     equipment_slot=EquipmentSlot.ACCESSORY,
-    modifier_key=_FEAR_IMMUNE_KEY,
 )
-_SCOPE_EXTRA = {"items": {_PENDANT.key: _PENDANT, _BROOCH.key: _BROOCH}}
+_SCOPE_EXTRA = {
+    "items": {_PENDANT.key: _PENDANT, _BROOCH.key: _BROOCH},
+    "equipment_effect_rules": {
+        _PENDANT.key: rule_for(_POISON_IMMUNE_KEY),
+        _BROOCH.key: rule_for(_FEAR_IMMUNE_KEY),
+    },
+}
 
 
 def _entity():

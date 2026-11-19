@@ -126,16 +126,12 @@ def graft_synth_exam_host_policies() -> None:
 
     weapon, armor = first_item(EquipmentSlot.WEAPON_MAIN), first_item(EquipmentSlot.ARMOR)
     if armor is None:
-        # The kit authors no armor row; the exam kit needs a real wearable
-        # pair, so graft one authored synthetic armor into the live registry.
-        from world.lore.items import EquipmentModifierKey
-        from world.tests.synthetic_data import make_item
+        # The live registry has no armor row; the exam kit needs a real
+        # wearable pair, so graft the shared synthetic catalog's armor row
+        # together with its explicit empty effect profile.
+        from world.tests.synthetic_data import graft_synthetic_equipment
 
-        armor = "t_synth_exam_armor"
-        ITEM_REGISTRY.setdefault(armor, make_item(
-            armor, equipment_slot=EquipmentSlot.ARMOR,
-            modifier_key=EquipmentModifierKey.LEATHER_ARMOR,
-        ))
+        armor = graft_synthetic_equipment("t_exam_armor")
     guild_exam_restrictions.PROFILES = MappingProxyType({
         next_rank: guild_exam_restrictions.RestrictionProfile(
             next_rank, None, weapon, armor, INNATE_SKILL_ORDER[-1],

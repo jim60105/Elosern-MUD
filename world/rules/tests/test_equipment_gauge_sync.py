@@ -40,15 +40,19 @@ _HEAVY = make_item(
     "t_bulwark_harness",
     display_name_zh="合成厚背護甲",
     equipment_slot=EquipmentSlot.ARMOR,
-    modifier_key=_CAP_HEAVY,
 )
 _LIGHT = make_item(
     "t_light_guard_ring",
     display_name_zh="合成輕護指環",
     equipment_slot=EquipmentSlot.ACCESSORY,
-    modifier_key=_CAP_LIGHT,
 )
-_SCOPE_EXTRA = {"items": {_HEAVY.key: _HEAVY, _LIGHT.key: _LIGHT}}
+_SCOPE_EXTRA = {
+    "items": {_HEAVY.key: _HEAVY, _LIGHT.key: _LIGHT},
+    "equipment_effect_rules": {
+        _HEAVY.key: rule_for(_CAP_HEAVY),
+        _LIGHT.key: rule_for(_CAP_LIGHT),
+    },
+}
 
 
 class _FakeAtomic:

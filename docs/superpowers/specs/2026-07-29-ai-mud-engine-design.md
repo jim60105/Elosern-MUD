@@ -70,6 +70,17 @@ These were settled during design. Do not relitigate them inside a change.
 > amendment approves the planned cutover; it does not claim that the current Python map
 > declarations or their consumers have already been migrated.
 
+> **Amended 2026-11-19, single authored item catalog (consolidate-item-authoring).**
+> Git-tracked declarative content may live under `content/`; items adopt that boundary.
+> `content/items/catalog.yaml` is the sole entry point and names an ordered list of typed
+> item slices, so one authored row owns an item's definition plus its dedicated use and
+> equipment effects. The item loader is data-only (no `world.rules` import); the existing
+> use/equipment validators attach meaning to the raw inline effect inputs, and the stable
+> item key is the only effect identity (the retired per-item modifier enum is gone). Shared
+> timing and equipment budgets stay in `world/rules/rulebook/`. This exception applies to
+> items only in this change: existing sources for other lore domains are unchanged, and no
+> save migration, compatibility alias, or parallel read is introduced.
+
 | D10 | **Generated scene art is keyed by archetype; authored rooms may override it with official artwork.** Resolution uses room official art, archetype generated art, archetype official art, then a declared town/forest terminal image. Every scene type has bundled official artwork. | GPU cost still scales with scene *kinds*, while authored locations can have distinct official art and remain illustrated offline. |
 | D11 | **The engine never calls Stable Diffusion.** It maintains a queue and shells out to a configurable worker command. | Keeps the engine free of GPU concerns and lets the prompt-writing agent be swapped without touching engine code. |
 

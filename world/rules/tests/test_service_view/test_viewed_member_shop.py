@@ -23,7 +23,7 @@ from typeclasses.rooms import Room
 from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.party_view_selection import PartyViewSelection
 from web.webclient.presentation.registry import build_production_registry
-from world.lore.items import EquipmentModifierKey, EquipmentSlot
+from world.lore.items import EquipmentSlot
 from world.rules.clock import get_world_clock
 from world.rules.economy import TradeError, TradeReason, buy, sell
 from world.rules.equipment_effects import EquipmentEffectRule
@@ -57,21 +57,18 @@ _SWORD = make_item(
     display_name_zh="測試鋼劍",
     sellable=True,
     equipment_slot=EquipmentSlot.WEAPON_MAIN,
-    modifier_key=EquipmentModifierKey.PLAIN_SWORD,
 )
 _STAFF = make_item(
     "t_viewed_staff",
     display_name_zh="測試法杖",
     sellable=True,
     equipment_slot=EquipmentSlot.WEAPON_MAIN,
-    modifier_key=EquipmentModifierKey.APPRENTICE_FOCUS_STAFF,
 )
 _WARHAMMER = make_item(
     "t_viewed_warhammer",
     display_name_zh="測試戰鎚",
     sellable=True,
     equipment_slot=EquipmentSlot.WEAPON_MAIN,
-    modifier_key=EquipmentModifierKey.BEASTFOLK_WARHAMMER,
 )
 _CHARMS = tuple(
     make_item(
@@ -79,7 +76,6 @@ _CHARMS = tuple(
         display_name_zh=f"測試飾品{index}",
         sellable=True,
         equipment_slot=EquipmentSlot.ACCESSORY,
-        modifier_key=EquipmentModifierKey.SILVER_HAIRPIN,
     )
     for index in range(6)
 )
@@ -90,18 +86,25 @@ _ITEMS = {row.key: row for row in (_SWORD, _STAFF, _WARHAMMER, *_CHARMS, _TONIC)
 
 # Test-authored magnitudes: staff +0 -> sword +6; warhammer +10 -> sword -4.
 _EFFECT_RULES = {
-    EquipmentModifierKey.PLAIN_SWORD: EquipmentEffectRule(
+    _SWORD.key: EquipmentEffectRule(
         adjustments={"atk_phys": 6}, gauge_caps={}, immune=(), attached_buffs=(), exposure_bias=0
     ),
-    EquipmentModifierKey.APPRENTICE_FOCUS_STAFF: EquipmentEffectRule(
+    _STAFF.key: EquipmentEffectRule(
         adjustments={}, gauge_caps={}, immune=(), attached_buffs=(), exposure_bias=0
     ),
-    EquipmentModifierKey.BEASTFOLK_WARHAMMER: EquipmentEffectRule(
+    _WARHAMMER.key: EquipmentEffectRule(
         adjustments={"atk_phys": 10}, gauge_caps={}, immune=(), attached_buffs=(), exposure_bias=0
     ),
-    EquipmentModifierKey.SILVER_HAIRPIN: EquipmentEffectRule(
-        adjustments={"defense": 2}, gauge_caps={}, immune=(), attached_buffs=(), exposure_bias=0
-    ),
+    **{
+        f"t_viewed_charm_{index}": EquipmentEffectRule(
+            adjustments={"defense": 2},
+            gauge_caps={},
+            immune=(),
+            attached_buffs=(),
+            exposure_bias=0,
+        )
+        for index in range(6)
+    },
 }
 
 _EMPTY = {"weapon_main": None, "weapon_off": None, "armor": None, "accessories": []}

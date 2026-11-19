@@ -276,7 +276,7 @@ def detail(name: str, key: str) -> dict[str, Any]:
                 }
             )
         referrers.append({"inverse": inverse_name, "items": rows})
-    return {
+    payload = {
         "registry": registry_meta(spec, entries),
         "key": key,
         "label": entry_label(entry),
@@ -285,6 +285,15 @@ def detail(name: str, key: str) -> dict[str, Any]:
         "references": references,
         "referrers": referrers,
     }
+    # Exact provenance only where the loaded catalog can name it: a multi-file
+    # authored registry (the item catalog) reports the file that supplied this
+    # row, while the registry metadata keeps identifying the catalog directory.
+    entry_source = getattr(spec, "entry_source", None)
+    if entry_source is not None:
+        source_path = entry_source(key)
+        if source_path:
+            payload["source_path"] = source_path
+    return payload
 
 
 def authored_link(registry: str, key: Any, label: str | None = None) -> dict[str, Any] | None:

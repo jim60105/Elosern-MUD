@@ -6,35 +6,35 @@ Holds the behavioral invariants that follow from an item's declared mechanical s
 ## Requirements
 
 ### Requirement: Retiring an item key leaves no dangling reference
-An item key that leaves the registry SHALL leave every surface that names items in the same change. Every loader, validator, and registry that can name an item key SHALL fail closed on a key the registry does not define rather than skipping the reference, substituting a placeholder, or degrading to an unnamed item, so that a half-completed removal is impossible to ship rather than merely discouraged.
+Removing an item row SHALL retire its dedicated effects with it. Every authored external reference to the item key SHALL be removed in the same change. A loader, validator, or registry encountering an undefined item key SHALL reject the reference and identify the key and owning surface.
 
 #### Scenario: A shop offer naming a retired key fails the catalog load
 - **WHEN** a shop's offered keys or offers name an item key the registry does not define
 - **THEN** the catalog load raises naming that key, and no merchant is constructed with a partial inventory
 
 #### Scenario: An equipment binding naming a retired key fails startup
-- **WHEN** an equipment-effect entry or modifier binding names an item key the registry does not define
-- **THEN** the rulebook load raises naming that key rather than leaving an orphaned entry
+- **WHEN** the shared budget file still supplies a retired item's effect mapping, or an item row attempts to bind its effects to a separate modifier key
+- **THEN** validation rejects those fields and names the owning source
 
 #### Scenario: A usable-item profile naming a retired key fails startup
-- **WHEN** an item-effect profile names an item key the registry does not define
-- **THEN** the two-sided close raises naming that key
+- **WHEN** the shared use-time file still supplies a retired item's use effects
+- **THEN** validation rejects the old per-item field and names the owning source
 
 #### Scenario: A kit, preset, or quest naming a retired key is rejected
-- **WHEN** a starting kit, a character preset, or a quest objective or reward names an item key the registry does not define
-- **THEN** its validator rejects that record naming the key, rather than granting nothing or granting an unnamed item
+- **WHEN** a starting kit, character preset, quest objective, or quest reward names an item key the registry does not define
+- **THEN** its validator rejects that record naming the key rather than granting nothing or granting an unnamed item
 
 #### Scenario: A completed retirement leaves the catalog closed
-- **WHEN** an item key is removed from the registry together with every reference to it
-- **THEN** startup succeeds, every loader closes with no unbound key and no orphaned entry, and no surface reports a missing item
+- **WHEN** an item row and all its external references are removed
+- **THEN** startup succeeds without editing a second effect table and no definition or effect profile remains for the key
 
 #### Scenario: The fail-closed error names the key and its owning surface
-- **WHEN** any loader, validator, or registry fails closed on an item key the registry does not define
-- **THEN** it raises naming the offending key and its owning surface
+- **WHEN** an authored external reference names an undefined item key
+- **THEN** validation identifies the missing key and the surface that names it
 
 #### Scenario: Every item-naming surface participates in the fail-closed check
-- **WHEN** shop offered keys and shop offers, equipment modifier bindings and equipment-effect entries, item-effect profiles, starting kits, character presets, or quest objectives and rewards name an undefined item key
-- **THEN** each such surface fails closed under the same rule — none is exempt
+- **WHEN** an undefined item key appears in shop offered keys, shop offers, starting kits, character presets, or quest objectives or rewards
+- **THEN** the corresponding surface rejects it instead of skipping it or substituting a placeholder
 
 ### Requirement: An item declaring no mechanics is inert
 An item that declares neither use mechanics nor an equipment slot SHALL be holdable, inspectable, and — when sellable and stocked — tradeable, and SHALL refuse every mechanical interaction with a stable named reason rather than a generic failure. Using such an item SHALL be refused for having no use mechanics; equipping it SHALL be refused for not being equipment. Neither refusal SHALL move a gauge, consume the item, or mutate inventory.
@@ -113,3 +113,18 @@ A usable item declaring that it may not be used in combat SHALL be refused when 
 #### Scenario: A combat-barred item cannot be used in a turn
 - **WHEN** an item declaring no combat use is submitted as a combat action
 - **THEN** the submission is rejected for the combat restriction, no gauge moves, and the item stays in inventory
+
+### Requirement: The item catalog has one ordered declarative source
+The shipped item catalog SHALL load from `content/items/` as typed, immutable definitions in authored order, keyed by stable `snake_case` identifiers. The loader SHALL reject malformed documents, unknown fields, and duplicate or invalid keys before accepting a candidate and report the source file and applicable item key and field.
+
+#### Scenario: Add equipment by editing one item document
+- **WHEN** an author adds a row with a new key, an equipment slot, and a valid effect using the existing vocabulary
+- **THEN** the catalog resolves that key and wearing the item applies its authored effect without another registration or a source-code edit
+
+#### Scenario: Authoring order is deterministic
+- **WHEN** a synthetic catalog declares source files and rows in an order different from key sort or filesystem order
+- **THEN** the loaded catalog follows the declared file order and preserves row order within each file
+
+#### Scenario: Duplicate declaration or invalid field is rejected
+- **WHEN** a candidate repeats an item key or YAML mapping key, includes a colon in an item key, or supplies an unknown field or a value of the wrong type
+- **THEN** the candidate is rejected and the diagnostic identifies the offending source and the applicable row and field

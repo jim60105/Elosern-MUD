@@ -3,10 +3,11 @@
 
 from __future__ import annotations
 
+from types import MappingProxyType
+
 from world.lore.economy import PriceEntry
 from world.lore.items import (
     ItemDefinition,
-    EquipmentModifierKey,
     EquipmentSlot,
     ItemIconKey,
     ItemKind,
@@ -20,11 +21,19 @@ from world.rules.item_effects import (
     ItemStat,
     ItemTargetScope,
 )
+from world.rules.equipment_effects import EquipmentEffectRule
 
-from world.tests.synthetic_data.vocab import (
-    _exposure_bias_modifier_key,
-    _first_equipment_modifier_key,
-)
+
+def _empty_rule(*, exposure_bias: int = 0) -> EquipmentEffectRule:
+    """One explicit no-adjustment equipment rule for a synthetic row."""
+    return EquipmentEffectRule(
+        adjustments=MappingProxyType({}),
+        gauge_caps=MappingProxyType({}),
+        immune=(),
+        attached_buffs=(),
+        exposure_bias=exposure_bias,
+    )
+
 
 # ---------------------------------------------------------------------------
 # Catalogs (design D1): a few representative entries each, real dataclasses.
@@ -76,10 +85,8 @@ SYNTH_ITEMS: dict[str, ItemDefinition] = {
         ),
     ),
     # Slotted gear: the starting-kit validator requires every kit item to
-    # carry an equipment slot, and every slotted item to bind one member of
-    # the closed shipped modifier enum — borrowed at runtime, never named.
-    # The synthetic key itself is unbound in the shipped rulebook, so no
-    # scoped consumer resolves an effect layer through this gear.
+    # carry an equipment slot, and every slotted item's dedicated effects are
+    # bound by its own item key (SYNTH_EQUIPMENT_EFFECT_RULES below).
     "t_thorn_knife": ItemDefinition(
         key="t_thorn_knife",
         display_name_zh="荊刺小刀",
@@ -92,12 +99,11 @@ SYNTH_ITEMS: dict[str, ItemDefinition] = {
             summary_zh="刀刃帶刺的合成入門短刀。",
         ),
         equipment_slot=EquipmentSlot.WEAPON_MAIN,
-        modifier_key=_first_equipment_modifier_key(),
     ),
     # A second main-hand row: the party-management acceptance fixture holds
     # one of these beside the equipped knife so the real equipment toggle has
-    # a distinct replacement to show. Both rows bind the same closed shipped
-    # modifier key and share the one synthetic weapon price band.
+    # a distinct replacement to show. Both rows carry their own empty rule and
+    # share the one synthetic weapon price band.
     "t_cinder_dirk": ItemDefinition(
         key="t_cinder_dirk",
         display_name_zh="燼微短刃",
@@ -110,7 +116,6 @@ SYNTH_ITEMS: dict[str, ItemDefinition] = {
             summary_zh="刃身覆著細碎冷燼的合成備用短刃。",
         ),
         equipment_slot=EquipmentSlot.WEAPON_MAIN,
-        modifier_key=_first_equipment_modifier_key(),
     ),
     "t_wayfarer_pass": ItemDefinition(
         key="t_wayfarer_pass",
@@ -137,10 +142,8 @@ SYNTH_ITEMS: dict[str, ItemDefinition] = {
         ),
     ),
     # The authored-dialogue physical-conditions fixture gear: one accessory
-    # whose borrowed modifier member carries a positive shipped exposure bias,
-    # so wearing it shifts the canonical effective-exposure overlay. Nothing
-    # else in the kit binds this row; the synthetic key itself stays unbound
-    # in the shipped rulebook.
+    # whose own rule carries a positive exposure bias, so wearing it shifts the
+    # canonical effective-exposure overlay.
     "t_veil_charm": ItemDefinition(
         key="t_veil_charm",
         display_name_zh="薄霧紗飾",
@@ -153,8 +156,33 @@ SYNTH_ITEMS: dict[str, ItemDefinition] = {
             summary_zh="繫在腰際、透著薄霧光澤的合成飾物。",
         ),
         equipment_slot=EquipmentSlot.ACCESSORY,
-        modifier_key=_exposure_bias_modifier_key(),
     ),
+    # The browser fixtures' exam fallback armor: a real wearable row with an
+    # explicit empty effect profile bound under its own key.
+    "t_exam_armor": ItemDefinition(
+        key="t_exam_armor",
+        display_name_zh="合成考官護甲",
+        price_table_key="t_ironbite_steel",
+        sellable=False,
+        presentation=ItemPresentation(
+            kind=ItemKind.ARMOR,
+            icon_key=ItemIconKey.ARMOR,
+            rarity=ItemRarity.COMMON,
+            summary_zh="供合成考核套裝使用的無效果護甲。",
+        ),
+        equipment_slot=EquipmentSlot.ARMOR,
+    ),
+}
+
+#: The dedicated effect half of every slotted kit row, keyed by the kit item's
+#: own key. The kit patches EQUIPMENT_EFFECT_RULES with this map in the same
+#: scope as the item registry, so worn synthetic gear resolves its own rule
+#: without borrowing a shipped item's binding.
+SYNTH_EQUIPMENT_EFFECT_RULES: dict[str, EquipmentEffectRule] = {
+    "t_thorn_knife": _empty_rule(),
+    "t_cinder_dirk": _empty_rule(),
+    "t_veil_charm": _empty_rule(exposure_bias=1),
+    "t_exam_armor": _empty_rule(),
 }
 
 # The rulebook-side half of every usable kit row: settlement resolves an

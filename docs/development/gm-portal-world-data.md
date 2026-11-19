@@ -16,6 +16,7 @@
 | `loader` | 延遲載入函式，回傳 `key → frozen dataclass` 的唯讀對應 |
 | `source_path` | 相對於儲存庫根目錄的原始檔或資料夾 |
 | `summary_fields` | 清單頁顯示的欄位，可用點號表示巢狀欄位；未宣告時改用第一個非 `key` 的字串欄位 |
+| `entry_source` | 選填的延遲查詢：給定條目 key，回傳**該載入列自己的**原始檔。目前只有多檔作者目錄（物品）提供；清單與索引頁仍顯示 `source_path` 的目錄 |
 
 載入函式在呼叫時才匯入擁有該資料的模組，所以匯入索引不會連帶載入 `world/rules`、`world/skills` 或 `world/quests`。載入函式讀取的是伺服器程序已載入的值，而不是重新讀取原始檔：
 
@@ -71,7 +72,7 @@ class MonsterSite:
 | `GET /gm/api/registry/` | 登錄表索引（名稱、標籤、分組、條目數、原始檔路徑、摘要欄位） |
 | `GET /gm/api/registry/?q=` | 跨登錄表搜尋：回傳所有符合的 `{registry, key}`，依登錄表名稱再依 key 排序，不分頁 |
 | `GET /gm/api/registry/<registry>?cursor=&limit=&q=` | 條目清單：依 key 排序，預設 50 筆，上限 200 筆，游標綁定查詢文字 |
-| `GET /gm/api/registry/<registry>/<key>` | 條目明細：轉換後的欄位、依欄位路徑列出的引用、依 inverse 名稱分組的引用者 |
+| `GET /gm/api/registry/<registry>/<key>` | 條目明細：轉換後的欄位、依欄位路徑列出的引用、依 inverse 名稱分組的引用者；多檔目錄的條目另帶頂層 `source_path` |
 | `GET /gm/api/sources/` | 原始檔允許清單 |
 | `GET /gm/api/sources/<name>` | 單一原始檔的磁碟內容 |
 | `POST /gm/api/sources/prompts/reload` | 重新載入提示詞庫，需要 CSRF 權杖 |
@@ -79,6 +80,12 @@ class MonsterSite:
 `/gm/api/registry` 有沒有結尾斜線都可以。保留的 `sources/prompts/reload` 路由必須在 `sources/<name>` 之前註冊。前端路由同樣先註冊 `/gm/world/sources/...`，再註冊 `/gm/world/<registry>` 與 `/gm/world/<registry>/<key>`。
 
 搜尋比對 key 以及條目中每個字串值（含巢狀 dataclass），不分大小寫，查詢文字上限 200 字元。欄位值的轉換沿用 `world/lore/sync.py` `_db_safe` 的語意：列舉轉為值、tuple 轉為 list，並遞迴進入巢狀 dataclass。JSON 無法表示的值會成為 `$unserializable` 標記。
+
+### 載入列來源（`source_path`）
+
+物品目錄由多個檔案組成（`content/items/catalog.yaml` 宣告的切片），所以「目錄」不是足夠精確的來源。物品明細回應因此在頂層加上 `source_path`，值為**提供目前載入列的那個檔案**（相對於儲存庫根目錄，例如 `content/items/core_items.yaml`）；`registry.source_path` 仍是目錄 `content/items/`。其他登錄表沒有逐列查詢，明細不含這個欄位，前端退回登錄表層級的來源說明。
+
+這個值是**載入快照**，不是磁碟現況：把列搬到另一個檔案、或改動磁碟上的切片，在伺服器重新啟動以前都不會改變明細顯示的來源。物品明細的價格引用連結照舊由 `price_table_key` 的宣告解析，與來源檔無關。
 
 錯誤碼：未知的登錄表為 404 `registry_not_found`，未知的 key 為 404 `entry_not_found`，不在允許清單中的原始檔為 404 `source_not_found`。存取、CSRF、方法與分頁錯誤沿用既有的錯誤碼。
 

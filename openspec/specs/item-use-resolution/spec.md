@@ -5,45 +5,39 @@ Deterministic item-use preflight, atomic settlement, stable event identity, worl
 ## Requirements
 
 ### Requirement: Item mechanics are immutable and independent from presentation
-Every registered item SHALL declare exactly one of a usable-item definition, an equipment-slot
-definition, or no mechanics. An equipment definition SHALL contain exactly one `EquipmentSlot` and
-exactly one registered `EquipmentModifierKey` binding it to the equipment-effect rulebook.
-Presentation kind, icon, rarity, summary, display name, and price SHALL NOT select or modify
-mechanics.
+An item SHALL declare immutable use mechanics, equipment mechanics with one slot, or no mechanics. Its own key SHALL resolve its effects. Presentation kind, icon, summary, name, and price SHALL NOT select mechanics. Rarity SHALL constrain validation of authored equipment effects without selecting or scaling them at runtime.
 
 #### Scenario: Healing potion resolves registered use mechanics
-- **WHEN** the `healing_potion` definition is inspected
-- **THEN** it is consumable, is allowed in combat, carries no equipment slot, and names no effect —
-  its single HP-restoring effect is resolved from the item-effect rulebook by its own key
+- **WHEN** a synthetic combat-permitted, consumable item authoring an HP restoration effect is used on an eligible wounded actor
+- **THEN** it restores the authored amount and is consumed, without an equipment slot or a separate effect identifier
 
 #### Scenario: A usable-item definition is mechanics-light by contract
-- **WHEN** a usable-item definition is registered
-- **THEN** it contains a boolean consumable flag and a combat-use permission, and does not name an
-  effect, magnitude, stat, scope, or status: a usable item's effects are bound to its own key by
-  the item-effect rulebook
+- **WHEN** a consumer reads a loaded usable definition to determine consumption and combat eligibility
+- **THEN** the consumer gets the two declared flags and resolves effect magnitude, stat, scope, or status through the profile keyed by the definition's item key
 
 #### Scenario: Visual metadata cannot make an item usable
-- **WHEN** an inspect-only item's presentation kind is changed to `potion` without adding use
-  mechanics
-- **THEN** item preflight still rejects it as not usable and no state changes
+- **WHEN** an inspect-only item's presentation kind is changed to `potion` without declaring use mechanics
+- **THEN** preflight still rejects it as not usable and no state changes
 
 #### Scenario: Ambiguous item mechanics fail registry validation
-- **WHEN** an item definition declares both use mechanics and an equipment slot
-- **THEN** registry construction fails before the item can be presented or used
+- **WHEN** a row declares both use mechanics and an equipment slot
+- **THEN** validation rejects the item before it can be presented, used, or equipped
 
 #### Scenario: Equipment must bind its effect key
-- **WHEN** an item definition declares an equipment slot without a registered modifier key, or
-  declares a modifier key while carrying no equipment slot
-- **THEN** registry construction fails before the item can be presented or toggled
+- **WHEN** equipment authoring declares an equipment slot with no inline effect mapping
+- **THEN** validation rejects the row rather than accepting an uneffectual missing binding
 
 #### Scenario: Only equipment mechanics may carry a modifier key
-- **WHEN** an item's registered mechanics are inspected
-- **THEN** an item whose mechanics are not an equipment definition SHALL NOT carry a modifier key
+- **WHEN** a non-equipment item declares equipment effects under its item key
+- **THEN** validation rejects the row rather than publishing effects for a non-equipment key
 
 #### Scenario: The registry rejects malformed mechanics
-- **WHEN** the registry is given an item that declares both forms, a malformed slot, or a missing or
-  unknown modifier key on an equipment item, or a modifier key on any non-equipment item
-- **THEN** the registry rejects the item
+- **WHEN** an authored row supplies an unknown slot or a non-boolean use flag
+- **THEN** validation rejects the row before it is published
+
+#### Scenario: A stored item key still resolves
+- **WHEN** equipment storage contains an existing item key and the same item is loaded from an authored document
+- **THEN** that key resolves its declared slot and effect with no second saved identifier or save rewrite
 
 ### Requirement: Item-use preflight is side-effect-free and revalidates current conditions
 The deterministic item-use service SHALL expose a side-effect-free preflight that resolves the item

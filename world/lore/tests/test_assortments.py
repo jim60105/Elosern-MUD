@@ -20,7 +20,6 @@ from tools.spec_traceability import covers_requirement
 
 from world.lore.items import (
     ITEM_REGISTRY,
-    EquipmentModifierKey,
     ItemDefinition,
     ItemIconKey,
     ItemKind,
@@ -33,6 +32,7 @@ from world.lore.settlements.assortments import (
     assortment_membership_violation,
 )
 from world.lore.settlements.shops import SHOP_REGISTRY, ShopDefinition
+from world.rules.equipment_effects import EQUIPMENT_EFFECT_RULES
 from world.skills.equipment import EquipmentSlot
 
 #: The deliberately named military family: six grade pairs, twelve keys.
@@ -60,9 +60,6 @@ def _synthetic_item(
             summary_zh="供貨架資格測試使用的合成物品。",
         ),
         equipment_slot=slot,
-        modifier_key=(
-            EquipmentModifierKey.PLAIN_SWORD if slot is not None else None
-        ),
     )
 
 
@@ -230,7 +227,7 @@ class MilitaryPairMembershipTests(unittest.TestCase):
             with self.subTest(item=key):
                 definition = ITEM_REGISTRY[key]
                 self.assertIsNotNone(definition.equipment_slot)
-                self.assertEqual(definition.modifier_key.value, key)
+                self.assertIn(key, EQUIPMENT_EFFECT_RULES)
                 self.assertTrue(definition.sellable)
                 self.assertTrue(
                     any(

@@ -13,7 +13,6 @@ from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 from typeclasses.npcs import NPC
 from typeclasses.characters import PlayerCharacter
 from world.rules import guild_exam_restrictions
-from world.lore.items import EquipmentModifierKey
 from world.rules.action import ActionRequest, ActionResolver, RejectReason
 from world.rules.action_preview import preview_skill
 from world.rules.combat import Battlefield, roll_initiative
@@ -46,10 +45,10 @@ _DOMAIN = make_skill("t_exam_domain_cast", effects=["self_buff_apply:t_exam_doma
 _DOMAIN_BUFF = make_buff("t_exam_domain")
 _POS_BUFF = make_buff("t_exam_pos")
 _PEN_BUFF = make_buff("t_exam_pen")
-_BLADE = make_item("t_exam_blade", equipment_slot=EquipmentSlot.WEAPON_MAIN, modifier_key=EquipmentModifierKey.PLAIN_SWORD)
-_ARMOR = make_item("t_exam_armor", equipment_slot=EquipmentSlot.ARMOR, modifier_key=EquipmentModifierKey.LEATHER_ARMOR)
-_RING = make_item("t_exam_ring", equipment_slot=EquipmentSlot.ACCESSORY, modifier_key=EquipmentModifierKey.GUILD_LIMIT_D, sellable=False, guild_property=True)
-_OTHER = make_item("t_exam_other", equipment_slot=EquipmentSlot.ACCESSORY, modifier_key=EquipmentModifierKey.SILVER_HAIRPIN)
+_BLADE = make_item("t_exam_blade", equipment_slot=EquipmentSlot.WEAPON_MAIN)
+_ARMOR = make_item("t_exam_armor", equipment_slot=EquipmentSlot.ARMOR)
+_RING = make_item("t_exam_ring", equipment_slot=EquipmentSlot.ACCESSORY, sellable=False, guild_property=True)
+_OTHER = make_item("t_exam_other", equipment_slot=EquipmentSlot.ACCESSORY)
 _OTHERS = tuple(replace(_OTHER, key=f"t_exam_other_{index}") for index in range(ACCESSORY_MAX_SLOTS))
 _PROFILE = RestrictionProfile(
     "T", _RING.key, _BLADE.key, _ARMOR.key, _ROOT.key,
@@ -57,10 +56,11 @@ _PROFILE = RestrictionProfile(
     MappingProxyType({"hp": 77, "mp": 60, "sp": 80, "atk_phys": 29, "agility": 12, "defense": 31, "magic_power": 23}), 11,
 )
 _RULES = {
-    _BLADE.modifier_key: EquipmentEffectRule({"atk_phys": 4}, {}, (), (), 0),
-    _ARMOR.modifier_key: EquipmentEffectRule({"defense": 5, "agility": 1}, {}, (), (), 0),
-    _RING.modifier_key: EquipmentEffectRule({}, {}, (), (), 0),
-    _OTHER.modifier_key: EquipmentEffectRule({}, {}, (), (), 0),
+    _BLADE.key: EquipmentEffectRule({"atk_phys": 4}, {}, (), (), 0),
+    _ARMOR.key: EquipmentEffectRule({"defense": 5, "agility": 1}, {}, (), (), 0),
+    _RING.key: EquipmentEffectRule({}, {}, (), (), 0),
+    _OTHER.key: EquipmentEffectRule({}, {}, (), (), 0),
+    **{row.key: EquipmentEffectRule({}, {}, (), (), 0) for row in _OTHERS},
 }
 
 

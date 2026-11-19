@@ -66,6 +66,7 @@ from ._support import (
     _STRONG_FOLK,
     _race_key,
     balanced_allocations,
+    equipment_effect_rows,
 )
 
 
@@ -109,6 +110,7 @@ def setUpModule():
             _NEUTRAL_WEAPON.key: _NEUTRAL_WEAPON,
             _PACK_TRINKET.key: _PACK_TRINKET,
         },
+        "equipment_effect_rules": equipment_effect_rows(),
     },
 )
 @patch.dict(

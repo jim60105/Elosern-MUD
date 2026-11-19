@@ -1316,14 +1316,13 @@ class EstimationIntegrationTests(EvenniaTestCase):
         "combat-resolution::physical-damage-multiplies-the-rounded-attack-component-by-equipped-weapon-factor",
     )
     def test_the_estimate_and_settlement_match_with_equipped_weapon_multiplier(self):
-        from world.lore.items import EquipmentSlot, EquipmentModifierKey
+        from world.lore.items import EquipmentSlot
         from world.rules.equipment_effects import EquipmentEffectRule
         from world.tests.synthetic_data import make_item
 
         synth_weapon = make_item(
             key="t_est_sword",
             equipment_slot=EquipmentSlot.WEAPON_MAIN,
-            modifier_key=EquipmentModifierKey.PLAIN_SWORD,
         )
         rule_1_5 = EquipmentEffectRule(
             adjustments={},
@@ -1346,7 +1345,7 @@ class EstimationIntegrationTests(EvenniaTestCase):
         target.traits.defense.base = 10
         target.traits.agility.base = 20
         with patch.dict("world.rules.equipment_effects.ITEM_REGISTRY", {synth_weapon.key: synth_weapon}):
-            with patch.dict("world.rules.equipment_effects.EQUIPMENT_EFFECT_RULES", {EquipmentModifierKey.PLAIN_SWORD: rule_1_5}):
+            with patch.dict("world.rules.equipment_effects.EQUIPMENT_EFFECT_RULES", {synth_weapon.key: rule_1_5}):
                 context, estimate = self._estimate(target, STRIKE.key)
                 self.assertNotIsInstance(estimate, InvalidEstimate)
                 projection = _recipient(estimate, target)

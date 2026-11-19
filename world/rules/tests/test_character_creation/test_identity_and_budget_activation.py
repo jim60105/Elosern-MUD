@@ -60,6 +60,7 @@ from ._support import (
     _kit_inventory,
     _race_key,
     balanced_allocations,
+    equipment_effect_rows,
 )
 from world.tests.start_room_fixture import STUB_START_ROOM_KEY, stub_start_room
 
@@ -91,6 +92,7 @@ from world.tests.start_room_fixture import STUB_START_ROOM_KEY, stub_start_room
             _NEUTRAL_WEAPON.key: _NEUTRAL_WEAPON,
             _PACK_TRINKET.key: _PACK_TRINKET,
         },
+        "equipment_effect_rules": equipment_effect_rows(),
     },
 )
 @patch.dict(

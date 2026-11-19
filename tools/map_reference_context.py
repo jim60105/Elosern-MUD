@@ -47,6 +47,7 @@ DEFAULT_OUTPUT_PATH = REPOSITORY_ROOT / "content" / "map-reference-context.json"
 
 #: Standard discovery rules for discovering the external static source set.
 DISCOVERY_RULES: tuple[str, ...] = (
+    "content/items/*.yaml",
     "world/lore/**/*.py",
     "world/quests/**/*.py",
     "world/rules/**/*.py",

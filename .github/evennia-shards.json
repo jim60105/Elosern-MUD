@@ -820,7 +820,8 @@
         "world.lore.tests.test_wilderness_regions",
         "world.narrative.tests.test_dialogue_reading",
         "world.narrative.tests.test_dialogue_unread",
-        "world.lore.tests.test_start_locations"
+        "world.lore.tests.test_start_locations",
+        "world.lore.tests.test_item_catalog"
       ]
     },
     {

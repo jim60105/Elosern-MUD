@@ -7,7 +7,6 @@ from dataclasses import replace
 from unittest import mock
 from world.lore.economy import PRICE_TABLE
 from world.lore.items import ITEM_REGISTRY
-from world.lore.items import EquipmentModifierKey
 from world.lore.items import ItemDefinition
 from world.lore.items import ItemIconKey
 from world.lore.items import ItemKind
@@ -466,9 +465,6 @@ def _synthetic_price_item(
             summary_zh="供商店分類與貨架測試使用的合成物品。",
         ),
         equipment_slot=slot,
-        modifier_key=(
-            EquipmentModifierKey.PLAIN_SWORD if slot is not None else None
-        ),
     )
 
 

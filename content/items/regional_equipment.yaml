@@ -1,0 +1,178 @@
+# Item catalogue slice: regional equipment.
+# Each row authors its own definition and its dedicated effects.
+items:
+  - key: beastfolk_warhammer
+    display_name_zh: 獸人重鎚
+    price_table_key: mundane_weapon
+    sellable: true
+    presentation:
+      kind: weapon
+      icon_key: weapon
+      rarity: uncommon
+      summary_zh: 部族鍛爐打造的巨型戰鎚，非獸人臂力難以掄動。
+    equipment_slot: weapon_main
+    equipment_effects:
+      adjustments:
+        atk_phys: 6
+        agility: -6%
+      weapon_damage_multiplier: 1.1
+  - key: beastfolk_repeating_bow
+    display_name_zh: 獸人連射短弓
+    price_table_key: mundane_weapon
+    sellable: true
+    presentation:
+      kind: weapon
+      icon_key: weapon
+      rarity: uncommon
+      summary_zh: 獸人擅用的輕量連射短弓，講求速度而非單發威力。
+    equipment_slot: weapon_main
+    equipment_effects:
+      adjustments:
+        atk_phys: 3
+        agility: 4
+      weapon_damage_multiplier: 1.1
+  - key: beastfolk_war_spear
+    display_name_zh: 獸人陣地長槍
+    price_table_key: mundane_weapon
+    sellable: true
+    presentation:
+      kind: weapon
+      icon_key: weapon
+      rarity: uncommon
+      summary_zh: 獸人部族列陣時使用的長槍，攻守兼備。
+    equipment_slot: weapon_main
+    equipment_effects:
+      adjustments:
+        atk_phys: 5
+        defense: 2
+      weapon_damage_multiplier: 1.1
+  - key: beastfolk_twin_claws
+    display_name_zh: 獸人雙爪刃
+    price_table_key: mundane_weapon
+    sellable: true
+    presentation:
+      kind: weapon
+      icon_key: weapon
+      rarity: uncommon
+      summary_zh: 獸人綁縛於指節的鋒利爪刃，高攻但幾乎不設防禦。
+    equipment_slot: weapon_main
+    equipment_effects:
+      adjustments:
+        atk_phys: 6
+        defense: -2
+      weapon_damage_multiplier: 1.1
+  - key: beastfolk_spirit_wand
+    display_name_zh: 獸人導靈短杖
+    price_table_key: mundane_weapon
+    sellable: true
+    presentation:
+      kind: weapon
+      icon_key: weapon
+      rarity: uncommon
+      summary_zh: 獸人施展魔力時所用的短杖，罕見的獸人法具。
+    equipment_slot: weapon_main
+    equipment_effects:
+      adjustments:
+        magic_power: 5
+        mp_cost: -6%
+      weapon_damage_multiplier: 1.0
+  - key: elven_longbow
+    display_name_zh: 精靈長弓
+    price_table_key: mundane_weapon
+    sellable: true
+    presentation:
+      kind: weapon
+      icon_key: weapon
+      rarity: epic
+      summary_zh: 精靈自製並反覆淬鍊的長弓，箭無虛發。
+    equipment_slot: weapon_main
+    equipment_effects:
+      adjustments:
+        atk_phys: 6
+        agility: 3
+      weapon_damage_multiplier: 1.2
+  - key: dragon_lair_trophy_blade
+    display_name_zh: 龍之巢穴戰利品劍
+    price_table_key: magic_weapon
+    sellable: true
+    presentation:
+      kind: weapon
+      icon_key: weapon
+      rarity: epic
+      summary_zh: 深入龍之巢穴討伐後才可能取得的鍛龍鱗劍，帶著淡淡硫磺氣息。
+    equipment_slot: weapon_main
+    equipment_effects:
+      adjustments:
+        atk_phys: 9
+        magic_power: 3
+      weapon_damage_multiplier: 1.22
+  - key: beastfolk_heavy_hide_armor
+    display_name_zh: 獸人厚甲
+    price_table_key: armor
+    sellable: true
+    presentation:
+      kind: armor
+      icon_key: armor
+      rarity: uncommon
+      summary_zh: 以獸皮與鐵片疊層縫製的部族重甲，犧牲機動換取硬度。
+    equipment_slot: armor
+    equipment_effects:
+      adjustments:
+        defense: 6
+        agility: -8%
+  - key: beastfolk_stalker_garb
+    display_name_zh: 獸人輕行衣
+    price_table_key: armor
+    sellable: true
+    presentation:
+      kind: armor
+      icon_key: armor
+      rarity: uncommon
+      summary_zh: 獸人暗殺者慣用的貼身輕甲，幾乎不影響身法。
+    equipment_slot: armor
+    equipment_effects:
+      adjustments:
+        defense: 2
+        agility: +6%
+  - key: elven_forest_veil
+    display_name_zh: 精靈森林輕紗
+    price_table_key: masterwork_gear
+    sellable: true
+    presentation:
+      kind: armor
+      icon_key: armor
+      rarity: legendary
+      summary_zh: 精靈以晨露編織的輕紗長裙，精靈傳統服飾的分支款式，精靈村商店應季上架的季節限定品。
+    equipment_slot: armor
+    equipment_effects:
+      adjustments:
+        defense: 4
+        pleasure_gain: +15%
+      exposure_bias: 1
+  - key: beastfolk_tribal_totem
+    display_name_zh: 獸人部族圖騰
+    price_table_key: jewelry
+    sellable: true
+    presentation:
+      kind: accessory
+      icon_key: accessory
+      rarity: uncommon
+      summary_zh: 以獵得的獸爪製成的部族圖騰項飾，力量與防禦並重。
+    equipment_slot: accessory
+    equipment_effects:
+      adjustments:
+        atk_phys: 2
+        defense: 2
+  - key: beastfolk_gale_earring
+    display_name_zh: 獸人疾風耳環
+    price_table_key: jewelry
+    sellable: true
+    presentation:
+      kind: accessory
+      icon_key: accessory
+      rarity: uncommon
+      summary_zh: 獸人以自身耳形為靈感打造的耳環，象徵族群的速度自豪。
+    equipment_slot: accessory
+    equipment_effects:
+      adjustments:
+        agility: +4%
