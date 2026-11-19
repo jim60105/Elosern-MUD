@@ -46,6 +46,10 @@ class RegistrySpec:
     source_path: str
     #: Field names (dotted for nested dataclasses) shown in entry lists.
     summary_fields: tuple[str, ...] = ()
+    #: Optional lazy lookup of one loaded entry's exact source file. Only a
+    #: multi-file authored catalog (the item catalog) supplies it; the browse
+    #: index stays cheap because the lookup runs only for a detail request.
+    entry_source: Callable[[str], str | None] | None = None
 
 
 # --- lazy loaders -------------------------------------------------------------
@@ -101,6 +105,13 @@ def _quest_definitions() -> Mapping[str, Any]:
     return MappingProxyType({definition.key: definition for definition in QUEST_CATALOG})
 
 
+def _item_source(key: str) -> str | None:
+    """The repository-relative file that supplied one loaded item row."""
+    from world.lore.items import ITEM_SOURCES
+
+    return ITEM_SOURCES.get(key)
+
+
 def _guild_section(section: str) -> Callable[[], Mapping[str, Any]]:
     """One keyed section of the guild-economy catalog.
 
@@ -149,8 +160,17 @@ def _spec(
     loader: Callable[[], Mapping[str, Any]],
     source_path: str,
     *summary_fields: str,
+    entry_source: Callable[[str], str | None] | None = None,
 ) -> RegistrySpec:
-    return RegistrySpec(name, label, group, loader, source_path, tuple(summary_fields))
+    return RegistrySpec(
+        name,
+        label,
+        group,
+        loader,
+        source_path,
+        tuple(summary_fields),
+        entry_source,
+    )
 
 
 REGISTRY_INDEX: tuple[RegistrySpec, ...] = (
@@ -179,7 +199,16 @@ REGISTRY_INDEX: tuple[RegistrySpec, ...] = (
     _spec("activity_areas", "活動範圍", "生物", _attr("world.lore.monster_activity", "ACTIVITY_AREA_REGISTRY"), f"{_LORE}/monster_activity.py", "region_key", "home_radius"),
     _spec("monster_activities", "魔物活動", "生物", _attr("world.lore.monster_activity", "MONSTER_ACTIVITY_REGISTRY"), f"{_LORE}/monster_activity.py", "policy", "area_key", "decision_interval"),
     # 物品與經濟
-    _spec("items", "物品", "物品與經濟", _attr("world.lore.items", "ITEM_REGISTRY"), f"{_LORE}/items", "display_name_zh", "price_table_key"),
+    _spec(
+        "items",
+        "物品",
+        "物品與經濟",
+        _attr("world.lore.items", "ITEM_REGISTRY"),
+        "content/items/",
+        "display_name_zh",
+        "price_table_key",
+        entry_source=_item_source,
+    ),
     _spec("prices", "價格表", "物品與經濟", _attr("world.lore.economy", "PRICE_TABLE"), f"{_LORE}/economy.py", "display_name_zh", "min_copper", "max_copper"),
     _spec("assortments", "商品組合", "物品與經濟", _attr("world.lore.settlements.assortments", "ASSORTMENT_REGISTRY"), f"{_LORE}/settlements/assortments.py", "display_name_zh"),
     _spec("starting_kits", "起始裝備", "物品與經濟", _attr("world.lore.starting_kits", "SUBRACE_STARTING_KIT_REGISTRY"), f"{_LORE}/starting_kits.py", "subrace_key"),

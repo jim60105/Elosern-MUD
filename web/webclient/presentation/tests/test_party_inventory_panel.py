@@ -28,7 +28,8 @@ from tools.spec_traceability import covers_requirement
 
 from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
-from world.lore.items import EquipmentModifierKey, EquipmentSlot, ItemUseMechanics
+from world.lore.items import EquipmentSlot, ItemUseMechanics
+from world.rules.equipment_effects import EquipmentEffectRule
 from world.rules.item_effects import (
     GaugeAdjustEffect,
     ItemEffectProfile,
@@ -80,7 +81,6 @@ _BLADE = make_item(
     display_name_zh="測試長劍",
     sellable=False,
     equipment_slot=EquipmentSlot.WEAPON_MAIN,
-    modifier_key=EquipmentModifierKey.PLAIN_SWORD,
 )
 _TONIC_KEY = "t_panel_tonic"
 _TONIC = make_item(
@@ -106,6 +106,9 @@ _SCOPE_EXTRA = {
         row.key: row for row in (_BLADE, _TONIC, *_MAXIMAL_ITEMS)
     },
     "item_effect_profiles": {_TONIC_KEY: _HEAL_PROFILE},
+    "equipment_effect_rules": {
+        _BLADE.key: EquipmentEffectRule({}, {}, (), (), 0),
+    },
 }
 
 

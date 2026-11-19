@@ -1,0 +1,14 @@
+# The single entry point for the shipped item catalog.
+# `files` is the authored presentation order; row order inside each file
+# is preserved. Every other .yaml in this directory must be listed.
+schema_version: 1
+files:
+  - core_items.yaml
+  - armor_accessories_materials.yaml
+  - named_equipment.yaml
+  - inspect_only_codex.yaml
+  - regional_equipment.yaml
+  - intimacy_items.yaml
+  - military_equipment.yaml
+  - guild_accessories.yaml
+  - elven_village_goods.yaml

@@ -77,7 +77,6 @@ from world.lore.elements import Element
 from world.lore.guild import GuildBranch, GuildRank
 from world.lore.items import (
     ItemDefinition,
-    EquipmentModifierKey,
     EquipmentSlot,
     ItemIconKey,
     ItemKind,
@@ -146,14 +145,18 @@ from world.tests.synthetic_data.vocab import (
     SYNTH_PREFIX,
     _SYNTH_MAP_KEY,
     _shipped_first_element_key,
-    _first_equipment_modifier_key,
     _shipped_first_element_row,
     _SYNTH_ELEMENT,
     _SYNTH_ELEMENT_ROW,
     SYNTH_GLOWMIRE_ELEMENT,
     _synth_elements,
 )
-from world.tests.synthetic_data.data_items import SYNTH_PRICES, SYNTH_ITEMS, SYNTH_ITEM_EFFECT_PROFILES
+from world.tests.synthetic_data.data_items import (
+    SYNTH_EQUIPMENT_EFFECT_RULES,
+    SYNTH_ITEMS,
+    SYNTH_ITEM_EFFECT_PROFILES,
+    SYNTH_PRICES,
+)
 from world.tests.synthetic_data.data_skills import (
     SYNTH_SKILLS,
     SYNTH_ACT_SKILL,
@@ -240,6 +243,7 @@ from world.tests.synthetic_data.install import (
     _INSTALLED_ATTRS,
     _INSTALL_REPLACEMENTS,
     _INSTALLED_DICTS,
+    graft_synthetic_equipment,
     install_synthetic_catalogs,
     _INSTALLED_DICTS,
     uninstall_synthetic_catalogs,
@@ -293,6 +297,7 @@ __all__ = [
     "SYNTH_PREFIX",
     "discover_consumer_bindings",
     "discover_import_time_derivations",
+    "graft_synthetic_equipment",
     "install_synthetic_catalogs",
     "make_*",
     "synthetic_registries",

@@ -160,21 +160,8 @@ _LINEAGE_SKILLS = {
 }
 
 
-# The kit's regen-style buff row the equipment fixtures attach through the
-# borrowed modifier key, plus the gauge-capped armor and the second
-# accessory-role item the worn-equipment fixtures need. Every shipped
-# modifier key resolves its effect layer through the shipped rulebook, so
-# the caps/attached-buff facts are read FROM that rulebook at runtime rather
-# than pinned as literals here.
-_MODIFIER_KEYS = list(
-    __import__(
-        "world.lore.items", fromlist=["EquipmentModifierKey"]
-    ).EquipmentModifierKey
-)
-
-
 def _rulebook_entry_with(feature: str):
-    """(modifier key, entry) for the first rulebook row matching a feature."""
+    """(shipped item key, entry) for the first rulebook row matching a feature."""
     from world.rules.equipment_effects import EQUIPMENT_EFFECT_RULES
 
     for key, entry in EQUIPMENT_EFFECT_RULES.items():
@@ -201,45 +188,42 @@ _SLOT_ACCESSORY = EquipmentSlot.ACCESSORY
 _SLOT_ACCESSORIES = "accessories"
 
 
-_CAP_MODIFIER_KEY, _CAP_ENTRY = _rulebook_entry_with("cap")
+_, _CAP_ENTRY = _rulebook_entry_with("cap")
 
 
-_BUFF_MODIFIER_KEY, _BUFF_ENTRY = _rulebook_entry_with("attached")
+_, _BUFF_ENTRY = _rulebook_entry_with("attached")
 
 
-def _plain_modifier_key():
+def _plain_entry():
     """A rulebook row with no caps and no attached buffs (side-effect-free)."""
     from world.rules.equipment_effects import EQUIPMENT_EFFECT_RULES
 
-    for key, entry in EQUIPMENT_EFFECT_RULES.items():
+    for entry in EQUIPMENT_EFFECT_RULES.values():
         if not entry.gauge_caps and not entry.attached_buffs:
-            return key
+            return entry
     raise AssertionError("every rulebook row carries a side effect")
 
 
-_PLAIN_MODIFIER_KEY = _plain_modifier_key()
+_PLAIN_ENTRY = _plain_entry()
 
 
-# Synthetic gear bound to the borrowed modifier keys so the shipped
-# rulebook resolves their effect layers exactly as production gear would.
+# Synthetic gear carrying its own rulebook row under its own key, so the
+# shipped rulebook layer resolves exactly as production gear would.
 _PLATEMAIL_ROW = make_item(
     "t_bulwark_plate",
     equipment_slot=_SLOT_ARMOR,
-    modifier_key=_CAP_MODIFIER_KEY,
 )
 
 
 _BEADS_ROW = make_item(
     "t_mote_charm",
     equipment_slot=_SLOT_ACCESSORY,
-    modifier_key=_BUFF_MODIFIER_KEY,
 )
 
 
 _NEUTRAL_WEAPON = make_item(
     "t_drifting_blade",
     equipment_slot=EquipmentSlot.WEAPON_MAIN,
-    modifier_key=_PLAIN_MODIFIER_KEY,
 )
 
 
@@ -248,7 +232,6 @@ _NEUTRAL_WEAPON = make_item(
 _PACK_TRINKET = make_item(
     "t_quiet_charm",
     equipment_slot=EquipmentSlot.ACCESSORY,
-    modifier_key=_PLAIN_MODIFIER_KEY,
 )
 
 
@@ -261,8 +244,18 @@ _WORN_KIT_SUBRACE = make_subrace("t_clad_folk_kin")
 _OFFHAND_ROW = make_item(
     "t_hush_fang",
     equipment_slot=EquipmentSlot.WEAPON_OFF,
-    modifier_key=_PLAIN_MODIFIER_KEY,
 )
+
+
+def equipment_effect_rows() -> dict[str, object]:
+    """The dedicated rule every scoped synthetic gear row binds by its own key."""
+    return {
+        _PLATEMAIL_ROW.key: _CAP_ENTRY,
+        _BEADS_ROW.key: _BUFF_ENTRY,
+        _NEUTRAL_WEAPON.key: _PLAIN_ENTRY,
+        _PACK_TRINKET.key: _PLAIN_ENTRY,
+        _OFFHAND_ROW.key: _PLAIN_ENTRY,
+    }
 
 
 # The deep preset card: a kit preset declaring the tree's crown, so

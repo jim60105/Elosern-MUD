@@ -2239,9 +2239,9 @@ def _participant_reads(
         for trait_key, value in reads.effective_traits(entity).items()
     }
     modifiers = dict(reads.modifiers(entity))
-    for modifier_key in ("atk_phys", "magic_power", "defense", "accuracy", "agility_flat"):
-        if modifier_key in modifiers:
-            _finite(modifiers[modifier_key], f"{identity}.{modifier_key}")
+    for stat_key in ("atk_phys", "magic_power", "defense", "accuracy", "agility_flat"):
+        if stat_key in modifiers:
+            _finite(modifiers[stat_key], f"{identity}.{stat_key}")
     return _Participant(
         entity=entity,
         identity=identity,

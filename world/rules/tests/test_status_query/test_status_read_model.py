@@ -66,7 +66,7 @@ class StatusReadModelTests(EvenniaTest):
         self.addCleanup(stack.close)
         items = {
             key: SimpleNamespace(
-                key=key, display_name_zh=label, modifier_key=key,
+                key=key, display_name_zh=label,
                 equipment_slot=EquipmentSlot.ACCESSORY,
             )
             for key, label in (("t_a", "合成護符甲"), ("t_b", "合成護符乙"))

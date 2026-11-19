@@ -10,7 +10,6 @@ from unittest.mock import patch
 from tools.spec_traceability import covers_requirement
 from typeclasses.components import GuildExamReception, GuildStaff, Merchant
 from world.lore.items import (
-    EquipmentModifierKey,
     ItemDefinition,
     ItemIconKey,
     ItemKind,

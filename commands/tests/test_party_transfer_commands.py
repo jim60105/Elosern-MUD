@@ -18,7 +18,6 @@ from commands.localized import CmdGive
 from typeclasses.characters import PlayerCharacter
 from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
-from world.lore.items import EquipmentModifierKey
 from world.quests.binding import bind_stage_runtime
 from world.quests.definitions import QuestStage
 from world.quests.runtime import read_records
@@ -59,7 +58,6 @@ _BLADE = make_item(
     display_name_zh="測試長劍",
     sellable=False,
     equipment_slot=EquipmentSlot.WEAPON_MAIN,
-    modifier_key=EquipmentModifierKey.PLAIN_SWORD,
 )
 _SEAL = make_item(
     "t_cmd_transfer_seal", display_name_zh="測試徽記", sellable=False, guild_property=True
@@ -68,7 +66,14 @@ _SEAL = make_item(
 
 def _scope_extra():
     """The locally authored item rows this module exercises."""
-    return {"items": {row.key: row for row in (_POTION, _BLADE, _SEAL)}}
+    from world.rules.equipment_effects import EquipmentEffectRule
+
+    return {
+        "items": {row.key: row for row in (_POTION, _BLADE, _SEAL)},
+        "equipment_effect_rules": {
+            _BLADE.key: EquipmentEffectRule({}, {}, (), (), 0)
+        },
+    }
 
 
 class _TransferCommandBase(BattlefieldIsolation, EvenniaCommandTestMixin, EvenniaTest):

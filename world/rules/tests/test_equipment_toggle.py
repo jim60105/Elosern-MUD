@@ -14,7 +14,6 @@ from unittest.mock import patch
 from evennia.utils.test_resources import EvenniaTest
 
 from world.lore.items import (
-    EquipmentModifierKey,
     ItemDefinition,
     ItemIconKey,
     ItemKind,
@@ -27,6 +26,7 @@ from world.rules.equipment import (
     preflight_equipment_toggle,
     toggle_equipment,
 )
+from world.rules.equipment_effects import EquipmentEffectRule
 from world.skills.equipment import ACCESSORY_MAX_SLOTS, EquipmentSlot, list_items
 from world.tests.synthetic_data import SYNTH_ITEMS
 
@@ -48,7 +48,6 @@ def _fixture_definition(key: str, slot: EquipmentSlot) -> ItemDefinition:
         sellable=False,
         presentation=_PRESENTATION,
         equipment_slot=slot,
-        modifier_key=EquipmentModifierKey.PLAIN_SWORD,
     )
 
 
@@ -73,8 +72,11 @@ class _ToggleTestCase(EvenniaTest):
         self.entity.db.inventory = []
 
     def register(self, *keys_and_slots: tuple[str, EquipmentSlot]) -> None:
+        from world.rules.equipment_effects import EQUIPMENT_EFFECT_RULES
+
         for key, slot in keys_and_slots:
             live_item_registry()[key] = _fixture_definition(key, slot)
+            EQUIPMENT_EFFECT_RULES[key] = EquipmentEffectRule({}, {}, (), (), 0)
 
     def hold(self, *keys: str) -> None:
         self.entity.db.inventory = list(keys)

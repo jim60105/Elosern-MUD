@@ -124,7 +124,7 @@ class DamageBandTests(unittest.TestCase):
     )
     def test_weapon_damage_multiplier_physical_consumer_and_controls(self):
         from world.rules.combat import _handle_heal
-        from world.lore.items import EquipmentSlot, EquipmentModifierKey
+        from world.lore.items import EquipmentSlot
         from world.rules.equipment_effects import EquipmentEffectRule
         from world.tests.synthetic_data import make_item
 
@@ -132,7 +132,6 @@ class DamageBandTests(unittest.TestCase):
         synth_main = make_item(
             key="t_synth_main_sword",
             equipment_slot=EquipmentSlot.WEAPON_MAIN,
-            modifier_key=EquipmentModifierKey.PLAIN_SWORD,
         )
         rule_1_5 = EquipmentEffectRule(
             adjustments={},
@@ -151,7 +150,7 @@ class DamageBandTests(unittest.TestCase):
         }
         target = FakeEntity("target", combat_identity='target', hp=100, defense=20, agility=10)
         with patch.dict("world.rules.equipment_effects.ITEM_REGISTRY", {synth_main.key: synth_main}):
-            with patch.dict("world.rules.equipment_effects.EQUIPMENT_EFFECT_RULES", {EquipmentModifierKey.PLAIN_SWORD: rule_1_5}):
+            with patch.dict("world.rules.equipment_effects.EQUIPMENT_EFFECT_RULES", {synth_main.key: rule_1_5}):
                 with patch("world.rules.combat.damage.evaluate_combat_modifiers", return_value={}):
                     with patch("world.rules.combat.damage.roll_d100", return_value=60):
                         # Physical strike: attack=60 * 1.5 = 90. K=40, def=20 => 90 * 40 / 60 = 60.
@@ -173,7 +172,7 @@ class DamageBandTests(unittest.TestCase):
         "combat-resolution::physical-damage-multiplies-the-rounded-attack-component-by-equipped-weapon-factor"
     )
     def test_weapon_damage_multiplier_critical_conditional_and_multistrike(self):
-        from world.lore.items import EquipmentSlot, EquipmentModifierKey
+        from world.lore.items import EquipmentSlot
         from world.rules.equipment_effects import EquipmentEffectRule
         from world.skills.effects import DamagePolicy, EffectPolicy, ResolvedEffect
         from world.tests.synthetic_data import make_item
@@ -181,7 +180,6 @@ class DamageBandTests(unittest.TestCase):
         synth_main = make_item(
             key="t_synth_ms_sword",
             equipment_slot=EquipmentSlot.WEAPON_MAIN,
-            modifier_key=EquipmentModifierKey.PLAIN_SWORD,
         )
         rule_1_5 = EquipmentEffectRule(
             adjustments={},
@@ -203,7 +201,7 @@ class DamageBandTests(unittest.TestCase):
         policy = DamagePolicy(extra_strikes=1, predicate=("dark",), attack_multiplier=2.0)
         res_eff = ResolvedEffect(source_skill="test_ms", policy=EffectPolicy(damage=policy))
         with patch.dict("world.rules.equipment_effects.ITEM_REGISTRY", {synth_main.key: synth_main}):
-            with patch.dict("world.rules.equipment_effects.EQUIPMENT_EFFECT_RULES", {EquipmentModifierKey.PLAIN_SWORD: rule_1_5}):
+            with patch.dict("world.rules.equipment_effects.EQUIPMENT_EFFECT_RULES", {synth_main.key: rule_1_5}):
                 with patch("world.rules.combat.damage.evaluate_combat_modifiers", return_value={}):
                     # Roll natural 100 -> critical hit (crit_multiplier = 2.0)
                     with patch("world.rules.combat.damage.roll_d100", return_value=100):

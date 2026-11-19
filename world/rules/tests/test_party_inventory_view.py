@@ -18,7 +18,8 @@ from tools.spec_traceability import covers_requirement
 
 from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
-from world.lore.items import EquipmentModifierKey, EquipmentSlot, ItemUseMechanics
+from world.lore.items import EquipmentSlot, ItemUseMechanics
+from world.rules.equipment_effects import EquipmentEffectRule
 from world.rules.combat_session import engage, read_session
 from world.rules.equipment import materialize_registry_object
 from world.rules.item_effects import (
@@ -54,14 +55,12 @@ _BLADE = make_item(
     display_name_zh="測試長劍",
     sellable=False,
     equipment_slot=EquipmentSlot.WEAPON_MAIN,
-    modifier_key=EquipmentModifierKey.PLAIN_SWORD,
 )
 _ROBE = make_item(
     "t_view_robe",
     display_name_zh="測試長袍",
     sellable=False,
     equipment_slot=EquipmentSlot.ARMOR,
-    modifier_key=EquipmentModifierKey.LEATHER_ARMOR,
 )
 _CHARMS = tuple(
     make_item(
@@ -69,7 +68,6 @@ _CHARMS = tuple(
         display_name_zh=f"測試飾品{index}",
         sellable=False,
         equipment_slot=EquipmentSlot.ACCESSORY,
-        modifier_key=EquipmentModifierKey.SILVER_HAIRPIN,
     )
     for index in range(6)
 )
@@ -93,7 +91,6 @@ _SEAL = make_item(
     sellable=False,
     guild_property=True,
     equipment_slot=EquipmentSlot.ACCESSORY,
-    modifier_key=EquipmentModifierKey.SILVER_HAIRPIN,
 )
 _MATERIALS = tuple(
     make_item(f"t_view_material_{index}", display_name_zh=f"測試素材{index}")
@@ -122,6 +119,15 @@ _SCOPE_EXTRA = {
     "item_effect_profiles": {
         _TONIC_KEY: _HEAL_PROFILE,
         _FIELD_ONLY_KEY: _HEAL_PROFILE,
+    },
+    "equipment_effect_rules": {
+        "t_view_blade": EquipmentEffectRule({}, {}, (), (), 0),
+        "t_view_robe": EquipmentEffectRule({}, {}, (), (), 0),
+        "t_view_seal": EquipmentEffectRule({}, {}, (), (), 0),
+        **{
+            f"t_view_charm_{index}": EquipmentEffectRule({}, {}, (), (), 0)
+            for index in range(6)
+        },
     },
 }
 

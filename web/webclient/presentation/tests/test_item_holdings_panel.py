@@ -28,7 +28,7 @@ from tools.spec_traceability import covers_requirement
 
 from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
-from world.lore.items import EquipmentModifierKey, EquipmentSlot
+from world.lore.items import EquipmentSlot
 from world.rules.combat_session import engage
 from world.rules.equipment_effects import EquipmentEffectRule
 from world.rules.party import join_party
@@ -73,45 +73,42 @@ _SWORD = make_item(
     display_name_zh="測試鋼劍",
     sellable=False,
     equipment_slot=EquipmentSlot.WEAPON_MAIN,
-    modifier_key=EquipmentModifierKey.PLAIN_SWORD,
 )
 _STAFF = make_item(
     "t_hold_panel_staff",
     display_name_zh="測試法杖",
     sellable=False,
     equipment_slot=EquipmentSlot.WEAPON_MAIN,
-    modifier_key=EquipmentModifierKey.APPRENTICE_FOCUS_STAFF,
 )
 _CHARM = make_item(
     "t_hold_panel_charm",
     display_name_zh="測試飾品",
     sellable=False,
     equipment_slot=EquipmentSlot.ACCESSORY,
-    modifier_key=EquipmentModifierKey.SILVER_HAIRPIN,
 )
 _TONIC_KEY = "t_hold_panel_tonic"
 _TONIC = make_item(_TONIC_KEY, display_name_zh="測試藥水", sellable=False)
 
 _SCOPE_EXTRA = {
-    "items": {row.key: row for row in (_SWORD, _STAFF, _CHARM, _TONIC)}
+    "items": {row.key: row for row in (_SWORD, _STAFF, _CHARM, _TONIC)},
 }
 
 _EFFECT_RULES = {
-    EquipmentModifierKey.PLAIN_SWORD: EquipmentEffectRule(
+    _SWORD.key: EquipmentEffectRule(
         adjustments={"atk_phys": 6},
         gauge_caps={},
         immune=(),
         attached_buffs=(),
         exposure_bias=0,
     ),
-    EquipmentModifierKey.APPRENTICE_FOCUS_STAFF: EquipmentEffectRule(
+    _STAFF.key: EquipmentEffectRule(
         adjustments={},
         gauge_caps={},
         immune=(),
         attached_buffs=(),
         exposure_bias=0,
     ),
-    EquipmentModifierKey.SILVER_HAIRPIN: EquipmentEffectRule(
+    _CHARM.key: EquipmentEffectRule(
         adjustments={"defense": 2},
         gauge_caps={},
         immune=(),
@@ -119,6 +116,8 @@ _EFFECT_RULES = {
         exposure_bias=0,
     ),
 }
+
+_SCOPE_EXTRA["equipment_effect_rules"] = dict(_EFFECT_RULES)
 
 _EMPTY = {"weapon_main": None, "weapon_off": None, "armor": None, "accessories": []}
 

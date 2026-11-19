@@ -1,0 +1,381 @@
+# Item catalogue slice: named equipment.
+# Each row authors its own definition and its dedicated effects.
+items:
+  - key: baptismal_holy_water
+    display_name_zh: 受洗聖水
+    price_table_key: potion
+    sellable: true
+    presentation:
+      kind: potion
+      icon_key: potion
+      rarity: uncommon
+      summary_zh: 光明教會祝禱的受洗聖水，能移除身上所有負面狀態。
+    use_mechanics:
+      consumable: true
+      combat_allowed: true
+      effects:
+        - remove_status: negative
+  - key: greater_healing_potion
+    display_name_zh: 強效治療藥水
+    price_table_key: potion
+    sellable: true
+    presentation:
+      kind: potion
+      icon_key: potion
+      rarity: rare
+      summary_zh: 濃縮煉製的高階治療藥劑。
+    use_mechanics:
+      consumable: true
+      combat_allowed: true
+      effects:
+        - stat: hp
+          amount: 120
+  - key: mana_potion
+    display_name_zh: 魔力藥水
+    price_table_key: potion
+    sellable: true
+    presentation:
+      kind: potion
+      icon_key: potion
+      rarity: uncommon
+      summary_zh: 恢復魔力的藍色藥劑。
+    use_mechanics:
+      consumable: true
+      combat_allowed: true
+      effects:
+        - stat: mp
+          amount: 40
+  - key: elven_traditional_robe
+    display_name_zh: 精靈傳統服飾
+    price_table_key: masterwork_gear
+    sellable: true
+    presentation:
+      kind: armor
+      icon_key: armor
+      rarity: legendary
+      summary_zh: 精靈族的白色蛛絲傳統服飾，精靈村商店的鎮店商品，體現「以坦露為聖」的文化。
+    equipment_slot: armor
+    equipment_effects:
+      adjustments:
+        defense: 3
+        pleasure_gain: +20%
+      exposure_bias: 2
+  - key: royal_signet_ring
+    display_name_zh: 薇歐蕾特的誕生細金戒
+    price_table_key: relic
+    sellable: false
+    presentation:
+      kind: accessory
+      icon_key: accessory
+      rarity: rare
+      summary_zh: 王室在長女誕生之年打造的紋章細金戒，全王國只鍛了這一枚；她戴在右手無名指的這枚細金戒，是隨身攜帶的唯一身分象徵。
+    equipment_slot: accessory
+    equipment_effects:
+      adjustments:
+        atk_phys: 3
+        sp_cost: -5%
+  - key: royal_heirloom_pendant
+    display_name_zh: 王室紋章吊墜
+    price_table_key: relic
+    sellable: false
+    presentation:
+      kind: accessory
+      icon_key: accessory
+      rarity: rare
+      summary_zh: 王室的紋章吊墜，代代相傳、貼身攜帶，象徵王室血脈的延續。
+    equipment_slot: accessory
+    equipment_effects:
+      adjustments:
+        defense: 4
+        mp_cost: -5%
+  - key: rose_crest_rapier
+    display_name_zh: 薇歐蕾特親刻薔薇輕劍
+    price_table_key: relic
+    sellable: false
+    presentation:
+      kind: weapon
+      icon_key: weapon
+      rarity: epic
+      summary_zh: 劍柄末端刻有薇歐蕾特親手雕的王室薔薇紋章，全大陸獨一無二，是主僕情誼的信物。
+    equipment_slot: weapon_main
+    equipment_effects:
+      adjustments:
+        atk_phys: 7
+        agility: 3
+      weapon_damage_multiplier: 1.2
+  - key: black_maid_dress
+    display_name_zh: 黑色女僕裝
+    price_table_key: relic
+    sellable: false
+    presentation:
+      kind: armor
+      icon_key: armor
+      rarity: uncommon
+      summary_zh: 侍女常見的黑白女僕裝，貼身剪裁自帶服從的暗示。
+    equipment_slot: armor
+    equipment_effects:
+      adjustments:
+        pleasure_gain: +10%
+      exposure_bias: 1
+  - key: silver_feather_earring
+    display_name_zh: 十二歲的銀羽
+    price_table_key: relic
+    sellable: false
+    presentation:
+      kind: accessory
+      icon_key: accessory
+      rarity: rare
+      summary_zh: 薇歐蕾特十二歲那年親贈的銀羽耳環，自贈與那日起從未摘下；名字本身就是一段年月。
+    equipment_slot: accessory
+    equipment_effects:
+      adjustments:
+        pleasure_gain: +15%
+      exposure_bias: 1
+  - key: crescent_earring
+    display_name_zh: 月牙耳環
+    price_table_key: masterwork_gear
+    sellable: true
+    presentation:
+      kind: accessory
+      icon_key: accessory
+      rarity: epic
+      summary_zh: 精靈匠作的月牙形耳環，精靈工藝的代表作，精靈村商店的定番首飾。
+    equipment_slot: accessory
+    equipment_effects:
+      adjustments:
+        pleasure_gain: +15%
+        sp_cost: -8%
+  - key: dark_elf_kimono
+    display_name_zh: 精靈短袍傳統服飾
+    price_table_key: masterwork_gear
+    sellable: true
+    presentation:
+      kind: armor
+      icon_key: armor
+      rarity: epic
+      summary_zh: 精靈的墨黑短袍傳統服飾，剪裁取法遊女的裝扮，精靈村商店的現成品。
+    equipment_slot: armor
+    equipment_effects:
+      adjustments:
+        pleasure_gain: +15%
+        agility: 3
+      exposure_bias: 1
+  - key: shadow_blade
+    display_name_zh: 暗影鋼刀
+    price_table_key: masterwork_gear
+    sellable: true
+    presentation:
+      kind: weapon
+      icon_key: weapon
+      rarity: legendary
+      summary_zh: 暗影鋼鍛成的雙刀之一，主手刀。
+    equipment_slot: weapon_main
+    equipment_effects:
+      adjustments:
+        atk_phys: 12
+        agility: 3
+      weapon_damage_multiplier: 1.28
+  - key: shadow_blade_echo
+    display_name_zh: 暗影鋼刀‧影
+    price_table_key: masterwork_gear
+    sellable: true
+    presentation:
+      kind: weapon
+      icon_key: weapon
+      rarity: legendary
+      summary_zh: 暗影鋼鍛成的雙刀之一，副手影刀。
+    equipment_slot: weapon_off
+    equipment_effects:
+      adjustments:
+        atk_phys: 10
+        agility: -3
+      weapon_damage_multiplier: 1.25
+  - key: dark_elf_ninja_garb
+    display_name_zh: 精靈戰鬥服飾
+    price_table_key: masterwork_gear
+    sellable: true
+    presentation:
+      kind: armor
+      icon_key: armor
+      rarity: epic
+      summary_zh: 精靈的墨黑戰鬥服飾，剪裁取法忍者的裝扮，兼顧行動力，精靈村商店的現成品。
+    equipment_slot: armor
+    equipment_effects:
+      adjustments:
+        defense: 5
+        agility: 5
+  - key: guild_recruit_badge
+    display_name_zh: 公會見習徽記
+    price_table_key: relic
+    sellable: false
+    presentation:
+      kind: accessory
+      icon_key: misc
+      rarity: common
+      summary_zh: 公會登錄時發給的見習徽記，是公會承認的身分證明；不可轉讓、不可交易，配戴時防禦 +1。
+    equipment_slot: accessory
+    equipment_effects:
+      adjustments:
+        defense: 1
+  - key: purified_pendant
+    display_name_zh: 淨化吊墜
+    price_table_key: magic_accessory
+    sellable: true
+    presentation:
+      kind: accessory
+      icon_key: accessory
+      rarity: rare
+      summary_zh: 牧師以聖水反覆洗淨的銀質吊墜，據說能隔絕瘴毒。
+    equipment_slot: accessory
+    equipment_effects:
+      adjustments:
+        defense: 2
+      immune:
+        - poisoned
+  - key: fearless_brooch
+    display_name_zh: 無懼胸針
+    price_table_key: magic_accessory
+    sellable: true
+    presentation:
+      kind: accessory
+      icon_key: accessory
+      rarity: rare
+      summary_zh: 獵魔人佩戴的赤鐵胸針，佩戴者不再聽見恐懼的低語。
+    equipment_slot: accessory
+    equipment_effects:
+      immune:
+        - fear
+  - key: knight_platemail
+    display_name_zh: 騎士全套板甲
+    price_table_key: armor
+    sellable: true
+    presentation:
+      kind: armor
+      icon_key: armor
+      rarity: rare
+      summary_zh: 騎士團儀仗用的全身板甲，防護全面但極為沉重。
+    equipment_slot: armor
+    equipment_effects:
+      adjustments:
+        atk_phys: -2
+        defense: 8
+        agility: -10%
+      gauge_caps:
+        hp: 15
+  - key: apothecary_beads
+    display_name_zh: 藥師珠串
+    price_table_key: jewelry
+    sellable: true
+    presentation:
+      kind: accessory
+      icon_key: accessory
+      rarity: uncommon
+      summary_zh: 草藥師以藥草樹脂煉成的珠串，溫潤的氣息緩緩滋養身體。
+    equipment_slot: accessory
+    equipment_effects:
+      attached_buffs:
+        - item_regen_light
+  - key: archmage_mending_robe
+    display_name_zh: 大術師補綴長袍
+    price_table_key: armor
+    sellable: true
+    presentation:
+      kind: armor
+      icon_key: armor
+      rarity: epic
+      summary_zh: 內裡縫滿回復符文的學者長袍，施法時法力的耗損明顯減輕。
+    equipment_slot: armor
+    equipment_effects:
+      adjustments:
+        magic_power: 8
+        mp_cost: -12%
+  - key: enticing_lace_set
+    display_name_zh: 誘蠱蕾絲內衣
+    price_table_key: armor
+    sellable: true
+    presentation:
+      kind: armor
+      icon_key: armor
+      rarity: uncommon
+      summary_zh: 黑市流傳的紫色蕾絲內衣，穿者舉手投足自帶挑逗的氣息。
+    equipment_slot: armor
+    equipment_effects:
+      adjustments:
+        pleasure_gain: +15%
+      exposure_bias: 1
+  - key: passion_silk_choker
+    display_name_zh: 迷情絲頸環
+    price_table_key: jewelry
+    sellable: true
+    presentation:
+      kind: accessory
+      icon_key: accessory
+      rarity: epic
+      summary_zh: 浸過迷情藥的深紅絲絨頸環，肌膚愈親近，感官愈熾熱。
+    equipment_slot: accessory
+    equipment_effects:
+      adjustments:
+        defense: -3
+        pleasure_gain: +25%
+  - key: sister_vestments
+    display_name_zh: 修女聖袍
+    price_table_key: armor
+    sellable: true
+    presentation:
+      kind: armor
+      icon_key: armor
+      rarity: rare
+      summary_zh: 光明教會修女的白銀聖袍，前襟自鎖骨一路開到臍下，兩側腰身只以聖徽細鏈相連，下襬分襬讓腿根全無遮擋，裙下從不著寸縷。聖職服儀刻意做成這副模樣，修女隨時掀開下襬就能被按在祭壇邊行房，體現以坦露為聖的教義精神。
+    liturgical_role: vestment_or_emblem
+    equipment_slot: armor
+    equipment_effects:
+      adjustments:
+        defense: -4
+        pleasure_gain: +20%
+        heal_gain: +10%
+      exposure_bias: 1
+  - key: radiant_holy_emblem
+    display_name_zh: 光輝聖徽
+    price_table_key: magic_accessory
+    sellable: true
+    presentation:
+      kind: accessory
+      icon_key: accessory
+      rarity: rare
+      summary_zh: 牧師祝禱的日輪聖徽，聖光為虔信者癒傷驅邪。
+    liturgical_role: vestment_or_emblem
+    equipment_slot: accessory
+    equipment_effects:
+      adjustments:
+        pleasure_gain: +10%
+        heal_gain: +20%
+      immune:
+        - dark_curse
+  - key: saintess_vestments
+    display_name_zh: 聖女聖袍
+    price_table_key: armor
+    sellable: true
+    presentation:
+      kind: armor
+      icon_key: armor
+      rarity: legendary
+      summary_zh: 傳說由聖女親手繡製的祭儀聖袍，近乎透明的聖絲只護住肩頸與背脊，胸口自鎖骨以下的起伏一覽無遺，腰間懸鈴不繫帶，分襬開至腰際，裙下的聖光裡什麼都不藏；聖女只領受、不施予，高潮本身就是公開的祝福奇蹟，聖寵如光暈環繞穿戴之人。
+    liturgical_role: vestment_or_emblem
+    equipment_slot: armor
+    equipment_effects:
+      adjustments:
+        defense: -5
+        pleasure_gain: +30%
+        heal_gain: +25%
+      exposure_bias: 2
+  - key: royal_traveling_robe
+    display_name_zh: 王室出行長袍
+    price_table_key: relic
+    sellable: false
+    presentation:
+      kind: armor
+      icon_key: armor
+      rarity: uncommon
+      summary_zh: 王國縫製工坊為首次出行的王女趕製的旅行長袍，剪裁端莊、袖口繡著王室紋章，專為長路與施法而製。
+    equipment_slot: armor
+    equipment_effects: {}

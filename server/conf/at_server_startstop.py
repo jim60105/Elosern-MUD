@@ -401,6 +401,22 @@ def _verify_population_state() -> None:
         require_initialized_population(script)
 
 
+def _validate_item_rulebooks() -> None:
+    """Fail-loud item and equipment rulebook validation (idempotent).
+
+    Importing either module validates the production ``content/items/``
+    candidate once; each ``ensure_*`` check then confirms that validation has
+    completed and never rereads or revalidates an already validated catalog
+    (design D2). Both domains share the load-bearing fail-loud contract: a
+    malformed item row, use-effect list, or equipment-effect mapping aborts
+    boot before any world synchronization can persist partial state.
+    """
+    item_effects = importlib.import_module("world.rules.item_effects")
+    equipment_effects = importlib.import_module("world.rules.equipment_effects")
+    item_effects.ensure_item_effect_rules_validated()
+    equipment_effects.ensure_equipment_effect_rules_validated()
+
+
 def at_server_start():
     """
     This is called every time the server starts up, regardless of
@@ -459,14 +475,12 @@ def at_server_start():
     # Deterministic startup owns the world-clock singleton; presentation reads
     # only through read_world_clock() and must never create it.
     _startup_step("world_clock_init", get_world_clock)
-    # Fail-loud equipment-effect rulebook validation (add-equipment-effect-
-    # rulebook D4): the only sanctioned startup consumer of the loader. The
-    # module import itself validates the canonical rulebook; a malformed
-    # roster aborts boot before any world sync can persist partial state.
-    _startup_step(
-        "equipment_rulebook_validation",
-        lambda: importlib.import_module("world.rules.equipment_effects"),
-    )
+    # Fail-loud item and equipment rulebook validation: the only sanctioned
+    # startup consumer of both loaders. Importing either module validates the
+    # production `content/items/` candidate, and the ensure checks complete the
+    # idempotent startup gate. A malformed row, use-effect list, or equipment
+    # mapping aborts boot before any world sync can persist partial state.
+    _startup_step("equipment_rulebook_validation", _validate_item_rulebooks)
     # Fail-loud guild-exam restriction rulebook validation
     # (guild-exam-restriction-policy): importing the module validates every
     # authored restriction row against the shipped items and skills, and the

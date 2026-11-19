@@ -612,9 +612,7 @@ class EquipmentGrowthCommittedReloadTests(TransactionTestCase):
         self.assertEqual(toggle_equipment(actor, item_key).outcome, "success")
 
     def _factor(self, item_key: str) -> float:
-        return EQUIPMENT_EFFECT_RULES[
-            ITEM_REGISTRY[item_key].modifier_key
-        ].weapon_damage_multiplier
+        return EQUIPMENT_EFFECT_RULES[item_key].weapon_damage_multiplier
 
     def _staged(self, attacker, defender, school: str) -> int:
         with patch("world.rules.combat.damage.roll_d100", return_value=_GROWTH_ROLL):
@@ -745,9 +743,7 @@ class EquipmentGrowthCommittedReloadTests(TransactionTestCase):
         self.assertEqual(equipment_weapon_multiplier(heavy_defender), 1.0)
         self.assertEqual(
             dict(equipment_adjustments(heavy_defender))["defense"],
-            EQUIPMENT_EFFECT_RULES[
-                ITEM_REGISTRY["military_s_armor"].modifier_key
-            ].adjustments["defense"],
+            EQUIPMENT_EFFECT_RULES["military_s_armor"].adjustments["defense"],
         )
         # The attacker's selected factor is untouched by the defender's armor.
         self.assertEqual(
@@ -927,14 +923,13 @@ _AUTHORED_SELECTED_WEAPON = "military_s_sword"
 @contextmanager
 def _declared_factor(attacker, factor: float):
     """Equip one file-local synthetic weapon declaring ``factor`` on the actor."""
-    from world.lore.items import EquipmentModifierKey, EquipmentSlot
+    from world.lore.items import EquipmentSlot
     from world.rules.equipment_effects import EquipmentEffectRule
     from world.tests.synthetic_data import make_item
 
     item = make_item(
         key="t_factor_sword",
         equipment_slot=EquipmentSlot.WEAPON_MAIN,
-        modifier_key=EquipmentModifierKey.PLAIN_SWORD,
     )
     rule = EquipmentEffectRule(
         adjustments={},
@@ -951,7 +946,7 @@ def _declared_factor(attacker, factor: float):
         patch.dict("world.rules.equipment_effects.ITEM_REGISTRY", {item.key: item}),
         patch.dict(
             "world.rules.equipment_effects.EQUIPMENT_EFFECT_RULES",
-            {EquipmentModifierKey.PLAIN_SWORD: rule},
+            {item.key: rule},
         ),
     ):
         yield

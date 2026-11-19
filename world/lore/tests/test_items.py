@@ -15,7 +15,6 @@ from pathlib import Path
 from world.lore.economy import PRICE_TABLE
 from world.lore.items import (
     ITEM_REGISTRY,
-    EquipmentModifierKey,
     ItemDefinition,
     ItemIconKey,
     ItemKind,
@@ -225,7 +224,6 @@ class ItemPresentationTests(unittest.TestCase):
                 "presentation",
                 "use_mechanics",
                 "equipment_slot",
-                "modifier_key",
                 # guild-exam-restriction-policy carries the guild property
                 # binding here so an item can require a guild rank.
                 "guild_property",
@@ -246,13 +244,13 @@ class ItemPresentationTests(unittest.TestCase):
         # Mechanics bindings are references resolved by the deterministic
         # rules capability; presentation carries no mechanics.
         for definition in ITEM_REGISTRY.values():
-            for mechanics_field in ("use_mechanics", "equipment_slot", "modifier_key"):
+            for mechanics_field in ("use_mechanics", "equipment_slot"):
                 value = getattr(definition, mechanics_field)
                 if value is None:
                     continue
                 self.assertIsInstance(
                     value,
-                    (ItemUseMechanics, EquipmentSlot, EquipmentModifierKey),
+                    (ItemUseMechanics, EquipmentSlot),
                     definition.key,
                 )
 
@@ -324,23 +322,10 @@ class ItemMechanicsTests(unittest.TestCase):
                     combat_allowed=True,
                 ),
                 equipment_slot=EquipmentSlot.WEAPON_MAIN,
-                modifier_key=EquipmentModifierKey.PLAIN_SWORD,
             ),
             "bare-string-slot": dict(equipment_slot="weapon_main"),
             "unknown-slot-string": dict(equipment_slot="saddle"),
             "bare-mechanics-object": dict(use_mechanics="self_heal"),
-            "slot-without-modifier": dict(equipment_slot=EquipmentSlot.WEAPON_MAIN),
-            "modifier-without-slot": dict(
-                modifier_key=EquipmentModifierKey.PLAIN_SWORD
-            ),
-            "use-with-modifier": dict(
-                use_mechanics=ItemUseMechanics(
-                    consumable=True,
-                    combat_allowed=True,
-                ),
-                modifier_key=EquipmentModifierKey.PLAIN_SWORD,
-            ),
-            "bare-string-modifier": dict(modifier_key="plain_sword"),
         }
         for name, overrides in cases.items():
             with self.subTest(case=name):
@@ -360,18 +345,14 @@ class ItemMechanicsTests(unittest.TestCase):
     def test_each_equipment_slot_is_acceptable(self):
         for slot in EquipmentSlot:
             with self.subTest(slot=slot.value):
-                definition = self._definition(
-                    equipment_slot=slot,
-                    modifier_key=EquipmentModifierKey.PLAIN_SWORD,
-                )
+                definition = self._definition(equipment_slot=slot)
                 self.assertIs(definition.equipment_slot, slot)
 
-    def test_equipment_slot_requires_a_modifier_key(self):
-        definition = self._definition(
-            equipment_slot=EquipmentSlot.WEAPON_MAIN,
-            modifier_key=EquipmentModifierKey.PLAIN_SWORD,
-        )
-        self.assertIs(definition.modifier_key, EquipmentModifierKey.PLAIN_SWORD)
+    def test_equipment_slot_carries_no_second_identity(self):
+        # The retired per-item binding is gone: the item's own key resolves
+        # its dedicated effects, and no second identifier exists on the row.
+        definition = self._definition(equipment_slot=EquipmentSlot.WEAPON_MAIN)
+        self.assertFalse(hasattr(definition, "modifier_key"))
 
     @covers_requirement(
         "equipment-effects::church-of-light-equipment-obeys-its-canon-doctrine"
@@ -381,7 +362,6 @@ class ItemMechanicsTests(unittest.TestCase):
         # fail at construction -- an effect rule cannot express it at all.
         role_bearing = self._definition(
             equipment_slot=EquipmentSlot.ARMOR,
-            modifier_key=EquipmentModifierKey.SISTER_VESTMENTS,
             liturgical_role=LiturgicalRole.VESTMENT_OR_EMBLEM,
         )
         self.assertIs(

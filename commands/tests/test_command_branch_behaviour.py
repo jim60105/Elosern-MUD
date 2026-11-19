@@ -445,14 +445,13 @@ class EconomyCommandBranchTests(TestCase):
         # Kit gear bound to a runtime-probed rulebook row whose rule is
         # replaced with locally authored numbers: the row renders the prose
         # suffix, the plain consumable row stays bare (prose-free path).
-        modifier, rule = unique_rule(
+        _, rule = unique_rule(
             "attached_buffs", lambda candidate: bool(candidate.attached_buffs)
         )
         gear = make_item(
             "t_branch_prose_blade",
             display_name_zh="韻文合成刃",
             equipment_slot=EquipmentSlot.WEAPON_MAIN,
-            modifier_key=modifier,
         )
         authored = replace(
             rule,
@@ -470,7 +469,7 @@ class EconomyCommandBranchTests(TestCase):
             "commands.economy.list_items",
             return_value=[gear.key, "t_ember_spray"],
         ), scope, patch.dict(
-            equipment_effects.EQUIPMENT_EFFECT_RULES, {modifier: authored}
+            equipment_effects.EQUIPMENT_EFFECT_RULES, {gear.key: authored}
         ):
             command.func()
         self.assertEqual(

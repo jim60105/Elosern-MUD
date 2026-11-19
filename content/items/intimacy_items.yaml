@@ -1,0 +1,179 @@
+# Item catalogue slice: intimacy items.
+# Each row authors its own definition and its dedicated effects.
+items:
+  - key: nymph_buds_clamp
+    display_name_zh: 花蒂銀夾
+    price_table_key: intimacy_tool
+    sellable: true
+    presentation:
+      kind: toy
+      icon_key: toy
+      rarity: uncommon
+      summary_zh: 聖所銀匠打的細銀乳夾，服儀的一部分，夾住之後每一口呼吸、每一步走動都被反覆輕錐，癢得發燙也摘不下手。
+    liturgical_role: sanctuary_device
+    equipment_slot: accessory
+    equipment_effects:
+      adjustments:
+        pleasure_gain: +8%
+        sp_cost: +5%
+  - key: warm_honey_orb
+    display_name_zh: 暖蜜魔導珠
+    price_table_key: intimacy_tool
+    sellable: true
+    presentation:
+      kind: toy
+      icon_key: toy
+      rarity: uncommon
+      summary_zh: 聖所器具店常見貨色裡的蜜色魔導珠，以體溫為動力源源不絕地暖磨最敏感的那處，一戴就是一整日。
+    liturgical_role: sanctuary_device
+    equipment_slot: accessory
+    equipment_effects:
+      adjustments:
+        defense: -1
+        pleasure_gain: +8%
+  - key: hyperesthesia_charm
+    display_name_zh: 尖銳觸感之飾
+    price_table_key: intimacy_tool
+    sellable: true
+    presentation:
+      kind: toy
+      icon_key: toy
+      rarity: uncommon
+      summary_zh: 聖所販售的祝禱掛飾，效果直白，佩戴期間皮膚的觸感被整體放大，衣料摩擦都變成細密的電流，平日無感的輕觸都會一路鑽進神經，從早到晚渾身不對勁。
+    liturgical_role: sanctuary_device
+    equipment_slot: accessory
+    equipment_effects:
+      adjustments:
+        pleasure_gain: +8%
+        sp_cost: +5%
+  - key: warmth_rune_egg
+    display_name_zh: 恆溫魔法卵
+    price_table_key: intimacy_tool
+    sellable: true
+    presentation:
+      kind: toy
+      icon_key: toy
+      rarity: uncommon
+      summary_zh: 刻入恆溫魔法陣的鵝卵石小卵，含在體內便持續溫熱下體、催出潤澤，外頭沒人看得出來。
+    equipment_slot: accessory
+    equipment_effects:
+      adjustments:
+        pleasure_gain: +8%
+  - key: tremor_crystal
+    display_name_zh: 恆振晶
+    price_table_key: intimacy_tool
+    sellable: true
+    presentation:
+      kind: toy
+      icon_key: toy
+      rarity: rare
+      summary_zh: 精靈匠作的乳色魔導晶，刻著人類學者讀不懂的微振術式，貼身藏好便能以恆定微顫終日刺激花心，術式撐到下次造訪精靈村前從不停歇。
+    equipment_slot: accessory
+    equipment_effects:
+      adjustments:
+        pleasure_gain: +10%
+  - key: aphrodisiac_bath_salts
+    display_name_zh: 催情浴鹽
+    price_table_key: intimacy_tool
+    sellable: true
+    presentation:
+      kind: toy
+      icon_key: toy
+      rarity: uncommon
+      summary_zh: 浴場的招牌入浴劑，泡完之後全身皮膚的敏感度提高，飄飄然地持續一整晚，冒險歸來的定番享受。
+    use_mechanics:
+      consumable: true
+      combat_allowed: false
+      effects:
+        - stat: pleasure
+          amount: 8
+  - key: kiss_of_goddess_mist
+    display_name_zh: 女神之吻聖霧
+    price_table_key: intimacy_tool
+    sellable: true
+    presentation:
+      kind: toy
+      icon_key: toy
+      rarity: rare
+      summary_zh: 聖所「女神之吻」禮儀聖霧的裝瓶紀念品，一噴讓全身敏感度瞬間拉到頂，信徒把它當成能帶回家的神蹟。
+    use_mechanics:
+      consumable: false
+      combat_allowed: false
+      effects:
+        - stat: pleasure
+          amount: 14
+  - key: censer_of_desire
+    display_name_zh: 情欲香爐
+    price_table_key: intimacy_tool
+    sellable: true
+    presentation:
+      kind: toy
+      icon_key: toy
+      rarity: rare
+      summary_zh: 聖所禮儀用的小巧香爐，爐煙沾上肌膚就化作綿長酥癢，越是動情燒得越旺。
+    use_mechanics:
+      consumable: false
+      combat_allowed: false
+      effects:
+        - stat: pleasure
+          amount: 14
+  - key: embracing_vine
+    display_name_zh: 纏枝魔藤
+    price_table_key: intimacy_tool
+    sellable: true
+    presentation:
+      kind: toy
+      icon_key: toy
+      rarity: rare
+      summary_zh: 一盆栽在陶盆裡的魔法藤蔓，澆水醒來後會溫柔地纏上全身每一處敏感地，以恰好不弄傷人的力道緩慢收緊磨蹭，一個季度後自己縮回盆裡沉睡，等下次澆水再醒。
+    use_mechanics:
+      consumable: false
+      combat_allowed: false
+      effects:
+        - stat: pleasure
+          amount: 11
+  - key: spark_candy
+    display_name_zh: 微電跳蛋糖
+    price_table_key: intimacy_tool
+    sellable: true
+    presentation:
+      kind: toy
+      icon_key: toy
+      rarity: uncommon
+      summary_zh: 含在嘴裡就對舌頭送微電流的神奇糖果，電流順著神經一路麻到下半身；外表和普通糖果無異，不知情的孩子常常誤食，附魔師公會因此被投訴過很多次。
+    use_mechanics:
+      consumable: true
+      combat_allowed: false
+      effects:
+        - stat: pleasure
+          amount: 11
+  - key: slime_lube_gel
+    display_name_zh: 史萊姆潤滑凝膠
+    price_table_key: intimacy_tool
+    sellable: true
+    presentation:
+      kind: toy
+      icon_key: toy
+      rarity: uncommon
+      summary_zh: 〔素材〕史萊姆黏液的下游製品，滅菌處理過的黏液分裝包，滑潤持久怎麼塗都不會乾，讓摩擦的每一寸都變成放大的觸感。
+    use_mechanics:
+      consumable: true
+      combat_allowed: false
+      effects:
+        - stat: pleasure
+          amount: 8
+  - key: hot_kiss_potion
+    display_name_zh: 熱吻藥水
+    price_table_key: intimacy_tool
+    sellable: true
+    presentation:
+      kind: toy
+      icon_key: toy
+      rarity: uncommon
+      summary_zh: 喝下去從舌頭一路暖到小腹的粉紅藥劑；鍊金坊的正經生意，櫃檯前永遠站著情侶和新婚夫妻。
+    use_mechanics:
+      consumable: true
+      combat_allowed: false
+      effects:
+        - stat: pleasure
+          amount: 8

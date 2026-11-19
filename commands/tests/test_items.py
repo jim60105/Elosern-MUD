@@ -26,7 +26,6 @@ from commands.items import CmdToggleEquip, CmdUseItem
 from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
 from world.lore.items import (
-    EquipmentModifierKey,
     ItemDefinition,
     ItemIconKey,
     ItemKind,
@@ -72,13 +71,6 @@ import world.rules.equipment_effects  # noqa: F401
 from world.rules import items as _items_rules
 from world.rules import equipment_effects as _equipment_rules
 
-# Locally authored gear vocabulary. The closed shipped modifier enum cannot
-# gain members, so rows borrow members positionally at runtime (never named
-# as literals); the invented effect table below is the only source their
-# prose resolves through while the scope is open. Index 0 is the kit blade's
-# own borrowed member, so local gear takes the next three.
-_BLADE_KEY, _RING_KEY = tuple(EquipmentModifierKey)[1:3]
-
 _SCOPE_LOGICALS = (
     "races",
     "static_tiers",
@@ -97,14 +89,12 @@ _BLADE = make_item(
     "t_test_blade",
     display_name_zh="測試鐵牙劍",
     equipment_slot=EquipmentSlot.WEAPON_MAIN,
-    modifier_key=_BLADE_KEY,
 )
 _BLADE_B = make_item(
     "t_test_blade_b",
     display_name_zh="測試匕首",
     price_table_key="t_ironbite_steel",
     equipment_slot=EquipmentSlot.WEAPON_MAIN,
-    modifier_key=_BLADE_KEY,
 )
 _RING_RULE = EquipmentEffectRule(
     adjustments={"defense": 6},
@@ -148,14 +138,13 @@ def _scope_extra() -> dict[str, dict[str, object]]:
                 summary_zh="測試用飾品。",
             ),
             equipment_slot=EquipmentSlot.ACCESSORY,
-            modifier_key=_RING_KEY,
         )
     return {"items": items}
 
 
 def _equip_prose(item: ItemDefinition) -> str:
     """The adjustment segment the command renders for one locally authored row."""
-    rule = _EQUIPMENT_RULES[item.modifier_key]
+    rule = _EQUIPMENT_RULES[item.key]
     rendered = []
     value = rule.adjustments.get("atk_phys")
     if value:
@@ -172,14 +161,21 @@ def _equip_prose(item: ItemDefinition) -> str:
 # Locally authored equipment-effect table swapped in while the scope is open:
 # both blades attack +2, the rings defend +6 with a +10 hp cap.
 _EQUIPMENT_RULES = {
-    _BLADE_KEY: EquipmentEffectRule(
+    _BLADE.key: EquipmentEffectRule(
         adjustments={"atk_phys": 2},
         gauge_caps={},
         immune=(),
         attached_buffs=(),
         exposure_bias=0,
     ),
-    _RING_KEY: _RING_RULE,
+    _BLADE_B.key: EquipmentEffectRule(
+        adjustments={"atk_phys": 2},
+        gauge_caps={},
+        immune=(),
+        attached_buffs=(),
+        exposure_bias=0,
+    ),
+    **{f"t_test_ring_{index}": _RING_RULE for index in range(1, 7)},
 }
 
 # The bounded restoration the live item-effect rulebook grants for the

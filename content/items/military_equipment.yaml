@@ -1,0 +1,174 @@
+# Item catalogue slice: military equipment.
+# Each row authors its own definition and its dedicated effects.
+items:
+  - key: military_e_sword
+    display_name_zh: 新兵軍劍
+    price_table_key: mundane_weapon
+    sellable: true
+    presentation:
+      kind: weapon
+      icon_key: weapon
+      rarity: common
+      summary_zh: 鍛坊量產的新兵裝備，結構簡潔。
+    equipment_slot: weapon_main
+    equipment_effects:
+      adjustments:
+        atk_phys: 3
+      weapon_damage_multiplier: 1.05
+  - key: military_e_armor
+    display_name_zh: 新兵軍甲
+    price_table_key: armor
+    sellable: true
+    presentation:
+      kind: armor
+      icon_key: armor
+      rarity: common
+      summary_zh: 鍛坊量產的新兵裝備，結構簡潔。
+    equipment_slot: armor
+    equipment_effects:
+      adjustments:
+        defense: 3
+  - key: military_d_sword
+    display_name_zh: 步兵軍劍
+    price_table_key: mundane_weapon
+    sellable: true
+    presentation:
+      kind: weapon
+      icon_key: weapon
+      rarity: uncommon
+      summary_zh: 鍛坊量產的步兵裝備，適合長途行軍。
+    equipment_slot: weapon_main
+    equipment_effects:
+      adjustments:
+        atk_phys: 4
+      weapon_damage_multiplier: 1.1
+  - key: military_d_armor
+    display_name_zh: 步兵軍甲
+    price_table_key: armor
+    sellable: true
+    presentation:
+      kind: armor
+      icon_key: armor
+      rarity: uncommon
+      summary_zh: 鍛坊量產的步兵裝備，適合長途行軍。
+    equipment_slot: armor
+    equipment_effects:
+      adjustments:
+        defense: 5
+        agility: 1
+  - key: military_c_sword
+    display_name_zh: 遊騎兵軍劍
+    price_table_key: mundane_weapon
+    sellable: true
+    presentation:
+      kind: weapon
+      icon_key: weapon
+      rarity: uncommon
+      summary_zh: 鍛坊量產的遊騎兵裝備，兼顧防護與靈活。
+    equipment_slot: weapon_main
+    equipment_effects:
+      adjustments:
+        atk_phys: 6
+        agility: 1
+      weapon_damage_multiplier: 1.1
+  - key: military_c_armor
+    display_name_zh: 遊騎兵軍甲
+    price_table_key: armor
+    sellable: true
+    presentation:
+      kind: armor
+      icon_key: armor
+      rarity: uncommon
+      summary_zh: 鍛坊量產的遊騎兵裝備，兼顧防護與靈活。
+    equipment_slot: armor
+    equipment_effects:
+      adjustments:
+        defense: 6
+        agility: 1
+  - key: military_b_sword
+    display_name_zh: 符文老兵軍劍
+    price_table_key: magic_weapon
+    sellable: true
+    presentation:
+      kind: weapon
+      icon_key: weapon
+      rarity: rare
+      summary_zh: 軍械庫以制式符文附魔後量產的老兵裝備。
+    equipment_slot: weapon_main
+    equipment_effects:
+      adjustments:
+        atk_phys: 8
+        agility: 1
+      weapon_damage_multiplier: 1.15
+  - key: military_b_armor
+    display_name_zh: 符文老兵軍甲
+    price_table_key: magic_armor
+    sellable: true
+    presentation:
+      kind: armor
+      icon_key: armor
+      rarity: rare
+      summary_zh: 軍械庫以制式符文附魔後量產的老兵裝備。
+    equipment_slot: armor
+    equipment_effects:
+      adjustments:
+        defense: 8
+        agility: 2
+  - key: military_a_sword
+    display_name_zh: 軍械騎士軍劍
+    price_table_key: magic_weapon
+    sellable: true
+    presentation:
+      kind: weapon
+      icon_key: weapon
+      rarity: epic
+      summary_zh: 軍械庫以制式附魔量產的騎士裝備。
+    equipment_slot: weapon_main
+    equipment_effects:
+      adjustments:
+        atk_phys: 10
+        agility: 3
+      weapon_damage_multiplier: 1.2
+  - key: military_a_armor
+    display_name_zh: 軍械騎士軍甲
+    price_table_key: magic_armor
+    sellable: true
+    presentation:
+      kind: armor
+      icon_key: armor
+      rarity: epic
+      summary_zh: 軍械庫以制式附魔量產的騎士裝備。
+    equipment_slot: armor
+    equipment_effects:
+      adjustments:
+        defense: 10
+        agility: 2
+  - key: military_s_sword
+    display_name_zh: 軍械統帥軍劍
+    price_table_key: magic_weapon
+    sellable: true
+    presentation:
+      kind: weapon
+      icon_key: weapon
+      rarity: legendary
+      summary_zh: 軍械庫以高階制式附魔量產的統帥裝備。
+    equipment_slot: weapon_main
+    equipment_effects:
+      adjustments:
+        atk_phys: 12
+        agility: 4
+      weapon_damage_multiplier: 1.25
+  - key: military_s_armor
+    display_name_zh: 軍械統帥軍甲
+    price_table_key: magic_armor
+    sellable: true
+    presentation:
+      kind: armor
+      icon_key: armor
+      rarity: legendary
+      summary_zh: 軍械庫以高階制式附魔量產的統帥裝備。
+    equipment_slot: armor
+    equipment_effects:
+      adjustments:
+        defense: 12
+        agility: 3

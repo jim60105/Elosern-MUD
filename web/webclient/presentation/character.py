@@ -540,9 +540,9 @@ def _validate_condition_row(value: Any) -> dict[str, Any]:
         )
     normalized_modifiers: dict[str, Any] = {}
     for key, amount in modifiers.items():
-        modifier_key = _validate_key(key, "condition modifier key")
-        normalized_modifiers[modifier_key] = _validate_modifier_value(
-            amount, f"condition modifier {modifier_key}"
+        stat_key = _validate_key(key, "condition modifier key")
+        normalized_modifiers[stat_key] = _validate_modifier_value(
+            amount, f"condition modifier {stat_key}"
         )
     source = _require_str(
         value, "source", maximum=MAX_CONDITION_SOURCE_CODE_POINTS

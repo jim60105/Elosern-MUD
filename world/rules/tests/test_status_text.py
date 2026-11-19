@@ -49,7 +49,7 @@ def _layered_armor() -> tuple[str, str, dict]:
     for key, definition in registry.items():
         if definition.equipment_slot is None:
             continue
-        layers = equipment_modifier_layers(definition.modifier_key)
+        layers = equipment_modifier_layers(key)
         if layers is None:
             continue
         defense = layers.get("defense")

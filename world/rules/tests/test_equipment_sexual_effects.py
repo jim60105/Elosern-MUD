@@ -58,46 +58,38 @@ _PRODUCTION_ROOTS = ("commands", "server", "typeclasses", "web", "world")
 # patched with locally authored rows under those keys for the test lifecycle,
 # so every folded magnitude here is data the suite owns. No shipped item key
 # or authored value is ever named.
-# The closed shipped modifier enum cannot gain members, so the kit items
-# borrow members positionally at runtime (never named as literals or
-# attributes); the locally authored patched rows below are the only source
-# their gear resolves through while the scope is open.
-from world.lore.items import EquipmentModifierKey
-
-_LACE_KEY, _CHOKER_KEY, _ROBE_KEY, _SISTER_KEY = tuple(EquipmentModifierKey)[1:5]
+# Each synthetic gear row binds its own item key; the locally authored patched
+# rows below are the only source their gear resolves through while the scope
+# is open.
 
 _LACE = make_item(
     "t_equip_lace",
     display_name_zh="合成誘絲內甲",
     equipment_slot=EquipmentSlot.ARMOR,
-    modifier_key=_LACE_KEY,
 )
 _CHOKER = make_item(
     "t_equip_choker",
     display_name_zh="合成慾絲頸飾",
     equipment_slot=EquipmentSlot.ACCESSORY,
-    modifier_key=_CHOKER_KEY,
 )
 _ROBE = make_item(
     "t_equip_robe",
     display_name_zh="合成聖袍",
     equipment_slot=EquipmentSlot.ARMOR,
-    modifier_key=_ROBE_KEY,
 )
 _SISTER = make_item(
     "t_equip_sister",
     display_name_zh="合成修袍",
     equipment_slot=EquipmentSlot.ARMOR,
-    modifier_key=_SISTER_KEY,
 )
 
-# (bias, adjustments) per borrowed modifier key, authored ONCE and mirrored
+# (bias, adjustments) per synthetic item key, authored ONCE and mirrored
 # into both the patched rulebook and the assertions.
 _GEAR: dict[str, tuple[int, dict[str, int | str]]] = {
-    _LACE_KEY: (1, {"pleasure_gain": "+15%"}),
-    _CHOKER_KEY: (0, {"defense": -3, "pleasure_gain": "+25%"}),
-    _ROBE_KEY: (2, {"defense": -3, "pleasure_gain": "+25%", "heal_gain": "+25%"}),
-    _SISTER_KEY: (1, {"pleasure_gain": "+15%", "heal_gain": "+10%"}),
+    _LACE.key: (1, {"pleasure_gain": "+15%"}),
+    _CHOKER.key: (0, {"defense": -3, "pleasure_gain": "+25%"}),
+    _ROBE.key: (2, {"defense": -3, "pleasure_gain": "+25%", "heal_gain": "+25%"}),
+    _SISTER.key: (1, {"pleasure_gain": "+15%", "heal_gain": "+10%"}),
 }
 _ITEMS = {_LACE.key: _LACE, _CHOKER.key: _CHOKER, _ROBE.key: _ROBE, _SISTER.key: _SISTER}
 
@@ -152,10 +144,10 @@ _ACTS = {_SOLO_DEF.key: _SOLO_DEF, _SOLO_LIFT_DEF.key: _SOLO_LIFT_DEF}
 
 
 def _patched_rules():
-    """A file-local rulebook replacing the borrowed members' rows.
+    """A file-local rulebook replacing the synthetic gear rows.
 
     The shipped rows stay in place (unrelated consumers may resolve them);
-    the four borrowed keys carry the locally authored magnitudes the whole
+    the four synthetic keys carry the locally authored magnitudes the whole
     file asserts on.
     """
     from world.rules.equipment_effects import (

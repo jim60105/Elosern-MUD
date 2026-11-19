@@ -86,12 +86,14 @@ RULEBOOK_CATALOG_KEYS = {
     "clock.yaml": ("periods",),
     "npc_schedules.yaml": ("schedules",),
     "monster_behaviour.yaml": ("behaviours",),
-    "item_effects.yaml": ("items",),
-    "equipment_effects.yaml": ("effects",),
     "sexual_pleasure.yaml": ("tiers",),
     "sexual_resist.yaml": ("stages",),
     "status_display.yaml": ("statuses",),
 }
+# Shared-only rulebook files contribute no identity tokens: item definitions and
+# their dedicated effects are authored in content/items/ (harvested through
+# ITEM_REGISTRY), and these files now carry only shared timing/budget settings.
+RULEBOOK_SHARED_ONLY = frozenset({"item_effects.yaml", "equipment_effects.yaml"})
 VIOLATION_CODES = ("unexempted", "new-debt", "untagged-contract", "stale-path", "duplicate", "seed-mismatch")
 
 _JS_LITERAL_RE = re.compile(r"""(?:'([^'\\\n]{1,400})'|"([^"\\\n]{1,400})"|`([^`\\\n]{1,800})`)""", re.S)
@@ -256,6 +258,8 @@ def _rulebook_keys(root: Path) -> set[str]:
     if not rulebook.is_dir():
         return keys
     for path in sorted(rulebook.glob("*.yaml")):
+        if path.name in RULEBOOK_SHARED_ONLY:
+            continue
         try:
             doc = yaml.safe_load(path.read_text(encoding="utf-8"))
         except (yaml.YAMLError, UnicodeDecodeError):

@@ -81,18 +81,6 @@ def _rule_row(adjustments: dict) -> EquipmentEffectRule:
     )
 
 
-def _borrowed_modifier_keys(count: int) -> list:
-    """``count`` distinct shipped modifier keys, resolved at runtime."""
-    enum_cls = getattr(
-        importlib.import_module("world.lore.items"), "EquipmentModifier" + "Key"
-    )
-    keys = list(enum_cls)
-    if len(keys) < count:
-        raise LookupError("modifier registry smaller than the synthetic cast")
-    return keys[:count]
-
-
-_MODIFIERS = _borrowed_modifier_keys(len(_GRACE_SPECS))
 _SLOTS = (
     EquipmentSlot.ARMOR,
     EquipmentSlot.ACCESSORY,
@@ -105,14 +93,13 @@ _CAST_ITEMS = {
         display_name_zh="合成禮袍",
         price_table_key="t_ironbite_steel",
         equipment_slot=slot,
-        modifier_key=modifier,
     )
-    for spec, slot, modifier in zip(_GRACE_SPECS, _SLOTS, _MODIFIERS)
+    for spec, slot in zip(_GRACE_SPECS, _SLOTS)
 }
-# modifier key -> spliced effect row (overlaid onto the live rulebook).
+# item key -> spliced effect row (overlaid onto the live rulebook).
 _CAST_ROWS = {
-    modifier: _rule_row(_EQUIP_ROWS[item_key])
-    for (item_key, _, _), modifier in zip(_GRACE_SPECS, _MODIFIERS)
+    item_key: _rule_row(_EQUIP_ROWS[item_key])
+    for item_key, _, _ in _GRACE_SPECS
 }
 # rule id -> spliced display row (overlaid onto the display table).
 _CAST_DISPLAY = {

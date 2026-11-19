@@ -13,7 +13,6 @@ from world.lore.elements import Element
 from world.lore.guild import GuildBranch, GuildRank
 from world.lore.items import (
     ItemDefinition,
-    EquipmentModifierKey,
     EquipmentSlot,
     ItemIconKey,
     ItemKind,

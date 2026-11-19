@@ -2,9 +2,10 @@
 
 Behavior files that must bind a synthetic item to a shipped effect ROW
 (immunity, attached buffs, gauge caps, prose layers, twin-capable weapon
-rows) resolve the borrowed ``EquipmentModifierKey`` here by a semantic
-feature predicate with an asserted UNIQUE match, never by the shipped key
-literal and never by registry insertion order. Values stay live: callers read
+rows) resolve the shipped row here by a semantic feature predicate with an
+asserted UNIQUE match, never by the shipped key literal and never by registry
+insertion order. The row is then rebound under the synthetic item's own key
+inside the test's equipment-rule scope. Values stay live: callers read
 magnitudes back through ``rule_for()`` so a data rework can only ever change
 what a test observes, never break it.
 """
@@ -23,9 +24,9 @@ def _rules() -> dict:
     return EQUIPMENT_EFFECT_RULES
 
 
-def rule_for(modifier_key):
-    """The loaded rule of one probed modifier key (live values, never pinned)."""
-    return _rules()[modifier_key]
+def rule_for(item_key):
+    """The loaded rule of one probed item key (live values, never pinned)."""
+    return _rules()[item_key]
 
 
 def _unique_feature(label: str, predicate) -> tuple:
@@ -39,13 +40,13 @@ def _unique_feature(label: str, predicate) -> tuple:
     return matches[0]
 
 
-def unique_modifier_key(label: str, predicate):
-    """The one modifier key whose rule matches ``predicate`` (fail-fast)."""
+def unique_item_key(label: str, predicate):
+    """The one shipped item key whose rule matches ``predicate`` (fail-fast)."""
     return _unique_feature(label, predicate)[0]
 
 
 def unique_rule(label: str, predicate):
-    """The one (modifier key, rule) pair matching ``predicate`` (fail-fast)."""
+    """The one (item key, rule) pair matching ``predicate`` (fail-fast)."""
     return _unique_feature(label, predicate)
 
 
@@ -84,13 +85,13 @@ def gauge_cap_row_keys() -> tuple:
 
 def immune_to_key(buff_key: str):
     """The one row whose ``immune`` tuple contains ``buff_key`` (fail-fast)."""
-    return unique_modifier_key(
+    return unique_item_key(
         f"immune[{buff_key}]", lambda rule: buff_key in rule.immune
     )
 
 
 def attached_buffs_rule():
-    """The one row attaching buff instances. (modifier_key, rule) pair."""
+    """The one row attaching buff instances. (item key, rule) pair."""
     return unique_rule("attached_buffs", lambda rule: bool(rule.attached_buffs))
 
 
@@ -102,26 +103,6 @@ def inventory_slot_vocabulary() -> dict:
     """
     slots = getattr(importlib.import_module("world.lore.items"), "EquipmentSlot")
     return {member.name: member for member in slots}
-
-
-def modifier_value(modifier_key) -> str:
-    """The string identity of one borrowed modifier key (registry-bound items)."""
-    return str(modifier_key)
-
-
-def rulebook_item_binding_pairs() -> list[tuple[str, object]]:
-    """(shipped item key, modifier key) for every slotted registry item.
-
-    The equipment toggle's key/alias resolution is tested against these real
-    registry pairings: the keys arrive as runtime values (object ``.key`` of
-    the borrowed item), so the test never names a shipped identifier.
-    """
-    registry = getattr(importlib.import_module("world.lore.items"), "ITEM" + "_REGISTRY")
-    return [
-        (definition.key, definition.modifier_key)
-        for definition in registry.values()
-        if definition.modifier_key is not None and definition.equipment_slot is not None
-    ]
 
 
 def rulebook_rules(module_dotted: str) -> list:
@@ -152,11 +133,9 @@ __all__ = [
     "display_label",
     "immune_to_key",
     "inventory_slot_vocabulary",
-    "modifier_value",
     "rule_for",
-    "rulebook_item_binding_pairs",
     "rulebook_rules",
     "rule_with_id",
-    "unique_modifier_key",
+    "unique_item_key",
     "unique_rule",
 ]

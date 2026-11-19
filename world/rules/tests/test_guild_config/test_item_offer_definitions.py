@@ -6,7 +6,6 @@ import unittest
 from dataclasses import fields
 from world.lore.economy import PRICE_TABLE
 from world.lore.items import ITEM_REGISTRY
-from world.lore.items import EquipmentModifierKey
 from world.lore.items import ItemDefinition
 from world.lore.items import ItemIconKey
 from world.lore.items import ItemKind
@@ -138,7 +137,6 @@ class ItemDefinitionTests(unittest.TestCase):
                 summary_zh="測試用的情趣穿戴品。",
             ),
             equipment_slot=EquipmentSlot.ACCESSORY,
-            modifier_key=EquipmentModifierKey.PILGRIM_MEDALLION,
         )
         usable_band = PRICE_TABLE[usable_item.price_table_key]
         equipment_band = PRICE_TABLE[equipment_item.price_table_key]

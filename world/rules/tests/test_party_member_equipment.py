@@ -20,7 +20,8 @@ from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
-from world.lore.items import EquipmentModifierKey, EquipmentSlot, ItemUseMechanics
+from world.lore.items import EquipmentSlot, ItemUseMechanics
+from world.rules.equipment_effects import EquipmentEffectRule
 from world.rules.buffs import entity_active_buffs
 from world.rules.clock import get_world_clock
 from world.rules.combat_session import (
@@ -42,7 +43,7 @@ from world.skills.equipment import list_items
 from world.tests.synthetic_data import make_item
 
 from ._combat_session_helpers import _monster, _player, _race_key, open_synthetic_scope
-from ._equipment_rulebook_probes import immune_to_key
+from ._equipment_rulebook_probes import immune_to_key, rule_for
 from .combat_fixtures import BattlefieldIsolation
 
 _BLADE = make_item(
@@ -50,14 +51,12 @@ _BLADE = make_item(
     display_name_zh="測試長劍",
     sellable=False,
     equipment_slot=EquipmentSlot.WEAPON_MAIN,
-    modifier_key=EquipmentModifierKey.PLAIN_SWORD,
 )
 _AXE = make_item(
     "t_member_equipment_axe",
     display_name_zh="測試戰斧",
     sellable=False,
     equipment_slot=EquipmentSlot.WEAPON_MAIN,
-    modifier_key=EquipmentModifierKey.PLAIN_SWORD,
 )
 _DRAUGHT_KEY = "t_member_equipment_draught"
 _DRAUGHT = make_item(
@@ -71,7 +70,6 @@ _WARD = make_item(
     display_name_zh="測試守護吊飾",
     sellable=False,
     equipment_slot=EquipmentSlot.ACCESSORY,
-    modifier_key=immune_to_key("poisoned"),
 )
 
 #: The debuff the synthetic draught applies; the probed immunity row blocks it.
@@ -83,6 +81,11 @@ _SCOPE_EXTRA = {
         _DRAUGHT_KEY: ItemEffectProfile(
             effects=(StatusApplyEffect(status=_DRAUGHT_DEBUFF),)
         )
+    },
+    "equipment_effect_rules": {
+        _BLADE.key: EquipmentEffectRule({}, {}, (), (), 0),
+        _AXE.key: EquipmentEffectRule({}, {}, (), (), 0),
+        _WARD.key: rule_for(immune_to_key("poisoned")),
     },
 }
 

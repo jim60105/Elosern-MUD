@@ -16,6 +16,7 @@ from tools.spec_traceability import covers_requirement
 
 import tempfile
 import unittest
+import shutil
 from pathlib import Path
 from unittest.mock import patch
 
@@ -23,7 +24,7 @@ import yaml
 
 from evennia.utils.test_resources import EvenniaTest
 
-from world.lore.items import ItemUseMechanics
+from world.lore.items import ItemUseMechanics, load_item_catalog
 from world.rules.buffs import apply_buff, entity_active_buffs
 from world.rules.clock import WorldClock
 from world.rules.item_effects import (
@@ -194,36 +195,55 @@ class StatusRemovalCleanseTests(EvenniaTest):
 class ItemEffectsLoaderRemovalShapeTests(unittest.TestCase):
     """Loader shape contract for status-removal entries (delta scenario)."""
 
-    def _document_with(self, entry):
-        """The canonical document with its negative-removal entry replaced.
+    _PROBE_KEY = "t_cleanse_probe"
 
-        The removal entry is located by content probe, so this fixture never
-        names the shipped item whose entry it mutates. It returns the temp path
-        and the key of the mutated item, so the caller asserts that item's own
-        profile rather than how many removal profiles shipped content declares.
-        """
-        source = Path(__file__).parents[1] / "rulebook" / "item_effects.yaml"
-        document = yaml.safe_load(source.read_text(encoding="utf-8"))
-        mutated = None
-        replaced = 0
-        for item_key, item_entry in document["items"].items():
-            for effect in item_entry["effects"]:
-                if effect.get("remove_status") == "negative":
-                    effect.clear()
-                    effect.update(entry)
-                    mutated = item_key
-                    replaced += 1
-        self.assertEqual(replaced, 1)
-        handle = tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False)
-        yaml.safe_dump(document, handle, allow_unicode=True)
-        handle.close()
-        return Path(handle.name), mutated
+    def _catalog_with(self, entry):
+        """A synthetic item document carrying one status-removal row."""
+        root = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, root, True)
+        (root / "catalog.yaml").write_text(
+            yaml.safe_dump({"schema_version": 1, "files": ["items.yaml"]}),
+            encoding="utf-8",
+        )
+        row = {
+            "key": self._PROBE_KEY,
+            "display_name_zh": "合成淨化試劑",
+            "price_table_key": "t_mossmeals",
+            "sellable": True,
+            "presentation": {
+                "kind": "potion",
+                "icon_key": "potion",
+                "rarity": "common",
+                "summary_zh": "供淨化條目形狀驗證使用的合成試劑。",
+            },
+            "use_mechanics": {
+                "consumable": True,
+                "combat_allowed": True,
+                "effects": [entry],
+            },
+        }
+        (root / "items.yaml").write_text(
+            yaml.safe_dump({"items": [row]}, allow_unicode=True, sort_keys=False),
+            encoding="utf-8",
+        )
+        return load_item_catalog(root)
 
     def _load(self, entry):
+        from world.rules.buffs import BUFF_DEFINITIONS
         from world.rules.item_effects import load_item_effect_rules
 
-        document_path, item_key = self._document_with(entry)
-        return load_item_effect_rules(document_path), item_key
+        catalog = self._catalog_with(entry)
+        rulebook = Path(__file__).parents[1] / "rulebook" / "item_effects.yaml"
+        return (
+            load_item_effect_rules(
+                path=rulebook,
+                registry=catalog.definitions,
+                use_effect_inputs=catalog.use_effect_inputs,
+                buff_definitions=BUFF_DEFINITIONS,
+                sources=catalog.sources,
+            ),
+            self._PROBE_KEY,
+        )
 
     def test_removal_entry_with_amount_is_rejected(self):
         with self.assertRaises(ItemEffectsRulebookError):

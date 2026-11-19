@@ -1,0 +1,156 @@
+# Item catalogue slice: elven village goods.
+# Each row authors its own definition and its dedicated effects.
+items:
+  - key: eolas_kiln_flatbread
+    display_name_zh: 幽月窯烤豆餅
+    price_table_key: specialty_food
+    sellable: true
+    presentation:
+      kind: food
+      icon_key: food
+      rarity: common
+      summary_zh: 幽月谷村共用窯烤出的豆餅，配著谷裡自種的香草一起吃。
+  - key: eolas_herb_tonic
+    display_name_zh: 幽月香草藥露
+    price_table_key: potion
+    sellable: true
+    presentation:
+      kind: potion
+      icon_key: potion
+      rarity: uncommon
+      summary_zh: 以幽月谷村梯田香草浸漬的藥露，飲下能恢復體力。
+    use_mechanics:
+      consumable: true
+      combat_allowed: true
+      effects:
+        - stat: sp
+          amount: 40
+  - key: eolas_glass_pendant
+    display_name_zh: 幽月琉璃墜
+    price_table_key: jewelry
+    sellable: true
+    presentation:
+      kind: accessory
+      icon_key: accessory
+      rarity: uncommon
+      summary_zh: 幽月谷村共用窯燒成的琉璃墜，配戴時讓施法更沉穩。
+    equipment_slot: accessory
+    equipment_effects:
+      adjustments:
+        mp_cost: -6%
+  - key: eolas_proving_wand
+    display_name_zh: 幽月練習短杖
+    price_table_key: masterwork_gear
+    sellable: true
+    presentation:
+      kind: weapon
+      icon_key: weapon
+      rarity: epic
+      summary_zh: 伊歐拉斯族削來在試煉場練法術的短杖，導引魔力格外順手。
+    equipment_slot: weapon_main
+    equipment_effects:
+      adjustments:
+        magic_power: 9
+        mp_cost: -10%
+      weapon_damage_multiplier: 1.0
+  - key: fionnen_wildflower_honey
+    display_name_zh: 森林百花蜜
+    price_table_key: specialty_food
+    sellable: true
+    presentation:
+      kind: food
+      icon_key: food
+      rarity: uncommon
+      summary_zh: 翠綠森林村花蕊蜜園的蜂群釀成的百花蜜。
+  - key: fionnen_beeswax_salve
+    display_name_zh: 森林蜂蠟膏
+    price_table_key: potion
+    sellable: true
+    presentation:
+      kind: potion
+      icon_key: potion
+      rarity: uncommon
+      summary_zh: 以蜂蠟與林間藥草熬成的敷膏，塗上能幫傷口收口。
+    use_mechanics:
+      consumable: true
+      combat_allowed: true
+      effects:
+        - stat: hp
+          amount: 60
+  - key: fionnen_archer_bracer
+    display_name_zh: 森林射手護腕
+    price_table_key: jewelry
+    sellable: true
+    presentation:
+      kind: accessory
+      icon_key: accessory
+      rarity: uncommon
+      summary_zh: 斐歐恩族弓手綁在持弓手臂上的木雕護腕，拉弓時更穩。
+    equipment_slot: accessory
+    equipment_effects:
+      adjustments:
+        agility: +5%
+  - key: fionnen_leafweave_garb
+    display_name_zh: 森林葉織獵衣
+    price_table_key: masterwork_gear
+    sellable: true
+    presentation:
+      kind: armor
+      icon_key: armor
+      rarity: epic
+      summary_zh: 為在巨木之間穿行而織的輕獵衣，身手幾乎不受牽絆。
+    equipment_slot: armor
+    equipment_effects:
+      adjustments:
+        defense: 6
+        agility: 4
+  - key: ciaran_nightbloom_preserve
+    display_name_zh: 暗影谷夜綻花釀
+    price_table_key: specialty_food
+    sellable: true
+    presentation:
+      kind: food
+      icon_key: food
+      rarity: uncommon
+      summary_zh: 谷裡入夜才綻的花趁夜採下，浸進糖漿裡釀成，是花饌好手最得意的一味。
+  - key: ciaran_ember_mushroom_skewer
+    display_name_zh: 暗影谷炭烤蕈串
+    price_table_key: specialty_food
+    sellable: true
+    presentation:
+      kind: food
+      icon_key: food
+      rarity: common
+      summary_zh: 谷裡採來的蕈子串在竹籤上，擱炭火烤透的野地熱食。
+  - key: ciaran_indigo_dye
+    display_name_zh: 暗影谷藍染
+    price_table_key: material
+    sellable: true
+    presentation:
+      kind: material
+      icon_key: material
+      rarity: common
+      summary_zh: 下游染布淺灘邊用植物揉出的染料塊，村裡布匹的藍就從它染出來。
+  - key: ciaran_crystal_sand
+    display_name_zh: 暗影谷晶砂
+    price_table_key: material
+    sellable: true
+    presentation:
+      kind: material
+      icon_key: material
+      rarity: uncommon
+      summary_zh: 從谷裡溪水淘洗出的圓潤晶砂，磨亮之後綴進村人的飾物裡。
+  - key: ciaran_antivenom_tincture
+    display_name_zh: 暗影谷解毒草露
+    price_table_key: potion
+    sellable: true
+    presentation:
+      kind: potion
+      icon_key: potion
+      rarity: uncommon
+      summary_zh: 以自家藥草園的解毒草浸出的草露，飲下能解身上的毒。
+    use_mechanics:
+      consumable: true
+      combat_allowed: true
+      effects:
+        - remove_status: poisoned

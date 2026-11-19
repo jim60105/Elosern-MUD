@@ -17,7 +17,6 @@ from evennia.utils.create import create_object
 
 from typeclasses.npcs import NPC
 from world.lore.guild_adventurers import ExamQualification, GuildAdventurer
-from world.lore.items import EquipmentModifierKey
 from world.lore.npc_card import NpcCard, NpcCardIdentity
 from world.rules.equipment import toggle_equipment
 from world.rules.equipment_effects import EquipmentEffectRule
@@ -32,12 +31,12 @@ HOST_NAME = "合成考官‧霜脊"
 HOST_AGE = 41
 
 EXAM_ROOT = make_skill("t_exam_root_cut", effects=["damage:none:physical"], cost={})
-NORMAL_BLADE = make_item("t_exam_normal_blade", equipment_slot=EquipmentSlot.WEAPON_MAIN, modifier_key=EquipmentModifierKey.PLAIN_SWORD)
-NORMAL_ARMOR = make_item("t_exam_normal_armor", equipment_slot=EquipmentSlot.ARMOR, modifier_key=EquipmentModifierKey.LEATHER_ARMOR)
-NORMAL_CHARM = make_item("t_exam_normal_charm", equipment_slot=EquipmentSlot.ACCESSORY, modifier_key=EquipmentModifierKey.SILVER_HAIRPIN)
-KIT_BLADE = make_item("t_exam_kit_blade", equipment_slot=EquipmentSlot.WEAPON_MAIN, modifier_key=EquipmentModifierKey.PLAIN_SWORD)
-KIT_ARMOR = make_item("t_exam_kit_armor", equipment_slot=EquipmentSlot.ARMOR, modifier_key=EquipmentModifierKey.LEATHER_ARMOR)
-LIMIT_RING = make_item("t_exam_limit_ring", equipment_slot=EquipmentSlot.ACCESSORY, modifier_key=EquipmentModifierKey.GUILD_LIMIT_D, sellable=False, guild_property=True)
+NORMAL_BLADE = make_item("t_exam_normal_blade", equipment_slot=EquipmentSlot.WEAPON_MAIN)
+NORMAL_ARMOR = make_item("t_exam_normal_armor", equipment_slot=EquipmentSlot.ARMOR)
+NORMAL_CHARM = make_item("t_exam_normal_charm", equipment_slot=EquipmentSlot.ACCESSORY)
+KIT_BLADE = make_item("t_exam_kit_blade", equipment_slot=EquipmentSlot.WEAPON_MAIN)
+KIT_ARMOR = make_item("t_exam_kit_armor", equipment_slot=EquipmentSlot.ARMOR)
+LIMIT_RING = make_item("t_exam_limit_ring", equipment_slot=EquipmentSlot.ACCESSORY, sellable=False, guild_property=True)
 
 EXAM_ITEMS = {item.key: item for item in (NORMAL_BLADE, NORMAL_ARMOR, NORMAL_CHARM, KIT_BLADE, KIT_ARMOR, LIMIT_RING)}
 EXAM_SKILLS = {EXAM_ROOT.key: EXAM_ROOT}
@@ -58,7 +57,7 @@ def _profile(rank: str) -> RestrictionProfile:
 
 EXAM_PROFILES = MappingProxyType({rank: _profile(rank) for rank in ("E", "D")})
 _ZERO_RULE = EquipmentEffectRule({}, {}, (), (), 0)
-EXAM_EFFECT_RULES = {item.modifier_key: _ZERO_RULE for item in EXAM_ITEMS.values()}
+EXAM_EFFECT_RULES = {item.key: _ZERO_RULE for item in EXAM_ITEMS.values()}
 
 CARD = NpcCard(
     identity=NpcCardIdentity(public="合成分會的常駐冒險者，偶爾主持升階考核。"),
@@ -72,7 +71,11 @@ CARD = NpcCard(
 
 def exam_scope_extra() -> dict[str, dict[str, object]]:
     """Synthetic rows the exam host fixture adds to an open registry scope."""
-    return {"skills": dict(EXAM_SKILLS), "items": dict(EXAM_ITEMS)}
+    return {
+        "skills": dict(EXAM_SKILLS),
+        "items": dict(EXAM_ITEMS),
+        "equipment_effect_rules": dict(EXAM_EFFECT_RULES),
+    }
 
 
 def install_exam_host_policies(test, branch_key: str) -> None:

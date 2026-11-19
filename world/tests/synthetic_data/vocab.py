@@ -8,7 +8,6 @@ import importlib
 from world.lore.elements import Element
 from world.lore.items import (
     ItemDefinition,
-    EquipmentModifierKey,
     EquipmentSlot,
     ItemIconKey,
     ItemKind,
@@ -111,39 +110,6 @@ def _shipped_first_element_key() -> str:
     )
     registry = getattr(module, "ELEMENT" + "_REGISTRY")
     return next(iter(registry))
-
-
-def _first_equipment_modifier_key() -> EquipmentModifierKey:
-    """The first member of the shipped closed equipment-modifier enum.
-
-    ``ItemDefinition`` requires every slotted item to bind exactly one
-    member of a CLOSED shipped enum; the kit cannot invent a member, so it
-    borrows the first one at runtime (never named as a literal). No scoped
-    consumer resolves an effect row through it: the synthetic item's own key
-    is not bound in the shipped rulebook, and equipment-effect lookups
-    return the neutral no-layer answer for that.
-    """
-    return next(iter(EquipmentModifierKey))
-
-
-def _exposure_bias_modifier_key() -> EquipmentModifierKey:
-    """The first closed modifier key whose loaded rule carries exposure bias.
-
-    The equipment-effect projection is deliberately shipped-derived even
-    inside a scoped catalog swap, and ``ItemDefinition`` requires a member of
-    the same closed enum. The kit therefore resolves, at runtime, the first
-    member whose rulebook row declares a positive ``exposure_bias`` -- it never
-    names a shipped member (or item key) literally. The synthetic item key
-    itself stays unbound in the shipped rulebook; only the borrowed MODIFIER
-    member resolves an effect row, which is what lets the browser fixture
-    drive the canonical effective-exposure overlay through worn gear.
-    """
-    module = importlib.import_module(".".join(("world", "rules", "equipment_effects")))
-    rules = getattr(module, "EQUIPMENT_EFFECT" + "_RULES")
-    for key, rule in rules.items():
-        if rule.exposure_bias > 0:
-            return key
-    raise RuntimeError("no equipment rule declares a positive exposure bias")
 
 
 def _shipped_first_element_row() -> Element:

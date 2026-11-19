@@ -1,12 +1,12 @@
 """The declarative item-effect model and its validated rulebook loader.
 
-Item mechanics identity lives in the immutable lore registry; every tunable
-effect — what an item does, how much, and to whom — lives in
-``rulebook/item_effects.yaml`` keyed by the item key and is read only through
-the validated loader in this module (item-effect-model design §3). One item
-profile is an ordered tuple of typed effect entries; an item with no effect
-entry is simply unusable through the registry's ``use_mechanics`` flag, never
-through a magic effect key.
+Item mechanics identity lives in the immutable lore registry; what an item
+does, how much, and to whom is authored on that item's own row in
+``content/items/`` and read only through the validated loader in this module
+(consolidate-item-authoring D2). One item profile is an ordered tuple of
+typed effect entries; an item with no effect entry is simply unusable through
+the registry's ``use_mechanics`` flag, never through a magic effect key.
+``rulebook/item_effects.yaml`` keeps only the shared out-of-combat use time.
 
 Forward-declared seam (design D4, tasks 4.4): the full target-scope
 vocabulary is defined and validated here, and every member maps to exactly
@@ -21,7 +21,10 @@ Consumers resolve an item's profile through the module-level
 :data:`ITEM_EFFECT_PROFILES` map at call time (``items.py`` reads the module
 attribute, never a name-imported copy), so the synthetic-data kit's scoped
 ``item_effect_profiles`` target and ``reload_item_effect_rules()`` reach the
-settlement path through the same object.
+settlement path through the same object. :func:`ensure_item_effect_rules_validated`
+is the startup gate's idempotent initialization check: importing the module
+already validates the production candidate, so an already validated catalog is
+never reread by the gate.
 """
 
 from collections.abc import Mapping
@@ -311,19 +314,23 @@ def _parse_amount(value: Any, field: str) -> int:
 def validate_item_effect_rules(
     document: Any,
     registry: Mapping[str, Any],
+    use_effect_inputs: Mapping[str, Any],
     buff_definitions: Mapping[str, Any],
+    sources: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
-    """Validate one parsed rulebook against the live item and buff catalogs.
+    """Validate the shared use time and every usable row's inline effects.
 
     Returns ``{"item_use_seconds": int, "profiles": {item_key:
-    ItemEffectProfile}}``. The items mapping must align bi-directionally
-    with the registry's usable key set: an orphan entry names an item the
-    registry does not allow to be used, and a missing entry leaves a usable
-    item with no declared effect — both fail validation at startup.
+    ItemEffectProfile}}``. ``use_effect_inputs`` carries the raw ``effects``
+    list authored on each item row in ``content/items/``; it must align
+    bi-directionally with the registry's usable key set: an orphan entry names
+    an item the registry does not allow to be used, and a missing entry leaves
+    a usable item with no declared effect — both fail validation at startup.
+    ``sources`` maps item keys to their authored file for diagnostics.
     """
-    if not isinstance(document, Mapping) or set(document) != {"item_use_seconds", "items"}:
+    if not isinstance(document, Mapping) or set(document) != {"item_use_seconds"}:
         raise ItemEffectsRulebookError(
-            "rulebook must declare exactly item_use_seconds and items"
+            "rulebook must declare exactly item_use_seconds"
         )
     seconds = document["item_use_seconds"]
     if isinstance(seconds, bool) or not isinstance(seconds, int):
@@ -332,34 +339,39 @@ def validate_item_effect_rules(
         raise ItemEffectsRulebookError(
             f"item_use_seconds must be between 1 and {MAX_ADVANCE_SECONDS}"
         )
-    items = document["items"]
-    if not isinstance(items, Mapping):
-        raise ItemEffectsRulebookError("items must be a mapping")
+    if not isinstance(use_effect_inputs, Mapping):
+        raise ItemEffectsRulebookError("item effect inputs must be a mapping")
     usable = {
         key
         for key, definition in registry.items()
         if getattr(definition, "use_mechanics", None) is not None
     }
-    orphans = set(items) - usable
+    orphans = set(use_effect_inputs) - usable
     if orphans:
         raise ItemEffectsRulebookError(
-            f"items declare entries no usable item needs {sorted(orphans)}"
+            "items declare effects no usable item needs "
+            f"{sorted(map(str, orphans))}"
         )
-    missing = usable - set(items)
+    missing = usable - set(use_effect_inputs)
     if missing:
         raise ItemEffectsRulebookError(
-            f"usable items without effect profiles {sorted(missing)}"
+            f"usable items without effect profiles {sorted(map(str, missing))}"
         )
     profiles: dict[str, ItemEffectProfile] = {}
-    for item_key, entry in items.items():
+    for item_key in usable:
         field = f"items.{item_key}"
-        if not isinstance(entry, Mapping) or set(entry) != {"effects"}:
-            raise ItemEffectsRulebookError(f"{field} must carry exactly effects")
-        effect_entries = entry["effects"]
-        if not isinstance(effect_entries, list) or not effect_entries:
+        if sources and item_key in sources:
+            field = f"{field} ({sources[item_key]})"
+        effect_entries = use_effect_inputs[item_key]
+        if not isinstance(effect_entries, (list, tuple)) or not effect_entries:
             raise ItemEffectsRulebookError(f"{field}.effects must be a non-empty list")
         parsed: list[ItemEffect] = []
         for position, effect_entry in enumerate(effect_entries, start=1):
+            if not isinstance(effect_entry, Mapping):
+                raise ItemEffectsRulebookError(
+                    f"{field}.effects[{position}] must be a mapping, "
+                    f"got {effect_entry!r}"
+                )
             parsed.append(
                 _parse_effect_entry(
                     effect_entry, f"{field}.effects[{position}]", buff_definitions
@@ -397,25 +409,37 @@ class _UniqueKeyLoader(yaml.SafeLoader):
 def load_item_effect_rules(
     path: Path | None = None,
     registry: Mapping[str, Any] | None = None,
+    use_effect_inputs: Mapping[str, Any] | None = None,
     buff_definitions: Mapping[str, Any] | None = None,
+    sources: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
-    """Load and validate the item-effect rulebook.
+    """Load the shared use time and validate the production inline effects.
 
-    Defaults to the canonical rulebook file, the live lore item registry, and
-    the live buff definitions; every parameter is injectable so loader tests
-    run against fabricated catalogs without touching shipped content.
+    Defaults to the canonical rulebook file, the live lore item registry, the
+    live inline effect inputs and provenance, and the live buff definitions;
+    every parameter is injectable so loader tests run against fabricated
+    catalogs without touching shipped content. ``path`` overrides only the
+    shared settings file, never the per-item rows.
     """
     document = yaml.load(
         (path or _RULEBOOK_PATH).read_text(encoding="utf-8"),
         Loader=_UniqueKeyLoader,
     )
     if registry is None:
-        from world.lore.items import ITEM_REGISTRY
+        from world.lore.items import ITEM_REGISTRY, ITEM_SOURCES, ITEM_USE_EFFECT_INPUTS
 
         registry = ITEM_REGISTRY
+        if use_effect_inputs is None:
+            use_effect_inputs = ITEM_USE_EFFECT_INPUTS
+        if sources is None:
+            sources = ITEM_SOURCES
     if buff_definitions is None:
         buff_definitions = BUFF_DEFINITIONS
-    return validate_item_effect_rules(document, registry, buff_definitions)
+    if use_effect_inputs is None:
+        use_effect_inputs = {}
+    return validate_item_effect_rules(
+        document, registry, use_effect_inputs, buff_definitions, sources
+    )
 
 
 _loaded = load_item_effect_rules()
@@ -430,11 +454,18 @@ ITEM_USE_SECONDS: int = _loaded["item_use_seconds"]
 #: scoped patches and their restore closures) stay meaningful.
 ITEM_EFFECT_PROFILES: dict[str, ItemEffectProfile] = _loaded["profiles"]
 
+#: Import-time validation completed for the production candidate. The startup
+#: gate calls :func:`ensure_item_effect_rules_validated`, which never rereads
+#: an already validated catalog.
+_validation_complete = True
+
 
 def reload_item_effect_rules(
     path: Path | None = None,
     registry: Mapping[str, Any] | None = None,
+    use_effect_inputs: Mapping[str, Any] | None = None,
     buff_definitions: Mapping[str, Any] | None = None,
+    sources: Mapping[str, str] | None = None,
 ) -> None:
     """Re-validate and refresh the live profile map in place (idempotent sync).
 
@@ -442,11 +473,26 @@ def reload_item_effect_rules(
     production rows, so profiles a still-open ``items`` scope patched in are
     dropped mid-test (the scope's restore closure then reverts them).
     """
-    global ITEM_USE_SECONDS
-    loaded = load_item_effect_rules(path, registry, buff_definitions)
+    global ITEM_USE_SECONDS, _validation_complete
+    loaded = load_item_effect_rules(
+        path, registry, use_effect_inputs, buff_definitions, sources
+    )
     ITEM_USE_SECONDS = loaded["item_use_seconds"]
     ITEM_EFFECT_PROFILES.clear()
     ITEM_EFFECT_PROFILES.update(loaded["profiles"])
+    _validation_complete = True
+
+
+def ensure_item_effect_rules_validated() -> None:
+    """Complete item-effect validation for the production candidate (idempotent).
+
+    Importing this module already validates the production catalog; the startup
+    gate calls this marker so a cold-import rejection is impossible to miss and
+    an already validated catalog is never reread or revalidated.
+    """
+    if _validation_complete:
+        return
+    reload_item_effect_rules()
 
 
 __all__ = [
@@ -462,6 +508,7 @@ __all__ = [
     "ScopeTargetingRule",
     "StatusApplyEffect",
     "StatusRemoveEffect",
+    "ensure_item_effect_rules_validated",
     "load_item_effect_rules",
     "reload_item_effect_rules",
     "scope_targeting_rule",

@@ -467,7 +467,7 @@ class PossessionPresentationTests(EvenniaTest):
         self.player.sexual.exposure.value = "中等"
         self.npc.sexual.exposure.value = "極高"
         items = {
-            key: SimpleNamespace(key=key, modifier_key=key, equipment_slot=EquipmentSlot.ACCESSORY, display_name_zh=label)
+            key: SimpleNamespace(key=key, equipment_slot=EquipmentSlot.ACCESSORY, display_name_zh=label)
             for key, label in (("t_owner", "合成主人護符"), ("t_host", "合成宿主護符"))
         }
         effects = {key: SimpleNamespace(exposure_bias=1, attached_buffs=()) for key in items}

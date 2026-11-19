@@ -23,7 +23,6 @@ from world.lore.guild import GUILD_BRANCH_REGISTRY
 from world.lore.guild import GUILD_RANK_REGISTRY
 from world.lore.items import (
     ITEM_REGISTRY,
-    EquipmentModifierKey,
     ItemDefinition,
     ItemIconKey,
     ItemKind,

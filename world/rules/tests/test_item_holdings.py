@@ -27,7 +27,7 @@ from tools.spec_traceability import covers_requirement
 
 from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
-from world.lore.items import EquipmentModifierKey, EquipmentSlot
+from world.lore.items import EquipmentSlot
 from world.rules.combat_session import engage
 from world.rules.equipment import (
     EquipmentToggleReason,
@@ -62,21 +62,18 @@ _SWORD = make_item(
     display_name_zh="測試鋼劍",
     sellable=False,
     equipment_slot=EquipmentSlot.WEAPON_MAIN,
-    modifier_key=EquipmentModifierKey.PLAIN_SWORD,
 )
 _STAFF = make_item(
     "t_hold_staff",
     display_name_zh="測試法杖",
     sellable=False,
     equipment_slot=EquipmentSlot.WEAPON_MAIN,
-    modifier_key=EquipmentModifierKey.APPRENTICE_FOCUS_STAFF,
 )
 _WARHAMMER = make_item(
     "t_hold_warhammer",
     display_name_zh="測試戰鎚",
     sellable=False,
     equipment_slot=EquipmentSlot.WEAPON_MAIN,
-    modifier_key=EquipmentModifierKey.BEASTFOLK_WARHAMMER,
 )
 _CHARMS = tuple(
     make_item(
@@ -84,7 +81,6 @@ _CHARMS = tuple(
         display_name_zh=f"測試飾品{index}",
         sellable=False,
         equipment_slot=EquipmentSlot.ACCESSORY,
-        modifier_key=EquipmentModifierKey.SILVER_HAIRPIN,
     )
     for index in range(6)
 )
@@ -93,14 +89,12 @@ _CAP_ARMOR = make_item(
     display_name_zh="測試生命鎧",
     sellable=False,
     equipment_slot=EquipmentSlot.ARMOR,
-    modifier_key=EquipmentModifierKey.APOTHECARY_BEADS,
 )
 _ROBE = make_item(
     "t_hold_robe",
     display_name_zh="測試長袍",
     sellable=False,
     equipment_slot=EquipmentSlot.ARMOR,
-    modifier_key=EquipmentModifierKey.LEATHER_ARMOR,
 )
 _SEAL = make_item(
     "t_hold_seal",
@@ -108,7 +102,6 @@ _SEAL = make_item(
     sellable=False,
     guild_property=True,
     equipment_slot=EquipmentSlot.ACCESSORY,
-    modifier_key=EquipmentModifierKey.SILVER_HAIRPIN,
 )
 _TONIC_KEY = "t_hold_tonic"
 _TONIC = make_item(_TONIC_KEY, display_name_zh="測試藥水", sellable=False)
@@ -130,42 +123,45 @@ _ITEMS = {
 # Test-authored magnitudes: the sword's +6, the staff's neutral +0 and the
 # warhammer's +10 are the design's independent arithmetic cases.
 _EFFECT_RULES = {
-    EquipmentModifierKey.PLAIN_SWORD: EquipmentEffectRule(
+    _SWORD.key: EquipmentEffectRule(
         adjustments={"atk_phys": 6},
         gauge_caps={},
         immune=(),
         attached_buffs=(),
         exposure_bias=0,
     ),
-    EquipmentModifierKey.APPRENTICE_FOCUS_STAFF: EquipmentEffectRule(
+    _STAFF.key: EquipmentEffectRule(
         adjustments={},
         gauge_caps={},
         immune=(),
         attached_buffs=(),
         exposure_bias=0,
     ),
-    EquipmentModifierKey.BEASTFOLK_WARHAMMER: EquipmentEffectRule(
+    _WARHAMMER.key: EquipmentEffectRule(
         adjustments={"atk_phys": 10},
         gauge_caps={},
         immune=(),
         attached_buffs=(),
         exposure_bias=0,
     ),
-    EquipmentModifierKey.SILVER_HAIRPIN: EquipmentEffectRule(
-        adjustments={"defense": 2},
-        gauge_caps={},
-        immune=(),
-        attached_buffs=(),
-        exposure_bias=0,
-    ),
-    EquipmentModifierKey.APOTHECARY_BEADS: EquipmentEffectRule(
+    **{
+        row.key: EquipmentEffectRule(
+            adjustments={"defense": 2},
+            gauge_caps={},
+            immune=(),
+            attached_buffs=(),
+            exposure_bias=0,
+        )
+        for row in (*_CHARMS, _SEAL)
+    },
+    _CAP_ARMOR.key: EquipmentEffectRule(
         adjustments={},
         gauge_caps={"hp": 20},
         immune=(),
         attached_buffs=(),
         exposure_bias=0,
     ),
-    EquipmentModifierKey.LEATHER_ARMOR: EquipmentEffectRule(
+    _ROBE.key: EquipmentEffectRule(
         adjustments={"defense": 4},
         gauge_caps={},
         immune=(),

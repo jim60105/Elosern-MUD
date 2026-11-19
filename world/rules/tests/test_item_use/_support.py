@@ -201,7 +201,6 @@ _WARDEN = make_item(
     _WARDEN_KEY,
     display_name_zh="合成守護吊飾",
     equipment_slot=EquipmentSlot.ACCESSORY,
-    modifier_key=immune_to_key("poisoned"),
 )
 
 
@@ -338,3 +337,6 @@ class _MultiEffectTestCase(_ItemUseTestCase):
         super().setUp()
         live_item_registry().update(_SCOPE_MULTI_ITEMS)
         live_item_effect_profiles().update(_SCOPE_MULTI_PROFILES)
+        from world.rules.equipment_effects import EQUIPMENT_EFFECT_RULES
+
+        EQUIPMENT_EFFECT_RULES[_WARDEN_KEY] = rule_for(immune_to_key("poisoned"))

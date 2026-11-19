@@ -199,62 +199,64 @@ _TONIC_PROFILE = ItemEffectProfile(
 )
 _HEAL_AMOUNT = _TONIC_PROFILE.effects[0].amount
 
-# --- synthetic gear bound to the probed rows -------------------------------
+# --- synthetic gear, each row bound to a probed rule under its own key ------
 _SABER = make_item(
     "t_fold_saber",
     display_name_zh="合成折刀",
     equipment_slot=EquipmentSlot.WEAPON_MAIN,
-    modifier_key=_ATK_KEY,
 )
 _PLATE = make_item(
     "t_fold_plate",
     display_name_zh="合成折甲",
     equipment_slot=EquipmentSlot.ARMOR,
-    modifier_key=_PLATE_KEY,
 )
 _RING = make_item(
     "t_fold_ring",
     display_name_zh="合成折戒",
     equipment_slot=EquipmentSlot.ACCESSORY,
-    modifier_key=_RING_KEY,
 )
 _BLADE = make_item(
     "t_fold_blade",
     display_name_zh="合成影刃",
     equipment_slot=EquipmentSlot.WEAPON_MAIN,
-    modifier_key=_BLADE_KEY,
 )
 _MAIL = make_item(
     "t_fold_mail",
     display_name_zh="合成鏈甲",
     equipment_slot=EquipmentSlot.ARMOR,
-    modifier_key=_MAIL_KEY,
 )
 _ROBE = make_item(
     "t_fold_robe",
     display_name_zh="合成法袍",
     equipment_slot=EquipmentSlot.ARMOR,
-    modifier_key=_ROBE_KEY,
 )
 _SEAL = make_item(
     "t_fold_seal",
     display_name_zh="合成印章戒",
     equipment_slot=EquipmentSlot.ACCESSORY,
-    modifier_key=_SEAL_KEY,
 )
 _ECHO = make_item(
     "t_fold_echo",
     display_name_zh="合成回聲刃",
     equipment_slot=EquipmentSlot.WEAPON_OFF,
-    modifier_key=_ECHO_KEY,
 )
 _EMBLEM = make_item(
     "t_fold_emblem",
     display_name_zh="合成聖徽",
     equipment_slot=EquipmentSlot.ACCESSORY,
-    modifier_key=_EMBLEM_KEY,
 )
 _SCOPE_ITEMS = {d.key: d for d in (_SABER, _PLATE, _RING, _BLADE, _MAIL, _ROBE, _SEAL, _ECHO, _EMBLEM, _TONIC)}
+_EFFECT_ROWS = {
+    _SABER.key: _ATK_ROW,
+    _PLATE.key: _PLATE_ROW,
+    _RING.key: _RING_ROW,
+    _BLADE.key: _BLADE_ROW,
+    _MAIL.key: _MAIL_ROW,
+    _ROBE.key: _ROBE_ROW,
+    _SEAL.key: _SEAL_ROW,
+    _ECHO.key: _ECHO_ROW,
+    _EMBLEM.key: _EMBLEM_ROW,
+}
 
 
 def _worn(entity, *, weapon=None, off=None, armor=None, accessories=()) -> None:
@@ -302,6 +304,7 @@ class _WearerCase(EvenniaTestCase):
                 "items": _SCOPE_ITEMS,
                 "skills": {_MP_SKILL.key: _MP_SKILL, _SP_SKILL.key: _SP_SKILL},
                 "item_effect_profiles": {_TONIC.key: _TONIC_PROFILE},
+                "equipment_effect_rules": dict(_EFFECT_ROWS),
             },
         )
 
@@ -411,9 +414,12 @@ class AccessorFoldTests(_WearerCase):
     def test_equipment_weapon_multiplier_precedence_and_controls(self):
         # _SABER is weapon_main, _ECHO is weapon_off, _PLATE is armor
         # Patch _SABER rule with factor 1.5, _ECHO rule with factor 2.0
-        saber_rule = replace(EQUIPMENT_EFFECT_RULES[_ATK_KEY], weapon_damage_multiplier=1.5)
-        echo_rule = replace(EQUIPMENT_EFFECT_RULES[_ECHO_KEY], weapon_damage_multiplier=2.0)
-        with patch.dict(EQUIPMENT_EFFECT_RULES, {_ATK_KEY: saber_rule, _ECHO_KEY: echo_rule}):
+        saber_rule = replace(_EFFECT_ROWS[_SABER.key], weapon_damage_multiplier=1.5)
+        echo_rule = replace(_EFFECT_ROWS[_ECHO.key], weapon_damage_multiplier=2.0)
+        with patch.dict(
+            EQUIPMENT_EFFECT_RULES,
+            {_SABER.key: saber_rule, _ECHO.key: echo_rule},
+        ):
             # Dual-wield: main hand has 1.5, off hand has 2.0 => factor is 1.5 (main hand wins)
             dual_entity = self.wear(_player("dual wielder"), _SABER.key, _ECHO.key)
             self.assertEqual(equipment_weapon_multiplier(dual_entity), 1.5)
@@ -584,8 +590,10 @@ class DamageWiringTests(_FixtureFieldCase):
         # rulebook row's authored physical factor is normalized to neutral:
         # the selected nonneutral factors are shipped data with their own
         # contract (their independent arithmetic lives in test_damage_bands).
-        neutral_row = replace(EQUIPMENT_EFFECT_RULES[_ATK_KEY], weapon_damage_multiplier=1.0)
-        with patch.dict(EQUIPMENT_EFFECT_RULES, {_ATK_KEY: neutral_row}):
+        neutral_row = replace(
+            _EFFECT_ROWS[_SABER.key], weapon_damage_multiplier=1.0
+        )
+        with patch.dict(EQUIPMENT_EFFECT_RULES, {_SABER.key: neutral_row}):
             worn = self._staged_damage(attacker, defender)
         # Crit roll 100 doubles the weapon's flat attack before defense.
         # With ratio mitigation (K=40, def=5):
