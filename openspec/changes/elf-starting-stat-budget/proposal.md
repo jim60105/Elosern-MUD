@@ -20,7 +20,9 @@ None.
 
 - `player-stat-allocation`: Define the distinct custom-elf allocation policy.
 - `character-creation-ux`: Explain the selected profile's point units in text creation.
+- `webclient-character-creation-ui`: Publish point and conversion bounds and resume stale allocations as incomplete.
+- `generative-character-concept`: Validate suggested allocations against the same custom profile.
 
 ## Impact
 
-Creation rules, draft staging, WebClient descriptor and controls, text wizard, and creation tests. No world data rebalance.
+Creation rules, draft staging, WebClient descriptor and controls, text wizard, concept validation, and creation tests. No world data rebalance. The design's “Human review: allocation briefing” section covers localized briefing and labels.
