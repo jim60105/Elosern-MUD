@@ -219,6 +219,7 @@ class CharacterCreationPromptTests(unittest.TestCase):
     @covers_requirement(
         "generative-character-concept::proposals-are-validated-deterministically-against-the-registries",
         "generative-character-concept::the-concept-prompt-requests-the-expanded-blueprint-and-the-race-affinity-bound",
+        "generative-character-concept::concept-generation-receives-the-custom-allocation-policy",
     )
     def test_race_catalog_carries_only_policy_numbers_and_affinity_bounds(self):
         import re

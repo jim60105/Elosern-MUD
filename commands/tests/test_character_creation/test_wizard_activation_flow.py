@@ -225,6 +225,9 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertIn("屬性親和", joined)
         self.assertIn("背景設定", joined)
 
+    @covers_requirement(
+        "player-stat-allocation::creation-surfaces-use-the-selected-allocation-policy"
+    )
     def test_the_custom_elf_briefing_explains_the_magic_conversion(self):
         from world.rules.starting_policy import CUSTOM_MODE, resolve_starting_profile
 

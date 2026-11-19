@@ -356,6 +356,9 @@ class CreationPanelValidationTests(unittest.TestCase):
             with self.assertRaises(Exception):
                 validate_creation(deepcopy(payload))
 
+    @covers_requirement(
+        "player-stat-allocation::creation-surfaces-use-the-selected-allocation-policy"
+    )
     def test_point_bounds_are_independent_of_the_lore_bounds(self):
         payload = validate_creation(_valid_payload())
         profile = payload["custom"]["profiles"][0]
@@ -390,6 +393,9 @@ class CreationPanelValidationTests(unittest.TestCase):
                 validate_creation(broken)
 
 
+    @covers_requirement(
+        "player-stat-allocation::creation-surfaces-use-the-selected-allocation-policy"
+    )
     def test_profile_budget_matches_resolve_starting_profile(self):
         payload = validate_creation(_valid_payload())
         for profile in payload["custom"]["profiles"]:

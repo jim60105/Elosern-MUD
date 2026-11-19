@@ -834,6 +834,9 @@ class CreationWizardTests(EvenniaTest):
         }
         return dict(self.character.creation_draft)
 
+    @covers_requirement(
+        "player-stat-allocation::creation-surfaces-use-the-selected-allocation-policy"
+    )
     def test_a_superseded_elf_draft_resumes_needing_an_allocation(self):
         elf, branch, scope = self.elf_scope()
         with scope:
@@ -902,6 +905,9 @@ class CreationWizardTests(EvenniaTest):
             )
             self.assertNotIn(ALLOCATION_POLICY_VERSION_KEY, draft)
 
+    @covers_requirement(
+        "player-stat-allocation::creation-surfaces-use-the-selected-allocation-policy"
+    )
     def test_activation_of_a_superseded_elf_draft_is_write_free(self):
         from world.rules.creation_portrait import CREATION_PORTRAIT_ATTRIBUTE
 
@@ -932,6 +938,9 @@ class CreationWizardTests(EvenniaTest):
             self.assertEqual(self.character.traits.all(), [])
             self.assertIsNone(self.character.age)
 
+    @covers_requirement(
+        "player-stat-allocation::creation-surfaces-use-the-selected-allocation-policy"
+    )
     def test_a_fresh_elf_allocation_restores_activation(self):
         elf, branch, scope = self.elf_scope()
         with scope:

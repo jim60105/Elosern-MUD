@@ -557,6 +557,9 @@ class CreationPanelPresenterTests(EvenniaTest):
             self.assertIn(f":{other.pk}:{entry['sex']}:", entry["artwork"]["subject_id"])
 
 
+    @covers_requirement(
+        "player-stat-allocation::creation-surfaces-use-the-selected-allocation-policy"
+    )
     def test_a_superseded_elf_draft_ships_as_unallocated(self):
         from world.tests.synthetic_data import SYNTH_RACES, make_subrace, synthetic_registries
 

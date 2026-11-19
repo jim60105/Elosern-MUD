@@ -79,6 +79,9 @@ class CreationFingerprintBindingTests(CreationActionBase):
         self.assertEqual(result["code"], "no_draft")
         self.assertTrue(self.character.creation_pending)
 
+    @covers_requirement(
+        "player-stat-allocation::creation-surfaces-use-the-selected-allocation-policy"
+    )
     def test_a_superseded_elf_draft_cannot_activate_even_with_a_matching_fingerprint(self):
         # A draft written under the old increment policy: structurally valid,
         # but its points are not points under the shipped custom-elf

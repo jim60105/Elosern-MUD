@@ -1,13 +1,13 @@
 """The custom-elf starting allocation policy (elf-starting-stat-budget).
 
 The policy, its exact half-up conversion, and the two activatable custom-elf
-endpoints. These are behavior tests for the change's ADDED requirements; the
-delta requirement ids only exist after archive sync, so no test here carries a
-``covers_requirement`` annotation.
+endpoints. These are behavior tests for the change's ADDED requirements.
 """
 
 from dataclasses import replace
 import unittest
+
+from tools.spec_traceability import covers_requirement
 
 from evennia.utils.create import create_account, create_object
 from evennia.utils.test_resources import EvenniaTest
@@ -136,6 +136,9 @@ class ProfilePolicyTests(unittest.TestCase):
         subrace = _elf_subrace()
         return race, subrace, _elf_scope(race, subrace)
 
+    @covers_requirement(
+        "player-stat-allocation::custom-elf-allocation-converts-points-to-starting-stats"
+    )
     def test_a_custom_elf_spends_its_three_physical_spans(self):
         race, subrace, scope = self._scope()
         span = 95 - 70
@@ -191,6 +194,9 @@ class ProfilePolicyTests(unittest.TestCase):
 
 
 class SyntheticElfPolicyTests(unittest.TestCase):
+    @covers_requirement(
+        "player-stat-allocation::custom-elf-allocation-converts-points-to-starting-stats"
+    )
     def test_the_budget_is_the_sum_of_the_physical_spans(self):
         race = _synthetic_elf(physical=(10, 15), magic=(40, 400))
         subrace = _elf_subrace()
@@ -204,6 +210,9 @@ class SyntheticElfPolicyTests(unittest.TestCase):
             )
             self.assertEqual(axes["hp"].point_cap, 0)
 
+    @covers_requirement(
+        "player-stat-allocation::custom-elf-allocation-converts-points-to-starting-stats"
+    )
     def test_a_cap_above_the_lore_ceiling_is_clamped(self):
         race = _synthetic_elf(magic=(40, 120))
         subrace = _elf_subrace()
@@ -232,6 +241,9 @@ class SyntheticElfPolicyTests(unittest.TestCase):
             self.assertEqual(hp.point_cap, 0)
             self.assertEqual(hp.value_at_cap, hp.minimum)
 
+    @covers_requirement(
+        "player-stat-allocation::custom-elf-allocation-converts-points-to-starting-stats"
+    )
     def test_subrace_modifiers_apply_once_after_conversion(self):
         race = _synthetic_elf(physical=(10, 20))
         subrace = _elf_subrace(static_modifiers=StatModifiers(atk_phys=0.50))
@@ -251,6 +263,9 @@ class SyntheticElfPolicyTests(unittest.TestCase):
             self.assertEqual(values["agility"], 20)
             self.assertEqual(values["magic_power"], 40)
 
+    @covers_requirement(
+        "player-stat-allocation::custom-elf-allocation-converts-points-to-starting-stats"
+    )
     def test_a_mixed_allocation_rounds_an_exact_half_upward(self):
         # physical spans 10 each -> budget 30; the magic band tops out at 15,
         # so a magic point is worth 0.5 stat units and odd spends land exactly
@@ -327,6 +342,9 @@ class CustomElfActivationTests(EvenniaTest):
             allocations=allocations,
         )
 
+    @covers_requirement(
+        "player-stat-allocation::custom-elf-allocation-converts-points-to-starting-stats"
+    )
     def test_both_custom_elf_endpoints_activate(self):
         with self._scope():
             all_magic = activate_player_character(
