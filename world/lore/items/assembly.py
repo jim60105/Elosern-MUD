@@ -95,6 +95,23 @@ def _display_path(path: Path) -> str:
         return str(path)
 
 
+def _resolve_contained(path: Path, root: Path, where: str) -> Path:
+    """Resolve ``path`` and require it to stay inside the catalog directory.
+
+    ``Path.is_file()`` follows symlinks, so a declared slice could otherwise
+    point at an external file and break the single-source boundary. The
+    resolved target must live under the resolved catalog root.
+    """
+    try:
+        resolved = path.resolve()
+        resolved.relative_to(root.resolve())
+    except (OSError, ValueError):
+        raise ItemCatalogError(
+            f"{where}: resolves outside the item catalog directory"
+        ) from None
+    return resolved
+
+
 def _unique_key_loader(source: str):
     """A SafeLoader that refuses duplicate mapping keys, naming the source."""
 
@@ -286,9 +303,11 @@ def load_item_catalog(directory: Path | None = None) -> ItemCatalog:
     files. Nothing is published until every declared document validates.
     """
     root = Path(directory) if directory is not None else CATALOG_DIRECTORY
+    root = root.resolve()
     manifest_path = root / CATALOG_FILENAME
     if not root.is_dir() or not manifest_path.is_file():
         raise ItemCatalogError(f"{_display_path(manifest_path)}: catalog manifest is missing")
+    _resolve_contained(manifest_path, root, _display_path(manifest_path))
 
     manifest = _require_mapping(
         _read_yaml(manifest_path), _display_path(manifest_path)
@@ -344,6 +363,7 @@ def load_item_catalog(directory: Path | None = None) -> ItemCatalog:
         path = root / name
         if not path.is_file():
             raise ItemCatalogError(f"{_display_path(path)}: not a readable regular file")
+        _resolve_contained(path, root, _display_path(path))
         source = _display_path(path)
         document = _require_mapping(_read_yaml(path), source)
         _require_fields(document, frozenset({"items"}), frozenset({"items"}), source)

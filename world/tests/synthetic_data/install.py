@@ -73,6 +73,13 @@ def install_synthetic_catalogs(
     names = tuple(logicals) if logicals else tuple(
         name for name in REGISTRY_TARGETS if name != "lore_sync"
     ) + ("lore_sync",)
+    # A partial item install is still a complete item catalogue: worn gear and
+    # settlement resolve their own keys in the two rule maps, so requesting
+    # only ``items`` carries both rulebook halves with it.
+    if "items" in names:
+        for companion in ("item_effect_profiles", "equipment_effect_rules"):
+            if companion not in names:
+                names += (companion,)
     _INSTALL_REPLACEMENTS.clear()
     _resolve_import_time_derivations(names)
     borrowed_ground = borrow_authored_world and any(

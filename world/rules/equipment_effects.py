@@ -197,7 +197,7 @@ def _validate_budgets(raw: Any) -> dict[str, dict[str, int | float]]:
     unknown = set(raw) - _BUDGET_RARITIES
     if unknown:
         raise EquipmentEffectsRulebookError(
-            f"budgets name unknown rarities: {sorted(unknown)}"
+            f"budgets name unknown rarities: {sorted(map(str, unknown))}"
         )
     missing = _BUDGET_RARITIES - set(raw)
     if missing:
@@ -205,7 +205,7 @@ def _validate_budgets(raw: Any) -> dict[str, dict[str, int | float]]:
             f"budgets are missing rarities: {sorted(missing)}"
         )
     budgets: dict[str, dict[str, int | float]] = {}
-    for rarity in sorted(raw):
+    for rarity in sorted(raw, key=str):
         columns = raw[rarity]
         if not isinstance(columns, dict):
             raise EquipmentEffectsRulebookError(
@@ -214,7 +214,7 @@ def _validate_budgets(raw: Any) -> dict[str, dict[str, int | float]]:
         unknown = set(columns) - _BUDGET_COLUMNS
         if unknown:
             raise EquipmentEffectsRulebookError(
-                f"budgets.{rarity} name unknown columns: {sorted(unknown)}"
+                f"budgets.{rarity} name unknown columns: {sorted(map(str, unknown))}"
             )
         missing = _BUDGET_COLUMNS - set(columns)
         if missing:
@@ -258,7 +258,8 @@ def _validate_entry(
     unknown = set(raw) - _ENTRY_FIELDS
     if unknown:
         raise EquipmentEffectsRulebookError(
-            f"effects.{item_key} contains unknown fields: {sorted(unknown)}"
+            f"effects.{item_key} contains unknown fields: "
+            f"{sorted(map(str, unknown))}"
         )
 
     ceilings = budgets[rarity]
@@ -274,9 +275,9 @@ def _validate_entry(
     if unknown:
         raise EquipmentEffectsRulebookError(
             f"effects.{item_key}.adjustments contain unknown fields: "
-            f"{sorted(unknown)}"
+            f"{sorted(map(str, unknown))}"
         )
-    for field in sorted(raw_adjustments):
+    for field in sorted(raw_adjustments, key=str):
         value = raw_adjustments[field]
         if field in _PERCENT_FIELDS:
             magnitude = _require_percent(value, f"effects.{item_key}.{field}")
@@ -316,10 +317,11 @@ def _validate_entry(
     unknown = set(raw_caps) - _GAUGE_TARGETS
     if unknown:
         raise EquipmentEffectsRulebookError(
-            f"effects.{item_key}.gauge_caps target unknown gauges: {sorted(unknown)}"
+            f"effects.{item_key}.gauge_caps target unknown gauges: "
+            f"{sorted(map(str, unknown))}"
         )
     gauge_caps: dict[str, int] = {}
-    for target in sorted(raw_caps):
+    for target in sorted(raw_caps, key=str):
         cap = _require_int(
             raw_caps[target],
             f"effects.{item_key}.gauge_caps.{target}",
@@ -541,7 +543,7 @@ def validate_equipment_effect_rules(
     if set(document) != {"budgets"}:
         raise EquipmentEffectsRulebookError(
             "rulebook must carry exactly the 'budgets' key, "
-            f"got {sorted(document)}"
+            f"got {sorted(document, key=str)}"
         )
     budgets = _validate_budgets(document["budgets"])
     if not isinstance(equipment_effect_inputs, Mapping):
@@ -645,7 +647,12 @@ def load_equipment_effect_rules(
     content. Fails loud with ``EquipmentEffectsRulebookError`` on any deviation.
     """
     source = _RULEBOOK_PATH if path is None else path
-    document = yaml.load(source.read_text(encoding="utf-8"), Loader=_UniqueKeyLoader)
+    try:
+        document = yaml.load(
+            source.read_text(encoding="utf-8"), Loader=_UniqueKeyLoader
+        )
+    except EquipmentEffectsRulebookError as error:
+        raise EquipmentEffectsRulebookError(f"{source.name}: {error}") from None
     if registry is None:
         registry = _PRODUCTION_REGISTRY
         if equipment_effect_inputs is None:
@@ -656,9 +663,12 @@ def load_equipment_effect_rules(
         buff_definitions = _PRODUCTION_BUFF_DEFINITIONS
     if equipment_effect_inputs is None:
         equipment_effect_inputs = {}
-    return validate_equipment_effect_rules(
-        document, registry, equipment_effect_inputs, buff_definitions, sources
-    )
+    try:
+        return validate_equipment_effect_rules(
+            document, registry, equipment_effect_inputs, buff_definitions, sources
+        )
+    except EquipmentEffectsRulebookError as error:
+        raise EquipmentEffectsRulebookError(f"{source.name}: {error}") from None
 
 
 _loaded = load_equipment_effect_rules()

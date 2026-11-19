@@ -247,7 +247,8 @@ def _parse_effect_entry(entry: Any, field: str, buff_definitions: Mapping[str, A
     extra = set(entry) - _ENTRY_FIELDS[verb]
     if extra:
         raise ItemEffectsRulebookError(
-            f"{field}: effect entry carries unknown fields {sorted(extra)}"
+            f"{field}: effect entry carries unknown fields "
+            f"{sorted(map(str, extra))}"
         )
     scope = _parse_scope(entry.get("scope", ItemTargetScope.SELF.value), field)
     if verb == "stat":
@@ -421,10 +422,14 @@ def load_item_effect_rules(
     catalogs without touching shipped content. ``path`` overrides only the
     shared settings file, never the per-item rows.
     """
-    document = yaml.load(
-        (path or _RULEBOOK_PATH).read_text(encoding="utf-8"),
-        Loader=_UniqueKeyLoader,
-    )
+    source = path or _RULEBOOK_PATH
+    try:
+        document = yaml.load(
+            source.read_text(encoding="utf-8"),
+            Loader=_UniqueKeyLoader,
+        )
+    except ItemEffectsRulebookError as error:
+        raise ItemEffectsRulebookError(f"{source.name}: {error}") from None
     if registry is None:
         from world.lore.items import ITEM_REGISTRY, ITEM_SOURCES, ITEM_USE_EFFECT_INPUTS
 
@@ -437,9 +442,12 @@ def load_item_effect_rules(
         buff_definitions = BUFF_DEFINITIONS
     if use_effect_inputs is None:
         use_effect_inputs = {}
-    return validate_item_effect_rules(
-        document, registry, use_effect_inputs, buff_definitions, sources
-    )
+    try:
+        return validate_item_effect_rules(
+            document, registry, use_effect_inputs, buff_definitions, sources
+        )
+    except ItemEffectsRulebookError as error:
+        raise ItemEffectsRulebookError(f"{source.name}: {error}") from None
 
 
 _loaded = load_item_effect_rules()
