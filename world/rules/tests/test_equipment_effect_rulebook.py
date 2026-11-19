@@ -342,6 +342,20 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
                     _production_loader(self._write_raw(text))
                 self.assertIn("duplicate YAML mapping key", str(caught.exception))
 
+    def test_retired_per_item_section_names_the_shared_file(self):
+        root = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, root, True)
+        source = root / "equipment_effects.yaml"
+        source.write_text(
+            "budgets: {}\neffects:\n  wooden_club: {}\n",
+            encoding="utf-8",
+        )
+        with self.assertRaises(EquipmentEffectsRulebookError) as caught:
+            _production_loader(source)
+        message = str(caught.exception)
+        self.assertIn("equipment_effects.yaml", message)
+        self.assertIn("budgets", message)
+
     # --- budgets ------------------------------------------------------------------
 
     @covers_requirement(
@@ -697,12 +711,11 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
     @covers_requirement(
         "equipment-effects::equipment-items-bind-one-to-one-to-a-closed-effect-identity"
     )
-    def test_duplicate_modifier_binding_is_rejected(self):
-        # Borrowing another item's binding is the hijack this guards: the
-        # load-time identity rule (value must equal the item's own key)
-        # rejects it first; the post-loop collapse check remains as
-        # defence in depth. Unreachable through the production dict either
-        # way, so the injectable seam carries the case.
+    def test_unbound_entry_without_a_row_is_rejected(self):
+        # A second effects source for one item is unreachable through the
+        # production candidate (one row owns its entry); the injectable seam
+        # carries the case: an entry with no row is an orphan, never a
+        # second binding.
         registry, document = self._two_entry_setup()
         document["effects"]["synthetic_orphan"] = {"adjustments": {}}
         with self.assertRaises(EquipmentEffectsRulebookError) as caught:

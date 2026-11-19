@@ -244,6 +244,94 @@ class StartupStepEventTests(_StubbedStartup):
         # step itself emits only ``startup_step_failed``, never ``startup_step``.
         self.assertEqual(self._steps(info), list(preceding))
 
+    def test_rulebook_gate_runs_both_idempotent_ensure_checks(self):
+        from types import SimpleNamespace
+        from unittest.mock import MagicMock
+
+        real_import = importlib.import_module
+        item_effects = SimpleNamespace(
+            ensure_item_effect_rules_validated=MagicMock()
+        )
+        equipment_effects = SimpleNamespace(
+            ensure_equipment_effect_rules_validated=MagicMock()
+        )
+
+        def fake_import(name, *args, **kwargs):
+            modules = {
+                "world.rules.item_effects": item_effects,
+                "world.rules.equipment_effects": equipment_effects,
+            }
+            if name in modules:
+                return modules[name]
+            return real_import(name, *args, **kwargs)
+
+        self._run({"import_module": {"side_effect": fake_import}})
+        item_effects.ensure_item_effect_rules_validated.assert_called_once_with()
+        equipment_effects.ensure_equipment_effect_rules_validated.assert_called_once_with()
+
+    def test_rulebook_rejection_aborts_before_sync_map_world(self):
+        real_import = importlib.import_module
+
+        def rejecting_import(name, *args, **kwargs):
+            if name == "world.rules.item_effects":
+                raise RuntimeError("malformed item row")
+            return real_import(name, *args, **kwargs)
+
+        info, warn, error = self._run(
+            {"import_module": {"side_effect": rejecting_import}},
+            assert_raises=RuntimeError,
+        )
+        error.assert_called_once()
+        self.assertEqual(error.call_args.args[0], "startup_step_failed")
+        self.assertEqual(
+            error.call_args.kwargs["context"],
+            {"step": "equipment_rulebook_validation"},
+        )
+        warn.assert_not_called()
+        steps = self._steps(info)
+        # The failing step emits only the failure event, never its success event.
+        self.assertNotIn("equipment_rulebook_validation", steps)
+        self.assertNotIn("sync_map_world", steps)
+
+    def test_item_validator_rejection_aborts_before_sync_map_world(self):
+        from types import SimpleNamespace
+        from unittest.mock import MagicMock
+
+        from world.rules.item_effects import ItemEffectsRulebookError
+
+        real_import = importlib.import_module
+        rejection = ItemEffectsRulebookError(
+            "content/items/slice.yaml: items[1] ('t_bad') unknown stat 'luck'"
+        )
+        item_effects = SimpleNamespace(
+            ensure_item_effect_rules_validated=MagicMock(side_effect=rejection)
+        )
+        equipment_effects = SimpleNamespace(
+            ensure_equipment_effect_rules_validated=MagicMock()
+        )
+
+        def fake_import(name, *args, **kwargs):
+            modules = {
+                "world.rules.item_effects": item_effects,
+                "world.rules.equipment_effects": equipment_effects,
+            }
+            if name in modules:
+                return modules[name]
+            return real_import(name, *args, **kwargs)
+
+        info, warn, error = self._run(
+            {"import_module": {"side_effect": fake_import}},
+            assert_raises=ItemEffectsRulebookError,
+        )
+        error.assert_called_once()
+        self.assertEqual(
+            error.call_args.kwargs["context"], {"step": "equipment_rulebook_validation"}
+        )
+        self.assertIn("content/items/slice.yaml", str(error.call_args.kwargs["exc"]))
+        warn.assert_not_called()
+        self.assertNotIn("sync_map_world", self._steps(info))
+        equipment_effects.ensure_equipment_effect_rules_validated.assert_not_called()
+
     def test_tolerant_registration_failure_degrades_and_startup_continues(self):
         from world.ai.guardrail import GuardrailRegistrationError
 

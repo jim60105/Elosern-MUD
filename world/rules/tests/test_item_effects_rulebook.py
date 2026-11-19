@@ -143,6 +143,25 @@ class CanonicalRulebookTests(unittest.TestCase):
         finally:
             Path(handle.name).unlink(missing_ok=True)
 
+    def test_retired_per_item_section_names_the_shared_file(self):
+        root = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, root, True)
+        source = root / "item_effects.yaml"
+        source.write_text(
+            "item_use_seconds: 6\nitems:\n  t_test_item:\n    effects: []\n",
+            encoding="utf-8",
+        )
+        with self.assertRaises(ItemEffectsRulebookError) as caught:
+            load_item_effect_rules(
+                source,
+                registry=_REGISTRY,
+                use_effect_inputs=_inputs({"stat": "hp", "amount": 5}),
+                buff_definitions=_BUFFS,
+            )
+        message = str(caught.exception)
+        self.assertIn("item_effects.yaml", message)
+        self.assertIn("item_use_seconds", message)
+
 
 class EffectVerbShapeTests(unittest.TestCase):
     """Delta: each effect declares exactly one verb."""
@@ -658,9 +677,15 @@ class AppendedRowUseAcceptanceTests(EvenniaTest):
         fresh = PlayerCharacter.objects.get(pk=actor.pk)
         self.assertIsNot(fresh, actor)
 
+        from world.rules.buffs import apply_buff
+
+        apply_buff(fresh, "fear")
         clock = WorldClock()
         settlement = use_item(fresh, _APPENDED_ROW["key"], clock=clock)
         self.assertEqual(settlement.result.outcome, "success")
+        # Removal ran before application: the pre-existing debuff is gone and
+        # the authored application landed. A reversed list would leave fear.
+        self.assertNotIn("fear", entity_active_buffs(fresh))
         self.assertIn("poisoned", entity_active_buffs(fresh))
         self.assertEqual(list_items(fresh), [])
         self.assertEqual(dict(fresh.db.equipment), legacy_equipment)

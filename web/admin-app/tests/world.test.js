@@ -295,6 +295,17 @@ describe("WorldEntryView", () => {
     expect(wrapper.text()).toContain("fixtures/critters");
   });
 
+  it("prefers the loaded row source over the registry provenance", async () => {
+    const entry = { ...MARKED_ENTRY, source_path: "content/items/alpha.yaml" };
+    const api = fakeApi({ "/registry/t_critters/t_marked": entry });
+    const { wrapper } = await mountAt(WorldEntryView, "/world/t_critters/t_marked", {
+      api,
+      props: { registry: "t_critters", entryKey: "t_marked" },
+    });
+    expect(wrapper.get(".gm-provenance__path").text()).toBe("content/items/alpha.yaml");
+    expect(wrapper.text()).not.toContain("fixtures/critters");
+  });
+
   it("explains an unknown key with a way back to the list", async () => {
     const api = fakeApi({ "/registry/t_critters/t_absent": errorWith("entry_not_found", "此登錄表中沒有這個條目。", 404) });
     const { wrapper } = await mountAt(WorldEntryView, "/world/t_critters/t_absent", {

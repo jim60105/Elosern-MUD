@@ -491,6 +491,41 @@ class FreshnessAndMutationTests(unittest.TestCase):
         self.assertFalse(freshness.current)
         self.assertEqual(freshness.status, STATUS_INCOMPATIBLE)
 
+    @covers_requirement("map-external-reference-context::reference-context-freshness-covers-source-closure-and-membership")
+    def test_item_catalog_sources_are_discovered_and_guarded(self):
+        # The single authored item catalog is part of the static closure: its
+        # manifest and slices are hashed, and a changed or newly added slice
+        # invalidates independent freshness exactly like any other source.
+        item_sources = sorted(
+            path for path in self.discovered if path.startswith("content/items/")
+        )
+        self.assertIn("content/items/catalog.yaml", item_sources)
+        self.assertTrue(
+            any(path.endswith(".yaml") and path != "content/items/catalog.yaml"
+                for path in item_sources)
+        )
+
+        changed_hashes = dict(self.current_hashes)
+        target = item_sources[0]
+        changed_hashes[target] = "ffff0000ffff0000"
+        changed = check_reference_context_freshness(
+            self.doc, changed_hashes, discovered_files=self.discovered
+        )
+        self.assertFalse(changed.current)
+        self.assertEqual(changed.status, STATUS_CHANGED)
+        self.assertTrue(any(target in reason for reason in changed.reasons))
+
+        added_hashes = dict(self.current_hashes)
+        added_hashes["content/items/synthetic_added.yaml"] = "abcdef123456"
+        added = check_reference_context_freshness(
+            self.doc,
+            added_hashes,
+            discovered_files=self.discovered + ["content/items/synthetic_added.yaml"],
+        )
+        self.assertFalse(added.current)
+        self.assertEqual(added.status, STATUS_MEMBERSHIP_MISMATCH)
+        self.assertTrue(any("synthetic_added.yaml" in reason for reason in added.reasons))
+
 
 class CliCheckEnforcementTests(unittest.TestCase):
     """The --check CLI option enforces freshness and rejects stale output without rewriting."""
