@@ -42,7 +42,7 @@ Work only in the files named below. Commands run from the repository root. Befor
 
 ## 4. Browser acceptance for the modified requirement
 
-- [ ] 4.1 In `web/tests/browser/test_browser_creation_viewport_pointer.py`, add the method `test_allocation_slider_tilde_range_and_zero_cap_lock` to `ViewportCreationJourney`, decorated with `@covers_requirement("webclient-character-creation-ui::creation-controls-preserve-native-entry-and-existing-authority")`. Steps:
+- [x] 4.1 In `web/tests/browser/test_browser_creation_viewport_pointer.py`, add the method `test_allocation_slider_tilde_range_and_zero_cap_lock` to `ViewportCreationJourney`, decorated with `@covers_requirement("webclient-character-creation-ui::creation-controls-preserve-native-entry-and-existing-authority")`. Steps:
   1. Open the custom form exactly as the first test does (`self._login_creation((1451, 790))`, `install_outbound_recorder`, `_wait_creation_available`, `_focus_dock`, ArrowDown, Enter, then the same `wait_for_store_state` readiness).
   2. On the identity tab, select subrace index 0 if a subrace select exists, then click the allocation tab.
   3. Walk the seven axis keys `hp, mp, sp, atk_phys, agility, defense, magic_power` and take the first two whose `creation-field-<axis>` `max` attribute is greater than 0 as A and B.
@@ -51,7 +51,7 @@ Work only in the files named below. Commands run from the repository root. Befor
   6. Wait with `page.wait_for_function` until `creation-slider-B` has `max == "0"`. Then assert that `creation-field-B`, `creation-slider-B`, `creation-step-B-up` and `creation-step-B-down` are disabled, and that the row (the closest `.creation-allocation`) has `data-locked == "true"`.
 
   Verify with `pnpm run build`, then `uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_browser_creation_viewport_pointer.ViewportCreationJourney`. Both methods must pass. If the existing method's allocation no-scroll assertion fails, apply the design Risks fallback in order (row gap, then slider height, then preview margin) and re-run. Never weaken the assertion.
-- [ ] 4.2 Run `uv run --locked python -m tools.spec_traceability check` and `uv run --locked python -m tools.contract_gate`. Both must exit 0 with no new uncovered requirement.
+- [x] 4.2 Run `uv run --locked python -m tools.spec_traceability check` and `uv run --locked python -m tools.contract_gate`. Both must exit 0 with no new uncovered requirement.
 
 ## 5. Integration check
 
