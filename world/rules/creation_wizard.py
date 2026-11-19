@@ -588,8 +588,12 @@ def _normalize_draft(storage: Any) -> dict[str, Any] | None:
         if sex not in SEX_VALUES:
             return None
         normalized["sex"] = sex
+        marker = storage.get(ALLOCATION_POLICY_VERSION_KEY)
+        # The marker is the exact accepted version: `True` and `1.0` compare
+        # equal to 1, so only a real int of the current version may keep the
+        # stored points activatable.
         if storage["race"] == ELF_RACE_KEY and (
-            storage.get(ALLOCATION_POLICY_VERSION_KEY) != ALLOCATION_POLICY_VERSION
+            type(marker) is not int or marker != ALLOCATION_POLICY_VERSION
         ):
             normalized["stage"] = CUSTOM_NEEDS_ALLOCATION_STAGE
             normalized["allocations"] = None

@@ -866,6 +866,16 @@ class CreationWizardTests(EvenniaTest):
             self.character.creation_draft = marked
             self.assertEqual(read_draft(self.character)["stage"], CUSTOM_STAGE)
             self.assertEqual(read_draft(self.character)["allocations"]["atk_phys"], 10)
+            # Only the exact integer version is current: a wrong integer, a
+            # boolean (which compares equal to 1), and a float all keep the
+            # draft unallocated.
+            for marker in (2, True, 1.0, "1", None):
+                with self.subTest(marker=marker):
+                    self.character.creation_draft = dict(marked)
+                    self.character.creation_draft[ALLOCATION_POLICY_VERSION_KEY] = marker
+                    draft = read_draft(self.character)
+                    self.assertEqual(draft["stage"], CUSTOM_NEEDS_ALLOCATION_STAGE)
+                    self.assertIsNone(draft["allocations"])
         save_custom_draft(self.account, self.character, self.custom_request())
         self.assertEqual(read_draft(self.character)["stage"], CUSTOM_STAGE)
         self.assertNotIn(ALLOCATION_POLICY_VERSION_KEY, self.character.creation_draft)
@@ -901,7 +911,12 @@ class CreationWizardTests(EvenniaTest):
             portrait = {"sentinel": "kept"}
             self.character.attributes.add(CREATION_PORTRAIT_ATTRIBUTE, portrait)
             fingerprint = draft_fingerprint(self.character)
-            with self.assertRaisesRegex(
+            # The rejection happens before the portrait unit, the mutation
+            # snapshots, and the transaction are entered at all.
+            with patch(
+                "world.rules.creation_wizard.draft_portrait_mutation",
+                side_effect=AssertionError("portrait unit must not be entered"),
+            ), self.assertRaisesRegex(
                 CharacterCreationError, "creation draft is incomplete"
             ):
                 activate_draft(self.account, self.character)

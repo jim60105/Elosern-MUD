@@ -251,6 +251,28 @@ class SyntheticElfPolicyTests(unittest.TestCase):
             self.assertEqual(values["agility"], 20)
             self.assertEqual(values["magic_power"], 40)
 
+    def test_a_mixed_allocation_rounds_an_exact_half_upward(self):
+        # physical spans 10 each -> budget 30; the magic band tops out at 15,
+        # so a magic point is worth 0.5 stat units and odd spends land exactly
+        # on the half boundary.
+        race = _synthetic_elf(physical=(10, 20), magic=(0, 15))
+        subrace = _elf_subrace()
+        with _elf_scope(race, subrace):
+            profile = resolve_starting_profile("elf", subrace.key, mode="custom")
+            allocations = {
+                "hp": 0, "mp": 0, "sp": 0,
+                "atk_phys": 10, "agility": 10, "defense": 5,
+                "magic_power": 5,
+            }
+            _validate_allocations(profile, allocations)
+            values = _resolve_values(profile, allocations)
+        self.assertEqual(values["hp"], 500)
+        self.assertEqual(values["atk_phys"], 20)
+        self.assertEqual(values["agility"], 20)
+        self.assertEqual(values["defense"], 15)
+        # 15 * 5 / 30 = 2.5 -> 3.
+        self.assertEqual(values["magic_power"], 3)
+
     def test_invalid_allocations_are_refused(self):
         race = _synthetic_elf(physical=(10, 20))
         subrace = _elf_subrace()

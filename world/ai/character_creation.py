@@ -57,7 +57,6 @@ from world.skills.registry import SKILL_REGISTRY
 from world.rules.starting_policy import (
     ALLOCATABLE_AXES,
     CUSTOM_MODE,
-    ELF_CUSTOM_MAGIC_CREATION_CAP,
     resolve_starting_profile,
 )
 
@@ -395,8 +394,9 @@ def _policy_catalog() -> str:
     """Render the custom allocation policy of every selectable race/subrace.
 
     One line per registered subrace, read from the same resolver activation
-    uses: the exact point budget and the per-axis point caps in
-    ``ALLOCATABLE_AXES`` order. The block comes first in the catalog so the
+    uses: the exact point budget, the per-axis point caps in
+    ``ALLOCATABLE_AXES`` order, and the magic value the magic point cap
+    converts to for that row. The block comes first in the catalog so the
     bounded output can never truncate a required policy row.
     """
     rows = []
@@ -404,12 +404,14 @@ def _policy_catalog() -> str:
         profile = resolve_starting_profile(subrace.race_key, subrace_key, mode=CUSTOM_MODE)
         axes = profile.axes_dict()
         caps = ",".join(str(axes[axis].point_cap) for axis in ALLOCATABLE_AXES)
-        rows.append(f"{subrace_key}：{profile.budget}｜{caps}")
+        magic = axes["magic_power"]
+        rows.append(
+            f"{subrace_key}：{profile.budget}｜{caps}｜魔力 {magic.value_at_cap}"
+        )
     header = (
         "配點政策（每列「子種族：預算｜"
         + ",".join(ALLOCATABLE_AXES)
-        + " 各軸點數上限」，總和必須等於預算；精靈魔力點數上限會換算為魔力值上限 "
-        + f"{ELF_CUSTOM_MAGIC_CREATION_CAP}）："
+        + " 各軸點數上限｜魔力點數上限換算出的魔力值」，總和必須等於預算）："
     )
     return header + "\n" + "\n".join(rows) + "\n"
 

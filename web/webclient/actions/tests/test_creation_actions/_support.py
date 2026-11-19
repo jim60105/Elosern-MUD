@@ -212,8 +212,10 @@ def _open_t_creation_scope(case):
     case.addCleanup(handle.stop)
 
 
-def balanced_allocations(race: str, subrace: str | None = None) -> dict[str, int]:
-    profile = resolve_starting_profile(race, subrace, mode="custom")
+def balanced_allocations(
+    race: str, subrace: str | None = None, *, mode: str = "custom"
+) -> dict[str, int]:
+    profile = resolve_starting_profile(race, subrace, mode=mode)
     remaining = profile.budget
     result: dict[str, int] = {}
     for axis in profile.axes:

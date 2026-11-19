@@ -193,11 +193,8 @@ class CreationConceptTests(CreationActionBase):
 
         # The superseded single-budget elf proposal (every axis spendable) is
         # refused by the shared policy, and the previous slot stays untouched.
-        old_style = {
-            "hp": 0, "mp": 0, "sp": 0,
-            "atk_phys": 10, "agility": 10, "defense": 10,
-            "magic_power": 10,
-        }
+        old_style = balanced_allocations("elf", _T_ELF_SUBRACE.key, mode="preset")
+        self.assertNotEqual(old_style, allocations)
         previous = self._slot()
         self._propose(
             _proposal(

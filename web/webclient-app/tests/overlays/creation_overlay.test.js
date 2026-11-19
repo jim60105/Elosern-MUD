@@ -1545,6 +1545,10 @@ describe("a superseded custom-elf draft resumes needing a fresh allocation", () 
     expect(wrapper.get(tid("creation-preview-magic_power")).text()).toContain("100");
     await wrapper.get(tid("creation-field-magic_power")).setValue(75);
     expect(wrapper.get(tid("creation-preview-magic_power")).text()).toContain("200");
+    // A mixed spend rounds the same way activation does: 100 + 37/75 of the
+    // 100-unit span lands on 149.33, so the preview shows 149.
+    await wrapper.get(tid("creation-field-magic_power")).setValue(37);
+    expect(wrapper.get(tid("creation-preview-magic_power")).text()).toContain("149");
     await wrapper.get(tid("creation-field-magic_power")).setValue(0);
     await wrapper.get(tid("creation-field-atk_phys")).setValue(25);
     expect(wrapper.get(tid("creation-preview-atk_phys")).text()).toContain("95");
