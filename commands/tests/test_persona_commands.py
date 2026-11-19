@@ -42,12 +42,12 @@ from world.tests.start_room_fixture import stub_start_room
 
 
 def _balanced_allocations(race: str, subrace: str | None = None) -> dict[str, int]:
-    profile = resolve_starting_profile(race, subrace)
+    profile = resolve_starting_profile(race, subrace, mode="custom")
     remaining = profile.budget
     result: dict[str, int] = {}
-    for key, (lower, upper) in profile.bounds:
-        value = min(upper - lower, remaining)
-        result[key] = value
+    for axis in profile.axes:
+        value = min(axis.point_cap, remaining)
+        result[axis.axis] = value
         remaining -= value
     return result
 

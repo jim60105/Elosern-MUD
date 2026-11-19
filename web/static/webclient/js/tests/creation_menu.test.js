@@ -103,20 +103,29 @@ function menuSilhouettes() {
 }
 
 function validPanel(overrides) {
+  const axis = (key, label, explanation, span) => ({
+    axis: key,
+    label,
+    explanation,
+    minimum: 0,
+    maximum: span,
+    point_cap: span,
+    value_at_cap: span,
+  });
   const axes = {
-    hp: { axis: "hp", label: "生命值", explanation: "決定承受", minimum: 0, maximum: 100 },
-    mp: { axis: "mp", label: "魔力值", explanation: "驅動魔法", minimum: 0, maximum: 100 },
-    sp: { axis: "sp", label: "體力值", explanation: "支撐行動", minimum: 0, maximum: 100 },
-    atk_phys: { axis: "atk_phys", label: "物理攻擊", explanation: "影響傷害", minimum: 0, maximum: 21 },
-    agility: { axis: "agility", label: "敏捷", explanation: "命中迴避", minimum: 0, maximum: 21 },
-    defense: { axis: "defense", label: "防禦", explanation: "減免傷害", minimum: 0, maximum: 85 },
-    magic_power: { axis: "magic_power", label: "魔法攻擊", explanation: "魔法傷害與治療強度", minimum: 0, maximum: 85 },
+    hp: axis("hp", "生命值", "決定承受", 100),
+    mp: axis("mp", "魔力值", "驅動魔法", 100),
+    sp: axis("sp", "體力值", "支撐行動", 100),
+    atk_phys: axis("atk_phys", "物理攻擊", "影響傷害", 21),
+    agility: axis("agility", "敏捷", "命中迴避", 21),
+    defense: axis("defense", "防禦", "減免傷害", 85),
+    magic_power: axis("magic_power", "魔法攻擊", "魔法傷害與治療強度", 85),
   };
   const humanAxes = ["hp", "mp", "sp", "atk_phys", "agility", "defense", "magic_power"].map((k) =>
     Object.assign({}, axes[k])
   );
   const panel = {
-    schema_version: 8,
+    schema_version: 9,
     available: true,
     kind: "creation",
     draft: null,
@@ -261,7 +270,7 @@ test("axis fields and budget follow the active profile", () => {
   const fields = CreationMenu.axisFields(panel, state);
   assert.equal(fields.length, 7);
   const hp = fields.find((f) => f.axis === "hp");
-  assert.deepEqual({ min: hp.minimum, max: hp.maximum }, { min: 0, max: 100 });
+  assert.deepEqual({ cap: hp.point_cap, value: hp.value_at_cap }, { cap: 100, value: 100 });
 });
 
 test("the allocation briefing mirrors the server profile exactly", () => {
@@ -272,15 +281,68 @@ test("the allocation briefing mirrors the server profile exactly", () => {
   const humanBriefing = CreationMenu.briefingFor(panel, humanState);
   assert.equal(humanBriefing.budget, humanProfile.budget);
   assert.equal(humanBriefing.axisCount, humanProfile.axes.length);
-  humanBriefing.spans.forEach((span, index) => {
+  humanBriefing.caps.forEach((cap, index) => {
     const axis = humanProfile.axes[index];
-    assert.equal(span.axis, axis.axis);
-    assert.equal(span.minimum, axis.minimum);
-    assert.equal(span.maximum, axis.maximum);
+    assert.equal(cap.axis, axis.axis);
+    assert.equal(cap.point_cap, axis.point_cap);
+    assert.deepEqual(humanBriefing.conversions, []);
   });
   assert.equal(humanBriefing.rule, "七項配點總和必須恰好等於 " + humanProfile.budget + "。");
   // A subrace with no profile resolves to no briefing.
   assert.equal(CreationMenu.briefingFor(panel, { raceKey: "human", subraceKey: null }), null);
+});
+
+test("the briefing and the preview explain a non-uniform conversion", () => {
+  // An elf profile: fixed gauges, raw-increment physical axes, and magic
+  // power interpolating from 100 to 200 across 75 points.
+  const panel = validPanel();
+  const profile = panel.custom.profiles[2];
+  profile.axes = profile.axes.map((axis) =>
+    axis.axis === "magic_power"
+      ? Object.assign({}, axis, { minimum: 100, maximum: 900, point_cap: 75, value_at_cap: 200 })
+      : axis
+  );
+  profile.budget = 75;
+  const state = CreationMenu.defaultCustomState(panel);
+  state.raceKey = "elf";
+  state.subraceKey = T_SR_LEAF;
+
+  const briefing = CreationMenu.briefingFor(panel, state);
+  assert.equal(briefing.budget, 75);
+  assert.deepEqual(briefing.conversions, ["魔法攻擊 75 點換算為 200（起點 100）"]);
+
+  // Both endpoints and a mixed allocation match the server's conversion.
+  const preview = (allocations) => {
+    const seeded = Object.assign({}, state, { allocations: Object.assign({}, state.allocations, allocations) });
+    return Object.fromEntries(
+      CreationMenu.allocationPreview(panel, seeded).map((entry) => [entry.axis, entry.value])
+    );
+  };
+  assert.deepEqual(preview({ magic_power: "75" }), {
+    hp: 0, mp: 0, sp: 0, atk_phys: 0, agility: 0, defense: 0, magic_power: 200,
+  });
+  assert.deepEqual(preview({ atk_phys: "21", agility: "21", defense: "33" }), {
+    hp: 0, mp: 0, sp: 0, atk_phys: 21, agility: 21, defense: 33, magic_power: 100,
+  });
+  // A partial magic allocation rounds half up: (100 * 37) / 75 = 49.33 → 49.
+  assert.equal(preview({ magic_power: "37" }).magic_power, 149);
+});
+
+test("an exact half in the conversion rounds upward", () => {
+  // Synthetic policy: 10 points span 15 units, so 5 points land exactly on
+  // the .5 boundary and must round up.
+  const panel = validPanel();
+  const profile = panel.custom.profiles[0];
+  profile.axes = profile.axes.map((axis) =>
+    axis.axis === "magic_power"
+      ? Object.assign({}, axis, { minimum: 0, maximum: 15, point_cap: 10, value_at_cap: 15 })
+      : axis
+  );
+  const state = CreationMenu.defaultCustomState(panel);
+  state.subraceKey = T_SR_ROYAL;
+  const seeded = Object.assign({}, state, { allocations: Object.assign({}, state.allocations, { magic_power: "5" }) });
+  const magic = CreationMenu.allocationPreview(panel, seeded).find((entry) => entry.axis === "magic_power");
+  assert.equal(magic.value, 8);
 });
 
 test("advisory validation flags out-of-range age, name, and budget errors", () => {

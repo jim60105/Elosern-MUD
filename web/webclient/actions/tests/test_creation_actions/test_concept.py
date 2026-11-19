@@ -171,6 +171,51 @@ class CreationConceptTests(CreationActionBase):
         )
         self.assertEqual(self._slot()["affinity_elements"], [])
 
+    def test_a_new_policy_elf_proposal_is_admitted_and_an_old_budget_is_rejected(self):
+        allocations = balanced_allocations("elf", _T_ELF_SUBRACE.key)
+        self._propose(
+            _proposal(
+                race_key="elf",
+                subrace_key=_T_ELF_SUBRACE.key,
+                allocations=allocations,
+                affinity_elements=(),
+            )
+        )
+        result = await_result(
+            _creation_concept_adapter(
+                self.character, _concept_payload(), self.fake_session
+            )
+        )
+        self.assertEqual(result["outcome"], "success")
+        self.assertEqual(self._slot()["allocations"], allocations)
+        # No draft is written by the transient fill.
+        self.assertIsNone(read_draft(self.character))
+
+        # The superseded single-budget elf proposal (every axis spendable) is
+        # refused by the shared policy, and the previous slot stays untouched.
+        old_style = {
+            "hp": 0, "mp": 0, "sp": 0,
+            "atk_phys": 10, "agility": 10, "defense": 10,
+            "magic_power": 10,
+        }
+        previous = self._slot()
+        self._propose(
+            _proposal(
+                race_key="elf",
+                subrace_key=_T_ELF_SUBRACE.key,
+                allocations=old_style,
+                affinity_elements=(),
+            )
+        )
+        rejected = await_result(
+            _creation_concept_adapter(
+                self.character, _concept_payload(), self.fake_session
+            )
+        )
+        self.assertEqual(rejected["outcome"], "rejected")
+        self.assertEqual(rejected["code"], "concept_unavailable")
+        self.assertEqual(self._slot(), previous)
+
     @covers_requirement("concept-transient-fill::concept-applies-transiently-with-zero-persistent-writes")
     def test_custom_save_and_reset_clear_the_slot(self):
         self._propose(_proposal())

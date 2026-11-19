@@ -73,7 +73,8 @@ class CreationPanelValidationTests(unittest.TestCase):
             (lambda p: p.update(schema_version=6), "legacy schema_version 6"),
             # v7 is the pre-portrait version (creation-draft-portrait-panel).
             (lambda p: p.update(schema_version=7), "legacy schema_version 7"),
-            (lambda p: p.update(schema_version=9), "future schema_version 9"),
+            # v8 is the pre-point-policy version (elf-starting-stat-budget).
+            (lambda p: p.update(schema_version=8), "legacy schema_version 8"),
             (lambda p: p.update(available=False), "available"),
             (lambda p: p.update(kind="services"), "kind"),
         ):
@@ -87,7 +88,7 @@ class CreationPanelValidationTests(unittest.TestCase):
     @covers_requirement("webclient-character-creation-ui::creation-presentation-derives-finite-controls-from-immutable-registries")
     def test_custom_descriptor_ships_server_labelled_sex_options(self):
         payload = validate_creation(_valid_payload())
-        self.assertEqual(payload["schema_version"], 8)
+        self.assertEqual(payload["schema_version"], 9)
         self.assertEqual(
             payload["custom"]["sex"],
             [
@@ -355,15 +356,57 @@ class CreationPanelValidationTests(unittest.TestCase):
             with self.assertRaises(Exception):
                 validate_creation(deepcopy(payload))
 
+    def test_point_bounds_are_independent_of_the_lore_bounds(self):
+        payload = validate_creation(_valid_payload())
+        profile = payload["custom"]["profiles"][0]
+        axis = profile["axes"][0]
+        # An interpolated axis reaches a value inside its lore band.
+        axis.update(
+            {"minimum": 100, "maximum": 900, "point_cap": 75, "value_at_cap": 200}
+        )
+        validated = validate_creation(deepcopy(payload))
+        self.assertEqual(
+            {
+                key: validated["custom"]["profiles"][0]["axes"][0][key]
+                for key in ("minimum", "maximum", "point_cap", "value_at_cap")
+            },
+            {"minimum": 100, "maximum": 900, "point_cap": 75, "value_at_cap": 200},
+        )
+        cases = {
+            "missing point_cap": ("point_cap", None),
+            "negative point_cap": ("point_cap", -1),
+            "value above maximum": ("value_at_cap", 901),
+            "value below minimum": ("value_at_cap", 99),
+            "zero cap away from the floor": ("point_cap", 0),
+        }
+        for label, (field, value) in cases.items():
+            broken = deepcopy(payload)
+            entry = broken["custom"]["profiles"][0]["axes"][0]
+            if value is None:
+                del entry[field]
+            else:
+                entry[field] = value
+            with self.subTest(label), self.assertRaises(Exception):
+                validate_creation(broken)
+
 
     def test_profile_budget_matches_resolve_starting_profile(self):
         payload = validate_creation(_valid_payload())
         for profile in payload["custom"]["profiles"]:
-            resolved = resolve_starting_profile(profile["race"], profile["subrace"])
+            resolved = resolve_starting_profile(
+                profile["race"], profile["subrace"], mode="custom"
+            )
             self.assertEqual(profile["budget"], resolved.budget)
             for axis in profile["axes"]:
-                bound = resolved.bounds_dict()[axis["axis"]]
-                self.assertEqual((axis["minimum"], axis["maximum"]), (0, bound[1] - bound[0]))
+                policy = resolved.axes_dict()[axis["axis"]]
+                self.assertEqual(
+                    (axis["minimum"], axis["maximum"]),
+                    (policy.minimum, policy.maximum),
+                )
+                self.assertEqual(
+                    (axis["point_cap"], axis["value_at_cap"]),
+                    (policy.point_cap, policy.value_at_cap),
+                )
 
 
     @covers_requirement("webclient-character-creation-ui::preset-cards-carry-a-server-built-artwork-descriptor")

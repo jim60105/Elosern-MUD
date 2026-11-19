@@ -221,6 +221,8 @@ class CreationPanelValidationTests(unittest.TestCase):
                     "explanation": huge(MAX_EXPLANATION_CODE_POINTS),
                     "minimum": 0,
                     "maximum": 10000,
+                    "point_cap": 10000,
+                    "value_at_cap": 10000,
                 }
                 result.append(entry)
             return result

@@ -79,6 +79,40 @@ class CreationFingerprintBindingTests(CreationActionBase):
         self.assertEqual(result["code"], "no_draft")
         self.assertTrue(self.character.creation_pending)
 
+    def test_a_superseded_elf_draft_cannot_activate_even_with_a_matching_fingerprint(self):
+        # A draft written under the old increment policy: structurally valid,
+        # but its points are not points under the shipped custom-elf
+        # conversion, so the read projects it as needing a fresh allocation.
+        from ._support import _T_ELF, _T_ELF_SUBRACE
+
+        self.character.creation_draft = {
+            "version": 3,
+            "mode": "custom",
+            "stage": "custom_filled",
+            "display_name": "舊精靈",
+            "age": 320,
+            "apparent_age": 20,
+            "race": _T_ELF.key,
+            "subrace": _T_ELF_SUBRACE.key,
+            "allocations": {
+                "hp": 0, "mp": 0, "sp": 0,
+                "atk_phys": 20, "agility": 20, "defense": 20,
+                "magic_power": 0,
+            },
+            "persona": None,
+            "sex": "female",
+        }
+        # The confirmation the browser would hold: a matching fingerprint must
+        # not make the incomplete draft eligible.
+        matching = draft_fingerprint(self.character)
+        self.character.ndb.elosern_confirmed_draft_fingerprint = matching
+        result = _creation_activate_adapter(self.character, {})
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "incomplete_draft")
+        self.assertTrue(self.character.creation_pending)
+        self.assertEqual(self.character.traits.all(), [])
+        self.assertEqual(draft_fingerprint(self.character), matching)
+
     def test_preset_save_also_binds_the_confirmation_fingerprint(self):
         result = _creation_preset_adapter(self.character, {"preset_key": _T_PRESET})
         self.assertEqual(result["outcome"], "success")

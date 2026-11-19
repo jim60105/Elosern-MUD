@@ -85,8 +85,20 @@ function creationSilhouettes() {
   return table;
 }
 
+// One v9 allocation axis: the story profiles spend one point per stat unit,
+// so every lore bound starts at 0 and the cap reaches the maximum.
+const storyAxis = (axis, label, explanation, cap) => ({
+  axis,
+  label,
+  explanation,
+  minimum: 0,
+  maximum: cap,
+  point_cap: cap,
+  value_at_cap: cap,
+});
+
 export const CREATION_PANEL_SAMPLE = {
-  schema_version: 8,
+  schema_version: 9,
   available: true,
   kind: "creation",
   draft: null,
@@ -169,13 +181,13 @@ export const CREATION_PANEL_SAMPLE = {
         subrace: null,
         budget: 28,
         axes: [
-          { axis: "hp", label: "生命", explanation: "承傷能力", minimum: 0, maximum: 8 },
-          { axis: "mp", label: "魔力", explanation: "法術資源", minimum: 0, maximum: 4 },
-          { axis: "sp", label: "精神", explanation: "精神資源", minimum: 0, maximum: 4 },
-          { axis: "atk_phys", label: "攻擊", explanation: "近戰傷害", minimum: 0, maximum: 4 },
-          { axis: "agility", label: "敏捷", explanation: "閃避與先攻", minimum: 0, maximum: 4 },
-          { axis: "defense", label: "防禦", explanation: "傷害減輕", minimum: 0, maximum: 4 },
-          { axis: "magic_power", label: "魔法攻擊", explanation: "魔法傷害與治療強度", minimum: 0, maximum: 4 },
+          storyAxis("hp", "生命", "承傷能力", 8),
+          storyAxis("mp", "魔力", "法術資源", 4),
+          storyAxis("sp", "精神", "精神資源", 4),
+          storyAxis("atk_phys", "攻擊", "近戰傷害", 4),
+          storyAxis("agility", "敏捷", "閃避與先攻", 4),
+          storyAxis("defense", "防禦", "傷害減輕", 4),
+          storyAxis("magic_power", "魔法攻擊", "魔法傷害與治療強度", 4),
         ],
       },
       {
@@ -183,13 +195,13 @@ export const CREATION_PANEL_SAMPLE = {
         subrace: "subrace_wolf",
         budget: 30,
         axes: [
-          { axis: "hp", label: "生命", explanation: "承傷能力", minimum: 0, maximum: 9 },
-          { axis: "mp", label: "魔力", explanation: "法術資源", minimum: 0, maximum: 4 },
-          { axis: "sp", label: "精神", explanation: "精神資源", minimum: 0, maximum: 4 },
-          { axis: "atk_phys", label: "攻擊", explanation: "近戰傷害", minimum: 0, maximum: 5 },
-          { axis: "agility", label: "敏捷", explanation: "閃避與先攻", minimum: 0, maximum: 4 },
-          { axis: "defense", label: "防禦", explanation: "傷害減輕", minimum: 0, maximum: 4 },
-          { axis: "magic_power", label: "魔法攻擊", explanation: "魔法傷害與治療強度", minimum: 0, maximum: 4 },
+          storyAxis("hp", "生命", "承傷能力", 9),
+          storyAxis("mp", "魔力", "法術資源", 4),
+          storyAxis("sp", "精神", "精神資源", 4),
+          storyAxis("atk_phys", "攻擊", "近戰傷害", 5),
+          storyAxis("agility", "敏捷", "閃避與先攻", 4),
+          storyAxis("defense", "防禦", "傷害減輕", 4),
+          storyAxis("magic_power", "魔法攻擊", "魔法傷害與治療強度", 4),
         ],
       },
       {
@@ -197,13 +209,13 @@ export const CREATION_PANEL_SAMPLE = {
         subrace: null,
         budget: 26,
         axes: [
-          { axis: "hp", label: "生命", explanation: "承傷能力", minimum: 0, maximum: 6 },
-          { axis: "mp", label: "魔力", explanation: "法術資源", minimum: 0, maximum: 6 },
-          { axis: "sp", label: "精神", explanation: "精神資源", minimum: 0, maximum: 4 },
-          { axis: "atk_phys", label: "攻擊", explanation: "近戰傷害", minimum: 0, maximum: 3 },
-          { axis: "agility", label: "敏捷", explanation: "閃避與先攻", minimum: 0, maximum: 5 },
-          { axis: "defense", label: "防禦", explanation: "傷害減輕", minimum: 0, maximum: 4 },
-          { axis: "magic_power", label: "魔法攻擊", explanation: "魔法傷害與治療強度", minimum: 0, maximum: 4 },
+          storyAxis("hp", "生命", "承傷能力", 6),
+          storyAxis("mp", "魔力", "法術資源", 6),
+          storyAxis("sp", "精神", "精神資源", 4),
+          storyAxis("atk_phys", "攻擊", "近戰傷害", 3),
+          storyAxis("agility", "敏捷", "閃避與先攻", 5),
+          storyAxis("defense", "防禦", "傷害減輕", 4),
+          storyAxis("magic_power", "魔法攻擊", "魔法傷害與治療強度", 4),
         ],
       },
     ],
@@ -342,7 +354,7 @@ export const CREATION_PANEL_PROPOSAL_TRANSIENT_SAMPLE = {
 // The `creation` panel unavailable form (registry-owned reason, the common
 // unavailable envelope).
 export const CREATION_PANEL_UNAVAILABLE_SAMPLE = {
-  schema_version: 8,
+  schema_version: 9,
   available: false,
   reason: { code: "creation_unavailable", message: "角色創建目前無法顯示" },
 };

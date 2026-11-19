@@ -24,6 +24,8 @@ from world.rules.character_creation import (
 )
 from world.rules.creation_messages import FALLBACK_CODE, rejection_code
 from world.rules.creation_wizard import (
+    ALLOCATION_POLICY_VERSION_KEY,
+    CUSTOM_NEEDS_ALLOCATION_STAGE,
     CUSTOM_STAGE,
     PRESET_STAGE,
     activate_draft,
@@ -74,13 +76,15 @@ _SCOPE = synthetic_registries(
 )
 
 
-def balanced_allocations(race: str, subrace: str | None = None) -> dict[str, int]:
-    profile = resolve_starting_profile(race, subrace)
+def balanced_allocations(
+    race: str, subrace: str | None = None, *, mode: str = "custom"
+) -> dict[str, int]:
+    profile = resolve_starting_profile(race, subrace, mode=mode)
     remaining = profile.budget
     result: dict[str, int] = {}
-    for key, (lower, upper) in profile.bounds:
-        value = min(upper - lower, remaining)
-        result[key] = value
+    for axis in profile.axes:
+        value = min(axis.point_cap, remaining)
+        result[axis.axis] = value
         remaining -= value
     if remaining:
         raise AssertionError("profile budget exceeds allocatable spans")
@@ -159,7 +163,8 @@ class CreationWizardTests(EvenniaTest):
         axes = {axis.axis for axis in elf_profile.axes}
         self.assertEqual(axes, set(ALLOCATABLE_AXES))
         self.assertEqual(
-            elf_profile.budget, resolve_starting_profile(race_key, subrace_key).budget
+            elf_profile.budget,
+            resolve_starting_profile(race_key, subrace_key, mode="custom").budget,
         )
         self.assertIsNone(view.draft)
 
@@ -799,6 +804,140 @@ class CreationWizardTests(EvenniaTest):
         }
         self.assertIsNone(read_draft(self.character))
         self.assertTrue(self.character.creation_pending)
+
+    # -- superseded custom-elf allocation ------------------------------------
+
+    def _store_superseded_elf_draft(self, branch, points):
+        """Store a valid v3 custom elf draft written under the old increment."""
+        self.character.creation_draft = {
+            "version": 3,
+            "mode": "custom",
+            "stage": CUSTOM_STAGE,
+            "display_name": "舊精靈",
+            "age": 320,
+            "apparent_age": 20,
+            "race": "elf",
+            "subrace": branch.key,
+            "allocations": {
+                "hp": 0, "mp": 0, "sp": 0,
+                "atk_phys": points, "agility": points, "defense": points,
+                "magic_power": 0,
+            },
+            "background": "舊林地的守望者",
+            "affinity_elements": [],
+            "persona": {
+                "personality": "沉靜",
+                "life_story": "在舊林長大",
+                "habit": "夜裡巡林",
+            },
+            "sex": "female",
+        }
+        return dict(self.character.creation_draft)
+
+    def test_a_superseded_elf_draft_resumes_needing_an_allocation(self):
+        elf, branch, scope = self.elf_scope()
+        with scope:
+            stored = self._store_superseded_elf_draft(branch, points=10)
+            draft = read_draft(self.character)
+            self.assertEqual(draft["stage"], CUSTOM_NEEDS_ALLOCATION_STAGE)
+            self.assertIsNone(draft["allocations"])
+            # Every non-allocation value (and the storage marker) is retained
+            # without ever exposing the marker.
+            self.assertEqual(draft["display_name"], "舊精靈")
+            self.assertEqual(draft["race"], "elf")
+            self.assertEqual(draft["subrace"], branch.key)
+            self.assertEqual(draft["background"], "舊林地的守望者")
+            self.assertEqual(draft["persona"]["habit"], "夜裡巡林")
+            self.assertEqual(draft["sex"], "female")
+            self.assertNotIn(ALLOCATION_POLICY_VERSION_KEY, draft)
+            # Reads mutate nothing.
+            self.assertEqual(dict(self.character.creation_draft), stored)
+            view = read_creation_view(self.character)
+            self.assertEqual(view.draft["stage"], CUSTOM_NEEDS_ALLOCATION_STAGE)
+            self.assertIsNone(view.draft["allocations"])
+            self.assertEqual(dict(self.character.creation_draft), stored)
+
+    def test_a_marked_elf_draft_and_a_non_elf_draft_are_untouched(self):
+        elf, branch, scope = self.elf_scope()
+        with scope:
+            self._store_superseded_elf_draft(branch, points=10)
+            marked = dict(self.character.creation_draft)
+            marked[ALLOCATION_POLICY_VERSION_KEY] = 1
+            self.character.creation_draft = marked
+            self.assertEqual(read_draft(self.character)["stage"], CUSTOM_STAGE)
+            self.assertEqual(read_draft(self.character)["allocations"]["atk_phys"], 10)
+        save_custom_draft(self.account, self.character, self.custom_request())
+        self.assertEqual(read_draft(self.character)["stage"], CUSTOM_STAGE)
+        self.assertNotIn(ALLOCATION_POLICY_VERSION_KEY, self.character.creation_draft)
+
+    def test_a_saved_elf_draft_carries_the_policy_marker(self):
+        from world.rules.creation_wizard import ALLOCATION_POLICY_VERSION
+
+        elf, branch, scope = self.elf_scope()
+        with scope:
+            draft = save_custom_draft(
+                self.account,
+                self.character,
+                self.custom_request(
+                    race="elf",
+                    subrace=branch.key,
+                    allocations=balanced_allocations("elf", branch.key),
+                    sex=elf.allowed_sexes[0],
+                ),
+            )
+            self.assertEqual(draft["stage"], CUSTOM_STAGE)
+            self.assertEqual(
+                self.character.creation_draft[ALLOCATION_POLICY_VERSION_KEY],
+                ALLOCATION_POLICY_VERSION,
+            )
+            self.assertNotIn(ALLOCATION_POLICY_VERSION_KEY, draft)
+
+    def test_activation_of_a_superseded_elf_draft_is_write_free(self):
+        from world.rules.creation_portrait import CREATION_PORTRAIT_ATTRIBUTE
+
+        elf, branch, scope = self.elf_scope()
+        with scope:
+            stored = self._store_superseded_elf_draft(branch, points=10)
+            portrait = {"sentinel": "kept"}
+            self.character.attributes.add(CREATION_PORTRAIT_ATTRIBUTE, portrait)
+            fingerprint = draft_fingerprint(self.character)
+            with self.assertRaisesRegex(
+                CharacterCreationError, "creation draft is incomplete"
+            ):
+                activate_draft(self.account, self.character)
+            # The fingerprint is not an eligibility check: a matching one still
+            # cannot activate the incomplete draft.
+            self.assertEqual(draft_fingerprint(self.character), fingerprint)
+            self.assertEqual(dict(self.character.creation_draft), stored)
+            self.assertEqual(
+                dict(self.character.attributes.get(CREATION_PORTRAIT_ATTRIBUTE)),
+                portrait,
+            )
+            self.assertTrue(self.character.creation_pending)
+            self.assertEqual(self.character.traits.all(), [])
+            self.assertIsNone(self.character.age)
+
+    def test_a_fresh_elf_allocation_restores_activation(self):
+        elf, branch, scope = self.elf_scope()
+        with scope:
+            self._store_superseded_elf_draft(branch, points=10)
+            stale = draft_fingerprint(self.character)
+            draft = save_custom_draft(
+                self.account,
+                self.character,
+                self.custom_request(
+                    race="elf",
+                    subrace=branch.key,
+                    allocations=balanced_allocations("elf", branch.key),
+                    sex=elf.allowed_sexes[0],
+                ),
+            )
+            self.assertEqual(draft["stage"], CUSTOM_STAGE)
+            self.assertNotEqual(draft_fingerprint(self.character), stale)
+            result = activate_draft(self.account, self.character)
+            self.assertEqual(result.display_name, "新角色")
+            self.assertFalse(self.character.creation_pending)
+            self.assertIsNone(read_draft(self.character))
 
     @covers_requirement(
         "webclient-character-creation-ui::the-server-owns-the-persisted-creation-wizard-draft"

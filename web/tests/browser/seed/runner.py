@@ -86,17 +86,17 @@ def main() -> None:
     from world.rules.character_creation import (
         CharacterCreationRequest,
         activate_player_character,
-        resolve_starting_profile,
     )
+    from world.rules.starting_policy import CUSTOM_MODE, resolve_starting_profile
 
     def balanced_allocations(race_key: str, subrace_key: str | None = None) -> dict[str, int]:
-        """Spend the exact starting budget deterministically from the profile bounds."""
-        profile = resolve_starting_profile(race_key, subrace_key)
+        """Spend the exact starting budget deterministically from the profile caps."""
+        profile = resolve_starting_profile(race_key, subrace_key, mode=CUSTOM_MODE)
         remaining = profile.budget
         result: dict[str, int] = {}
-        for key, (lower, upper) in profile.bounds:
-            value = min(upper - lower, remaining)
-            result[key] = value
+        for axis in profile.axes:
+            value = min(axis.point_cap, remaining)
+            result[axis.axis] = value
             remaining -= value
         if remaining != 0:
             raise AssertionError("starting profile budget exceeds allocatable spans")
