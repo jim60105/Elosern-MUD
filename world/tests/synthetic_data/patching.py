@@ -54,11 +54,11 @@ class synthetic_registries(ContextDecorator):
             ):
                 raise KeyError(f"unknown synthetic registry target {logical!r}")
         # Dependency closure: rows whose construction resolves foreign keys
-        # through other catalogs require those targets in the same scope.
-        for logical in tuple(names):
-            for dependency in _TARGET_DEPENDENCIES.get(logical, ()):
-                if dependency not in names:
-                    names.append(dependency)
+        # through other catalogs require those targets in the same scope, and
+        # the closure runs transitively before the item companions below: a
+        # shop scope reaches the item catalog through its bundle rows and
+        # still needs that catalog's rule maps.
+        names = list(_dependency_order(names))
         # Usable-item closure: settlement resolves an item's effects by item
         # key through the live profile map, so every scoped item registry
         # carries its rulebook-side profiles automatically.
@@ -378,7 +378,10 @@ def _resolve_import_time_derivations(logicals: tuple[str, ...]) -> None:
     projection that cross-validates a shipped table against the live registry
     fails loudly instead, because shipped rows can never describe synthetic
     ones. Importing the module first makes that derivation shipped, while
-    every live binding still sees the scope's synthetic content.
+    every live binding still sees the scope's synthetic content. A derivation
+    whose result is itself a kit target (the equipment rule map) is patched in
+    place afterwards like any other target; the pre-import protects its
+    shipped-input validation and its frozen registry snapshot.
     """
     for logical in logicals:
         if logical in GEOGRAPHY_TARGETS or logical in SETTLEMENT_TARGETS:

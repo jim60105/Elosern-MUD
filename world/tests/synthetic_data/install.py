@@ -73,13 +73,17 @@ def install_synthetic_catalogs(
     names = tuple(logicals) if logicals else tuple(
         name for name in REGISTRY_TARGETS if name != "lore_sync"
     ) + ("lore_sync",)
+    # The dependency closure runs transitively before the item companions
+    # below: a partial install of a dependent target (a bundle or shop scope)
+    # still reaches the item catalog and needs that catalog's rule maps.
+    names = _dependency_order(names)
     # A partial item install is still a complete item catalogue: worn gear and
     # settlement resolve their own keys in the two rule maps, so requesting
     # only ``items`` carries both rulebook halves with it.
     if "items" in names:
-        for companion in ("item_effect_profiles", "equipment_effect_rules"):
-            if companion not in names:
-                names += (companion,)
+        names = _dependency_order(
+            names + ("item_effect_profiles", "equipment_effect_rules")
+        )
     _INSTALL_REPLACEMENTS.clear()
     _resolve_import_time_derivations(names)
     borrowed_ground = borrow_authored_world and any(
@@ -92,7 +96,7 @@ def install_synthetic_catalogs(
         from world.maps import runtime as runtime_module
 
         runtime_module.ensure_published()
-    for logical in _dependency_order(names):
+    for logical in names:
         module_name, attribute = REGISTRY_TARGETS[logical]
         module = importlib.import_module(module_name)
         shipped = getattr(module, attribute)

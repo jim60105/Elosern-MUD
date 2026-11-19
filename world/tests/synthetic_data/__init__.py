@@ -17,9 +17,11 @@ attribute. Consumer bindings are not hand-maintained: an AST discovery pass
 enumerates them from the source tree (cached). The same pass enumerates the
 modules that derive state from a catalog at import; those are resolved
 BEFORE the swap, so a projection computed in module scope (the equipment
-rulebook is one) stays shipped-derived while live bindings see synthetic
-content. The lore-sync import-time capture dict is an explicit target for
-scopes that invoke ``sync_all()``.
+rulebook's frozen registry snapshot is one) is built from shipped rows while
+live bindings see synthetic content. A derivation whose result is itself a
+kit target (the equipment rule map) is then patched for the scope like any
+other target. The lore-sync import-time capture dict is an explicit target
+for scopes that invoke ``sync_all()``.
 
 Process scope (design D2b): ``install_synthetic_catalogs()`` applies the same
 swap process-wide and idempotently, for the separate managed-browser seed and

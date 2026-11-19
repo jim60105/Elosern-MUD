@@ -48,27 +48,14 @@ _CANON_RE = re.compile("export const SYNTH_" + "CANONICAL" + r"_JSON = `([^`]*)`
 # symbol, and catalog binding are assembled from fragments like every other
 # shipped reference in this file.
 DERIVED_MODULE = "world.rules.equipment" + "_effects"
-DERIVED_SYMBOL = "EQUIPMENT_EFFECT" + "_RULES"
 DERIVED_INPUT_BINDING = "ITEM_" + "REGISTRY"
-
-
-def _projection_content(rules: dict) -> dict:
-    """Comparable content of a loaded projection.
-
-    Each rule keeps its nested mappings as read-only views, and two views of
-    equal content are never equal objects, so equality has to be established
-    field by field rather than on the loaded mapping itself.
-    """
-    return {
-        key: (
-            dict(rule.adjustments),
-            dict(rule.gauge_caps),
-            rule.immune,
-            rule.attached_buffs,
-            rule.exposure_bias,
-        )
-        for key, rule in rules.items()
-    }
+# The module freezes its production registry snapshot at import and never
+# re-derives it, so that frozen copy is the observable for the derivation's
+# input phase. The equipment rule map beside it is itself a kit target (a
+# scope patches it in place so worn synthetic gear resolves its own keys), so
+# its live content cannot distinguish shipped-derived from synthetic-derived.
+DERIVED_SNAPSHOT = "_PRODUCTION" + "_REGISTRY"
+DERIVED_PARENT, _, DERIVED_ATTRIBUTE = DERIVED_MODULE.rpartition(".")
 
 
 def _catalog_maps() -> dict[str, dict]:
@@ -295,6 +282,24 @@ class PatchRestoreTests(unittest.TestCase):
     @covers_requirement(
         "test-data-independence::the-kit-patches-and-restores-registries-exactly"
     )
+    def test_a_scope_reaching_items_through_a_dependency_carries_the_rule_maps(self):
+        """A shop scope reaches the item catalog through bundle rows, not directly.
+
+        The item registry and both rulebook halves must swap together or worn
+        synthetic gear raises on a missing rule key.
+        """
+        with kit.synthetic_registries("shops"):
+            for logical in ("items", "item_effect_profiles", "equipment_effect_rules"):
+                current = self._original(logical)
+                self.assertTrue(current, logical)
+                self.assertTrue(
+                    all(str(key).startswith(kit.SYNTH_PREFIX) for key in current),
+                    f"{logical} stayed shipped behind an indirect item scope",
+                )
+
+    @covers_requirement(
+        "test-data-independence::the-kit-patches-and-restores-registries-exactly"
+    )
     def test_reentering_an_open_scope_is_rejected_and_the_first_entry_still_restores(self):
         # The CI leak this guards: re-entering the same scope object used to
         # replace the live patch stack, orphaning the shipped-catalog restore
@@ -319,13 +324,16 @@ class PatchRestoreTests(unittest.TestCase):
     def test_import_time_derived_projection_stays_shipped_inside_a_scope(self):
         """A module deriving catalog state at import must derive shipped state.
 
-        The projection is recorded in module scope, where the import runs once
-        per process: a swap landing first either freezes synthetic rows into
-        production state or fails a shipped-rulebook cross-validation, which
-        is how the whole test module used to error out on import order alone.
+        The frozen registry snapshot is recorded in module scope, where the
+        import runs once per process: a swap landing first freezes synthetic
+        rows into production state, and the inline-effect derivation running
+        beside it fails a shipped-input cross-validation, which is how the
+        whole test module used to error out on import order alone.
         """
         original = self._original("items")
-        baseline = getattr(importlib.import_module(DERIVED_MODULE), DERIVED_SYMBOL)
+        baseline = dict(
+            getattr(importlib.import_module(DERIVED_MODULE), DERIVED_SNAPSHOT)
+        )
         self.assertTrue(baseline, "the production projection is empty")
         saved = sys.modules.pop(DERIVED_MODULE, None)
         self.assertIsNotNone(saved, "the derivation module was never imported")
@@ -340,13 +348,13 @@ class PatchRestoreTests(unittest.TestCase):
                     ),
                     "the scope did not reach the live catalog binding",
                 )
-                derived = getattr(derived_module, DERIVED_SYMBOL)
-                self.assertEqual(_projection_content(derived), _projection_content(baseline))
+                derived = dict(getattr(derived_module, DERIVED_SNAPSHOT))
+                self.assertEqual(derived, baseline)
                 self.assertEqual(
                     [
-                        str(key.value)
+                        str(key)
                         for key in derived
-                        if str(key.value).startswith(kit.SYNTH_PREFIX)
+                        if str(key).startswith(kit.SYNTH_PREFIX)
                     ],
                     [],
                     "the import-time projection was built from synthetic rows",
@@ -354,6 +362,13 @@ class PatchRestoreTests(unittest.TestCase):
         finally:
             sys.modules.pop(DERIVED_MODULE, None)
             sys.modules[DERIVED_MODULE] = saved
+            # A fresh import also re-pointed the parent package at the
+            # throwaway module; restore that attribute or a later
+            # ``from <package> import <module>`` reads a second copy whose
+            # target dict no production caller reads.
+            setattr(
+                importlib.import_module(DERIVED_PARENT), DERIVED_ATTRIBUTE, saved
+            )
         self.assertIs(self._original("items"), original)
 
     @covers_requirement(
@@ -786,9 +801,25 @@ class ProcessInstallTests(unittest.TestCase):
     @covers_requirement(
         "test-data-independence::the-kit-installs-process-wide-for-separate-test-processes"
     )
+    def test_a_partial_install_through_a_dependent_target_carries_the_rule_maps(self):
+        """A bundle or shop install reaches items through its dependency edge."""
+        self.addCleanup(kit.uninstall_synthetic_catalogs)
+        self.assertTrue(kit.install_synthetic_catalogs(("shops",)))
+        for logical in ("items", "item_effect_profiles", "equipment_effect_rules"):
+            current = self._resolved(logical)
+            self.assertTrue(
+                all(str(key).startswith(kit.SYNTH_PREFIX) for key in current),
+                f"{logical} stayed shipped behind an indirect partial install",
+            )
+
+    @covers_requirement(
+        "test-data-independence::the-kit-installs-process-wide-for-separate-test-processes"
+    )
     def test_install_resolves_import_time_derived_projection_before_swapping(self):
         """The process install pins module-scope derivations to shipped rows."""
-        baseline = getattr(importlib.import_module(DERIVED_MODULE), DERIVED_SYMBOL)
+        baseline = dict(
+            getattr(importlib.import_module(DERIVED_MODULE), DERIVED_SNAPSHOT)
+        )
         self.assertTrue(baseline, "the production projection is empty")
         saved = sys.modules.pop(DERIVED_MODULE, None)
         self.assertIsNotNone(saved, "the derivation module was never imported")
@@ -803,13 +834,22 @@ class ProcessInstallTests(unittest.TestCase):
                 "the install did not reach the live catalog binding",
             )
             self.assertEqual(
-                _projection_content(getattr(derived_module, DERIVED_SYMBOL)),
-                _projection_content(baseline),
+                dict(getattr(derived_module, DERIVED_SNAPSHOT)),
+                baseline,
             )
         finally:
-            kit.uninstall_synthetic_catalogs()
-            sys.modules.pop(DERIVED_MODULE, None)
-            sys.modules[DERIVED_MODULE] = saved
+            try:
+                kit.uninstall_synthetic_catalogs()
+            finally:
+                sys.modules.pop(DERIVED_MODULE, None)
+                sys.modules[DERIVED_MODULE] = saved
+                # A fresh import also re-pointed the parent package at the
+                # throwaway module; restore that attribute too.
+                setattr(
+                    importlib.import_module(DERIVED_PARENT),
+                    DERIVED_ATTRIBUTE,
+                    saved,
+                )
 
 
 class JsMirrorTests(unittest.TestCase):
