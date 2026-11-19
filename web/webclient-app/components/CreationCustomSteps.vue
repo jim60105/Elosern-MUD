@@ -111,6 +111,15 @@ function stepAllocation(axis, direction) {
   if (canStep(axis, direction)) allocations[axis.axis] += direction;
 }
 
+// Styling only: how far the slider's gold progress runs along its track (the
+// thumb position the browser already shows, mirrored for WebKit, which has no
+// native progress pseudo-element). Never feeds back into the form value.
+function sliderFill(axis) {
+  const value = Number(allocations[axis.axis]);
+  const share = axis.point_cap > 0 && Number.isFinite(value) ? value / axis.point_cap : 0;
+  return `${Math.max(0, Math.min(1, share)) * 100}%`;
+}
+
 // A zero-cap axis admits no points. It locks only while its value is already
 // zero, so a stale non-zero value stays correctable through the number field.
 // The axis whose number field holds focus never locks mid-edit (clearing a
@@ -413,6 +422,7 @@ defineExpose({ submit });
               :disabled="ax.point_cap === 0"
               v-model.number="allocations[ax.axis]"
               :data-testid="`creation-slider-${ax.axis}`"
+              :style="{ '--fill': sliderFill(ax) }"
             />
             <p class="creation-allocation__help" :data-testid="`creation-preview-${ax.axis}`">
               預覽值 {{ allocationPreview.find((entry) => entry.axis === ax.axis)?.value ?? ax.minimum }}

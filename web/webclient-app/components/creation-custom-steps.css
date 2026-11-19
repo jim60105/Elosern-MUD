@@ -283,3 +283,76 @@
 .creation-stepper input:disabled,
 .creation-allocation__slider:disabled { color: var(--paper-500); cursor: not-allowed; opacity: 0.55; }
 .creation-allocation[data-locked="true"] .creation-allocation__label { color: var(--paper-500); }
+
+/* -- Slider skin: an ink groove, a gold progress run and a gold diamond
+   thumb (the theme's mark shape). Locked sliders swap the groove for a dashed
+   one and dim the thumb, so the state never rests on colour alone. ------- */
+.creation-allocation__slider {
+  --slider-track: calc(4px * var(--ui-scale));
+  --slider-thumb: calc(12px * var(--ui-scale));
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  border-radius: var(--radius-sm);
+}
+.creation-allocation__slider::-webkit-slider-runnable-track {
+  height: var(--slider-track);
+  border-radius: var(--slider-track);
+  background:
+    linear-gradient(90deg, var(--gold-600), var(--gold-400)) 0 0 / var(--fill, 0%) 100% no-repeat,
+    var(--ink-700);
+}
+.creation-allocation__slider::-moz-range-track {
+  height: var(--slider-track);
+  border-radius: var(--slider-track);
+  background: var(--ink-700);
+}
+.creation-allocation__slider::-moz-range-progress {
+  height: var(--slider-track);
+  border-radius: var(--slider-track);
+  background: linear-gradient(90deg, var(--gold-600), var(--gold-400));
+}
+.creation-allocation__slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  box-sizing: border-box;
+  width: var(--slider-thumb);
+  height: var(--slider-thumb);
+  margin-top: calc((var(--slider-track) - var(--slider-thumb)) / 2);
+  background: var(--gold-400);
+  border: 1px solid var(--gold-300);
+  border-radius: 2px;
+  box-shadow: 0 0 0 2px var(--ink-950);
+  transform: rotate(45deg);
+  transition: box-shadow var(--motion-fast) var(--ease-standard), background-color var(--motion-fast) var(--ease-standard);
+}
+.creation-allocation__slider::-moz-range-thumb {
+  box-sizing: border-box;
+  width: var(--slider-thumb);
+  height: var(--slider-thumb);
+  background: var(--gold-400);
+  border: 1px solid var(--gold-300);
+  border-radius: 2px;
+  box-shadow: 0 0 0 2px var(--ink-950);
+  transform: rotate(45deg);
+  transition: box-shadow var(--motion-fast) var(--ease-standard), background-color var(--motion-fast) var(--ease-standard);
+}
+.creation-allocation__slider:enabled:hover::-webkit-slider-thumb,
+.creation-allocation__slider:enabled:active::-webkit-slider-thumb {
+  background: var(--gold-300);
+  box-shadow: 0 0 0 2px var(--ink-950), 0 0 0 calc(6px * var(--ui-scale)) var(--gold-glow);
+}
+.creation-allocation__slider:enabled:hover::-moz-range-thumb,
+.creation-allocation__slider:enabled:active::-moz-range-thumb {
+  background: var(--gold-300);
+  box-shadow: 0 0 0 2px var(--ink-950), 0 0 0 calc(6px * var(--ui-scale)) var(--gold-glow);
+}
+.creation-allocation__slider:disabled::-webkit-slider-runnable-track {
+  background: repeating-linear-gradient(90deg, var(--ink-600) 0 calc(6px * var(--ui-scale)), transparent 0 calc(10px * var(--ui-scale)));
+}
+.creation-allocation__slider:disabled::-moz-range-track {
+  background: repeating-linear-gradient(90deg, var(--ink-600) 0 calc(6px * var(--ui-scale)), transparent 0 calc(10px * var(--ui-scale)));
+}
+.creation-allocation__slider:disabled::-moz-range-progress { background: none; }
+.creation-allocation__slider:disabled::-webkit-slider-thumb { background: var(--ink-700); border-color: var(--paper-700); }
+.creation-allocation__slider:disabled::-moz-range-thumb { background: var(--ink-700); border-color: var(--paper-700); }
