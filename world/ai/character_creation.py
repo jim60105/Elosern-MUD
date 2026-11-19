@@ -20,10 +20,11 @@ Boundary contract (``tests/test_ai_transport_contract.py``): this module imports
 no state writer, no typeclass, no live transport, and no socket. It reads only
 the immutable ``world.lore`` and ``world.skills`` registries and consumes the
 client through the injected protocol exactly like ``npc_dialogue.py``. The
-allocation-band derivation mirrors
-``world/rules/character_creation.resolve_starting_profile`` against the same
-lore registries, and the transient-fill bounds mirror the rule-layer constants
-as local values (see the transport-boundary mirror note below); the
+allocation policy comes from the read-only
+``world/rules/starting_policy.resolve_starting_profile``, so a proposal is
+checked against exactly the caps and budget activation enforces, and the
+transient-fill bounds mirror the rule-layer constants as local values (see the
+transport-boundary mirror note below); the
 deterministic preflight at activation remains the final authority over every
 proposal value.
 """
@@ -53,12 +54,18 @@ from world.lore.races import RACE_REGISTRY, SUBRACE_REGISTRY
 from world.lore.elements import ELEMENT_REGISTRY
 from world.prompts.loader import PromptUnavailableError, render_prompt
 from world.skills.registry import SKILL_REGISTRY
+from world.rules.starting_policy import (
+    ALLOCATABLE_AXES,
+    CUSTOM_MODE,
+    ELF_CUSTOM_MAGIC_CREATION_CAP,
+    resolve_starting_profile,
+)
 
-# The seven allocatable starting axes (design D2). Mirrors
-# ``world/rules/traits.GAUGE_KEYS + STATIC_KEYS``; the tuple is duplicated here
-# only because ``world/ai`` must not import ``world.rules`` (transport-boundary
-# contract), and the activation preflight remains the authoritative checker.
-ALLOCATABLE_AXES = ("hp", "mp", "sp", "atk_phys", "agility", "defense", "magic_power")
+# The allocation policy and its seven axis keys come from the read-only
+# ``world.rules.starting_policy`` module: it carries no database, typeclass, or
+# Evennia import, so the transport-boundary contract admits it exactly like the
+# lore registries (see ``tests/test_ai_transport_contract.py``). The
+# deterministic activation preflight remains the authoritative checker.
 
 # Hard prompt bounds (design D2): the concept input is capped before it enters
 # any prompt, the race catalog is bounded with an explicit truncation marker,
@@ -221,37 +228,6 @@ def _validate_subrace(parsed: Any) -> list[str]:
     return []
 
 
-def _race_bands(race_key: str, subrace_key: str | None) -> dict[str, tuple[int, int]]:
-    """Return the allocatable band per axis, mirroring ``resolve_starting_profile``.
-
-    Reads only the immutable race/subrace registries: the race's vital and
-    static baselines, overridden per-axis by the subrace's vital overrides.
-    """
-    race = RACE_REGISTRY[race_key]
-    bounds: dict[str, tuple[int, int]] = {
-        "hp": race.vital_baseline.hp,
-        "mp": race.vital_baseline.mp,
-        "sp": race.vital_baseline.sp,
-        "atk_phys": race.static_baseline.atk_phys,
-        "agility": race.static_baseline.agility,
-        "defense": race.static_baseline.defense,
-        "magic_power": race.static_baseline.magic_power,
-    }
-    if subrace_key is not None:
-        subrace = SUBRACE_REGISTRY[subrace_key]
-        if subrace.vital_overrides:
-            bounds.update(subrace.vital_overrides)
-    return bounds
-
-
-def _allocation_budget(race_key: str, subrace_key: str | None) -> int:
-    spans = [
-        upper - lower
-        for lower, upper in _race_bands(race_key, subrace_key).values()
-    ]
-    return sum(spans) // 2
-
-
 def _validate_allocations(parsed: Any) -> list[str]:
     if not isinstance(parsed, Mapping):
         return []
@@ -265,22 +241,34 @@ def _validate_allocations(parsed: Any) -> list[str]:
         # The subrace validator reports the unknown key; bands cannot be
         # derived for it, so this validator stays silent.
         return []
+    if (
+        isinstance(subrace_key, str)
+        and SUBRACE_REGISTRY[subrace_key].race_key != race_key
+    ):
+        # A registered subrace of another race is the subrace validator's
+        # whole-proposal failure; the policy cannot resolve that pair.
+        return []
     allocations = parsed.get("allocations")
     if not isinstance(allocations, Mapping) or set(allocations) != set(ALLOCATABLE_AXES):
         return ["allocations must contain exactly the seven starting axes"]
-    bands = _race_bands(race_key, subrace_key)
+    # The selected profile's own policy is the authority: a custom elf's magic
+    # cap and budget differ from every raw-increment profile, and the retry
+    # feedback must name the numbers activation will actually enforce.
+    profile = resolve_starting_profile(race_key, subrace_key, mode=CUSTOM_MODE)
+    axes = profile.axes_dict()
     for axis in ALLOCATABLE_AXES:
         value = allocations.get(axis)
-        lower, upper = bands[axis]
-        span = upper - lower
-        if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= span:
-            return [f"allocation for {axis} must be an integer from 0 to {span}"]
-    budget = _allocation_budget(race_key, subrace_key)
-    if sum(allocations[axis] for axis in ALLOCATABLE_AXES) != budget:
+        cap = axes[axis].point_cap
+        if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= cap:
+            return [f"allocation for {axis} must be an integer from 0 to {cap}"]
+    if sum(allocations[axis] for axis in ALLOCATABLE_AXES) != profile.budget:
         # The prompt intentionally carries no numbers (design D2), so the
         # retry feedback is the model's only route to a convergent fix: name
         # the exact budget like the per-axis band messages name their bound.
-        return [f"allocations must sum exactly to the allocation budget {budget}"]
+        return [
+            "allocations must sum exactly to the allocation budget "
+            f"{profile.budget}"
+        ]
     return []
 
 
@@ -403,16 +391,40 @@ def _normalize_transient_fields(parsed: Mapping[str, Any]) -> dict[str, Any]:
     return normalized
 
 
+def _policy_catalog() -> str:
+    """Render the custom allocation policy of every selectable race/subrace.
+
+    One line per registered subrace, read from the same resolver activation
+    uses: the exact point budget and the per-axis point caps in
+    ``ALLOCATABLE_AXES`` order. The block comes first in the catalog so the
+    bounded output can never truncate a required policy row.
+    """
+    rows = []
+    for subrace_key, subrace in SUBRACE_REGISTRY.items():
+        profile = resolve_starting_profile(subrace.race_key, subrace_key, mode=CUSTOM_MODE)
+        axes = profile.axes_dict()
+        caps = ",".join(str(axes[axis].point_cap) for axis in ALLOCATABLE_AXES)
+        rows.append(f"{subrace_key}：{profile.budget}｜{caps}")
+    header = (
+        "配點政策（每列「子種族：預算｜"
+        + ",".join(ALLOCATABLE_AXES)
+        + " 各軸點數上限」，總和必須等於預算；精靈魔力點數上限會換算為魔力值上限 "
+        + f"{ELF_CUSTOM_MAGIC_CREATION_CAP}）："
+    )
+    return header + "\n" + "\n".join(rows) + "\n"
+
+
 def build_race_catalog() -> str:
     """Render a bounded registry-derived race/subrace/skill brief for the prompt.
 
-    Deterministic: identical registries always produce byte-identical output,
-    except the per-race affinity input bound annotated on every race entry
-    (the LLM must not infer allocation bands or budgets from any other number).
-    The bounded element-key line names the only values ``affinity_elements``
-    may carry.
-    The catalog is hard-bounded with an explicit truncation marker; the
-    deterministic proposal validation is unaffected by a truncated catalog.
+    Deterministic: identical registries always produce byte-identical output.
+    The leading policy block carries the exact budget and per-axis point caps
+    of every selectable race/subrace from ``resolve_starting_profile``; every
+    race entry carries its affinity input bound; the element-key line names the
+    only values ``affinity_elements`` may carry. No other number is rendered.
+    The catalog is hard-bounded with an explicit truncation marker and the
+    policy block leads, so truncation only ever shortens the trailing skill
+    list; the deterministic proposal validation is unaffected either way.
     """
     race_entries = "、".join(
         f"{key}（{race.description}，親附上限：{_AFFINITY_INPUT_BOUNDS.get(key, 0)}）"
@@ -424,6 +436,7 @@ def build_race_catalog() -> str:
     )
     skill_entries = "、".join(SKILL_REGISTRY)
     catalog = (
+        f"{_policy_catalog()}"
         f"種族：{race_entries}\n子種族：{subrace_entries}\n"
         f"元素鍵值：{'、'.join(ELEMENT_REGISTRY)}\n"
         f"可建議技能鍵值：{skill_entries}"

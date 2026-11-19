@@ -35,6 +35,10 @@
   // suite exactly like the combat flee row's button label.
   var RESET_DISPLAY = { actionLabel: "清除草稿" };
 
+  // Mirror of the creation panel's superseded-allocation draft stage: the
+  // resumed form must allocate again before it can be confirmed.
+  var NEEDS_ALLOCATION_STAGE = "custom_needs_allocation";
+
   // Mirror of world/lore/sex.py DEFAULT_SEX (key only — labels are
   // server-owned prose from the panel `custom.sex` descriptor). Pinned by
   // tests/test_creation_parity_contract.py; the select model is always a
@@ -160,6 +164,10 @@
       // D11): the fresh form displays the mirrored default, matching the
       // option the browser preselects.
       sexKey: DEFAULT_SEX_KEY,
+      // True while the resumed draft's allocation predates the shipped
+      // policy: the form opens on the allocation step with no points restored
+      // and confirmation stays unavailable until a fresh valid save.
+      needsAllocation: false,
     };
   }
 
@@ -193,6 +201,10 @@
     state.apparentAge = String(draft.apparent_age == null ? "" : draft.apparent_age);
     // A v3 draft always carries the concrete normalized member.
     state.sexKey = draft.sex || DEFAULT_SEX_KEY;
+    // A draft projected as needing a fresh allocation carries no points: the
+    // stored integers are not points under the shipped conversion, so they are
+    // never restored (a null allocation slot leaves every field blank).
+    state.needsAllocation = draft.stage === NEEDS_ALLOCATION_STAGE;
     return state;
   }
 
@@ -235,26 +247,42 @@
   }
 
   // The allocation briefing facts shown above the allocation fields: the total
-  // budget, the seven-axis count, each axis's 0–span, and the sum-must-equal-
-  // budget rule. Derived entirely from the server-owned profile so the web
-  // form can never drift from ``resolve_starting_profile`` (design D3).
+  // budget, the seven-axis count, each axis's zero-through-point-cap range,
+  // every conversion that is not one point per stat unit, and the
+  // sum-must-equal-budget rule. Derived entirely from the server-owned profile
+  // so the web form can never drift from ``resolve_starting_profile``.
   function briefingFor(panel, state) {
     var profile = profileFor(panel, state.raceKey, state.subraceKey);
     if (!profile) {
       return null;
     }
-    var spans = profile.axes.map(function (axis) {
+    var caps = profile.axes.map(function (axis) {
       return {
         axis: axis.axis,
         label: axis.label,
+        point_cap: axis.point_cap,
         minimum: axis.minimum,
         maximum: axis.maximum,
+        value_at_cap: axis.value_at_cap,
       };
     });
+    // A conversion line is shown only where one point buys more (or less) than
+    // one stat unit; every raw-increment axis stays implicit.
+    var conversions = caps
+      .filter(function (axis) {
+        return axis.point_cap > 0 && axis.value_at_cap - axis.minimum !== axis.point_cap;
+      })
+      .map(function (axis) {
+        return (
+          axis.label + " " + axis.point_cap + " 點換算為 " + axis.value_at_cap +
+          "（起點 " + axis.minimum + "）"
+        );
+      });
     return {
       budget: profile.budget,
-      axisCount: spans.length,
-      spans: spans,
+      axisCount: caps.length,
+      caps: caps,
+      conversions: conversions,
       rule: "七項配點總和必須恰好等於 " + profile.budget + "。",
     };
   }
@@ -282,6 +310,47 @@
         explanation: axis.explanation,
         minimum: axis.minimum,
         maximum: axis.maximum,
+        point_cap: axis.point_cap,
+        value_at_cap: axis.value_at_cap,
+      };
+    });
+  }
+
+  // The pre-modifier value one axis's entered points produce, read entirely
+  // from the server-owned policy (minimum, point_cap, value_at_cap). BigInt
+  // intermediates keep the half-up ratio exact; the result is a safe integer.
+  function previewValue(axis, raw) {
+    var points = parseInt(raw, 10);
+    if (isNaN(points) || points < 0) {
+      points = 0;
+    }
+    if (points > axis.point_cap) {
+      points = axis.point_cap;
+    }
+    if (axis.point_cap === 0) {
+      return axis.minimum;
+    }
+    var span = BigInt(axis.value_at_cap - axis.minimum);
+    var cap = BigInt(axis.point_cap);
+    var scaled = BigInt(2) * span * BigInt(points) + cap;
+    return axis.minimum + Number(scaled / (BigInt(2) * cap));
+  }
+
+  // The seven resulting starting values a complete allocation would activate
+  // with (pre-modifier, exactly the server's conversion).
+  function allocationPreview(panel, state) {
+    var profile = profileFor(panel, state.raceKey, state.subraceKey);
+    if (!profile) {
+      return null;
+    }
+    return profile.axes.map(function (axis) {
+      return {
+        axis: axis.axis,
+        label: axis.label,
+        minimum: axis.minimum,
+        point_cap: axis.point_cap,
+        value_at_cap: axis.value_at_cap,
+        value: previewValue(axis, state.allocations[axis.axis]),
       };
     });
   }
@@ -335,9 +404,9 @@
           return;
         }
         var value = parseInt(raw, 10);
-        if (isNaN(value) || value < field.minimum || value > field.maximum) {
+        if (isNaN(value) || value < 0 || value > field.point_cap) {
           errors[axis] =
-            field.label + " 配點需為 " + field.minimum + "–" + field.maximum + " 的整數。";
+            field.label + " 配點需為 0–" + field.point_cap + " 的整數。";
         }
       });
       var total = allocatedTotal(state);
@@ -606,6 +675,8 @@
     briefingFor: briefingFor,
     axisField: axisField,
     axisFields: axisFields,
+    allocationPreview: allocationPreview,
+    previewValue: previewValue,
     budgetFor: budgetFor,
     allocatedTotal: allocatedTotal,
     validateCustom: validateCustom,

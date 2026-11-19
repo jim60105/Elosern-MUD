@@ -20,11 +20,11 @@ from world.rules.character_creation import (
     CharacterCreationRequest,
     activate_player_character,
     max_affinity_elements,
-    resolve_starting_profile,
 )
 from world.rules.creation_wizard import (
     ALLOCATION_AXIS_EXPLANATIONS,
 )
+from world.rules.starting_policy import CUSTOM_MODE, resolve_starting_profile
 
 # The concept input bound mirrors the generative layer's prompt-side cap
 # (``MAX_CONCEPT_LENGTH`` in the character-creation layer module); the command
@@ -211,22 +211,36 @@ class CmdCharacter(Command):
                 affinity_elements = yield from _collect_affinity_elements(
                     race, affinity_max
                 )
-            profile = resolve_starting_profile(race, subrace)
+            profile = resolve_starting_profile(race, subrace, mode=CUSTOM_MODE)
             briefing_lines = [
                 f"配點說明：共 {len(ALLOCATABLE_AXES)} 個項目，可用點數 {profile.budget}。",
             ]
-            for axis, (lower, upper) in profile.bounds:
-                span = upper - lower
-                label = ALLOCATION_AXIS_EXPLANATIONS.get(axis, "")
-                briefing_lines.append(f"  {axis} {label}：0–{span}")
+            for axis in profile.axes:
+                label = ALLOCATION_AXIS_EXPLANATIONS.get(axis.axis, "")
+                briefing_lines.append(
+                    f"  {axis.axis} {label}：配點 0–{axis.point_cap}"
+                )
+                # Only a conversion that is not one point per stat unit is
+                # spelled out, so the player sees why a magic point is worth
+                # more than one stat unit before entering any number.
+                if (
+                    axis.point_cap > 0
+                    and axis.value_at_cap - axis.minimum != axis.point_cap
+                ):
+                    briefing_lines.append(
+                        f"    （{axis.point_cap} 點換算為 {axis.value_at_cap}，"
+                        f"起點 {axis.minimum}；每點換算值不同）"
+                    )
             briefing_lines.append(f"七項配點總和必須恰好等於 {profile.budget}。")
             self.caller.msg("\n".join(briefing_lines))
             allocations: dict[str, int] = {}
-            for axis, (lower, upper) in profile.bounds:
-                span = upper - lower
-                explanation = ALLOCATION_AXIS_EXPLANATIONS.get(axis, "")
-                allocations[axis] = _integer(
-                    (yield f"{axis} 配點（0–{span}）：{explanation}\n"), axis
+            for axis in profile.axes:
+                explanation = ALLOCATION_AXIS_EXPLANATIONS.get(axis.axis, "")
+                allocations[axis.axis] = _integer(
+                    (yield (
+                        f"{axis.axis} 配點（0–{axis.point_cap}）：{explanation}\n"
+                    )),
+                    axis.axis,
                 )
             background = (yield (
                 f"背景設定（風味文字，可留空或輸入 cancel 取消，上限 {MAX_PERSONA_FIELD_LENGTH} 字）："

@@ -70,6 +70,7 @@ from world.rules.creation_portrait import (
     read_draft_portrait,
 )
 from world.rules.creation_wizard import (
+    CUSTOM_NEEDS_ALLOCATION_STAGE,
     CUSTOM_STAGE,
     PRESET_STAGE,
     AffinityElementView,
@@ -95,7 +96,11 @@ from world.rules.creation_wizard import (
 # exact-schema gate on both ends.
 # v8 adds the required read-only ``portrait`` state union
 # (creation-draft-portrait-panel); v7 and every other version are rejected.
-CREATION_SCHEMA_VERSION = 8
+# v9 adds every allocation axis's ``point_cap`` and ``value_at_cap`` next to its
+# lore bounds, and the ``custom_needs_allocation`` draft stage that reports a
+# superseded custom-elf allocation as unallocated (elf-starting-stat-budget);
+# the mirrored JS validator moves together, so v8 is rejected on both ends.
+CREATION_SCHEMA_VERSION = 9
 
 # Exact shared bounds (design D2) -- must stay equal in the JS validator and to
 # the creation-wizard view-builder caps (webclient-character-creation-ui D2).
@@ -371,7 +376,15 @@ def _validate_axis(value: Any) -> dict[str, Any]:
     _require_exact_fields(
         value,
         "allocation axis",
-        {"axis", "label", "explanation", "minimum", "maximum"},
+        {
+            "axis",
+            "label",
+            "explanation",
+            "minimum",
+            "maximum",
+            "point_cap",
+            "value_at_cap",
+        },
         {},
     )
     axis = _validate_key(value["axis"], "axis", MAX_SUBRACE_KEY_CODE_POINTS)
@@ -387,12 +400,26 @@ def _validate_axis(value: Any) -> dict[str, Any]:
     maximum = _require_int(value, "maximum", minimum=0, maximum=MAX_SAFE_INTEGER)
     if minimum > maximum:
         raise ProtocolValidationError("axis minimum must not exceed maximum")
+    point_cap = _require_int(value, "point_cap", minimum=0, maximum=MAX_SAFE_INTEGER)
+    value_at_cap = _require_int(
+        value, "value_at_cap", minimum=0, maximum=MAX_SAFE_INTEGER
+    )
+    # Point bounds are independent of the lore bounds the axis advertises: a
+    # fixed gauge admits no points and stays at its floor, while an
+    # interpolated axis (the custom elf's magic power) reaches ``value_at_cap``
+    # somewhere inside its lore band.
+    if not minimum <= value_at_cap <= maximum:
+        raise ProtocolValidationError("axis value_at_cap must lie within its lore bounds")
+    if point_cap == 0 and value_at_cap != minimum:
+        raise ProtocolValidationError("axis value_at_cap must equal minimum for a zero cap")
     return {
         "axis": axis,
         "label": label,
         "explanation": explanation,
         "minimum": minimum,
         "maximum": maximum,
+        "point_cap": point_cap,
+        "value_at_cap": value_at_cap,
     }
 
 
@@ -711,8 +738,17 @@ def _validate_draft(value: Any) -> dict[str, Any] | None:
             {"mode", "stage", "display_name", "age", "apparent_age", "race", "subrace", "allocations", "background", "affinity_elements", "persona", "sex"},
             {},
         )
-        if value["stage"] != CUSTOM_STAGE:
+        stage = value["stage"]
+        if stage not in (CUSTOM_STAGE, CUSTOM_NEEDS_ALLOCATION_STAGE):
             raise ProtocolValidationError("unsupported custom draft stage")
+        # The stage and the allocation slot are one exact pair: only a draft
+        # whose policy was superseded reports no allocation, and such a draft
+        # never carries points the browser could confirm.
+        allocations = value["allocations"]
+        if (stage == CUSTOM_NEEDS_ALLOCATION_STAGE) != (allocations is None):
+            raise ProtocolValidationError(
+                "custom draft stage and allocations do not pair"
+            )
         display_name = _require_str(
             value, "display_name", maximum=MAX_DISPLAY_NAME_CODE_POINTS
         )
@@ -737,13 +773,17 @@ def _validate_draft(value: Any) -> dict[str, Any] | None:
             raise ProtocolValidationError("draft sex is not a vocabulary member")
         return {
             "mode": "custom",
-            "stage": CUSTOM_STAGE,
+            "stage": stage,
             "display_name": display_name,
             "age": age,
             "apparent_age": apparent_age,
             "race": race,
             "subrace": subrace,
-            "allocations": _validate_allocations(value, "custom draft"),
+            "allocations": (
+                None
+                if allocations is None
+                else _validate_allocations(value, "custom draft")
+            ),
             "background": background,
             "affinity_elements": affinity_elements,
             "persona": persona,
@@ -1012,6 +1052,8 @@ def _serialize_axis(axis: AllocationAxisView) -> dict[str, Any]:
         "explanation": axis.explanation,
         "minimum": axis.minimum,
         "maximum": axis.maximum,
+        "point_cap": axis.point_cap,
+        "value_at_cap": axis.value_at_cap,
     }
 
 
@@ -1077,13 +1119,17 @@ def _serialize_draft(draft: dict[str, Any] | None) -> dict[str, Any] | None:
         }
     return {
         "mode": "custom",
-        "stage": CUSTOM_STAGE,
+        "stage": draft["stage"],
         "display_name": draft["display_name"],
         "age": draft["age"],
         "apparent_age": draft["apparent_age"],
         "race": draft["race"],
         "subrace": draft["subrace"],
-        "allocations": dict(draft["allocations"]),
+        # A draft whose allocation policy was superseded reports no points:
+        # the browser resumes at the allocation step and cannot confirm them.
+        "allocations": (
+            None if draft["allocations"] is None else dict(draft["allocations"])
+        ),
         "background": draft.get("background"),
         "affinity_elements": list(draft.get("affinity_elements") or []),
         # The wizard normalizer guarantees a concrete member on every v3

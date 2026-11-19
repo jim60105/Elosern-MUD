@@ -51,8 +51,17 @@ export function useCreationForm(props) {
   // the preset state. Live snapshot updates to the `creation` prop re-sync the
   // wizard from the server-persisted draft (webclient-character-creation-ui:
   // the server owns the draft — the browser resumes at the saved stage).
+  // The superseded-allocation stage is still a custom draft: it resumes on the
+  // custom form (at the allocation step, with no points restored) so the
+  // player can allocate again and save.
   const stageMode = (stage) =>
-    stage === "custom_filled" ? "custom" : "preset";
+    stage === "custom_filled" || stage === "custom_needs_allocation" ? "custom" : "preset";
+  // True while the server-persisted draft reports that its allocation predates
+  // the shipped policy: the form opens at allocation and the stored points are
+  // never restored, so only a fresh valid save can be confirmed.
+  const needsAllocation = computed(
+    () => draft.value?.mode === "custom" && draft.value.stage === "custom_needs_allocation",
+  );
   const mode = ref("preset");
 
   function setMode(next) {
@@ -229,6 +238,7 @@ export function useCreationForm(props) {
     latchedStage,
     applyFrozen,
     stageMode,
+    needsAllocation,
     mode,
     setMode,
     name,

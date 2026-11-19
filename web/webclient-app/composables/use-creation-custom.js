@@ -62,15 +62,42 @@ export function useCreationCustom(props, form, emit) {
   });
 
   // Allocation briefing (character-creation-ux contract): before the
-  // allocation inputs, state the profile budget, each axis's 0–span range, and
-  // the rule that the total must equal the budget.
+  // allocation inputs, state the profile budget, each axis's
+  // zero-through-point-cap range, every conversion that is not one point per
+  // stat unit, and the rule that the total must equal the budget.
   const allocationTotal = computed(() =>
     Object.values(allocations).reduce((sum, value) => sum + (Number(value) || 0), 0));
   const budgetBriefing = computed(() => {
     const profile = currentProfile.value;
     if (!profile) return "";
-    const ranges = profile.axes.map((a) => `${a.label} ${a.minimum}-${a.maximum}`).join(" ‧ ");
-    return `點數額度 ${profile.budget}｜${ranges}｜總和須等於額度 ${profile.budget}`;
+    const ranges = profile.axes.map((a) => `${a.label} 0-${a.point_cap}`).join(" ‧ ");
+    const conversions = profile.axes
+      .filter((a) => a.point_cap > 0 && a.value_at_cap - a.minimum !== a.point_cap)
+      .map((a) => `${a.label} ${a.point_cap} 點換算為 ${a.value_at_cap}（起點 ${a.minimum}）`);
+    const conversionText = conversions.length ? `｜${conversions.join(" ‧ ")}` : "";
+    return `點數額度 ${profile.budget}｜${ranges}｜總和須等於額度 ${profile.budget}${conversionText}`;
+  });
+
+  // The pre-modifier starting value each allocation yields, from the server's
+  // own point policy and the same half-up conversion activation applies.
+  // BigInt intermediates keep the ratio exact; results stay safe integers.
+  function previewValue(axis, points) {
+    const cap = axis.point_cap;
+    if (cap === 0) return axis.minimum;
+    const spent = Math.min(cap, Math.max(0, Number.isInteger(points) ? points : 0));
+    const two = BigInt(2);
+    const scaled = two * BigInt(axis.value_at_cap - axis.minimum) * BigInt(spent) + BigInt(cap);
+    return axis.minimum + Number(scaled / (two * BigInt(cap)));
+  }
+  const allocationPreview = computed(() => {
+    const profile = currentProfile.value;
+    if (!profile) return [];
+    return profile.axes.map((axis) => ({
+      axis: axis.axis,
+      label: axis.label,
+      point_cap: axis.point_cap,
+      value: previewValue(axis, Number(allocations[axis.axis])),
+    }));
   });
 
   // The age bounds gate (design D1): reject when EITHER age field is below the
@@ -80,6 +107,7 @@ export function useCreationCustom(props, form, emit) {
   const gatePassed = computed(() => ageMeetsMinimum.value && apparentMeetsMinimum.value);
   const gateError = ref(false);
   const budgetError = ref(false);
+  const capError = ref(null);
   const subraceError = ref(false);
   const personaError = ref(false);
   // The field identifiers (use-creation-steps.js FIELD_STEP keys) the gate
@@ -100,6 +128,7 @@ export function useCreationCustom(props, form, emit) {
   const formMessage = computed(() => {
     if (gateError.value) return `年齡與外觀年齡皆須 ≥ ${minimumAge.value}`;
     if (subraceError.value) return "已選擇有血統的種族時，必須先選擇血統";
+    if (capError.value) return capError.value;
     if (budgetError.value) return `點數總和 ${allocationTotal.value} 不等於額度 ${currentProfile.value?.budget}`;
     if (personaError.value) return "人設三欄（個性、生平、習慣）需全部填寫或全部留空";
     return "";
@@ -143,6 +172,7 @@ export function useCreationCustom(props, form, emit) {
   function confirmCustom() {
     gateError.value = false;
     budgetError.value = false;
+    capError.value = null;
     subraceError.value = false;
     personaError.value = false;
     formErrorFields.value = [];
@@ -160,6 +190,19 @@ export function useCreationCustom(props, form, emit) {
       return;
     }
     const profile = currentProfile.value;
+    if (profile) {
+      const outOfCap = profile.axes.find((axis) => {
+        const value = Number(allocations[axis.axis]);
+        return !Number.isInteger(value) || value < 0 || value > axis.point_cap;
+      });
+      if (outOfCap) {
+        // A point value outside the server-declared cap is rejected here with
+        // its own field; the server revalidates the exact budget anyway.
+        capError.value = `${outOfCap.label} 配點需為 0–${outOfCap.point_cap} 的整數`;
+        formErrorFields.value = [`allocations.${outOfCap.axis}`];
+        return;
+      }
+    }
     if (profile && allocationTotal.value !== profile.budget) {
       budgetError.value = true;
       // The budget is a sum, so the error lands on the first displayed axis.
@@ -229,6 +272,7 @@ export function useCreationCustom(props, form, emit) {
     currentProfile,
     allocationTotal,
     budgetBriefing,
+    allocationPreview,
     gatePassed,
     formMessage,
     formErrorFields,
