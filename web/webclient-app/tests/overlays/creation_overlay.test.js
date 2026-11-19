@@ -85,7 +85,7 @@ describe("CreationOverlay (B5 overlays family)", () => {
     await wrapper.get('[data-testid="creation-submit"]').trigger("click");
     expect(lastAction(wrapper, "creation.custom")).toBeNull();
     expect(wrapper.get('[data-testid="creation-form-message"]').text()).toContain(
-      `0–${axis.point_cap}`,
+      `0~${axis.point_cap}`,
     );
     wrapper.unmount();
   });

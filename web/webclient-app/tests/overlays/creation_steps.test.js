@@ -217,7 +217,7 @@ describe("CreationCustomSteps: errors open the first invalid field's step", () =
     expect(document.activeElement).toBe(input.element);
     expect(input.attributes("aria-invalid")).toBe("true");
     expect(flagged("allocation")).toBe(true);
-    expect(wrapper.get("#creation-form-message").text()).toContain(`0–${over.point_cap}`);
+    expect(wrapper.get("#creation-form-message").text()).toContain(`0~${over.point_cap}`);
   });
 
   it("opens the allocation step for an out-of-cap value even with a persona gap", async () => {
@@ -259,6 +259,196 @@ describe("CreationCustomSteps: errors open the first invalid field's step", () =
     await wrapper.get(tid("creation-subrace")).setValue(SUBRACED.subraces[0]);
     expect(flagged("identity")).toBe(false);
     expect(wrapper.get(tid("creation-subrace")).attributes("aria-invalid")).toBeUndefined();
+  });
+});
+
+describe("CreationCustomSteps: point ranges", () => {
+  it("renders every axis point range with a tilde", async () => {
+    mountDraft();
+    await openStep("allocation");
+    for (const axis of DRAFT_PROFILE.axes) {
+      const help = wrapper.get(`#creation-axis-help-${axis.axis}`).text();
+      expect(help).toContain(`0~${axis.point_cap}`);
+      expect(help).not.toMatch(/0[-–]\d/);
+    }
+    const briefing = wrapper.get(tid("creation-budget-briefing")).text();
+    expect(briefing).toContain(`0~${DRAFT_PROFILE.axes[0].point_cap}`);
+    expect(briefing).not.toMatch(/0[-–]\d/);
+  });
+});
+
+describe("CreationCustomSteps: allocation slider", () => {
+  const field = (axis) => wrapper.get(tid(`creation-field-${axis}`));
+  const slider = (axis) => wrapper.get(tid(`creation-slider-${axis}`));
+  const capped = DRAFT_PROFILE.axes.find((axis) => axis.point_cap > 0);
+
+  it("spans zero to the point cap in steps of one, after the number field", async () => {
+    mountDraft();
+    await openStep("allocation");
+    for (const axis of DRAFT_PROFILE.axes) {
+      const range = slider(axis.axis);
+      expect(range.attributes("type")).toBe("range");
+      expect(range.attributes("min")).toBe("0");
+      expect(range.attributes("max")).toBe(String(axis.point_cap));
+      expect(range.attributes("step")).toBe("1");
+      const order = field(axis.axis).element.compareDocumentPosition(range.element);
+      expect(order & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
+  });
+
+  it("keeps the slider and the number field on the same value", async () => {
+    mountDraft();
+    await openStep("allocation");
+    const draftValue = DRAFT.allocations[capped.axis];
+    const viaSlider = draftValue === 0 ? 1 : draftValue - 1;
+    await slider(capped.axis).setValue(viaSlider);
+    expect(field(capped.axis).element.value).toBe(String(viaSlider));
+    const viaField = viaSlider === 0 ? 1 : viaSlider - 1;
+    await field(capped.axis).setValue(viaField);
+    expect(slider(capped.axis).element.value).toBe(String(viaField));
+  });
+
+  it("submits the slider value as the allocation", async () => {
+    mountDraft();
+    await openStep("allocation");
+    const lower = DRAFT_PROFILE.axes.find((axis) => DRAFT.allocations[axis.axis] > 0);
+    const raise = DRAFT_PROFILE.axes.find((axis) => axis !== lower && DRAFT.allocations[axis.axis] < axis.point_cap);
+    expect(sum(DRAFT.allocations)).toBe(DRAFT_PROFILE.budget);
+    await slider(lower.axis).setValue(DRAFT.allocations[lower.axis] - 1);
+    await slider(raise.axis).setValue(DRAFT.allocations[raise.axis] + 1);
+    await submit();
+    const sent = actions("creation.custom");
+    expect(sent).toHaveLength(1);
+    expect(sent[0][0].payload.allocations[lower.axis]).toBe(Number(slider(lower.axis).element.value));
+    expect(sent[0][0].payload.allocations[raise.axis]).toBe(Number(slider(raise.axis).element.value));
+    expect(sent[0][0].payload.allocations[lower.axis]).toBe(DRAFT.allocations[lower.axis] - 1);
+  });
+
+  it("never clamps the slider to the remaining budget", async () => {
+    mountDraft();
+    await openStep("allocation");
+    const remaining = Number(wrapper.get(tid("creation-steps-remaining")).attributes("data-remaining"));
+    const axis = DRAFT_PROFILE.axes.find((entry) => entry.point_cap > remaining);
+    expect(axis).toBeDefined();
+    expect(slider(axis.axis).attributes("max")).toBe(String(axis.point_cap));
+  });
+
+  it("follows a bound and value change made in the same render", async () => {
+    const panel = structuredClone(PANEL);
+    const profile = panel.custom.profiles.find((p) => p.race === OTHER_PLAIN.key);
+    const target = profile.axes.find((axis) => axis.axis === capped.axis);
+    const newCap = capped.point_cap + 2;
+    target.point_cap = newCap;
+    target.maximum = Math.max(target.maximum, target.minimum + newCap);
+    target.value_at_cap = target.maximum;
+    mountDraft(panel);
+    await openStep("allocation");
+    wrapper.get(tid("creation-race")).setValue(OTHER_PLAIN.key);
+    field(capped.axis).setValue(newCap);
+    await nextTick();
+    await nextTick();
+    expect(slider(capped.axis).attributes("max")).toBe(String(newCap));
+    expect(slider(capped.axis).element.value).toBe(String(newCap));
+  });
+});
+
+// A synthetic zero-cap axis on the story panel: the matching profiles (or all
+// of them) get `point_cap: 0` with `value_at_cap` at the axis minimum. With
+// `balanceBudget`, each changed profile's budget becomes the draft's sum over
+// its other axes, so a draft with the axis at zero can confirm unchanged.
+function zeroCapPanel(axisKey, { race, subrace, draftValue, balanceBudget = false } = {}) {
+  const panel = structuredClone(PANEL);
+  const scoped = race !== undefined || subrace !== undefined;
+  for (const profile of panel.custom.profiles) {
+    if (scoped && (profile.race !== race || (profile.subrace ?? null) !== (subrace ?? null))) continue;
+    const axis = profile.axes.find((entry) => entry.axis === axisKey);
+    axis.point_cap = 0;
+    axis.value_at_cap = axis.minimum;
+    if (balanceBudget) {
+      profile.budget = profile.axes
+        .filter((entry) => entry.axis !== axisKey)
+        .reduce((total, entry) => total + panel.draft.allocations[entry.axis], 0);
+    }
+  }
+  if (draftValue !== undefined) panel.draft.allocations[axisKey] = draftValue;
+  return panel;
+}
+
+describe("CreationCustomSteps: zero-cap axes lock", () => {
+  const AXIS = DRAFT_PROFILE.axes.find((axis) => axis.point_cap > 0).axis;
+  const field = (axis) => wrapper.get(tid(`creation-field-${axis}`));
+  const slider = (axis) => wrapper.get(tid(`creation-slider-${axis}`));
+  const row = (axis) => field(axis).element.closest(".creation-allocation");
+  const disabled = (id) => wrapper.get(tid(id)).attributes("disabled") !== undefined;
+
+  it("locks every control of a zero-cap axis at zero and still submits zero", async () => {
+    mountDraft(zeroCapPanel(AXIS, { draftValue: 0, balanceBudget: true }));
+    await openStep("allocation");
+    for (const id of [`creation-field-${AXIS}`, `creation-slider-${AXIS}`, `creation-step-${AXIS}-up`, `creation-step-${AXIS}-down`]) {
+      expect(disabled(id)).toBe(true);
+    }
+    expect(row(AXIS).getAttribute("data-locked")).toBe("true");
+    await submit();
+    const sent = actions("creation.custom");
+    expect(sent).toHaveLength(1);
+    expect(sent[0][0].payload.allocations[AXIS]).toBe(0);
+  });
+
+  it("a race change zeroes and locks the new profile's zero-cap axis", async () => {
+    mountDraft(zeroCapPanel(AXIS, { race: OTHER_PLAIN.key }));
+    expect(DRAFT.allocations[AXIS]).toBeGreaterThan(0);
+    await wrapper.get(tid("creation-race")).setValue(OTHER_PLAIN.key);
+    await openStep("allocation");
+    expect(field(AXIS).element.value).toBe("0");
+    expect(row(AXIS).getAttribute("data-locked")).toBe("true");
+    expect(disabled(`creation-field-${AXIS}`)).toBe(true);
+  });
+
+  it("a subrace change zeroes and locks the new profile's zero-cap axis", async () => {
+    const sub = SUBRACED.subraces[0];
+    mountDraft(zeroCapPanel(AXIS, { race: SUBRACED.key, subrace: sub }));
+    await openStep("allocation");
+    await field(AXIS).setValue(1);
+    await openStep("identity");
+    await wrapper.get(tid("creation-race")).setValue(SUBRACED.key);
+    await wrapper.get(tid("creation-subrace")).setValue(sub);
+    await openStep("allocation");
+    expect(field(AXIS).element.value).toBe("0");
+    expect(row(AXIS).getAttribute("data-locked")).toBe("true");
+  });
+
+  it("a stale non-zero value stays correctable and locks once cleared and left", async () => {
+    mountDraft(zeroCapPanel(AXIS, { draftValue: 1 }));
+    await openStep("allocation");
+    expect(disabled(`creation-field-${AXIS}`)).toBe(false);
+    expect(disabled(`creation-slider-${AXIS}`)).toBe(true);
+    expect(row(AXIS).getAttribute("data-locked")).toBeNull();
+    await submit();
+    expect(actions("creation.custom")).toHaveLength(0);
+    expect(document.activeElement).toBe(field(AXIS).element);
+    expect(wrapper.get("#creation-form-message").text()).toContain("0~0");
+    await field(AXIS).trigger("focus");
+    await field(AXIS).setValue(0);
+    expect(disabled(`creation-field-${AXIS}`)).toBe(false);
+    await field(AXIS).trigger("blur");
+    expect(disabled(`creation-field-${AXIS}`)).toBe(true);
+    expect(row(AXIS).getAttribute("data-locked")).toBe("true");
+  });
+
+  it("a budget mismatch skips a locked first axis", async () => {
+    const first = DRAFT_PROFILE.axes[0].axis;
+    const panel = zeroCapPanel(first, { draftValue: 0 });
+    const profile = panel.custom.profiles.find((p) => p.race === DRAFT.race && (p.subrace ?? null) === (DRAFT.subrace ?? null));
+    const target = profile.axes.find((axis) => axis.point_cap > 0).axis;
+    const other = profile.axes.find((axis) => axis.axis !== first && axis.axis !== target && axis.point_cap > 0).axis;
+    mountDraft(panel);
+    await openStep("allocation");
+    await field(other).setValue(panel.draft.allocations[other] === 0 ? 1 : panel.draft.allocations[other] - 1);
+    await openStep("identity");
+    await submit();
+    expect(actions("creation.custom")).toHaveLength(0);
+    expect(document.activeElement).toBe(field(target).element);
+    expect(field(target).attributes("aria-invalid")).toBe("true");
   });
 });
 

@@ -51,3 +51,22 @@ export const Allocation = {
 export const FreshForm = {
   args: { creation: CREATION_PANEL_SAMPLE, step: "identity" },
 };
+
+// 03 能力配置 with a locked axis: the draft profile's first axis is turned into
+// a zero-cap axis at zero (as on a custom elf), so its row renders muted with
+// every control disabled. Derived from the draft panel, not separate data.
+const lockedAxisPanel = (() => {
+  const panel = structuredClone(CREATION_PANEL_CUSTOM_DRAFT_SAMPLE);
+  const { race, subrace = null } = panel.draft;
+  const profile = panel.custom.profiles.find((p) => p.race === race && (p.subrace ?? null) === subrace);
+  const axis = profile.axes[0];
+  profile.budget -= panel.draft.allocations[axis.axis];
+  axis.point_cap = 0;
+  axis.value_at_cap = axis.minimum;
+  panel.draft.allocations[axis.axis] = 0;
+  return panel;
+})();
+
+export const AllocationLockedAxis = {
+  args: { creation: lockedAxisPanel, step: "allocation" },
+};

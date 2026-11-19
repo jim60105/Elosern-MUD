@@ -14,6 +14,7 @@
 // before and after running the existing `confirmCustom` unchanged.
 import { computed, nextTick, ref } from "vue";
 import { STEPS, stepOfField } from "../composables/use-creation-steps.js";
+import { formatPointRange } from "../composables/use-creation-custom.js";
 
 const props = defineProps({
   // The useCreationOverlay binding object (a plain object of refs, computeds
@@ -50,6 +51,7 @@ const {
   formErrorFields,
   reviewPrompt,
   onRaceChange,
+  onSubraceChange,
   toggleAffinity,
   confirmCustom,
   rollName,
@@ -109,12 +111,22 @@ function stepAllocation(axis, direction) {
   if (canStep(axis, direction)) allocations[axis.axis] += direction;
 }
 
-function allocationFraction(axis) {
-  const value = allocations[axis.axis];
-  const span = axis.point_cap;
-  return Number.isFinite(value) && span > 0
-    ? Math.max(0, Math.min(1, value / span))
-    : 0;
+// Styling only: how far the slider's gold progress runs along its track (the
+// thumb position the browser already shows, mirrored for WebKit, which has no
+// native progress pseudo-element). Never feeds back into the form value.
+function sliderFill(axis) {
+  const value = Number(allocations[axis.axis]);
+  const share = axis.point_cap > 0 && Number.isFinite(value) ? value / axis.point_cap : 0;
+  return Math.max(0, Math.min(1, share));
+}
+
+// A zero-cap axis admits no points. It locks only while its value is already
+// zero, so a stale non-zero value stays correctable through the number field.
+// The axis whose number field holds focus never locks mid-edit (clearing a
+// stale value to 0 must not drop keyboard/IME focus); it locks on blur.
+const editingAxis = ref(null);
+function isLocked(axis) {
+  return axis.point_cap === 0 && allocations[axis.axis] === 0 && editingAxis.value !== axis.axis;
 }
 
 function fieldElements() {
@@ -291,7 +303,7 @@ defineExpose({ submit });
 
         <label v-if="hasSubraces" class="creation-field">
           <span>血統</span>
-          <select v-model="subrace" data-testid="creation-subrace" v-bind="fieldAttrs('subrace')">
+          <select v-model="subrace" data-testid="creation-subrace" v-bind="fieldAttrs('subrace')" @change="onSubraceChange">
             <option v-for="o in subraceOptions" :key="o.key" :value="o.key">{{ o.label }}</option>
           </select>
         </label>
@@ -377,19 +389,41 @@ defineExpose({ submit });
           </p>
         </div>
         <div class="creation-allocations">
-          <div v-for="ax in currentProfile?.axes" :key="ax.axis" class="creation-allocation">
-            <label :for="`creation-allocation-${ax.axis}`" class="creation-allocation__label">{{ ax.label }}</label>
-            <p :id="`creation-axis-help-${ax.axis}`" class="creation-allocation__help">{{ ax.explanation }} ‧ 配點 0–{{ ax.point_cap }}</p>
+          <div
+            v-for="ax in currentProfile?.axes"
+            :key="ax.axis"
+            class="creation-allocation"
+            :data-locked="isLocked(ax) ? 'true' : null"
+          >
+            <label :id="`creation-allocation-label-${ax.axis}`" :for="`creation-allocation-${ax.axis}`" class="creation-allocation__label">{{ ax.label }}</label>
+            <p :id="`creation-axis-help-${ax.axis}`" class="creation-allocation__help">{{ ax.explanation }} ‧ 配點 {{ formatPointRange(0, ax.point_cap) }}</p>
             <div class="creation-stepper">
               <button type="button" class="ui-icon-btn" :aria-label="`減少${ax.label}`"
                 :data-testid="`creation-step-${ax.axis}-down`" :disabled="!canStep(ax, -1)" @click="stepAllocation(ax, -1)">−</button>
               <input :id="`creation-allocation-${ax.axis}`" type="number" min="0" :max="ax.point_cap"
                 v-bind="fieldAttrs(`allocations.${ax.axis}`, `creation-axis-help-${ax.axis}`)"
+                :disabled="isLocked(ax)" @focus="editingAxis = ax.axis" @blur="editingAxis = null"
                 v-model.number="allocations[ax.axis]" :data-testid="`creation-field-${ax.axis}`" />
               <button type="button" class="ui-icon-btn" :aria-label="`增加${ax.label}`"
                 :data-testid="`creation-step-${ax.axis}-up`" :disabled="!canStep(ax, 1)" @click="stepAllocation(ax, 1)">+</button>
             </div>
-            <div class="creation-allocation__bar" aria-hidden="true"><span :style="{ transform: `scaleX(${allocationFraction(ax)})` }"></span></div>
+            <!-- Keyed by the cap: a cap and value change in one render would
+                 otherwise clamp the value to the old max (v-model runs first). -->
+            <input
+              :id="`creation-slider-${ax.axis}`"
+              :key="`${ax.axis}:${ax.point_cap}`"
+              type="range"
+              class="creation-allocation__slider"
+              min="0"
+              :max="ax.point_cap"
+              step="1"
+              :aria-labelledby="`creation-allocation-label-${ax.axis}`"
+              v-bind="fieldAttrs(`allocations.${ax.axis}`, `creation-axis-help-${ax.axis}`)"
+              :disabled="ax.point_cap === 0"
+              v-model.number="allocations[ax.axis]"
+              :data-testid="`creation-slider-${ax.axis}`"
+              :style="{ '--fill': sliderFill(ax) }"
+            />
             <p class="creation-allocation__help" :data-testid="`creation-preview-${ax.axis}`">
               預覽值 {{ allocationPreview.find((entry) => entry.axis === ax.axis)?.value ?? ax.minimum }}
             </p>

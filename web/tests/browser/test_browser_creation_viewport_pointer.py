@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import copy
+
 from tools.spec_traceability import covers_requirement
 from .browser_helpers import (
     focus_creation_action_dock,
@@ -162,6 +164,103 @@ class ViewportCreationJourney(CreationBrowserTest):
         creation = self._creation_panel(page)
         for forbidden in ("persona", "skills", "equipment", "inventory", "magic_level"):
             self.assertNotIn(forbidden, creation)
+
+
+    @covers_requirement(
+        "webclient-character-creation-ui::creation-controls-preserve-native-entry-and-existing-authority"
+    )
+    def test_allocation_slider_tilde_range_and_zero_cap_lock(self):
+        page = self._login_creation((1451, 790))
+        install_outbound_recorder(page)
+        self._wait_creation_available(page)
+        self._focus_dock(page)
+        _press(page, "ArrowDown")
+        _press(page, "Enter")  # 自訂角色
+
+        def _custom_form_ready(state):
+            if not state.get("connected") or state.get("mode") != "creation":
+                return False
+            panel = (state.get("panels") or {}).get("creation")
+            return bool(panel and panel.get("available") is True)
+
+        wait_for_store_state(
+            page,
+            _custom_form_ready,
+            dom_readiness={
+                "selector": '[data-testid="creation-submit"]',
+                "predicate": (
+                    "() => { const s = document.querySelector('[data-testid=\"creation-submit\"]'); "
+                    "return s !== null; }"
+                ),
+                "description": "creation submit control rendered",
+            },
+            timeout=30000,
+        )
+        subrace = page.locator('[data-testid="creation-subrace"]')
+        if subrace.count():
+            subrace.select_option(index=0)
+        page.locator('[data-testid="creation-steps-tab-allocation"]').click()
+        page.locator('[data-testid="creation-steps-panel-allocation"]').wait_for(
+            state="visible", timeout=5000
+        )
+
+        axes = ("hp", "mp", "sp", "atk_phys", "agility", "defense", "magic_power")
+        open_axes = [
+            axis
+            for axis in axes
+            if page.locator(f'[data-testid="creation-field-{axis}"]').count()
+            and int(page.locator(f'[data-testid="creation-field-{axis}"]').get_attribute("max")) > 0
+        ]
+        self.assertGreaterEqual(len(open_axes), 2)
+        axis_a, axis_b = open_axes[:2]
+
+        # A: the slider spans the advertised range and mirrors the number field.
+        number_a = page.locator(f'[data-testid="creation-field-{axis_a}"]')
+        slider_a = page.locator(f'[data-testid="creation-slider-{axis_a}"]')
+        max_a = int(number_a.get_attribute("max"))
+        self.assertEqual(slider_a.get_attribute("min"), "0")
+        self.assertEqual(slider_a.get_attribute("max"), str(max_a))
+        self.assertEqual(slider_a.get_attribute("step"), "1")
+        first, second = str(max_a), str(max_a - 1)
+        slider_a.fill(first)
+        self.assertEqual(number_a.input_value(), first)
+        number_a.fill(second)
+        self.assertEqual(slider_a.input_value(), second)
+        self.assertIn(
+            f"0~{max_a}", page.locator(f"#creation-axis-help-{axis_a}").inner_text()
+        )
+
+        # B: a panel that zero-caps the axis locks its controls once applied.
+        number_b = page.locator(f'[data-testid="creation-field-{axis_b}"]')
+        number_b.fill("0")
+        # A focused number field never locks mid-edit; leave it first.
+        number_b.blur()
+        panel = copy.deepcopy(self._creation_panel(page))
+        for profile in panel["custom"]["profiles"]:
+            for axis in profile["axes"]:
+                if axis["axis"] == axis_b:
+                    axis["point_cap"] = 0
+                    axis["value_at_cap"] = axis["minimum"]
+        inject_update(page, {"creation": panel}, mode="creation")
+        page.wait_for_function(
+            "(axis) => document.querySelector(`[data-testid=\"creation-slider-${axis}\"]`)"
+            "?.getAttribute('max') === '0'",
+            arg=axis_b,
+            timeout=15000,
+        )
+        for testid in (
+            f"creation-field-{axis_b}",
+            f"creation-slider-{axis_b}",
+            f"creation-step-{axis_b}-up",
+            f"creation-step-{axis_b}-down",
+        ):
+            self.assertTrue(page.locator(f'[data-testid="{testid}"]').is_disabled(), testid)
+        self.assertEqual(
+            page.locator(f'[data-testid="creation-field-{axis_b}"]').evaluate(
+                "(el) => el.closest('.creation-allocation').dataset.locked"
+            ),
+            "true",
+        )
 
 
 class PointerCreationJourneys(CreationBrowserTest):

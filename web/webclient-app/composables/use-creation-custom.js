@@ -12,6 +12,11 @@ import { computed, ref } from "vue";
 // tests/overlays/creation_overlay.test.js.
 const ACTION_RESULT_FALLBACK_MESSAGE = "動作未生效，請重試或返回上層。";
 
+// Every allocation point range in the custom form reads `low~high`.
+export function formatPointRange(low, high) {
+  return `${low}~${high}`;
+}
+
 export function useCreationCustom(props, form, emit) {
   const {
     custom,
@@ -70,7 +75,7 @@ export function useCreationCustom(props, form, emit) {
   const budgetBriefing = computed(() => {
     const profile = currentProfile.value;
     if (!profile) return "";
-    const ranges = profile.axes.map((a) => `${a.label} 0-${a.point_cap}`).join(" ‧ ");
+    const ranges = profile.axes.map((a) => `${a.label} ${formatPointRange(0, a.point_cap)}`).join(" ‧ ");
     const conversions = profile.axes
       .filter((a) => a.point_cap > 0 && a.value_at_cap - a.minimum !== a.point_cap)
       .map((a) => `${a.label} ${a.point_cap} 點換算為 ${a.value_at_cap}（起點 ${a.minimum}）`);
@@ -154,6 +159,21 @@ export function useCreationCustom(props, form, emit) {
     const max = affinityMax.value;
     const keys = [...affinitySelected.value];
     if (keys.length > max) affinitySelected.value = new Set(keys.slice(0, max));
+    clearZeroCapAllocations();
+  }
+
+  // A user-driven profile change zeroes the new profile's zero-cap axes so they
+  // lock at once. Draft sync and proposal fill never call this.
+  function clearZeroCapAllocations() {
+    const profile = currentProfile.value;
+    if (!profile) return;
+    for (const axis of profile.axes) {
+      if (axis.point_cap === 0) allocations[axis.axis] = 0;
+    }
+  }
+
+  function onSubraceChange() {
+    clearZeroCapAllocations();
   }
 
   function toggleAffinity(elementKey) {
@@ -198,15 +218,17 @@ export function useCreationCustom(props, form, emit) {
       if (outOfCap) {
         // A point value outside the server-declared cap is rejected here with
         // its own field; the server revalidates the exact budget anyway.
-        capError.value = `${outOfCap.label} 配點需為 0–${outOfCap.point_cap} 的整數`;
+        capError.value = `${outOfCap.label} 配點需為 ${formatPointRange(0, outOfCap.point_cap)} 的整數`;
         formErrorFields.value = [`allocations.${outOfCap.axis}`];
         return;
       }
     }
     if (profile && allocationTotal.value !== profile.budget) {
       budgetError.value = true;
-      // The budget is a sum, so the error lands on the first displayed axis.
-      formErrorFields.value = profile.axes?.[0] ? [`allocations.${profile.axes[0].axis}`] : [];
+      // The budget is a sum, so the error lands on the first displayed axis
+      // that can take points (a locked zero-cap field cannot take focus).
+      const target = profile.axes?.find((axis) => axis.point_cap > 0) ?? profile.axes?.[0];
+      formErrorFields.value = target ? [`allocations.${target.axis}`] : [];
       return;
     }
     // Persona local validation is all-empty-or-all-filled (design D5): a
@@ -278,6 +300,7 @@ export function useCreationCustom(props, form, emit) {
     formErrorFields,
     resultMessage,
     onRaceChange,
+    onSubraceChange,
     toggleAffinity,
     confirmCustom,
   };
