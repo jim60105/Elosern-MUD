@@ -236,6 +236,14 @@ class QuestBeatTests(CompileRegistryIsolation, StoryDirectorBeatsTestCase):
         open_synthetic_scope(self, "items", "guild_branches", "archetypes", "anchors", "anchor_placements")
         super().setUp()
         register_scenario_director()
+        # The permitted-reference catalog is shipped content; a behavior test
+        # must not depend on how many authored rows it currently carries.
+        self.enterContext(
+            patch(
+                "world.narrative.quest_beats.dialogue_reference_catalog",
+                return_value={"t_family": {"t_reference": "t_label"}},
+            )
+        )
         self.payload = _defeat_payload()
         self.owner.location = self.room1
         self.room1.anchor_key = self.payload["stages"][0]["location_req"]["anchor_key"]
@@ -433,6 +441,29 @@ class QuestBeatTests(CompileRegistryIsolation, StoryDirectorBeatsTestCase):
                 with patch("world.ai.scenario_director.generation.get_template_pool", side_effect=AssertionError("no filler")):
                     self.assertIsNone(generate_beat_quest_blueprint(client, context=context).result)
         self.assertEqual(list_payloads(), [])
+
+    @covers_requirement("narrative-quest-compilation::beat-context-failure-creates-no-template-replacement")
+    def test_the_permissioned_frame_bound_refuses_exactly_above_the_cap(self):
+        from world.ai.scenario_director.blueprints import MAX_SCENE_CONTEXT_SIZE
+
+        context, _ = quest_context(self.prepare(), self.proposal("quest_seed"))
+        base = json.dumps(context, ensure_ascii=False, sort_keys=True)
+        padding = MAX_SCENE_CONTEXT_SIZE - len(base.encode("utf-8"))
+        self.assertGreater(padding, 0)
+        context["note"] = context["note"] + "x" * padding
+        at_cap = json.dumps(context, ensure_ascii=False, sort_keys=True)
+        self.assertEqual(len(at_cap.encode("utf-8")), MAX_SCENE_CONTEXT_SIZE)
+        client = self.recorded()
+        self.assertIsNotNone(
+            generate_beat_quest_blueprint(client, context=context).result
+        )
+        context["note"] += "x"
+        refusing = self.recorded()
+        self.assertIsNone(
+            generate_beat_quest_blueprint(refusing, context=context).result
+        )
+        # The refusal happens before any transport call or template draw.
+        self.assertEqual(refusing.calls, [])
 
     @covers_requirement("narrative-quest-compilation::beat-context-failure-creates-no-template-replacement")
     def test_unreachable_generation_keeps_thread_and_creates_no_filler(self):

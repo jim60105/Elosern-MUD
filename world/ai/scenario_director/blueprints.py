@@ -29,9 +29,10 @@ from world.ai.scenario_director import packages
 # validator.
 MAX_CONTEXT_FIELD_LENGTH = 200
 MAX_TOTAL_SIZE = 12000
-#: The scene route carries the complete immutable planning frame, including the
-#: bounded permitted dialogue-reference catalog, so it has its own bound. The
-#: generic QuestBlueprint route keeps ``MAX_TOTAL_SIZE`` unchanged.
+#: The permissioned beat routes (scene package and quest seed) carry the
+#: complete immutable planning frame, including the bounded permitted
+#: dialogue-reference catalog, so they share this byte bound. The generic
+#: scenario-director context prompt keeps ``MAX_TOTAL_SIZE`` unchanged.
 MAX_SCENE_CONTEXT_SIZE = 65536
 MAX_NAME_LENGTH = 80
 MAX_SCENE_SENTENCE_LENGTH = 500

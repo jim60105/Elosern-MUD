@@ -217,13 +217,16 @@ def generate_quest_blueprint(client: Any, *, context: dict[str, Any]):
 @defer.inlineCallbacks
 def generate_beat_quest_blueprint(client: Any, *, context: dict[str, Any]):
     """Propose a context-fitting beat quest, never substitute authored filler."""
-    from world.ai.scenario_director.blueprints import MAX_TOTAL_SIZE
+    from world.ai.scenario_director.blueprints import MAX_SCENE_CONTEXT_SIZE
 
     if client is None:
         raise ScenarioDirectorClientRequiredError("beat generation requires a client")
     _require_registered()
     frame = json.dumps(context, ensure_ascii=False, sort_keys=True)
-    if len(frame) > MAX_TOTAL_SIZE:
+    # The permissioned beat snapshot carries the complete immutable planning
+    # frame, including the permitted dialogue-reference catalog, exactly like
+    # the scene route; the generic context prompt keeps ``MAX_TOTAL_SIZE``.
+    if len(frame.encode("utf-8")) > MAX_SCENE_CONTEXT_SIZE:
         return None
     try:
         system, user = build_scenario_prompt(context)

@@ -79,7 +79,7 @@
 決定性敘事核心
   └── attempt_decision(candidate=… 或 request=…)
         ├── 準備不可變脈絡框架
-        │     └── 超過 MAX_TOTAL_SIZE ──> 放棄本次決策
+        │     └── 超過 MAX_SCENE_CONTEXT_SIZE ──> 放棄本次決策
         ├── generate_beat_quest_blueprint()     # world/ai/scenario_director/generation.py
         │     ├── 成功 ──> QuestBlueprint
         │     └── 降級 ──> None（不抽範本）
