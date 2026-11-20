@@ -256,7 +256,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "913fdf0c626646d6437773b8181f74807ec9841c5507af51128ae7f90c1edefb",
+  "fingerprint": "11ddd9743cdf4c1697cdbb308d40a94fc9182e33f991e9f1aa6dcdd0b0cf8f13",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -16429,10 +16429,10 @@
   "source_manifest": {
     "content/items/armor_accessories_materials.yaml": "733dfc3e5b6d2bcf2352dda1b6e76715772ac73b723047e0d4ab89334d90501f",
     "content/items/catalog.yaml": "cb16eec0c359753d94884bbf5782c0f1c544f0c54079bdef839571ce33595e6a",
-    "content/items/core_items.yaml": "7e737ef329d88192641c8ce86da2873e58b0a446546d8b81e6d1d96c1f7da00f",
-    "content/items/elven_village_goods.yaml": "6c58edd5c70f812849c76ab7e9ccc7eedfb43890074f095d37dd3cfecd58965e",
+    "content/items/core_items.yaml": "a9b938bb12fb38d330d2e942ef44d5d26ca43aee402974b9d515f005774d8cab",
+    "content/items/elven_village_goods.yaml": "2a63ae4d98f217be93979946c48cd33847c825c3fe5b6bdf88da4b7f4d4914a4",
     "content/items/guild_accessories.yaml": "05833cf9c6c3b02f58484b6826134375dead18f2f25704e3527dbfab9e96751e",
-    "content/items/inspect_only_codex.yaml": "495ad07a1c01802427abdf355f479c8ae7250de1056a87e98d006c176c7dbf7a",
+    "content/items/inspect_only_codex.yaml": "613578a0b1469633027f608f3ffcbb48c614d09b39b4bf1b58d9a2bb39b99354",
     "content/items/intimacy_items.yaml": "2ccf8524e70c9aa00c8a45793d08f240701ce72cf47ffc087c675c67c2739fd6",
     "content/items/military_equipment.yaml": "552d1cd714d266ea30ab5c7e79a75b9e7f6070df4258ad17ebe834696f173e3c",
     "content/items/named_equipment.yaml": "1fef73ee8013fc80c669c4b7e679bfc78da6e8cbf147fa63d3881f528d4cb52a",

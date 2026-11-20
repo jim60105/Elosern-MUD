@@ -10,6 +10,12 @@ items:
       icon_key: food
       rarity: common
       summary_zh: 幽月谷村共用窯烤出的豆餅，配著谷裡自種的香草一起吃。
+    use_mechanics:
+      consumable: true
+      combat_allowed: false
+      effects:
+        - stat: sp
+          amount: 12
   - key: eolas_herb_tonic
     display_name_zh: 幽月香草藥露
     price_table_key: potion
@@ -62,6 +68,14 @@ items:
       icon_key: food
       rarity: uncommon
       summary_zh: 翠綠森林村花蕊蜜園的蜂群釀成的百花蜜。
+    use_mechanics:
+      consumable: true
+      combat_allowed: false
+      effects:
+        - stat: mp
+          amount: 4
+        - stat: sp
+          amount: 6
   - key: fionnen_beeswax_salve
     display_name_zh: 森林蜂蠟膏
     price_table_key: potion
@@ -113,6 +127,12 @@ items:
       icon_key: food
       rarity: uncommon
       summary_zh: 谷裡入夜才綻的花趁夜採下，浸進糖漿裡釀成，是花饌好手最得意的一味。
+    use_mechanics:
+      consumable: true
+      combat_allowed: false
+      effects:
+        - stat: mp
+          amount: 10
   - key: ciaran_ember_mushroom_skewer
     display_name_zh: 暗影谷炭烤蕈串
     price_table_key: specialty_food
@@ -122,6 +142,14 @@ items:
       icon_key: food
       rarity: common
       summary_zh: 谷裡採來的蕈子串在竹籤上，擱炭火烤透的野地熱食。
+    use_mechanics:
+      consumable: true
+      combat_allowed: false
+      effects:
+        - stat: hp
+          amount: 6
+        - stat: sp
+          amount: 8
   - key: ciaran_indigo_dye
     display_name_zh: 暗影谷藍染
     price_table_key: material
