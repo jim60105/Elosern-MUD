@@ -70,7 +70,7 @@ topics:
       text: 她側過臉，像在辨認窗外那陣風。
     - kind: speech
       speaker: host
-      text: 「名是記號。你記住了，就找到我們。忘了，也就錯過了。」
+      text: 「名是記號。你記住了，就找到這家。忘了，也就錯過了。」
 - topic_id: ciaran_resident_naernel.topic_05
   keyword: 私語
   label: 私語
