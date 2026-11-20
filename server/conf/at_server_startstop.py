@@ -55,6 +55,7 @@ STARTUP_STEP_ORDER: tuple[str, ...] = (
     "state_reaction_rules",
     "npc_persona_roster_validation",
     "sync_map_world",
+    "sync_residents",
     "sync_all",
     "sync_quest_runtime",
     "sync_guild_economy",
@@ -434,6 +435,7 @@ def at_server_start():
     from world.rules.clock import get_world_clock
     from world.rules.guild_economy import restore_persisted_sessions, sync_guild_economy
     from world.rules.npc_schedules import sync_npc_schedules
+    from world.rules.resident_sync import sync_residents
 
     log_info(
         "art_optional_stages",
@@ -534,6 +536,12 @@ def at_server_start():
         "sync_map_world",
         lambda: _late("world.maps.runtime", "synchronize"),
     )
+    # Chat-only residents are materialized once the persistent interior sync
+    # has committed their homes and village public nodes. The step validates
+    # the whole authored resident registry before its single write transaction;
+    # the roster gate above already checked the same references, so a failure
+    # here is a map/materialization defect, not an authoring one.
+    _startup_step("sync_residents", sync_residents)
     _startup_step("sync_all", sync_all)
     _startup_step("sync_quest_runtime", sync_quest_runtime)
     _startup_step("sync_guild_economy", sync_guild_economy)

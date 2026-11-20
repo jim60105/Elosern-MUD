@@ -3,8 +3,8 @@
 Validates the complete shipped NPC roster before world synchronization at server
 start: derives shipped sources from live registries and files, checks bidirectional
 inventory equality, verifies compact cards and voice lines for place hosts,
-persistent guild adventurers, companion partner presets, quest template
-occupants, and import examples, and flags orphan profiles.
+persistent guild adventurers, residents, companion partner presets, quest
+template occupants, and import examples, and flags orphan profiles.
 """
 
 from __future__ import annotations
@@ -40,7 +40,8 @@ def _resolve_shipped_inputs(
     quest_templates: Iterable[Any] | None,
     examples_dir: Path | None,
     adventurers: Mapping | None,
-) -> tuple[Any, Any, Any, tuple, Path, Any]:
+    residents: Mapping[str, Any] | None,
+) -> tuple[Any, Any, Any, tuple, Path, Any, Any]:
     """Resolve the live registries a shipped-source derivation reads.
 
     ``quest_templates`` has no default: only the composition root knows the
@@ -55,6 +56,10 @@ def _resolve_shipped_inputs(
         from world.lore.guild_adventurers import ADVENTURER_REGISTRY
 
         adventurers = ADVENTURER_REGISTRY
+    if residents is None:
+        from world.lore.residents import RESIDENT_REGISTRY
+
+        residents = RESIDENT_REGISTRY
     if dialogue_rows is None:
         from world.lore.dialogue import DIALOGUE_ROWS
 
@@ -71,7 +76,15 @@ def _resolve_shipped_inputs(
         import world.imports.examples as _examples_pkg
 
         examples_dir = Path(_examples_pkg.__file__).resolve().parent
-    return places, dialogue_rows, player_presets, quest_templates, examples_dir, adventurers
+    return (
+        places,
+        dialogue_rows,
+        player_presets,
+        quest_templates,
+        examples_dir,
+        adventurers,
+        residents,
+    )
 
 
 def derive_shipped_sources(
@@ -82,6 +95,7 @@ def derive_shipped_sources(
     quest_templates: Iterable[Any] | None = None,
     examples_dir: Path | None = None,
     adventurers: Mapping | None = None,
+    residents: Mapping[str, Any] | None = None,
 ) -> frozenset[tuple[str, str]]:
     """Derive the complete set of shipped NPC source (kind, key) pairs.
 
@@ -90,7 +104,15 @@ def derive_shipped_sources(
     adventurers, starting companion declarations, quest template occupants, and
     shipped import examples.
     """
-    places, dialogue_rows, player_presets, quest_templates, examples_dir, adventurers = (
+    (
+        places,
+        dialogue_rows,
+        player_presets,
+        quest_templates,
+        examples_dir,
+        adventurers,
+        residents,
+    ) = (
         _resolve_shipped_inputs(
             places=places,
             dialogue_rows=dialogue_rows,
@@ -98,6 +120,7 @@ def derive_shipped_sources(
             quest_templates=quest_templates,
             examples_dir=examples_dir,
             adventurers=adventurers,
+            residents=residents,
         )
     )
 
@@ -112,6 +135,9 @@ def derive_shipped_sources(
 
     for key in adventurers:
         sources.add(("persistent_adventurer", key))
+
+    for key in residents:
+        sources.add(("resident", key))
 
     for preset in player_presets.values():
         for companion in preset.starting_companions:
@@ -138,13 +164,15 @@ def derive_shipped_source_owners(
     quest_templates: Iterable[Any] | None = None,
     examples_dir: Path | None = None,
     adventurers: Mapping | None = None,
+    residents: Mapping[str, Any] | None = None,
     profile_key_slices: Mapping[str, str] | None = None,
 ) -> dict[tuple[str, str], str]:
     """The owning content-slice label every profile-backed source resolves to.
 
-    Only the three profile-backed kinds carry a derivable owner: a host's and a
-    person's owner is the profile slice that declares its profile, and a
-    dialogue table's owner is the owner of its single hosting place. The three
+    Only the three profile-backed kinds carry a derivable owner: a host's, a
+    person's and a resident's owner is the profile slice that declares its
+    profile, and a dialogue table's owner is the slice that owns the place or
+    resident authoring it. The three
     kinds that author no profile (``starting_companion``,
     ``quest_template_occupant``, ``import_example``) are absent here; those rows
     are only required to name a non-empty owning slice.
@@ -155,7 +183,15 @@ def derive_shipped_source_owners(
     registered slice declares -- a synthetic profile registry -- is omitted
     rather than guessed.
     """
-    places, dialogue_rows, player_presets, quest_templates, examples_dir, adventurers = (
+    (
+        places,
+        dialogue_rows,
+        player_presets,
+        quest_templates,
+        examples_dir,
+        adventurers,
+        residents,
+    ) = (
         _resolve_shipped_inputs(
             places=places,
             dialogue_rows=dialogue_rows,
@@ -163,6 +199,7 @@ def derive_shipped_source_owners(
             quest_templates=quest_templates,
             examples_dir=examples_dir,
             adventurers=adventurers,
+            residents=residents,
         )
     )
     if profile_key_slices is None:
@@ -188,6 +225,12 @@ def derive_shipped_source_owners(
         owner = profile_key_slices.get(person.profile_key)
         if owner is not None:
             owners[("persistent_adventurer", person_key)] = owner
+    for resident_key, resident in residents.items():
+        owner = profile_key_slices.get(resident.profile_key)
+        if owner is not None:
+            owners[("resident", resident_key)] = owner
+            if resident.dialogue_key:
+                owners.setdefault(("dialogue_table", resident.dialogue_key), owner)
     return owners
 
 
@@ -201,6 +244,7 @@ def validate_npc_roster(
     profile_registry: Mapping[str, NpcProfile] | None = None,
     inventory: Iterable[NpcSource] | None = None,
     adventurers: Mapping | None = None,
+    residents: Mapping[str, Any] | None = None,
     owners: Mapping[tuple[str, str], str] | None = None,
 ) -> None:
     """Validate the complete shipped NPC roster and raise NpcRosterError on failure.
@@ -210,19 +254,23 @@ def validate_npc_roster(
     2. Every source names a non-empty owning content slice, and every
        profile-backed source's owner is the slice that declares its profile
        (``owners`` overrides the derived resolution for a synthetic universe).
-    3. Persistent adventurers resolve to distinct profiles with valid compact cards,
+    3. Residents resolve to distinct profiles with valid compact cards,
+       bounded age pairs, one owned dialogue table, and the shipped schedule
+       vocabulary.
+    4. Persistent adventurers resolve to distinct profiles with valid compact cards,
        bounded age pairs and both offline voice lines.
-    4. Place hosts resolve to profiles with valid compact cards, bounded age pairs,
+    5. Place hosts resolve to profiles with valid compact cards, bounded age pairs,
        exactly one inventory assignment, and (as scripted hosts) a valid
        misunderstanding reply and no profile greeting.
-    5. Dialogue tables are answered by exactly one hosted place.
-    6. Starting companion partner presets provide speech_style, greeting, and a valid
+    6. Dialogue tables are answered by exactly one owner: a hosted place or a
+       resident.
+    7. Starting companion partner presets provide speech_style, greeting, and a valid
        derived card with maximum-length synthetic owner.
-    7. Quest template occupants carry personas with valid compact cards and pass
+    8. Quest template occupants carry personas with valid compact cards and pass
        characterization.
-    8. Shipped import examples validate cleanly as NPC character records.
-    9. Every profile in profile_registry is referenced by a hosted place or persistent
-       adventurer.
+    9. Shipped import examples validate cleanly as NPC character records.
+    10. Every profile in profile_registry is referenced by a hosted place,
+        persistent adventurer or resident.
     """
     if places is None:
         from world.lore.settlements.places import PLACE_REGISTRY
@@ -232,6 +280,10 @@ def validate_npc_roster(
         from world.lore.guild_adventurers import ADVENTURER_REGISTRY
 
         adventurers = ADVENTURER_REGISTRY
+    if residents is None:
+        from world.lore.residents import RESIDENT_REGISTRY
+
+        residents = RESIDENT_REGISTRY
     if dialogue_rows is None:
         from world.lore.dialogue import DIALOGUE_ROWS
 
@@ -267,6 +319,7 @@ def validate_npc_roster(
         race_lifespan_upper_bound,
     )
     from world.rules.creation_wizard import NAME_MAX_LENGTH
+    from world.rules.npc_identity import NPCNameError, validate_npc_name
 
     violations: list[str] = []
     referenced_profiles: set[str] = set()
@@ -280,6 +333,7 @@ def validate_npc_roster(
         quest_templates=quest_templates,
         examples_dir=examples_dir,
         adventurers=adventurers,
+        residents=residents,
     )
     inventory_sources = {(row.kind, row.key) for row in inventory}
     if len(inventory_sources) != len(inventory):
@@ -308,6 +362,7 @@ def validate_npc_roster(
             quest_templates=quest_templates,
             examples_dir=examples_dir,
             adventurers=adventurers,
+            residents=residents,
         )
     row_by_source = {(row.kind, row.key): row for row in inventory}
     for kind, key in sorted(actual_sources):
@@ -326,18 +381,128 @@ def validate_npc_roster(
                 f"instead of the resolved owner {expected_owner!r}"
             )
 
-    # Persistent people have distinct profiles and both offline reply paths.
-    person_profiles: set[str] = set()
+    # Residents: registered distinct profiles, complete offline voices, a
+    # resolvable dialogue table and the shipped schedule vocabulary.
+    from world.rules.npc_schedules import get_rulebook
+    from world.rules.resident_sync import SCHEDULE_TARGET_ROLES
+
+    resident_profiles: set[str] = set()
+    resident_table_owners: dict[str, list[str]] = {}
     other_profiles = {
         place.host_profile_key
         for place in places.values()
         if place.host_profile_key is not None
     }
+    adventurer_profiles = {person.profile_key for person in adventurers.values()}
+    for resident_key, resident in residents.items():
+        label = (
+            f"source kind='resident' key={resident_key!r} "
+            f"profile {resident.profile_key!r}"
+        )
+        if resident.key != resident_key:
+            violations.append(f"{label} declares key {resident.key!r}")
+            continue
+        try:
+            validate_npc_name(resident.name)
+        except NPCNameError as err:
+            violations.append(f"{label} has invalid name: {err}")
+        profile_key = resident.profile_key
+        referenced_profiles.add(profile_key)
+        if (
+            profile_key in other_profiles
+            or profile_key in adventurer_profiles
+            or profile_key in resident_profiles
+        ):
+            violations.append(f"{label} must have a distinct resident profile")
+        resident_profiles.add(profile_key)
+        profile = profile_registry.get(profile_key)
+        if profile is None:
+            violations.append(f"{label} references missing profile")
+            continue
+        assignments = [
+            row for row in inventory if row.kind == "resident" and row.key == resident_key
+        ]
+        if len(assignments) != 1 or (
+            assignments[0].profile_key,
+            assignments[0].age,
+            assignments[0].apparent_age,
+        ) != (profile_key, profile.age, profile.apparent_age):
+            violations.append(
+                f"{label} has missing or stale profile/age inventory assignment"
+            )
+        try:
+            normalize_card(profile.card.to_record())
+        except (NpcCardError, ValueError) as err:
+            violations.append(f"{label} has invalid card: {err}")
+        for field in ("age", "apparent_age"):
+            value = getattr(profile, field)
+            if type(value) is not int or not 0 <= value <= 10000:
+                violations.append(f"{label} has invalid {field}")
+        misunderstood = profile.voice.misunderstood
+        if not isinstance(misunderstood, str) or not misunderstood.strip():
+            violations.append(f"{label} missing misunderstood")
+        else:
+            try:
+                normalize_offline_greeting(misunderstood)
+            except (NpcCardError, ValueError) as err:
+                violations.append(f"{label} invalid misunderstood: {err}")
+        if resident.dialogue_key is None:
+            greeting = profile.voice.greeting
+            if not isinstance(greeting, str) or not greeting.strip():
+                violations.append(f"{label} missing offline greeting")
+            else:
+                try:
+                    normalize_offline_greeting(greeting)
+                except (NpcCardError, ValueError) as err:
+                    violations.append(f"{label} invalid offline greeting: {err}")
+        else:
+            table = dialogue_rows.get(resident.dialogue_key)
+            if table is None:
+                violations.append(
+                    f"{label} references missing dialogue table {resident.dialogue_key!r}"
+                )
+            else:
+                if not getattr(table, "greeting", None):
+                    violations.append(
+                        f"{label} dialogue table {resident.dialogue_key!r} authors no greeting"
+                    )
+                if getattr(table, "services", ()):
+                    violations.append(
+                        f"{label} dialogue table {resident.dialogue_key!r} advertises a service"
+                    )
+                resident_table_owners.setdefault(resident.dialogue_key, []).append(
+                    resident_key
+                )
+            if profile.voice.greeting is not None:
+                violations.append(
+                    f"{label} authors a greeting beside its dialogue table"
+                )
+        template = get_rulebook().template_by_key(resident.schedule_template)
+        if template is None:
+            violations.append(
+                f"{label} has unknown schedule template {resident.schedule_template!r}"
+            )
+        else:
+            moves = [entry for entry in template.entries if entry.kind == "move"]
+            if not moves:
+                violations.append(f"{label} schedule template has no move entry")
+            for entry in moves:
+                if entry.target not in SCHEDULE_TARGET_ROLES:
+                    violations.append(
+                        f"{label} schedule target {entry.target!r} has no route role"
+                    )
+
+    # Persistent people have distinct profiles and both offline reply paths.
+    person_profiles: set[str] = set()
     for person_key, person in adventurers.items():
         profile_key = person.profile_key
         referenced_profiles.add(profile_key)
         label = f"source kind='persistent_adventurer' key={person_key!r} profile {profile_key!r}"
-        if profile_key in person_profiles or profile_key in other_profiles:
+        if (
+            profile_key in person_profiles
+            or profile_key in other_profiles
+            or profile_key in resident_profiles
+        ):
             violations.append(f"{label} must have a distinct normal-person profile")
         person_profiles.add(profile_key)
         profile = profile_registry.get(profile_key)
@@ -432,15 +597,17 @@ def validate_npc_roster(
     # Check cardinality for each dialogue table
     for table_key in sorted(dialogue_rows):
         hosts = table_hosts[table_key]
-        if len(hosts) == 0:
+        resident_owners = resident_table_owners.get(table_key, [])
+        total_owners = len(hosts) + len(resident_owners)
+        if total_owners == 0:
             violations.append(
-                f"source kind='dialogue_table' key={table_key!r} is answered by 0 hosted places"
+                f"source kind='dialogue_table' key={table_key!r} is answered by 0 owners"
             )
-        elif len(hosts) > 1:
-            host_ids = [h.host_profile_key for h in hosts]
+        elif total_owners > 1:
+            owners_label = [h.host_profile_key for h in hosts] + list(resident_owners)
             violations.append(
-                f"source kind='dialogue_table' key={table_key!r} is answered by {len(hosts)} "
-                f"hosted places: {host_ids!r}"
+                f"source kind='dialogue_table' key={table_key!r} is answered by "
+                f"{total_owners} owners: {owners_label!r}"
             )
 
     # Validate voice lines independently for EVERY scripted host
@@ -599,7 +766,8 @@ def validate_npc_roster(
     orphan_keys = sorted(set(profile_registry) - referenced_profiles)
     for prof_key in orphan_keys:
         violations.append(
-            f"orphan profile {prof_key!r} in profile registry is referenced by no hosted place or persistent adventurer"
+            f"orphan profile {prof_key!r} in profile registry is referenced by no hosted place, "
+            "persistent adventurer or resident"
         )
 
     if violations:

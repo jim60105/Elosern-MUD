@@ -25,13 +25,33 @@ CONTENT_DIR = Path(__file__).resolve().parent / "content"
 
 
 def canonical_dialogue_bindings() -> dict[str, str]:
-    """Derive canonical dialogue_key -> profile_key mappings from PLACE_REGISTRY."""
+    """Derive canonical dialogue_key -> profile_key mappings from authored owners.
+
+    A place host owns the tables its ``scripted_dialogue`` capabilities name; a
+    resident owns the one table its ``dialogue_key`` names. One dialogue key
+    cannot be claimed by two different profiles.
+    """
     bindings: dict[str, str] = {}
+
+    def _bind(dialogue_key: str, profile_key: str) -> None:
+        existing = bindings.get(dialogue_key)
+        if existing is not None and existing != profile_key:
+            raise ValueError(
+                f"dialogue key {dialogue_key!r} is claimed by profiles "
+                f"{existing!r} and {profile_key!r}"
+            )
+        bindings[dialogue_key] = profile_key
+
     for place in PLACE_REGISTRY.values():
         if not place.host_profile_key:
             continue
         for dialogue_key in place_dialogue_keys(place):
-            bindings[dialogue_key] = place.host_profile_key
+            _bind(dialogue_key, place.host_profile_key)
+    from world.lore.residents import RESIDENT_REGISTRY
+
+    for resident in RESIDENT_REGISTRY.values():
+        if resident.dialogue_key:
+            _bind(resident.dialogue_key, resident.profile_key)
     return bindings
 
 

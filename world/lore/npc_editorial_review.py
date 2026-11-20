@@ -34,6 +34,7 @@ LEDGER_FACES_BY_KIND = (
     ("place_host", ("profile", "card", "voice")),
     ("dialogue_table", ("greeting", "responses", "service-semantics")),
     ("persistent_adventurer", ("profile", "card", "voice")),
+    ("resident", ("profile", "card", "voice")),
     ("starting_companion", ("card", "voice")),
     ("quest_template_occupant", ("card",)),
     ("import_example", ("card",)),

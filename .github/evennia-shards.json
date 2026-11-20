@@ -824,7 +824,8 @@
         "world.narrative.tests.test_dialogue_reading",
         "world.narrative.tests.test_dialogue_unread",
         "world.lore.tests.test_start_locations",
-        "world.lore.tests.test_item_catalog"
+        "world.lore.tests.test_item_catalog",
+        "world.lore.tests.test_residents"
       ]
     },
     {
@@ -1227,7 +1228,8 @@
       "name": "maps-36",
       "workers": 1,
       "labels": [
-        "world.maps.tests.test_runtime_adoption_rollback"
+        "world.maps.tests.test_runtime_adoption_rollback",
+        "world.maps.tests.test_resident_route"
       ]
     },
     {
@@ -1481,7 +1483,8 @@
       "name": "rules-11-3",
       "workers": 4,
       "labels": [
-        "world.rules.tests.test_map_knowledge_integration.test_non_recording"
+        "world.rules.tests.test_map_knowledge_integration.test_non_recording",
+        "world.rules.tests.test_resident_sync"
       ]
     },
     {

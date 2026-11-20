@@ -107,6 +107,7 @@ def _find_service_host(host_key: str) -> NPC | None:
     another source owns, even when that source reuses the same profile key.
     """
     from world.rules.human_guild_hosts import PERSON_ATTRIBUTE
+    from world.rules.resident_sync import RESIDENT_ATTRIBUTE
 
     matches = [
         npc
@@ -124,6 +125,11 @@ def _find_service_host(host_key: str) -> NPC | None:
         raise ServiceHostIntegrityError(
             f"canonical host identity {host_key!r} belongs to an authored "
             "persistent adventurer, which no service roster may take over"
+        )
+    if host.attributes.has(RESIDENT_ATTRIBUTE):
+        raise ServiceHostIntegrityError(
+            f"canonical host identity {host_key!r} belongs to an authored "
+            "resident, which no service roster may take over"
         )
     return host
 

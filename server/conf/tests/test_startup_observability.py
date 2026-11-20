@@ -41,6 +41,7 @@ _BODY_TARGETS = (
     "world.rules.guild_economy.restore_persisted_sessions",
     "world.rules.guild_economy.sync_guild_economy",
     "world.rules.npc_schedules.sync_npc_schedules",
+    "world.rules.resident_sync.sync_residents",
     "world.rules.titles.register_title_planner",
     "world.prompts.loader.load_prompt_library",
     "world.art.service.art_sync_all",
@@ -143,8 +144,19 @@ class StartupStepEventTests(_StubbedStartup):
                 "state_reaction_rules",
                 "npc_persona_roster_validation",
                 "sync_map_world",
+                "sync_residents",
             ],
         )
+
+    def test_resident_sync_runs_after_roster_validation_and_before_lore_sync(self):
+        order = list(STARTUP_STEP_ORDER)
+        self.assertLess(
+            order.index("npc_persona_roster_validation"), order.index("sync_residents")
+        )
+        self.assertLess(order.index("sync_residents"), order.index("sync_all"))
+        # The persistent map/interior sync must precede it: homes and public
+        # nodes are materialized there, never by adoption alone.
+        self.assertLess(order.index("sync_map_world"), order.index("sync_residents"))
 
     def test_npc_persona_roster_validation_failure_aborts_before_sync_all(self):
         info, warn, error = self._run(

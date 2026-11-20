@@ -28,6 +28,7 @@ from world.lore.settlements.places import PLACE_REGISTRY
 from world.rules.npc_capabilities import capability, place_bound
 from world.rules.npc_roster_validation import (
     NpcRosterError,
+    derive_shipped_source_owners,
     derive_shipped_sources,
     validate_npc_roster,
 )
@@ -428,6 +429,170 @@ class SyntheticNpcRosterValidationTests(unittest.TestCase):
         )
         return profile
 
+    def _add_resident(self, synth=None, *, dialogue_key=None, **overrides):
+        """Add one chat-only resident, its profile and its inventory rows."""
+        synth = self.synth if synth is None else synth
+        profile = replace(
+            synth["profile_registry"]["t_shop_service"],
+            key="t_resident_profile",
+            voice=NpcVoiceLines(
+                greeting=None if dialogue_key else "「日安，旅人。」",
+                misunderstood="「再說一次吧。」",
+            ),
+        )
+        synth["profile_registry"][profile.key] = profile
+        fields = {
+            "key": "t_resident",
+            "name": "測試居民",
+            "profile_key": profile.key,
+            "dialogue_key": dialogue_key,
+            "schedule_template": "resident",
+        }
+        fields.update(overrides)
+        synth["residents"] = {"t_resident": SimpleNamespace(**fields)}
+        synth["inventory"] += (
+            NpcSource(
+                "resident",
+                "t_resident",
+                "test_slice",
+                profile.key,
+                profile.age,
+                profile.apparent_age,
+            ),
+        )
+        if dialogue_key is not None and dialogue_key not in synth["dialogue_rows"]:
+            synth["dialogue_rows"][dialogue_key] = DialogueDefinition(
+                greeting="「我是這裡的居民。」",
+                responses=(KeywordResponse("近況", "「一切都好。」"),),
+            )
+            synth["inventory"] += (
+                NpcSource("dialogue_table", dialogue_key, "test_slice"),
+            )
+        return profile
+
+    def test_a_resident_with_its_own_profile_passes_before_startup(self):
+        self._add_resident(dialogue_key="t_resident_dialogue")
+        validate_npc_roster(**self.synth)
+
+    @covers_requirement(
+        "npc-residents::residents-participate-in-source-inventory-and-roster-integrity"
+    )
+    def test_each_resident_reference_fault_is_reported_by_key(self):
+        for label, overrides, expected in (
+            (
+                "missing_profile",
+                {"profile_key": "t_missing_profile"},
+                "references missing profile",
+            ),
+            (
+                "missing_table",
+                {"dialogue_key": "t_missing_dialogue"},
+                "references missing dialogue table",
+            ),
+            (
+                "unknown_template",
+                {"schedule_template": "t_no_template"},
+                "unknown schedule template",
+            ),
+        ):
+            with self.subTest(fault=label):
+                synth = _make_valid_synthetic_universe(self.tmp_path)
+                self._add_resident(synth, dialogue_key="t_resident_dialogue")
+                resident = synth["residents"]["t_resident"]
+                synth["residents"]["t_resident"] = SimpleNamespace(
+                    **{**vars(resident), **overrides}
+                )
+                with self.assertRaises(NpcRosterError) as caught:
+                    validate_npc_roster(**synth)
+                message = str(caught.exception)
+                self.assertIn("resident", message)
+                self.assertIn("t_resident", message)
+                self.assertIn(expected, message)
+
+    @covers_requirement(
+        "npc-residents::residents-participate-in-source-inventory-and-roster-integrity"
+    )
+    def test_a_resident_profile_shared_with_another_resident_is_reported(self):
+        profile = self._add_resident()
+        self.synth["residents"]["t_resident_2"] = SimpleNamespace(
+            key="t_resident_2",
+            name="測試居民二",
+            profile_key=profile.key,
+            dialogue_key=None,
+            schedule_template="resident",
+        )
+        self.synth["inventory"] += (
+            NpcSource(
+                "resident",
+                "t_resident_2",
+                "test_slice",
+                profile.key,
+                profile.age,
+                profile.apparent_age,
+            ),
+        )
+        with self.assertRaises(NpcRosterError) as caught:
+            validate_npc_roster(**self.synth)
+        message = str(caught.exception)
+        self.assertIn("t_resident_2", message)
+        self.assertIn(profile.key, message)
+        self.assertIn("distinct resident profile", message)
+
+    def test_a_resident_without_a_table_needs_an_offline_greeting(self):
+        profile = self._add_resident()
+        self.synth["profile_registry"][profile.key] = replace(
+            profile, voice=NpcVoiceLines(misunderstood="「再說一次吧。」")
+        )
+        with self.assertRaises(NpcRosterError) as caught:
+            validate_npc_roster(**self.synth)
+        self.assertIn("missing offline greeting", str(caught.exception))
+
+    def test_a_resident_with_a_table_authors_no_profile_greeting(self):
+        profile = self._add_resident(dialogue_key="t_resident_dialogue")
+        self.synth["profile_registry"][profile.key] = replace(
+            profile,
+            voice=NpcVoiceLines(
+                greeting="「你好。」", misunderstood="「再說一次吧。」"
+            ),
+        )
+        with self.assertRaises(NpcRosterError) as caught:
+            validate_npc_roster(**self.synth)
+        self.assertIn(
+            "authors a greeting beside its dialogue table", str(caught.exception)
+        )
+
+    def test_a_resident_and_a_host_cannot_share_one_dialogue_table(self):
+        self._add_resident(dialogue_key="t_dialogue")
+        with self.assertRaises(NpcRosterError) as caught:
+            validate_npc_roster(**self.synth)
+        message = str(caught.exception)
+        self.assertIn("t_dialogue", message)
+        self.assertIn("answered by 2 owners", message)
+        self.assertIn("t_resident", message)
+
+    @covers_requirement(
+        "npc-residents::residents-participate-in-source-inventory-and-roster-integrity"
+    )
+    def test_a_resident_owned_table_resolves_the_resident_slice(self):
+        profile = self._add_resident(dialogue_key="t_resident_dialogue")
+        owners = derive_shipped_source_owners(
+            places=self.synth["places"],
+            dialogue_rows=self.synth["dialogue_rows"],
+            player_presets=self.synth["player_presets"],
+            quest_templates=self.synth["quest_templates"],
+            examples_dir=self.synth["examples_dir"],
+            adventurers=self.synth["adventurers"],
+            residents=self.synth["residents"],
+            profile_key_slices={
+                "t_shop_service": "test_slice",
+                profile.key: "t_resident_slice",
+            },
+        )
+        self.assertEqual(owners[("resident", "t_resident")], "t_resident_slice")
+        self.assertEqual(
+            owners[("dialogue_table", "t_resident_dialogue")], "t_resident_slice"
+        )
+
     def _add_new_owner_host_and_table(self, owner: str = "test_slice_2") -> None:
         """Add a second hosted place, its table, its profile and its own owner.
 
@@ -709,7 +874,7 @@ class SyntheticNpcRosterValidationTests(unittest.TestCase):
         msg = str(caught.exception)
         self.assertIn("dialogue_table", msg)
         self.assertIn("orphan_table", msg)
-        self.assertIn("0 hosted places", msg)
+        self.assertIn("answered by 0 owners", msg)
 
     @covers_requirement(
         "npc-profile-registry::the-shipped-npc-roster-is-validated-as-complete-before-the-game-starts"
@@ -735,7 +900,7 @@ class SyntheticNpcRosterValidationTests(unittest.TestCase):
         msg = str(caught.exception)
         self.assertIn("dialogue_table", msg)
         self.assertIn("t_dialogue", msg)
-        self.assertIn("hosted places", msg)
+        self.assertIn("answered by 2 owners", msg)
         self.assertIn("t_shop_service", msg)
 
     @covers_requirement(

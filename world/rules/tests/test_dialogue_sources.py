@@ -21,6 +21,8 @@ from world.lore.dialogue.codec import (
     make_static_host_key,
 )
 from world.lore.dialogue.shape import AuthoredDialogue, DialogueDefinition, KeywordResponse
+from world.lore.residents import RESIDENT_REGISTRY
+from world.lore.settlements.places import PLACE_REGISTRY, place_dialogue_keys
 from world.rules.dialogue_sources import (
     ResolvedDialogueSource,
     canonical_dialogue_bindings,
@@ -49,6 +51,14 @@ class DialogueSourcesTests(unittest.TestCase):
         bindings = canonical_dialogue_bindings()
         self.assertTrue(bindings)
         self.assertEqual(set(bindings), set(DIALOGUE_SNAPSHOT))
+        place_tables = {
+            key for place in PLACE_REGISTRY.values() for key in place_dialogue_keys(place)
+        }
+        resident_tables = {
+            resident.dialogue_key
+            for resident in RESIDENT_REGISTRY.values()
+            if resident.dialogue_key
+        }
 
         for diag_key, prof_key in bindings.items():
             with self.subTest(dialogue_key=diag_key):
@@ -63,7 +73,13 @@ class DialogueSourcesTests(unittest.TestCase):
                 self.assertEqual(source.identity.profile_key, prof_key)
                 self.assertEqual(source.identity.dialogue_key, diag_key)
                 self.assertTrue(source.dialogue.greeting)
-                self.assertEqual(len(source.dialogue.topics), 4)
+                if diag_key in place_tables:
+                    self.assertEqual(len(source.dialogue.topics), 4)
+                else:
+                    # Resident tables author their own topic count; the
+                    # mechanism only requires a complete, non-empty table.
+                    self.assertIn(diag_key, resident_tables)
+                    self.assertGreaterEqual(len(source.dialogue.topics), 1)
 
     @covers_requirement(
         "scripted-dialogue::dialogue-tables-are-immutable-keyed-and-registry-backed",
