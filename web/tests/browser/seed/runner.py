@@ -87,11 +87,11 @@ def main() -> None:
         CharacterCreationRequest,
         activate_player_character,
     )
-    from world.rules.starting_policy import CUSTOM_MODE, resolve_starting_profile
+    from world.rules.starting_policy import resolve_starting_profile
 
     def balanced_allocations(race_key: str, subrace_key: str | None = None) -> dict[str, int]:
         """Spend the exact starting budget deterministically from the profile caps."""
-        profile = resolve_starting_profile(race_key, subrace_key, mode=CUSTOM_MODE)
+        profile = resolve_starting_profile(race_key, subrace_key)
         remaining = profile.budget
         result: dict[str, int] = {}
         for axis in profile.axes:

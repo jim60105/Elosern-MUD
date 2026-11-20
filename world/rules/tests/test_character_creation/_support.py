@@ -59,15 +59,14 @@ def _race_key() -> str:
 
 
 def balanced_allocations(
-    race: str, subrace: str | None = None, *, mode: str = "custom"
+    race: str, subrace: str | None = None
 ) -> dict[str, int]:
     """Spend a profile's exact budget on its leading axes first.
 
-    ``mode`` names the policy under test: custom activation uses the custom
-    policy, a preset card (and the companion/builder consumers of
-    ``resolve_preset_values``) uses the raw-increment preset policy.
+    The resolved race decides the policy, so custom activation, preset cards
+    and the companion builder all spend against the same profile.
     """
-    profile = resolve_starting_profile(race, subrace, mode=mode)
+    profile = resolve_starting_profile(race, subrace)
     remaining = profile.budget
     result = {key: 0 for key in ALLOCATABLE_AXES}
     for axis in profile.axes:

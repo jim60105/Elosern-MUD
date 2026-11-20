@@ -45,7 +45,7 @@ _SCOPE_LOGICALS = (
 
 
 def _balanced_allocations(race: str, subrace: str | None = None) -> dict[str, int]:
-    profile = resolve_starting_profile(race, subrace, mode="custom")
+    profile = resolve_starting_profile(race, subrace)
     remaining = profile.budget
     result: dict[str, int] = {}
     for axis in profile.axes:
@@ -134,7 +134,7 @@ class BackgroundCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         # the last axis receives 0 points and rests on its profile floor —
         # read back from the patched profile, never a pinned number.
         profile = resolve_starting_profile(
-            next(iter(SYNTH_RACES)), next(iter(SYNTH_SUBRACES)), mode="custom"
+            next(iter(SYNTH_RACES)), next(iter(SYNTH_SUBRACES))
         )
         last_axis = profile.axes[-1]
         self.assertEqual(self.char1.traits[last_axis.axis].value, last_axis.minimum)

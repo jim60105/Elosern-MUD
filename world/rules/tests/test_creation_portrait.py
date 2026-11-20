@@ -615,7 +615,7 @@ def _png_bytes() -> bytes:
 
 
 def _balanced_allocations() -> dict[str, int]:
-    profile = resolve_starting_profile(_race_key(), _subrace_key(), mode="custom")
+    profile = resolve_starting_profile(_race_key(), _subrace_key())
     remaining = profile.budget
     result = {key: 0 for key in ALLOCATABLE_AXES}
     for axis in profile.axes:
@@ -1214,7 +1214,7 @@ class IdentityEditRetentionTests(_DraftPortraitCase):
         ready = self.admit()
         self.drain()
         profile = resolve_starting_profile(
-            _SINGLE_SEX_RACE.key, _SINGLE_SEX_SUBRACE.key, mode="custom"
+            _SINGLE_SEX_RACE.key, _SINGLE_SEX_SUBRACE.key
         )
         allocations = {key: 0 for key in ALLOCATABLE_AXES}
         remaining = profile.budget

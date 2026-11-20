@@ -33,8 +33,6 @@ from world.rules.surfaces import (
 )
 from world.rules.starting_policy import (
     ALLOCATABLE_AXES,
-    CUSTOM_MODE,
-    PRESET_MODE,
     PHYSICAL_AXES,
     StartingProfile,
     resolve_starting_profile,
@@ -294,7 +292,7 @@ def resolve_preset_values(preset: PlayerPreset) -> dict[str, int]:
     and no write. The returned mapping is a fresh caller-owned dict per call.
     """
     return _resolve_values(
-        resolve_starting_profile(preset.race, preset.subrace, mode=PRESET_MODE),
+        resolve_starting_profile(preset.race, preset.subrace),
         preset.allocation_dict(),
     )
 
@@ -406,7 +404,7 @@ def preflight_character_creation(
         values = resolve_preset_values(preset)
     else:
         values = _resolve_values(
-            resolve_starting_profile(race, subrace, mode=CUSTOM_MODE), allocations
+            resolve_starting_profile(race, subrace), allocations
         )
     if request.mode == "custom":
         # Custom-mode affinity is race-bounded player input (D4): an elf

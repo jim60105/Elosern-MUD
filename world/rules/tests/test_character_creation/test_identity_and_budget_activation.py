@@ -131,7 +131,7 @@ class CharacterActivationTests(EvenniaTest):
         )
         # magic_power is static-band-floor + allocation: derived from the
         # scoped race row, never a pinned shipped number.
-        profile = resolve_starting_profile(race_key, mode="custom")
+        profile = resolve_starting_profile(race_key)
         self.assertEqual(
             result.magic_power,
             profile.axes_dict()["magic_power"].minimum
@@ -164,7 +164,7 @@ class CharacterActivationTests(EvenniaTest):
                 race=_race_key(), subrace=modified.key, allocations=allocations
             )
             checked = preflight_character_creation(self.account, self.character, request)
-            profile = resolve_starting_profile(_race_key(), modified.key, mode="custom")
+            profile = resolve_starting_profile(_race_key(), modified.key)
             axes = profile.axes_dict()
             for key in ("atk_phys", "agility", "defense"):
                 raw = axes[key].value_for(allocations[key])
@@ -173,7 +173,7 @@ class CharacterActivationTests(EvenniaTest):
 
     def test_under_and_over_budget_rejections_are_non_mutating(self):
         valid = balanced_allocations(_race_key())
-        axes = resolve_starting_profile(_race_key(), mode="custom").axes_dict()
+        axes = resolve_starting_profile(_race_key()).axes_dict()
         for delta in (-1, 1):
             allocations = dict(valid)
             key = next(
@@ -246,7 +246,7 @@ class CharacterActivationTests(EvenniaTest):
             key=key, display_name=f"合成{key}", age=20, apparent_age=20,
             race=race_key, subrace=subrace_key,
             allocations=tuple(
-                balanced_allocations(race_key, subrace_key, mode="preset").items()
+                balanced_allocations(race_key, subrace_key).items()
             ),
             emphasis="測試", sex="female",
         )

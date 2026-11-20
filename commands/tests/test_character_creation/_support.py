@@ -184,7 +184,7 @@ def _open_creation_scope(test):
 
 def _balanced_replies(race: str, subrace: str | None = None):
     """Allocation reply strings that exactly meet the custom profile budget."""
-    profile = resolve_starting_profile(race, subrace, mode="custom")
+    profile = resolve_starting_profile(race, subrace)
     remaining = profile.budget
     values = {}
     for axis in profile.axes:

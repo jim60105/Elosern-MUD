@@ -289,7 +289,7 @@ class HumanCombatCalibrationTests(EvenniaTest):
         self.room = create_object(Room, key="calibration_room")
 
     def _create_human_f(self) -> NPC:
-        profile = resolve_starting_profile("human", "human_plains", mode="custom")
+        profile = resolve_starting_profile("human", "human_plains")
         allocations = {
             "hp": 69, "mp": 69, "sp": 69,
             "atk_phys": 4, "agility": 4, "defense": 4,
@@ -1558,7 +1558,7 @@ def _build_encounter_ally(cell: EncounterCell, room: Room, index: int) -> NPC:
     """Build one cell ally: the F creation kit, or a restricted senior."""
     key = f"{cell.label}_{index}"
     if cell.rank is None:
-        profile = resolve_starting_profile("human", "human_plains", mode="custom")
+        profile = resolve_starting_profile("human", "human_plains")
         values = _resolve_values(
             profile,
             {

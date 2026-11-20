@@ -331,6 +331,9 @@ class AffinityCreationTests(EvenniaTest):
             race="elf",
             subrace=self.seeding_branch.key,
             affinity_elements=(),
+            allocations=tuple(
+                balanced_allocations("elf", self.seeding_branch.key).items()
+            ),
         )
         with synthetic_registries(
             "races",

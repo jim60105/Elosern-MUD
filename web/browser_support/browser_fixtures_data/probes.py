@@ -62,14 +62,14 @@ def synth_concept_proposal_values() -> dict:
     registry symbol-refs there).
     """
     from world.lore.races import RACE_REGISTRY, SUBRACE_REGISTRY
-    from world.rules.starting_policy import CUSTOM_MODE, resolve_starting_profile
+    from world.rules.starting_policy import resolve_starting_profile
     from world.skills.registry import SKILL_REGISTRY
 
     race_key = next(iter(RACE_REGISTRY))
     subrace_key = next(
         key for key, sub in SUBRACE_REGISTRY.items() if sub.race_key == race_key
     )
-    profile = resolve_starting_profile(race_key, subrace_key, mode=CUSTOM_MODE)
+    profile = resolve_starting_profile(race_key, subrace_key)
     remaining = profile.budget
     allocations: dict[str, int] = {}
     for axis in profile.axes:

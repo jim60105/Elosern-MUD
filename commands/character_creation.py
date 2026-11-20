@@ -24,7 +24,7 @@ from world.rules.character_creation import (
 from world.rules.creation_wizard import (
     ALLOCATION_AXIS_EXPLANATIONS,
 )
-from world.rules.starting_policy import CUSTOM_MODE, resolve_starting_profile
+from world.rules.starting_policy import resolve_starting_profile
 
 # The concept input bound mirrors the generative layer's prompt-side cap
 # (``MAX_CONCEPT_LENGTH`` in the character-creation layer module); the command
@@ -211,7 +211,7 @@ class CmdCharacter(Command):
                 affinity_elements = yield from _collect_affinity_elements(
                     race, affinity_max
                 )
-            profile = resolve_starting_profile(race, subrace, mode=CUSTOM_MODE)
+            profile = resolve_starting_profile(race, subrace)
             briefing_lines = [
                 f"配點說明：共 {len(ALLOCATABLE_AXES)} 個項目，可用點數 {profile.budget}。",
             ]

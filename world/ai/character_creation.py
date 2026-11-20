@@ -56,7 +56,6 @@ from world.prompts.loader import PromptUnavailableError, render_prompt
 from world.skills.registry import SKILL_REGISTRY
 from world.rules.starting_policy import (
     ALLOCATABLE_AXES,
-    CUSTOM_MODE,
     resolve_starting_profile,
 )
 
@@ -253,7 +252,7 @@ def _validate_allocations(parsed: Any) -> list[str]:
     # The selected profile's own policy is the authority: a custom elf's magic
     # cap and budget differ from every raw-increment profile, and the retry
     # feedback must name the numbers activation will actually enforce.
-    profile = resolve_starting_profile(race_key, subrace_key, mode=CUSTOM_MODE)
+    profile = resolve_starting_profile(race_key, subrace_key)
     axes = profile.axes_dict()
     for axis in ALLOCATABLE_AXES:
         value = allocations.get(axis)
@@ -401,7 +400,7 @@ def _policy_catalog() -> str:
     """
     rows = []
     for subrace_key, subrace in SUBRACE_REGISTRY.items():
-        profile = resolve_starting_profile(subrace.race_key, subrace_key, mode=CUSTOM_MODE)
+        profile = resolve_starting_profile(subrace.race_key, subrace_key)
         axes = profile.axes_dict()
         caps = ",".join(str(axes[axis].point_cap) for axis in ALLOCATABLE_AXES)
         magic = axes["magic_power"]

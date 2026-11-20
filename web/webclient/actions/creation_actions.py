@@ -56,7 +56,7 @@ from world.rules.creation_wizard import (
     save_preset_draft,
 )
 from world.rules.namegen import roll_name_for_race
-from world.rules.starting_policy import CUSTOM_MODE, resolve_starting_profile
+from world.rules.starting_policy import resolve_starting_profile
 
 from web.webclient.presentation.protocol_validation import (
     validate_affinity_elements,
@@ -648,7 +648,7 @@ def _creation_concept_adapter(actor: Any, payload: dict[str, Any], session: Any 
             return _rejected("ownership_rejected")
         try:
             profile = resolve_starting_profile(
-                proposal.race_key, proposal.subrace_key, mode=CUSTOM_MODE
+                proposal.race_key, proposal.subrace_key
             )
             _validate_allocations(profile, proposal.allocations)
             _validate_persona_block(proposal.persona)
