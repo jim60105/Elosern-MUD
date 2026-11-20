@@ -1,0 +1,102 @@
+schema_version: 1
+greeting: 伊斯爾溫放下木桶，直起身：「要水，還是問菜？我手上還濕著。」
+topics:
+- topic_id: fionnen_resident_ithrwen.topic_01
+  keyword: 澆水
+  label: 澆水
+  fallback:
+    scene_id: fionnen_resident_ithrwen.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「這菜圃的水，是怎麼引來的？」
+    - kind: speech
+      speaker: host
+      text: 「打林溪來。渠我常清，哪段淤了、哪段漏了，一看便知。水順了，菜才綠。」
+    - kind: narration
+      text: 她舀起一瓢，勻勻地澆在菜根上。
+    - kind: speech
+      speaker: host
+      text: 「水不能多，多了爛根；也不能少，少了蔫葉。我天天探土，比誰都清楚。」
+- topic_id: fionnen_resident_ithrwen.topic_02
+  keyword: 看渠
+  label: 看渠
+  fallback:
+    scene_id: fionnen_resident_ithrwen.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「看渠這活，累不累？」
+    - kind: speech
+      speaker: host
+      text: 「不累，就是磨性子。旱了要引，澇了要排，一場雨都得盯著。可看著菜喝足了水，心裡就踏實。」
+    - kind: speech
+      speaker: host
+      text: 「谷裡人靠這圃子吃，我不盯著，誰盯。你哪天見我在渠邊發呆，那是在看水。」
+- topic_id: fionnen_resident_ithrwen.topic_03
+  keyword: 家人
+  label: 家人
+  fallback:
+    scene_id: fionnen_resident_ithrwen.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你家裡，你最掛心誰？」
+    - kind: speech
+      speaker: host
+      text: 「掛心妹妹米拉拉。她採菜總忘喝水，曬得臉通紅。我澆水時，總留一瓢給她也澆一澆。」
+    - kind: narration
+      text: 她說著笑了，語氣裡盡是疼惜。
+    - kind: speech
+      speaker: host
+      text: 「娘種，我澆，妹妹採。一家人，一瓢水都要分著用。」
+- topic_id: fionnen_resident_ithrwen.topic_04
+  keyword: 名字
+  label: 名字
+  fallback:
+    scene_id: fionnen_resident_ithrwen.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「孫希斯佩爾，是日頭的低語？」
+    - kind: speech
+      speaker: host
+      text: 「日語。午後的光穿過樹葉，細細碎碎，像在囑咐什麼。這家守著那光，就取了它。」
+    - kind: narration
+      text: 她仰起臉，任光斑落在她頰上。
+    - kind: speech
+      speaker: host
+      text: 「光會說話，只是要靜下心聽。你常來，也聽得見。」
+- topic_id: fionnen_resident_ithrwen.topic_05
+  keyword: 私語
+  label: 私語
+  requires:
+    kind: affinity_at_least
+    stage_key: trusted
+  unavailable: locked
+  refusal:
+    scene_id: fionnen_resident_ithrwen.topic_05_refusal
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: host
+      text: 「水渠邊的話，只跟澆過同一畦菜的人說。」
+  fallback:
+    scene_id: fionnen_resident_ithrwen.topic_05_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你最想要的陪伴，是什麼樣？」
+    - kind: speech
+      speaker: host
+      text: 「是澆完水，日頭正毒，有個人把我拉進樹蔭，替我擦去脖頸上的汗，再把我的手貼在她涼涼的頰上。那一刻，暑氣都散了。」
+    - kind: narration
+      text: 她撫了撫自己的手，像在回味那份涼。
+    - kind: speech
+      speaker: host
+      text: 「澆水的人，也盼著被誰滋養。你懂水，就懂我。」

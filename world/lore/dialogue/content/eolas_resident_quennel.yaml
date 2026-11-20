@@ -1,0 +1,102 @@
+schema_version: 1
+greeting: 奎內爾的織機停了下來，她抬眼望向你：「來問布，還是問織法？」
+topics:
+- topic_id: eolas_resident_quennel.topic_01
+  keyword: 織布
+  label: 織布
+  fallback:
+    scene_id: eolas_resident_quennel.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「這谷裡的布，怎麼織得又輕又結實？」
+    - kind: speech
+      speaker: host
+      text: 「經線拉得勻，緯線壓得實。手要穩，眼要毒，一個線頭都不能冒。織壞了就拆，拆到自己服氣為止。」
+    - kind: narration
+      text: 她拍了拍那架老織機，木框的包漿在燈下發亮。
+    - kind: speech
+      speaker: host
+      text: 「這衣裳貼著身子，輕得沒有分量。你摸一摸料子，比聽我說十句都真。」
+- topic_id: eolas_resident_quennel.topic_02
+  keyword: 染色
+  label: 染色
+  fallback:
+    scene_id: eolas_resident_quennel.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「谷裡也有帶顏色的布？」
+    - kind: speech
+      speaker: host
+      text: 「不多。白衣是谷裡的底，想添點顏色，就去找泰莉斯討她燒瓷剩下的色料，染出幾匹淡布。」
+    - kind: speech
+      speaker: host
+      text: 「這裡的人不靠衣裳辨人。脫了都一樣，靠說話和身子認。你要嫌太素，就穿那件白底，也耐看。」
+- topic_id: eolas_resident_quennel.topic_03
+  keyword: 家人
+  label: 家人
+  fallback:
+    scene_id: eolas_resident_quennel.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「這架織機，是你們家傳下來的？」
+    - kind: speech
+      speaker: host
+      text: 「村裡最老的一架，到我手裡還在用。大的妮瑞爾管剪裁，小的凱勒斯管分線，母女仨圍著它轉。」
+    - kind: narration
+      text: 她說起女兒，手裡的緯梭多帶了一分勁。
+    - kind: speech
+      speaker: host
+      text: 「夜裡誰倦了誰先歇，一間屋三張鋪。一家人，沒那麼多講究。」
+- topic_id: eolas_resident_quennel.topic_04
+  keyword: 名字
+  label: 名字
+  fallback:
+    scene_id: eolas_resident_quennel.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「『維爾維特莉夫』，是怎麼來的？」
+    - kind: speech
+      speaker: host
+      text: 「絨葉。岩屋坡的老樹葉子背後有層細絨，風一過，白茫茫一片，像下雪。這家就取了這景。」
+    - kind: narration
+      text: 她瞇起眼，像在回味那陣絨。
+    - kind: speech
+      speaker: host
+      text: 「谷裡人取名，都取眼跟前的事物。你聽多了，就曉得哪家住在哪片坡上。」
+- topic_id: eolas_resident_quennel.topic_05
+  keyword: 私語
+  label: 私語
+  requires:
+    kind: affinity_at_least
+    stage_key: trusted
+  unavailable: locked
+  refusal:
+    scene_id: eolas_resident_quennel.topic_05_refusal
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: host
+      text: 「有的話只織給自家人。你來多坐幾回，再聊。」
+  fallback:
+    scene_id: eolas_resident_quennel.topic_05_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「織了這麼多年布，你最享受的是哪一樣？」
+    - kind: speech
+      speaker: host
+      text: 「織完一匹，把布抖開，貼著臉蹭過去。那一下，整天的酸都化在布上。有時我裹著它，就著窗光站很久，自己跟自己待一會。」
+    - kind: narration
+      text: 她垂下眼，指尖在布面上劃了劃。
+    - kind: speech
+      speaker: host
+      text: 「歡愉不一定要誰。有時一塊好布，比一個情人還貼心。」

@@ -1,0 +1,19 @@
+# Permanent interior authored source (schema version 1).
+# A 暗影谷村 resident family home (杜斯克瓦爾克爾 household), opening onto the
+# village's shared public node.
+version: 1
+kind: interior
+id: ciaran_duskwalker_home
+rooms:
+  ciaran_duskwalker_home:
+    name_zh: 杜斯克瓦爾克爾的家
+    desc_zh: 木屋緊挨村中廣場，門旁立著幾把磨得發亮的練習刀，牆上掛著纏手的粗布。地面被踩得結實，一家人練完刀回來，汗和喘都留在這屋裡。
+    scene_archetype: tavern_interior
+connections: []
+exterior:
+  settlement: elven_village_ciaran
+  node: village_plaza
+  room: ciaran_duskwalker_home
+  doorway_key: 杜斯克瓦爾克爾的家
+  doorway_aliases:
+  - duskwalker

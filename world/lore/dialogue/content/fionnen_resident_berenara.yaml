@@ -1,0 +1,102 @@
+schema_version: 1
+greeting: 貝瑞娜拉從瞭望枝上望下來，聲音乘著風：「風快變了。你剛才問什麼？」
+topics:
+- topic_id: fionnen_resident_berenara.topic_01
+  keyword: 天象
+  label: 天象
+  fallback:
+    scene_id: fionnen_resident_berenara.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你怎麼看得出，風要變了？」
+    - kind: speech
+      speaker: host
+      text: 「雲的厚薄、風的乾濕，都寫在樹梢上。我在高處站久了，天還沒變，身子先知道。」
+    - kind: narration
+      text: 她抬手，任風從指縫間穿過。
+    - kind: speech
+      speaker: host
+      text: 「天不騙人。你學會看，林子就不再騙你。」
+- topic_id: fionnen_resident_berenara.topic_02
+  keyword: 瞭望
+  label: 瞭望
+  fallback:
+    scene_id: fionnen_resident_berenara.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「站那麼高，你都在看什麼？」
+    - kind: speech
+      speaker: host
+      text: 「看雲，也看獵隊出沒。東方那片的平原，晴雨都先打這裡過。我在樹頂，就是這片林的眼睛。」
+    - kind: speech
+      speaker: host
+      text: 「高處風大，衣裳都往後扯。可站得高，心也開闊，谷裡的事都小了。」
+- topic_id: fionnen_resident_berenara.topic_03
+  keyword: 家人
+  label: 家人
+  fallback:
+    scene_id: fionnen_resident_berenara.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你家裡人，都上高處看天？」
+    - kind: speech
+      speaker: host
+      text: 「大女兒洛爾內爾爬樹最快，替我上去；小女兒翁德斯聽風，辨林裡的動靜。我管看，她倆管傳。」
+    - kind: narration
+      text: 她朝樹下那兩個身影招了招手。
+    - kind: speech
+      speaker: host
+      text: 「一家人，一雙眼睛、兩隻耳朵。天要變，谷裡頭一個知道的就是這家。」
+- topic_id: fionnen_resident_berenara.topic_04
+  keyword: 名字
+  label: 名字
+  fallback:
+    scene_id: fionnen_resident_berenara.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「蒙斯哈德，是月影的意思？」
+    - kind: speech
+      speaker: host
+      text: 「月影。夜裡月亮的影子投進林間，一塊明一塊暗。這家住在光庭邊，那影就在門前晃。」
+    - kind: narration
+      text: 她指指腳下那片斑駁的月光。
+    - kind: speech
+      speaker: host
+      text: 「名跟月亮走。你夜裡來，踏著影，就找到這家。」
+- topic_id: fionnen_resident_berenara.topic_05
+  keyword: 私語
+  label: 私語
+  requires:
+    kind: affinity_at_least
+    stage_key: trusted
+  unavailable: locked
+  refusal:
+    scene_id: fionnen_resident_berenara.topic_05_refusal
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: host
+      text: 「我站的這高處，只容得下交心的人。你多來，我再說。」
+  fallback:
+    scene_id: fionnen_resident_berenara.topic_05_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你最享受的時刻，是什麼樣？」
+    - kind: speech
+      speaker: host
+      text: 「是風大的夜晚，我褪盡衣裳，靠在高處的枝幹上，讓風把全身撫過。有個人爬上樹來，從身後抱住我，在風裡跟我一塊抖。那時天地都晃，只有她抓得緊。」
+    - kind: narration
+      text: 她仰起臉，像還浸在那陣風裡。
+    - kind: speech
+      speaker: host
+      text: 「高處的情，比平地烈。你站上來，就懂了。」

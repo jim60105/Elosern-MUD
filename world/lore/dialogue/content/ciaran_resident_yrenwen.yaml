@@ -1,0 +1,102 @@
+schema_version: 1
+greeting: 伊倫溫把一綹線纏在指上，慢騰騰地抬眼：「線的事嗎？你先坐。」
+topics:
+- topic_id: ciaran_resident_yrenwen.topic_01
+  keyword: 線
+  label: 線
+  fallback:
+    scene_id: ciaran_resident_yrenwen.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「這麼多線，你都分得清？」
+    - kind: speech
+      speaker: host
+      text: 「分得清。深一線、淺一線，閉著眼也摸得出。我生在染房，眼裡只有顏色。」
+    - kind: narration
+      text: 她舉起一綹線，對著窗光比了比。
+    - kind: speech
+      speaker: host
+      text: 「線不會騙人。你和它熟了，它什麼都告訴你。」
+- topic_id: ciaran_resident_yrenwen.topic_02
+  keyword: 顏色
+  label: 顏色
+  fallback:
+    scene_id: ciaran_resident_yrenwen.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你最喜歡哪種顏色？」
+    - kind: speech
+      speaker: host
+      text: 「一種說不清的藍，介在夜和溪水之間。染出來那晚，我把它捧在掌心，捨不得放進染缸。」
+    - kind: speech
+      speaker: host
+      text: 「顏色像人，看久了才有魂。你要有心，我指給你看。」
+- topic_id: ciaran_resident_yrenwen.topic_03
+  keyword: 家人
+  label: 家人
+  fallback:
+    scene_id: ciaran_resident_yrenwen.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你家裡人都圍著布轉？」
+    - kind: speech
+      speaker: host
+      text: 「娘妮瑪拉染，姊姊瑞拉拉織，我分線。仨人一天到頭都在顏色裡，連夢裡都是藍。」
+    - kind: narration
+      text: 她瞇起眼，像又做起那個夢。
+    - kind: speech
+      speaker: host
+      text: 「姊姊總催我快點，可線這東西，急就亂了。你多坐一會，我慢慢分給你看。」
+- topic_id: ciaran_resident_yrenwen.topic_04
+  keyword: 名字
+  label: 名字
+  fallback:
+    scene_id: ciaran_resident_yrenwen.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「特魯松，是那排不歪的松？」
+    - kind: speech
+      speaker: host
+      text: 「真松。坡上的松都直。我家人也直，就我溫吞，常被姊姊笑。」
+    - kind: narration
+      text: 她縮了縮肩，像自己先笑了。
+    - kind: speech
+      speaker: host
+      text: 「可線不能太直，得有軟勁。這家，總算也容得下我。」
+- topic_id: ciaran_resident_yrenwen.topic_05
+  keyword: 私語
+  label: 私語
+  requires:
+    kind: affinity_at_least
+    stage_key: trusted
+  unavailable: locked
+  refusal:
+    scene_id: ciaran_resident_yrenwen.topic_05_refusal
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: host
+      text: 「我的心事像這團線，得等你幫我理，我才肯說。」
+  fallback:
+    scene_id: ciaran_resident_yrenwen.topic_05_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你一個人待著，最想要什麼？」
+    - kind: speech
+      speaker: host
+      text: 「想有個人，把我當一綹亂了的線，攤在膝上，一根根理順。手指繞著我，不疾不徐，像在哄一團困倦的顏色。理到最後，我也服了軟，化在那人腿上。」
+    - kind: narration
+      text: 她垂下眼，指尖無意識地絞著線。
+    - kind: speech
+      speaker: host
+      text: 「線亂了要理，人亂了也要。你哪天想理我，就懂了。」

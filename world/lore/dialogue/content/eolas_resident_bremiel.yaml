@@ -1,0 +1,102 @@
+schema_version: 1
+greeting: 布瑞米爾把一簍豆子從肩頭放下，拍了拍手上的泥：「是來問菜畦，還是想討一簍回去？」
+topics:
+- topic_id: eolas_resident_bremiel.topic_01
+  keyword: 菜畦
+  label: 菜畦
+  fallback:
+    scene_id: eolas_resident_bremiel.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「石階菜畦都種些什麼？」
+    - kind: speech
+      speaker: host
+      text: 「塊根、豆子，還有幾樣香草。一畦一畦錯開了種，熟了哪樣吃哪樣。這地養人，也養性子。」
+    - kind: narration
+      text: 她蹲下身，捏了捏土，滿意地拍了拍手心。
+    - kind: speech
+      speaker: host
+      text: 「土鬆了，水足了，菜就肯長。人也是，勤著鬆一鬆，日子才不結塊。」
+- topic_id: eolas_resident_bremiel.topic_02
+  keyword: 下種
+  label: 下種
+  fallback:
+    scene_id: eolas_resident_bremiel.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「下種有時辰講究嗎？」
+    - kind: speech
+      speaker: host
+      text: 「看天，也看地。土太濕，種子會爛；太乾，發不出。我下種前先抓一把土，捏得成團、一碰就散，才算時候。」
+    - kind: speech
+      speaker: host
+      text: 「谷裡人幹活不看鐘，看日頭。日出下田，日斜收工，中間想歇就歇。你急，地不急。」
+- topic_id: eolas_resident_bremiel.topic_03
+  keyword: 家人
+  label: 家人
+  fallback:
+    scene_id: eolas_resident_bremiel.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你家裡人都下田？」
+    - kind: speech
+      speaker: host
+      text: 「大女兒阿拉瑞斯翻土，小女兒翁德溫採藥草，我管種。仨人一長列蹲在畦裡，話不多，就聽鋤頭和豆莢響。」
+    - kind: narration
+      text: 她朝背後那片綠油油的菜畦望了望。
+    - kind: speech
+      speaker: host
+      text: 「天黑收了工，一家人挨著吃飯。谷裡不興客套，誰餓了先吃，誰倦了先倒。」
+- topic_id: eolas_resident_bremiel.topic_04
+  keyword: 名字
+  label: 名字
+  fallback:
+    scene_id: eolas_resident_bremiel.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「『格林拉德』，是綠地的意思？」
+    - kind: speech
+      speaker: host
+      text: 「綠穀。春來整片菜畦泛青，像水流過山谷。這家就認了這個姓。」
+    - kind: narration
+      text: 她語氣裡帶點得意，像在誇自己這片地。
+    - kind: speech
+      speaker: host
+      text: 「地不虧待人。你待它好一分，它還你一寸青。谷裡的規矩，就這麼樸實。」
+- topic_id: eolas_resident_bremiel.topic_05
+  keyword: 私語
+  label: 私語
+  requires:
+    kind: affinity_at_least
+    stage_key: trusted
+  unavailable: locked
+  refusal:
+    scene_id: eolas_resident_bremiel.topic_05_refusal
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: host
+      text: 「體己話留給交心的人。你今兒先嚐我這簍豆子吧。」
+  fallback:
+    scene_id: eolas_resident_bremiel.topic_05_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你勞作了一輩子的身子，最懂什麼？」
+    - kind: speech
+      speaker: host
+      text: 「最懂累到骨頭痠透之後，被人逐寸揉開的滋味。春耕那幾夜，我常和合得來的人在草堆裡，讓她的手把我從頭到腳焐暖。」
+    - kind: narration
+      text: 她笑紋一深，像是想起了很遠的春夜。
+    - kind: speech
+      speaker: host
+      text: 「身子熱了，心才軟。你要是在田裡幹過，就知道我說的是哪一種。」

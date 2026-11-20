@@ -1,0 +1,102 @@
+schema_version: 1
+greeting: 薩拉拉把一株草在掌心碾了碾，抬起紅眸：「是身子不適，還是來問草？」
+topics:
+- topic_id: ciaran_resident_thalara.topic_01
+  keyword: 草
+  label: 草
+  fallback:
+    scene_id: ciaran_resident_thalara.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「藥草園都種些什麼？」
+    - kind: speech
+      speaker: host
+      text: 「治傷、安神、驅蟲的都有，還有幾味催情草。藥草園裡的草各有各的脾氣，你問哪一樣，我都說得上。」
+    - kind: narration
+      text: 她拈起一株葉緣帶鋸齒的草，在鼻下搖了搖。
+    - kind: speech
+      speaker: host
+      text: 「谷裡人不把身子當禁忌。累了要補，想要了也有一味草點火。你記著，草是伺候身子的東西。」
+- topic_id: ciaran_resident_thalara.topic_02
+  keyword: 藥
+  label: 藥
+  fallback:
+    scene_id: ciaran_resident_thalara.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你們熬藥，有什麼講究？」
+    - kind: speech
+      speaker: host
+      text: 「火候。大一分藥性就散，小一分又出不來。我守著壺，聞著氣味由苦轉香，就知道成了。」
+    - kind: speech
+      speaker: host
+      text: 「谷裡人不常病，病了也不慌。身子自己要癒，藥只是搭把手。」
+- topic_id: ciaran_resident_thalara.topic_03
+  keyword: 家人
+  label: 家人
+  fallback:
+    scene_id: ciaran_resident_thalara.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你家裡人都在園子裡忙？」
+    - kind: speech
+      speaker: host
+      text: 「大女兒埃瑞妮爾夜裡採草，天亮了才回；小女兒希爾溫清早熬藥。我管種。仨人湊齊，園子裡滿是人影。」
+    - kind: narration
+      text: 她朝屋後那片草影望了一眼，語氣裡帶著篤定。
+    - kind: speech
+      speaker: host
+      text: 「一家人話不多，卻誰也離不開誰。你要找誰，喊一聲，人就在草叢裡。」
+- topic_id: ciaran_resident_thalara.topic_04
+  keyword: 名字
+  label: 名字
+  fallback:
+    scene_id: ciaran_resident_thalara.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「『索爾恩伍德』這姓，是什麼意思？」
+    - kind: speech
+      speaker: host
+      text: 「棘木。藥草園邊那一圈帶刺的老木，圍著園子。這家取了它，說是要像棘木，護著裡頭的草。」
+    - kind: narration
+      text: 她伸手往園子外圍那排黑黢黢的枝影指了指。
+    - kind: speech
+      speaker: host
+      text: 「名跟地連著。你要認這家，就先認那排棘木。」
+- topic_id: ciaran_resident_thalara.topic_05
+  keyword: 私語
+  label: 私語
+  requires:
+    kind: affinity_at_least
+    stage_key: trusted
+  unavailable: locked
+  refusal:
+    scene_id: ciaran_resident_thalara.topic_05_refusal
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: host
+      text: 「有些話像藥，得熬夠火候才出味。你來多坐坐。」
+  fallback:
+    scene_id: ciaran_resident_thalara.topic_05_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你自己最常喝哪一味？」
+    - kind: speech
+      speaker: host
+      text: 「一味催情草。夜裡獨處，煎一碗喝了，身子從裡頭熱起來，指尖都發燙。那時我褪了衣裳，靠著草堆，由著自己來回。」
+    - kind: narration
+      text: 她眼皮微垂，像在回味那股熱。
+    - kind: speech
+      speaker: host
+      text: 「草有活氣，會替你點火。你要試，得先信我，也信草。」

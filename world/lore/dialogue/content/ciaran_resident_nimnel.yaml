@@ -1,0 +1,102 @@
+schema_version: 1
+greeting: 寧內爾正哄著兩個孩子，回頭朝你笑：「你來啦？孩子鬧著呢，等我一下。」
+topics:
+- topic_id: ciaran_resident_nimnel.topic_01
+  keyword: 孩子
+  label: 孩子
+  fallback:
+    scene_id: ciaran_resident_nimnel.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「村裡的孩子，都是你在照看？」
+    - kind: speech
+      speaker: host
+      text: 「多半是。誰家忙不過來，就把孩子往我這兒一塞。我帶他們認路、認樹，到晚上再把娘的故事講給他們。」
+    - kind: narration
+      text: 一個孩子扯著她的衣角，她順手把孩子撈起來抱在膝上。
+    - kind: speech
+      speaker: host
+      text: 「谷裡孩子由全村一起養，誰都有份。」
+- topic_id: ciaran_resident_nimnel.topic_02
+  keyword: 哄睡
+  label: 哄睡
+  fallback:
+    scene_id: ciaran_resident_nimnel.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「孩子鬧到晚上，你怎麼哄得睡？」
+    - kind: speech
+      speaker: host
+      text: 「唱一段，搖一搖，再不行就抱到古樹下，讓風替他們哼。谷裡的孩子沒什麼哄不好，身子一貼著大人，就軟了。」
+    - kind: speech
+      speaker: host
+      text: 「大人也一樣。累極了有人抱一抱，話都不用說，就睡實了。」
+- topic_id: ciaran_resident_nimnel.topic_03
+  keyword: 家人
+  label: 家人
+  fallback:
+    scene_id: ciaran_resident_nimnel.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你家裡人都做什麼？」
+    - kind: speech
+      speaker: host
+      text: 「娘埃林溫說故事，姊姊奈爾內爾記舊事。我最小，就管這些小不點。一家人裡，我這活最吵。」
+    - kind: narration
+      text: 她笑得眼睛彎成月牙。
+    - kind: speech
+      speaker: host
+      text: 「夜裡孩子散了，仨人坐回火塘邊，反倒安靜。你想熱鬧，就來找我；想安靜，去找姊姊。」
+- topic_id: ciaran_resident_nimnel.topic_04
+  keyword: 名字
+  label: 名字
+  fallback:
+    scene_id: ciaran_resident_nimnel.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「溫特爾松，就是冬日的歌？」
+    - kind: speech
+      speaker: host
+      text: 「冬松。風一過，松林就哼。我常領孩子去聽，他們說像有人在喊自己的名。」
+    - kind: narration
+      text: 她模仿起風聲，逗得膝上的孩子咯咯笑。
+    - kind: speech
+      speaker: host
+      text: 「這名字好記也好聽。你往後路過，順著那歌聲，就能找著我。」
+- topic_id: ciaran_resident_nimnel.topic_05
+  keyword: 私語
+  label: 私語
+  requires:
+    kind: affinity_at_least
+    stage_key: trusted
+  unavailable: locked
+  refusal:
+    scene_id: ciaran_resident_nimnel.topic_05_refusal
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: host
+      text: 「我話多，可也不是對誰都掏心。你先陪我把這孩子哄睡。」
+  fallback:
+    scene_id: ciaran_resident_nimnel.topic_05_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你最想要大人陪的時候，是什麼樣？」
+    - kind: speech
+      speaker: host
+      text: 「是哄完最後一個孩子，屋裡忽然空了那陣。我想有個人把我抱到榻上，讓我像孩子一樣蜷著，什麼都不用管，只把臉埋進她胸口，聽她的心跳哄我。」
+    - kind: narration
+      text: 她低頭撫了撫懷裡孩子的髮，聲音柔得能化開。
+    - kind: speech
+      speaker: host
+      text: 「哄人哄多了，也想被哄一回。你哪天哄哄我，我就把最軟的心事說給你。」

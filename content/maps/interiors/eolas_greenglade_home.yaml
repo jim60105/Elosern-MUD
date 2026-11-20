@@ -1,0 +1,19 @@
+# Permanent interior authored source (schema version 1).
+# A 幽月谷村 resident family home (格林拉德 household), opening onto the
+# village's shared public node.
+version: 1
+kind: interior
+id: eolas_greenglade_home
+rooms:
+  eolas_greenglade_home:
+    name_zh: 格林拉德的家
+    desc_zh: 石屋緊貼谷底空地，門邊靠著幾只裝塊根和豆子的竹簍，香草束倒吊在樑下，滿屋乾草的暖味。天一亮，母女仨背著簍子去石階菜畦。
+    scene_archetype: tavern_interior
+connections: []
+exterior:
+  settlement: elven_village_eolas
+  node: valley_floor
+  room: eolas_greenglade_home
+  doorway_key: 格林拉德的家
+  doorway_aliases:
+  - greenglade

@@ -1,0 +1,102 @@
+schema_version: 1
+greeting: 翁德斯閉著眼站在風口，好一會才轉向你：「風正吹過。你找我有事？」
+topics:
+- topic_id: fionnen_resident_ondeth.topic_01
+  keyword: 聽風
+  label: 聽風
+  fallback:
+    scene_id: fionnen_resident_ondeth.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「風有什麼好聽的？」
+    - kind: speech
+      speaker: host
+      text: 「風裡有葉、有鳥、有遠方的雲。它拂過哪棵樹，我都聽得出來。聽久了，林子就跟你說話。」
+    - kind: narration
+      text: 她側過耳，像在辨認一陣極細的動靜。
+    - kind: speech
+      speaker: host
+      text: 「你靜下來，也能聽見。這林子的心跳，就藏在風裡。」
+- topic_id: fionnen_resident_ondeth.topic_02
+  keyword: 動靜
+  label: 動靜
+  fallback:
+    scene_id: fionnen_resident_ondeth.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「林子裡有什麼動靜，都逃不過你的耳朵？」
+    - kind: speech
+      speaker: host
+      text: 「大多逃不過。鳥驚了，葉動了，獸踩斷了枯枝，我都先知道。所以谷裡人叫我這家的耳朵。」
+    - kind: speech
+      speaker: host
+      text: 「夜深了，林子也不靜。交纏的喘息、翻身的響，都順著風來。我聽得見，只是不去驚。」
+- topic_id: fionnen_resident_ondeth.topic_03
+  keyword: 家人
+  label: 家人
+  fallback:
+    scene_id: fionnen_resident_ondeth.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你家裡，就你耳朵最靈？」
+    - kind: speech
+      speaker: host
+      text: 「娘貝瑞娜拉看天，姊姊洛爾內爾爬樹。我聽風。仨人一個看、一個爬、一個聽，把這片林護得周全。」
+    - kind: narration
+      text: 她語氣很輕，像怕吵到什麼。
+    - kind: speech
+      speaker: host
+      text: 「我話少，姊姊話多。一家人裡，我常是那個先發現事的人。」
+- topic_id: fionnen_resident_ondeth.topic_04
+  keyword: 名字
+  label: 名字
+  fallback:
+    scene_id: fionnen_resident_ondeth.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「蒙斯哈德，是月光下的影？」
+    - kind: speech
+      speaker: host
+      text: 「月影。夜裡月影挪動，沒有聲音，可我聽得見它壓過草葉。這家就認了這片靜。」
+    - kind: narration
+      text: 她低頭，看腳下那片月光慢慢移。
+    - kind: speech
+      speaker: host
+      text: 「名靜，我也靜。你往後夜裡想靜一靜，就來找我。」
+- topic_id: fionnen_resident_ondeth.topic_05
+  keyword: 私語
+  label: 私語
+  requires:
+    kind: affinity_at_least
+    stage_key: trusted
+  unavailable: locked
+  refusal:
+    scene_id: fionnen_resident_ondeth.topic_05_refusal
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: host
+      text: 「風裡的話，我只跟一起靜過的人說。」
+  fallback:
+    scene_id: fionnen_resident_ondeth.topic_05_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你最想要的時刻，是什麼樣？」
+    - kind: speech
+      speaker: host
+      text: 「是夜半無風，林子靜得能聽見自己的心跳。有個人躺在我身邊，用指尖順著我的耳廓，一下一下。她的呼吸貼著我，比什麼聲音都清楚。那一刻，我只聽得見她。」
+    - kind: narration
+      text: 她眼睫輕顫，像還沉在那片靜裡。
+    - kind: speech
+      speaker: host
+      text: 「聽了一輩子風，最想聽一個人的心跳。你懂了，就懂我。」

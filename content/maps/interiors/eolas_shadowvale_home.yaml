@@ -1,0 +1,19 @@
+# Permanent interior authored source (schema version 1).
+# A 幽月谷村 resident family home (沙多瓦勒 household), opening onto the
+# village's shared public node.
+version: 1
+kind: interior
+id: eolas_shadowvale_home
+rooms:
+  eolas_shadowvale_home:
+    name_zh: 沙多瓦勒的家
+    desc_zh: 岩屋挨著谷底空地，窗台與木架堆滿了從蛛絲林帶回的絲軸，屋裡飄著絲的腥氣。梭子和線團擱在織機邊，一大清早母女仨就順著坡往上，去蛛絲林放輕腳步。
+    scene_archetype: tavern_interior
+connections: []
+exterior:
+  settlement: elven_village_eolas
+  node: valley_floor
+  room: eolas_shadowvale_home
+  doorway_key: 沙多瓦勒的家
+  doorway_aliases:
+  - shadowvale

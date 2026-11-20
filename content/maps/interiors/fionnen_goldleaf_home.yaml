@@ -1,0 +1,19 @@
+# Permanent interior authored source (schema version 1).
+# A 翠綠森林村 resident family home (戈爾德莉夫 household), opening onto the
+# village's shared public node.
+version: 1
+kind: interior
+id: fionnen_goldleaf_home
+rooms:
+  fionnen_goldleaf_home:
+    name_zh: 戈爾德莉夫的家
+    desc_zh: 樹屋搭在林間光庭邊，屋裡斜靠著幾張長弓，牆上釘著靶心磨禿的木牌。箭羽散在矮凳旁，一家人練完箭，就在這裡拆弦、抹油、說靶道上的事。
+    scene_archetype: tavern_interior
+connections: []
+exterior:
+  settlement: elven_village_fionnen
+  node: light_court
+  room: fionnen_goldleaf_home
+  doorway_key: 戈爾德莉夫的家
+  doorway_aliases:
+  - goldleaf

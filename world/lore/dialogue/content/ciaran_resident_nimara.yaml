@@ -1,0 +1,102 @@
+schema_version: 1
+greeting: 妮瑪拉把一匹藍布從染缸裡撈起，抬眼：「是來問染布，還是看料子？」
+topics:
+- topic_id: ciaran_resident_nimara.topic_01
+  keyword: 染布
+  label: 染布
+  fallback:
+    scene_id: ciaran_resident_nimara.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「這谷裡的藍，是怎麼染出來的？」
+    - kind: speech
+      speaker: host
+      text: 「從溪邊的染草熬出來。一道色要反反覆覆浸、晾、再浸，藍才吃進布里。急不得，急了色就浮。」
+    - kind: narration
+      text: 她把布抖開，一縷靛藍順著布紋流下去。
+    - kind: speech
+      speaker: host
+      text: 「顏色像人，深一層、淺一層，都得花日子養。你摸一摸，藍有活氣。」
+- topic_id: ciaran_resident_nimara.topic_02
+  keyword: 織房
+  label: 織房
+  fallback:
+    scene_id: ciaran_resident_nimara.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「織房坡上，都掛著些什麼？」
+    - kind: speech
+      speaker: host
+      text: 「新染的布掛在繩上晾，藍、青、黑各色，風一吹，滿坡都是顏色。人走在裡頭，像游在一片染池裡。」
+    - kind: speech
+      speaker: host
+      text: 「夜裡坡上靜，只有布拍打的聲音。那時候談天、談情，都最真。」
+- topic_id: ciaran_resident_nimara.topic_03
+  keyword: 家人
+  label: 家人
+  fallback:
+    scene_id: ciaran_resident_nimara.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「織房坡這攤子，都是你們仨在忙？」
+    - kind: speech
+      speaker: host
+      text: 「是。我染，大女兒瑞拉拉織，小女兒伊倫溫分線。仨人一天到晚泡在顏色裡，手上、胳膊上，都是洗不掉的藍。」
+    - kind: narration
+      text: 她攤開手，掌心的藍暈像一朵開在皮膚上的花。
+    - kind: speech
+      speaker: host
+      text: 「一家人靠色過活，我染、大女兒織、小女兒分線，一匹布仨人經手。」
+- topic_id: ciaran_resident_nimara.topic_04
+  keyword: 名字
+  label: 名字
+  fallback:
+    scene_id: ciaran_resident_nimara.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「特魯松，是什麼意思？」
+    - kind: speech
+      speaker: host
+      text: 「真松。這坡上的松直，不歪。我家做布也求個直，紋路、染色，都不許走樣。」
+    - kind: narration
+      text: 她朝坡上那排松影望了一眼。
+    - kind: speech
+      speaker: host
+      text: 「直是谷裡的老規矩。你來久了，也能看出哪匹布直、哪匹歪。」
+- topic_id: ciaran_resident_nimara.topic_05
+  keyword: 私語
+  label: 私語
+  requires:
+    kind: affinity_at_least
+    stage_key: trusted
+  unavailable: locked
+  refusal:
+    scene_id: ciaran_resident_nimara.topic_05_refusal
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: host
+      text: 「顏色之外的心事，得等你我熟到能共一缸藍。」
+  fallback:
+    scene_id: ciaran_resident_nimara.topic_05_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「染了這些年，你最中意哪一缸？」
+    - kind: speech
+      speaker: host
+      text: 「是最深那缸靛藍。布出缸，我整個人也鬆下來，衣裳半褪，靠著缸沿喘。有個人在身後，用沾了藍的手，順著我的背往下抹，把我當一匹剛染好的布。」
+    - kind: narration
+      text: 她眼裡浮起一點慵懶，像還泡在那缸藍裡。
+    - kind: speech
+      speaker: host
+      text: 「染布的人，也盼著被染。你哪天想試這份藍，來找我。」

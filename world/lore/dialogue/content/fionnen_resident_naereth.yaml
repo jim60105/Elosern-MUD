@@ -1,0 +1,102 @@
+schema_version: 1
+greeting: 奈瑞斯跑得滿頭汗，停下腳步，笑得燦爛：「你來啦？要我帶你去靶道嗎？」
+topics:
+- topic_id: fionnen_resident_naereth.topic_01
+  keyword: 跑
+  label: 跑
+  fallback:
+    scene_id: fionnen_resident_naereth.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你怎麼跑得這麼快？」
+    - kind: speech
+      speaker: host
+      text: 「撿箭練出了這雙腿。箭射出去，我得搶在箭落前追上。一天下來，比誰都跑得多。」
+    - kind: narration
+      text: 她在原地小跳著，還沒歇過氣來。
+    - kind: speech
+      speaker: host
+      text: 「跑起來風貼著身子，帶著涼意，比誰的懷抱都自由。你也跑兩步，試試。」
+- topic_id: fionnen_resident_naereth.topic_02
+  keyword: 靶道
+  label: 靶道
+  fallback:
+    scene_id: fionnen_resident_naereth.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「靶道上，一天都熱鬧嗎？」
+    - kind: speech
+      speaker: host
+      text: 「白天熱鬧，娘拉弓，姊姊做箭，孩子也來學。我跑來跑去送箭，笑聲滿道。」
+    - kind: speech
+      speaker: host
+      text: 「到了傍晚人就少了。那時我一個人躺在靶道盡頭，看天，等風來。」
+- topic_id: fionnen_resident_naereth.topic_03
+  keyword: 家人
+  label: 家人
+  fallback:
+    scene_id: fionnen_resident_naereth.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你家裡，你最喜歡跟誰待著？」
+    - kind: speech
+      speaker: host
+      text: 「姊姊基爾溫。她削箭，我坐她旁邊，什麼也不幹。她不趕我，我也不吵她，就那麼陪著。」
+    - kind: narration
+      text: 她扯著衣角，笑得有些不好意思。
+    - kind: speech
+      speaker: host
+      text: 「娘管得嚴，姊姊卻由著我。夜裡我跑累了，她會替我擦汗。」
+- topic_id: fionnen_resident_naereth.topic_04
+  keyword: 名字
+  label: 名字
+  fallback:
+    scene_id: fionnen_resident_naereth.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「戈爾德莉夫，是秋天的金葉？」
+    - kind: speech
+      speaker: host
+      text: 「金葉。我跑過靶道，腳下踩著一地金黃，嘩啦嘩啦響，像在跟我說話。」
+    - kind: narration
+      text: 她抬腳做出踩葉子的動作，眼裡亮晶晶。
+    - kind: speech
+      speaker: host
+      text: 「我喜歡這名字，跑起來特別順。你跟著我跑，也分得到一陣金風。」
+- topic_id: fionnen_resident_naereth.topic_05
+  keyword: 私語
+  label: 私語
+  requires:
+    kind: affinity_at_least
+    stage_key: trusted
+  unavailable: locked
+  refusal:
+    scene_id: fionnen_resident_naereth.topic_05_refusal
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: host
+      text: 「我話多，可有些心事，只跟陪我跑過的人說。」
+  fallback:
+    scene_id: fionnen_resident_naereth.topic_05_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你最開心的時刻，是什麼樣？」
+    - kind: speech
+      speaker: host
+      text: 「是跑了一整天，累得腿發軟，有人把我接住，抱在懷裡轉圈。我笑得停不下來，汗水全蹭在她身上，她也不鬆手。」
+    - kind: narration
+      text: 她臉頰發紅，像剛跑完一場。
+    - kind: speech
+      speaker: host
+      text: 「被抱著飛起來，比什麼都快活。你哪天也接住我，我就賴著不走了。」

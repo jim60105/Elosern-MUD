@@ -1,0 +1,102 @@
+schema_version: 1
+greeting: 賽莉爾從蜂箱邊蹦過來，手裡舉著一勺蜜：「你嚐嚐？剛搖下來的！」
+topics:
+- topic_id: fionnen_resident_saeliel.topic_01
+  keyword: 採蜜
+  label: 採蜜
+  fallback:
+    scene_id: fionnen_resident_saeliel.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「採蜜不怕被蜇嗎？」
+    - kind: speech
+      speaker: host
+      text: 「不怕。手輕點，別驚牠們，牠們就不蜇我。蜇一下也沒啥，嚐到的甜更真。」
+    - kind: narration
+      text: 她搖了搖手裡的勺，蜜汁在陽光下泛著金。
+    - kind: speech
+      speaker: host
+      text: 「這園子的蜂都認我。你要不怕，跟我去看它們釀蜜。」
+- topic_id: fionnen_resident_saeliel.topic_02
+  keyword: 花
+  label: 花
+  fallback:
+    scene_id: fionnen_resident_saeliel.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「這花圃裡，你認得多少花？」
+    - kind: speech
+      speaker: host
+      text: 「都認得。哪朵幾時開、哪朵蜜多，我都知道。我打小在花裡鑽，像隻採不夠的蜂。」
+    - kind: speech
+      speaker: host
+      text: 「花開花落，一年就過去了。可蜜留得住，甜也留得住。你聞聞，這園子連風都帶甜。」
+- topic_id: fionnen_resident_saeliel.topic_03
+  keyword: 家人
+  label: 家人
+  fallback:
+    scene_id: fionnen_resident_saeliel.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你家裡，都喜歡這園子嗎？」
+    - kind: speech
+      speaker: host
+      text: 「喜歡。娘艾莉斯看蜂，姊姊邁特希斯熬蜜。我採。仨人一回家，滿屋子都是甜味，連做夢都發黏。」
+    - kind: narration
+      text: 她舔了舔指尖的蜜，笑得眉眼彎彎。
+    - kind: speech
+      speaker: host
+      text: 「姊姊總說我吵，可沒了我，誰去搖那頭一勺蜜？你來，我帶你嘗最新鮮的一勺。」
+- topic_id: fionnen_resident_saeliel.topic_04
+  keyword: 名字
+  label: 名字
+  fallback:
+    scene_id: fionnen_resident_saeliel.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「希爾維爾布魯克，是條銀溪？」
+    - kind: speech
+      speaker: host
+      text: 「銀溪。月光下的林溪，閃得像灑了蜜。這家就認了它。」
+    - kind: narration
+      text: 她踮起腳，朝溪水的方向望。
+    - kind: speech
+      speaker: host
+      text: 「這名字漂亮。你晚上跟我去溪邊，能瞧見那層銀光。」
+- topic_id: fionnen_resident_saeliel.topic_05
+  keyword: 私語
+  label: 私語
+  requires:
+    kind: affinity_at_least
+    stage_key: trusted
+  unavailable: locked
+  refusal:
+    scene_id: fionnen_resident_saeliel.topic_05_refusal
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: host
+      text: 「我話多，可最甜的那句，只留給特別的人。」
+  fallback:
+    scene_id: fionnen_resident_saeliel.topic_05_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你最開心的時刻，是什麼樣？」
+    - kind: speech
+      speaker: host
+      text: 「是採完蜜，滿手黏，有人拉我坐下，替我舔乾淨指縫。她的舌頭又暖又慢，我一邊躲一邊笑，最後癱在她懷裡，甜得說不出話。」
+    - kind: narration
+      text: 她臉紅到耳根，眼裡卻滿是回味。
+    - kind: speech
+      speaker: host
+      text: 「蜜沾了手，總得有人收。你哪天也沾一沾，就知道多甜了。」

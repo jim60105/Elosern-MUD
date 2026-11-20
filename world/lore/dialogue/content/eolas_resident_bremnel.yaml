@@ -1,0 +1,100 @@
+schema_version: 1
+greeting: 布倫內爾把一捆絲往肩上一搭，另一手抹了把汗：「找我背東西，還是問路？」
+topics:
+- topic_id: eolas_resident_bremnel.topic_01
+  keyword: 絲捆
+  label: 絲捆
+  fallback:
+    scene_id: eolas_resident_bremnel.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你肩上這捆絲有多重？」
+    - kind: speech
+      speaker: host
+      text: 「不稱，稱了就提不起勁。我一天來回幾趟，從蛛林背到谷底，再累也就著溪水沖一沖肩膀。」
+    - kind: narration
+      text: 她把捆子往下顛了顛，重新搭穩。
+    - kind: speech
+      speaker: host
+      text: 「谷裡不藏著力氣。你上手掂一掂，就知道這絲有多緊實。」
+- topic_id: eolas_resident_bremnel.topic_02
+  keyword: 山路
+  label: 山路
+  fallback:
+    scene_id: eolas_resident_bremnel.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「背著這捆走山路，不危險嗎？」
+    - kind: speech
+      speaker: host
+      text: 「腳踝最要緊。上山吃力，下山靠腳底沾地，我摔過幾次，摔出這雙腿的記性。」
+    - kind: speech
+      speaker: host
+      text: 「要趕夜路，就等月亮全出來再走。白天走得急，夜裡反倒穩。你要去蛛林，我指你一條不滑的路。」
+- topic_id: eolas_resident_bremnel.topic_03
+  keyword: 家人
+  label: 家人
+  fallback:
+    scene_id: eolas_resident_bremnel.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你家裡人都在忙什麼？」
+    - kind: speech
+      speaker: host
+      text: 「娘和姊姊在林子裡，一個養蛛、一個抽絲；我管把收成的絲往山下拉。一家人手不停，口也不停，混在一片裡。」
+    - kind: narration
+      text: 她忽然笑了，露出一口白牙。
+    - kind: speech
+      speaker: host
+      text: 「夜裡母女仨擠一張榻，挨著睡，各佔一角。你要聽這家的事，問我姊，她話多。」
+- topic_id: eolas_resident_bremnel.topic_04
+  keyword: 名字
+  label: 名字
+  fallback:
+    scene_id: eolas_resident_bremnel.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「沙多瓦勒，是影谷的意思？」
+    - kind: speech
+      speaker: host
+      text: 「對。影谷。月亮一來，谷壁的影子蓋到我家門前，一條整齊得很。我娘就認了這個姓。」
+    - kind: speech
+      speaker: host
+      text: 「姓跟著住處換。哪天我搬去別處，就換個姓。你要是哪天也搬進谷，說不定跟我家同一個影。」
+- topic_id: eolas_resident_bremnel.topic_05
+  keyword: 私語
+  label: 私語
+  requires:
+    kind: affinity_at_least
+    stage_key: trusted
+  unavailable: locked
+  refusal:
+    scene_id: eolas_resident_bremnel.topic_05_refusal
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: host
+      text: 「我話直，可也不是跟誰都交底。等熟一點，你再問。」
+  fallback:
+    scene_id: eolas_resident_bremnel.topic_05_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你幹活幹得最累，晚上都怎麼歇？」
+    - kind: speech
+      speaker: host
+      text: 「先把汗沖了，再光著身子把自己摔上榻。最累的那天，我喜歡找個人從背後壓住我，抱到喘不過氣，才算骨頭歸了位。」
+    - kind: narration
+      text: 她說得坦然，像在說一件再平常不過的活計。
+    - kind: speech
+      speaker: host
+      text: 「力氣使盡了，痛快才進得來。這種滋味，你哪天用力過頭，自然就懂。」

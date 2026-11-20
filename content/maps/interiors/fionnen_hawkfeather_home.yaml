@@ -1,0 +1,19 @@
+# Permanent interior authored source (schema version 1).
+# A 翠綠森林村 resident family home (哈克菲特赫爾 household), opening onto the
+# village's shared public node.
+version: 1
+kind: interior
+id: fionnen_hawkfeather_home
+rooms:
+  fionnen_hawkfeather_home:
+    name_zh: 哈克菲特赫爾的家
+    desc_zh: 樹屋緊靠林間光庭，屋裡堆著木料與刨花，牆上掛著半成的弓與織補用的木針。一家人從木作空地回來，滿身木屑，一抖就是一陣香。
+    scene_archetype: tavern_interior
+connections: []
+exterior:
+  settlement: elven_village_fionnen
+  node: light_court
+  room: fionnen_hawkfeather_home
+  doorway_key: 哈克菲特赫爾的家
+  doorway_aliases:
+  - hawkfeather

@@ -1,0 +1,20 @@
+# Permanent interior authored source (schema version 1).
+# A 幽月谷村 resident family home. The single room is the home of the 溫德松
+# household (three chat-only residents) and opens onto the village's shared
+# public node so the ``resident`` schedule's two walk legs resolve.
+version: 1
+kind: interior
+id: eolas_windsong_home
+rooms:
+  eolas_windsong_home:
+    name_zh: 溫德松的家
+    desc_zh: 石屋在谷底空地邊上，門外就是族人往來的平地。屋裡摞著洗池用的木盆與布巾，牆根還洇著水，一家三口在溫泉邊忙完，才踩著濕腳回來。
+    scene_archetype: tavern_interior
+connections: []
+exterior:
+  settlement: elven_village_eolas
+  node: valley_floor
+  room: eolas_windsong_home
+  doorway_key: 溫德松的家
+  doorway_aliases:
+  - windsong

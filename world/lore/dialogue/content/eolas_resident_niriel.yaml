@@ -1,0 +1,102 @@
+schema_version: 1
+greeting: 妮瑞爾把剪子往布上一放，轉過身來笑問：「是來量身子，還是來說說話？」
+topics:
+- topic_id: eolas_resident_niriel.topic_01
+  keyword: 量衣
+  label: 量衣
+  fallback:
+    scene_id: eolas_resident_niriel.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「這谷裡做衣裳，都要量身嗎？」
+    - kind: speech
+      speaker: host
+      text: 「要。量身子是門手藝，手貼著你的肩、你的腰走一圈，就把尺寸記下了。尷不尷，我一下摸得出來。」
+    - kind: narration
+      text: 她張開一隻手掌，在空氣裡比了比。
+    - kind: speech
+      speaker: host
+      text: 「谷裡人不慌這個，站直了，把衣裳解了才量得準。你哪天真要做，就給我量。」
+- topic_id: eolas_resident_niriel.topic_02
+  keyword: 剪裁
+  label: 剪裁
+  fallback:
+    scene_id: eolas_resident_niriel.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「一刀下去剪壞了，怎麼補？」
+    - kind: speech
+      speaker: host
+      text: 「補不回頭。所以下刀前先畫線，眼焐到發燙都不動手。剪是好剪，手一歪，一整匹就白糟蹋。」
+    - kind: speech
+      speaker: host
+      text: 「跟做事一個理，急不得。我這把剪子跟了多年，熟到我閉著眼都剪不歪。」
+- topic_id: eolas_resident_niriel.topic_03
+  keyword: 家人
+  label: 家人
+  fallback:
+    scene_id: eolas_resident_niriel.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你家裡頭，誰管哪一樣？」
+    - kind: speech
+      speaker: host
+      text: 「娘織布，我剪裁，妹妹凱勒斯分線。織機一響，母女仨就各占了半間屋。妹妹那雙手，分線比誰都利索。」
+    - kind: narration
+      text: 她往裡屋努了努嘴，梭聲正從那兒傳來。
+    - kind: speech
+      speaker: host
+      text: 「一家人吵歸吵，鬧歸鬧，到夜裡各自鋪開睡，嘴上也不饒人。你要打聽誰的底細，先陪我把這匹布裁完。」
+- topic_id: eolas_resident_niriel.topic_04
+  keyword: 名字
+  label: 名字
+  fallback:
+    scene_id: eolas_resident_niriel.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「『維爾維特莉夫』這姓，是葉子的意思？」
+    - kind: speech
+      speaker: host
+      text: 「絨葉。老樹葉背那層細絨，風一過滿坡白。娘說，做衣裳的人都細，跟那絨一樣。」
+    - kind: narration
+      text: 她拈起一片從窗縫飄入的葉子，翻了個面給你看。
+    - kind: speech
+      speaker: host
+      text: 「名跟地方拴著。你要是常來，這巷子、這坡，日子一久就都是熟面孔了。」
+- topic_id: eolas_resident_niriel.topic_05
+  keyword: 私語
+  label: 私語
+  requires:
+    kind: affinity_at_least
+    stage_key: trusted
+  unavailable: locked
+  refusal:
+    scene_id: eolas_resident_niriel.topic_05_refusal
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: host
+      text: 「量身子都行，可有些話要我認了你，才肯講。」
+  fallback:
+    scene_id: eolas_resident_niriel.topic_05_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你最享受做衣裳的哪一步？」
+    - kind: speech
+      speaker: host
+      text: 「是量人。手貼著熱的身子，順著曲線往下走，那點熱隔著掌心跳，像描一道活的線。量著量著，我自己先軟了。」
+    - kind: narration
+      text: 她咬了咬下唇，眼裡浮著笑意。
+    - kind: speech
+      speaker: host
+      text: 「這門手藝最妙的地方，是能先摸到人。你哪天讓我量一回，就曉得了。」

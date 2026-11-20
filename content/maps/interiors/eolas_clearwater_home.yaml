@@ -1,0 +1,19 @@
+# Permanent interior authored source (schema version 1).
+# A 幽月谷村 resident family home (克莉爾瓦特爾 household), opening onto the
+# village's shared public node.
+version: 1
+kind: interior
+id: eolas_clearwater_home
+rooms:
+  eolas_clearwater_home:
+    name_zh: 克莉爾瓦特爾的家
+    desc_zh: 石屋離谷底空地只幾步，屋裡擱著汲水的木桶和長柄瓢，牆上掛著幾只水囊。地板被水洇得發亮，一家人天不亮就提著桶上溪源。
+    scene_archetype: tavern_interior
+connections: []
+exterior:
+  settlement: elven_village_eolas
+  node: valley_floor
+  room: eolas_clearwater_home
+  doorway_key: 克莉爾瓦特爾的家
+  doorway_aliases:
+  - clearwater

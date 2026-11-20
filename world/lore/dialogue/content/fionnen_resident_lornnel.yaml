@@ -1,0 +1,102 @@
+schema_version: 1
+greeting: 洛爾內爾從樹上下來，拍掉手上的木屑：「有話等我站穩了說，這兒風大。」
+topics:
+- topic_id: fionnen_resident_lornnel.topic_01
+  keyword: 爬樹
+  label: 爬樹
+  fallback:
+    scene_id: fionnen_resident_lornnel.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你爬瞭望枝，怎麼這麼利索？」
+    - kind: speech
+      speaker: host
+      text: 「打小爬，枝丫哪根能踩、哪根會晃，都刻在腳底。越高我越穩，平地反倒不踏實。」
+    - kind: narration
+      text: 她抬頭望了眼那根高枝，眼神像在估算距離。
+    - kind: speech
+      speaker: host
+      text: 「樹不欺人。你踩實了，它就托你；你怕了，它才晃。要不要試兩步？」
+- topic_id: fionnen_resident_lornnel.topic_02
+  keyword: 高處
+  label: 高處
+  fallback:
+    scene_id: fionnen_resident_lornnel.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「站那麼高，不怕摔嗎？」
+    - kind: speech
+      speaker: host
+      text: 「不怕。摔過，也學精了。高處看得遠，雲往哪走、獵隊到哪兒，一眼就明。谷裡人都靠這雙腿。」
+    - kind: speech
+      speaker: host
+      text: 「風吹得衣裳獵獵作響，那才叫自在。你上過一回，就捨不得下來。」
+- topic_id: fionnen_resident_lornnel.topic_03
+  keyword: 家人
+  label: 家人
+  fallback:
+    scene_id: fionnen_resident_lornnel.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你家裡，都愛往高處跑？」
+    - kind: speech
+      speaker: host
+      text: 「娘貝瑞娜拉看天，我爬樹，妹妹翁德斯聽風。仨人各占一處，把這片林看得明明白白。」
+    - kind: narration
+      text: 她朝樹下那個仰著頭的身影指了指。
+    - kind: speech
+      speaker: host
+      text: 「妹妹在下面聽風，我上去看雲。娘在中間坐鎮。一家人，就這麼守著。」
+- topic_id: fionnen_resident_lornnel.topic_04
+  keyword: 名字
+  label: 名字
+  fallback:
+    scene_id: fionnen_resident_lornnel.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「蒙斯哈德，是夜裡的月影？」
+    - kind: speech
+      speaker: host
+      text: 「月影。夜裡月影投在樹冠上，一塊塊地晃。我在高處，踩著那些影往上，像踩著月亮。」
+    - kind: narration
+      text: 她伸手在月光裡虛虛一撈。
+    - kind: speech
+      speaker: host
+      text: 「這名字配我。你往後夜裡瞧見樹上有人，多半是我。」
+- topic_id: fionnen_resident_lornnel.topic_05
+  keyword: 私語
+  label: 私語
+  requires:
+    kind: affinity_at_least
+    stage_key: trusted
+  unavailable: locked
+  refusal:
+    scene_id: fionnen_resident_lornnel.topic_05_refusal
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: host
+      text: 「高處的事，只跟敢跟我爬上去的人說。」
+  fallback:
+    scene_id: fionnen_resident_lornnel.topic_05_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你最想和人分享的時刻，是什麼樣？」
+    - kind: speech
+      speaker: host
+      text: 「是爬上最高的枝，看一場完整的日落。有個人跟我並排坐，腳懸在半空，誰也不說話，就讓風把頭髮吹成一團。她的肩靠著我，帶著暖意。」
+    - kind: narration
+      text: 她語氣裡有一絲嚮往，眼睛望向遠方。
+    - kind: speech
+      speaker: host
+      text: 「高處的安靜，要有人陪才圓滿。你哪天跟我上去，我分你一半。」

@@ -1,0 +1,102 @@
+schema_version: 1
+greeting: 瑞林直起腰，拍拍手上的泥：「是問菜，還是問我這身泥？」
+topics:
+- topic_id: fionnen_resident_relllin.topic_01
+  keyword: 菜圃
+  label: 菜圃
+  fallback:
+    scene_id: fionnen_resident_relllin.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「林間菜圃，都種些什麼？」
+    - kind: speech
+      speaker: host
+      text: 「蔬菜成排種到樹根邊，果樹雜在其間。收成不多，夠村裡吃，多的曬乾留到冬天。這片隙地，養了整座村。」
+    - kind: narration
+      text: 她摘下一片菜葉，就著露水看了看。
+    - kind: speech
+      speaker: host
+      text: 「土好，菜就肯長。人也是，扎得深，才站得穩。」
+- topic_id: fionnen_resident_relllin.topic_02
+  keyword: 收成
+  label: 收成
+  fallback:
+    scene_id: fionnen_resident_relllin.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「收成的時候，忙得過來嗎？」
+    - kind: speech
+      speaker: host
+      text: 「忙，可也樂。一家人齊上陣，彎腰採、澆水、分裝的人，笑聲滿圃。累了一季，就等這一茬。」
+    - kind: speech
+      speaker: host
+      text: 「收完煮一大鍋，全村來分。那種踏實，比躺在誰懷裡還沉。」
+- topic_id: fionnen_resident_relllin.topic_03
+  keyword: 家人
+  label: 家人
+  fallback:
+    scene_id: fionnen_resident_relllin.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你家裡人都下圃？」
+    - kind: speech
+      speaker: host
+      text: 「大女兒伊斯爾溫澆水看渠，小女兒米拉拉採菜。我管種。仨人一長排蹲在畦裡，話不多，就聽鋤頭響。」
+    - kind: narration
+      text: 她朝菜圃另一頭的身影揮了揮手。
+    - kind: speech
+      speaker: host
+      text: 「一家人靠這片地過活。你餓了，來摘兩把，不礙事。」
+- topic_id: fionnen_resident_relllin.topic_04
+  keyword: 名字
+  label: 名字
+  fallback:
+    scene_id: fionnen_resident_relllin.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「孫希斯佩爾，是日語的意思？」
+    - kind: speech
+      speaker: host
+      text: 「日語。日頭穿過樹冠，光斑灑在菜圃上，像在低聲說話。這家守著這片光，就取了它。」
+    - kind: narration
+      text: 她攤開手，接住一片漏下來的陽光。
+    - kind: speech
+      speaker: host
+      text: 「菜要光，人要暖。你往後晌午來，這圃子最亮堂。」
+- topic_id: fionnen_resident_relllin.topic_05
+  keyword: 私語
+  label: 私語
+  requires:
+    kind: affinity_at_least
+    stage_key: trusted
+  unavailable: locked
+  refusal:
+    scene_id: fionnen_resident_relllin.topic_05_refusal
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: host
+      text: 「土裡的話，只跟一起流過汗的人說。」
+  fallback:
+    scene_id: fionnen_resident_relllin.topic_05_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你最踏實的時刻，是什麼樣？」
+    - kind: speech
+      speaker: host
+      text: 「是收完最後一畦，夕陽把人曬得懶洋洋，有個人遞來一瓢水，再順手替我抹掉眉角的汗。我靠在她肩上，兩個人一起看這片綠，誰也不說話。」
+    - kind: narration
+      text: 她瞇起眼，像正沐在那時的夕照裡。
+    - kind: speech
+      speaker: host
+      text: 「日子靠種，也靠人陪。你懂了土，就懂我。」

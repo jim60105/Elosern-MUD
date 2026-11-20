@@ -1,0 +1,102 @@
+schema_version: 1
+greeting: 凱勒斯從一堆彩線裡抬起頭，指尖還勾著一綹：「是來尋線，還是順路看看我？」
+topics:
+- topic_id: eolas_resident_caeleth.topic_01
+  keyword: 線
+  label: 線
+  fallback:
+    scene_id: eolas_resident_caeleth.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「這麼多線，你都分得清？」
+    - kind: speech
+      speaker: host
+      text: 「分得清。手指一撚，哪個滑、哪個澀，心裡就有數。線跟人不一樣，不會騙你。」
+    - kind: narration
+      text: 她把一綹灰藍的線舉到窗邊，讓光照透它。
+    - kind: speech
+      speaker: host
+      text: 「我分線分慣了，連別人的心事也愛撚一撚。你瞧見我時，我多半正忙這個。」
+- topic_id: eolas_resident_caeleth.topic_02
+  keyword: 經緯
+  label: 經緯
+  fallback:
+    scene_id: eolas_resident_caeleth.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「織布前，線要怎麼排？」
+    - kind: speech
+      speaker: host
+      text: 「先上經，一根一根拉直、繃勻，半點馬虎不得。緯線後穿進去，跟經線一交，布才成。」
+    - kind: speech
+      speaker: host
+      text: 「人和人也這樣。得先有人拉直了，再有人織進去。谷裡幾家人，就是這麼一張布。」
+- topic_id: eolas_resident_caeleth.topic_03
+  keyword: 家人
+  label: 家人
+  fallback:
+    scene_id: eolas_resident_caeleth.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你姊姊剪布，你分線，日子不悶嗎？」
+    - kind: speech
+      speaker: host
+      text: 「不悶。娘和姊姊都在屋裡，織機、剪子、繞線，聲音擠成一團。我不用說話，也有人懂我。」
+    - kind: narration
+      text: 她垂下眼，耳根子微微發紅。
+    - kind: speech
+      speaker: host
+      text: 「夜裡我睡最靠窗，風涼。你留下來多坐一會，這屋就多一個氣。」
+- topic_id: eolas_resident_caeleth.topic_04
+  keyword: 名字
+  label: 名字
+  fallback:
+    scene_id: eolas_resident_caeleth.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「『維爾維特莉夫』，是怎麼取來的？」
+    - kind: speech
+      speaker: host
+      text: 「絨葉。岩屋坡老樹的葉背有一層絨，日頭一打，像蒙了霧。這家的姓，就是那層絨。」
+    - kind: narration
+      text: 她拈起一片枯葉，用指甲在葉背刮了刮。
+    - kind: speech
+      speaker: host
+      text: 「別看它細，刮傷了會癢。谷裡人待人也是細性子，你不惹，誰也不碰你。」
+- topic_id: eolas_resident_caeleth.topic_05
+  keyword: 私語
+  label: 私語
+  requires:
+    kind: affinity_at_least
+    stage_key: trusted
+  unavailable: locked
+  refusal:
+    scene_id: eolas_resident_caeleth.topic_05_refusal
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: host
+      text: 「我的心事像線，亂得很，不跟生人說。」
+  fallback:
+    scene_id: eolas_resident_caeleth.topic_05_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你一個人待著的時候，都在想什麼？」
+    - kind: speech
+      speaker: host
+      text: 「想被一雙熱手從身後環住，貼著背，不緊不慢地、一圈一圈地揉。什麼都不用說，就讓那雙手把我當線，理個清楚。」
+    - kind: narration
+      text: 她抬起眼，眼底像是被人看穿了，又別了開。
+    - kind: speech
+      speaker: host
+      text: 「這種安靜，比渾身濕透的痛快還沉。你聽得懂，就是懂我一半了。」

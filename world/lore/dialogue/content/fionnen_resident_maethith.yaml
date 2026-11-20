@@ -1,0 +1,102 @@
+schema_version: 1
+greeting: 邁特希斯攪著鍋裡的糖，側過頭：「你聞，花蕊快好了。想問什麼？」
+topics:
+- topic_id: fionnen_resident_maethith.topic_01
+  keyword: 蜜漬
+  label: 蜜漬
+  fallback:
+    scene_id: fionnen_resident_maethith.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「蜜漬花蕊，是怎麼做的？」
+    - kind: speech
+      speaker: host
+      text: 「花瓣採下來，蜜浸足日子，再小火熬。火候差一點，花瓣就塌了；熬對了，入口先脆後甜。」
+    - kind: narration
+      text: 她攪動木勺，糖漿黏稠地掛在勺沿。
+    - kind: speech
+      speaker: host
+      text: 「做甜食要耐心。你急，甜就跑了。坐一會，我盛一勺給你嚐。」
+- topic_id: fionnen_resident_maethith.topic_02
+  keyword: 花蕊
+  label: 花蕊
+  fallback:
+    scene_id: fionnen_resident_maethith.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「這花蕊，都是你們園子裡的？」
+    - kind: speech
+      speaker: host
+      text: 「是。清晨花瓣還帶著露，就採下來。妹妹賽莉爾採蜜，我醃花，娘看蜂。一家人把園子的香都收進罐裡。」
+    - kind: speech
+      speaker: host
+      text: 「一罐子封好，就是一天的工夫。你帶一罐回去，甜能留到冬天。」
+- topic_id: fionnen_resident_maethith.topic_03
+  keyword: 家人
+  label: 家人
+  fallback:
+    scene_id: fionnen_resident_maethith.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你家裡，你最黏誰？」
+    - kind: speech
+      speaker: host
+      text: 「黏娘。她性子軟，我也慢，湊一塊正好。妹妹賽莉爾太鬧，常把我熬的糖攪出泡。」
+    - kind: narration
+      text: 她搖搖頭，語氣裡盡是縱容。
+    - kind: speech
+      speaker: host
+      text: 「一家人裡，就我耐得住火。夜裡糖冷透了，仨人分著吃，最香。」
+- topic_id: fionnen_resident_maethith.topic_04
+  keyword: 名字
+  label: 名字
+  fallback:
+    scene_id: fionnen_resident_maethith.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「希爾維爾布魯克，是月夜的銀溪？」
+    - kind: speech
+      speaker: host
+      text: 「銀溪。月亮一來，溪水泛著銀光，像一鍋熬開的糖。這家就認了它。」
+    - kind: narration
+      text: 她望向窗外，像在看那條溪。
+    - kind: speech
+      speaker: host
+      text: 「這名字甜。你往後晚上來，能瞧見那一片銀。」
+- topic_id: fionnen_resident_maethith.topic_05
+  keyword: 私語
+  label: 私語
+  requires:
+    kind: affinity_at_least
+    stage_key: trusted
+  unavailable: locked
+  refusal:
+    scene_id: fionnen_resident_maethith.topic_05_refusal
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: host
+      text: 「我的甜話，只留給肯陪我守火的人。」
+  fallback:
+    scene_id: fionnen_resident_maethith.topic_05_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你最想要的陪伴，是什麼樣？」
+    - kind: speech
+      speaker: host
+      text: 「是熬糖熬到半夜，鍋裡終於收成，回頭有個人靠在門邊，就那麼等我。我把第一勺蜜漬餵進她嘴裡，看她被甜得瞇眼。那一刻，比糖還甜。」
+    - kind: narration
+      text: 她咬著下唇，笑意從眼底漫開。
+    - kind: speech
+      speaker: host
+      text: 「有人等，熬多久都值。」

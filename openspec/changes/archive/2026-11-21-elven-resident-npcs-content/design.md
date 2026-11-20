@@ -27,7 +27,7 @@ Every card and line treats each resident as an adult woman. No prose states a ye
 
 ### D4 — Homes and schedule targets
 
-Fifteen new interior rooms per village under `content/maps/interiors/` (plus editor layouts), each with a real Exit onto the village's street/public node so scheduled traversal resolves. `home_room` is that room's ID. Every resident uses the existing `resident` schedule template; the resident sync (mechanism) binds `residence`→home and `market_square`→the village's authored shared public room (read from `content/maps/` and `settlement-locations.md` — e.g. 幽月谷村的溫泉浴場／共食棚／圖書館 以及另兩村的對應共用場所; never invented). Public rooms may be shared by multiple residents.
+Five family homes per village (15 total) under `content/maps/interiors/` (plus editor layouts). Each household of three — a mother and two daughters sharing one surname — cohabits one home room, so three residents' `home_room` point at the same room; the home's single `exterior` opens onto the village's street/public node so scheduled traversal resolves. Every resident uses the existing `resident` schedule template; the resident sync (mechanism) binds `residence`→home and `market_square`→the village's authored shared public room (read from `content/maps/` and `settlement-locations.md` — e.g. 幽月谷村的溫泉浴場／共食棚／圖書館 以及另兩村的對應共用場所; never invented). Public rooms may be shared by multiple residents, and multiple residents share each home.
 
 ### D5 — Conditional dialogue shape
 
@@ -40,7 +40,7 @@ One `docs/lore/` review document per village (or one combined resident-review do
 ## Risks / Trade-offs
 
 - [45 × (home + card + table) is a large surface] → three village slices; reuse the shared `resident` template; keep tables lean (5–10 topics, ≤8 lines/scene).
-- [Scheduled movement skips when a home lacks a street/public Exit] → each home authors that Exit; the content slice verifies via the map sources check + a per-village schedule runtime test.
+- [Scheduled movement skips when a home lacks a street/public Exit] → each home authors that Exit; the content slice verifies via the map sources check, and cohabitation is exercised by the existing resident-sync tests.
 - [A proper noun without a registry row] → each slice's review pass resolves every named place/item/title to a registry row; invented names are caught by the `--places` lint and the hand sweep before handoff.
 - [Eolas secret leaking into prose] → the adult-register rule in D2 is a hard review checkpoint per card and line.
 

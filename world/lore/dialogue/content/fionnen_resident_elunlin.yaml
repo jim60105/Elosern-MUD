@@ -1,0 +1,102 @@
+schema_version: 1
+greeting: 埃倫林從木堆後探出頭，腰間別著一圈麻繩：「你找我？我正穿繩呢。」
+topics:
+- topic_id: fionnen_resident_elunlin.topic_01
+  keyword: 穿繩
+  label: 穿繩
+  fallback:
+    scene_id: fionnen_resident_elunlin.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你腰裡那圈麻繩，是做什麼的？」
+    - kind: speech
+      speaker: host
+      text: 「補橋、穿繩、捆木料，走到哪用到哪。樹冠吊橋上的結，一半出自我的手。鬆了，我就去補。」
+    - kind: narration
+      text: 她靈活地從木堆間鑽出來，麻繩在她腰間晃。
+    - kind: speech
+      speaker: host
+      text: 「這谷裡要打結的地方多。你哪兒見著鬆了，喊我。」
+- topic_id: fionnen_resident_elunlin.topic_02
+  keyword: 吊橋
+  label: 吊橋
+  fallback:
+    scene_id: fionnen_resident_elunlin.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「樹冠吊橋，都是你們在補？」
+    - kind: speech
+      speaker: host
+      text: 「是。風大的日子繩橋會晃，我常上去巡，哪兒磨了、哪兒鬆了，一眼就瞧見。補好了，人走著才踏實。」
+    - kind: speech
+      speaker: host
+      text: 「橋連著一戶一戶。我補的不止是繩，也是谷裡的往來。」
+- topic_id: fionnen_resident_elunlin.topic_03
+  keyword: 家人
+  label: 家人
+  fallback:
+    scene_id: fionnen_resident_elunlin.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你家裡，你最像誰？」
+    - kind: speech
+      speaker: host
+      text: 「像娘，閒不住，愛動手。姊姊倫溫坐得住，一鑿一鑿刻花。我滿場跑，她在一旁看我，也不管。」
+    - kind: narration
+      text: 她笑得燦爛，眼裡閃著活泛的光。
+    - kind: speech
+      speaker: host
+      text: 「一家人裡，就我閒不住。你要跑腿、傳話，找我最快。」
+- topic_id: fionnen_resident_elunlin.topic_04
+  keyword: 名字
+  label: 名字
+  fallback:
+    scene_id: fionnen_resident_elunlin.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「哈克菲特赫爾，是天上落下的鷹羽？」
+    - kind: speech
+      speaker: host
+      text: 「鷹羽。換羽時落在空地上，我常撿來別在腰間。風一吹，羽絨就蓬開。」
+    - kind: narration
+      text: 她拍拍腰間，像那兒真別著一根。
+    - kind: speech
+      speaker: host
+      text: 「這名字輕，我也輕。你跟著我跑，保管摔不著。」
+- topic_id: fionnen_resident_elunlin.topic_05
+  keyword: 私語
+  label: 私語
+  requires:
+    kind: affinity_at_least
+    stage_key: trusted
+  unavailable: locked
+  refusal:
+    scene_id: fionnen_resident_elunlin.topic_05_refusal
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: host
+      text: 「我這人閒不住，可心裡的結，只給幫我解過繩的人。」
+  fallback:
+    scene_id: fionnen_resident_elunlin.topic_05_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你最痛快的時刻，是什麼樣？」
+    - kind: speech
+      speaker: host
+      text: 「是補完一座吊橋，站在橋中央，風把橋吹得晃。有個人從後面追上來，一把攬住我的腰，兩個人在半空裡搖。我怕摔，抱她抱得死緊，笑聲全被風吞了。」
+    - kind: narration
+      text: 她眼裡發亮，像又站回了那座橋。
+    - kind: speech
+      speaker: host
+      text: 「懸著的時候，才曉得抱緊了有多踏實。你哪天跟我上橋，就懂了。」

@@ -1,0 +1,102 @@
+schema_version: 1
+greeting: 奈爾內爾放下手裡的書卷，抬起眼：「是來問舊事，還是新事？」
+topics:
+- topic_id: ciaran_resident_naernel.topic_01
+  keyword: 舊事
+  label: 舊事
+  fallback:
+    scene_id: ciaran_resident_naernel.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「這谷裡最遠的舊事，能追到哪一年？」
+    - kind: speech
+      speaker: host
+      text: 「遠到溪水還沒改道、古樹還只有一人高。娘記得住，我也記得。日子久了，事就沉了，可沒散。」
+    - kind: narration
+      text: 她指尖沿著書卷的邊，慢慢劃下去。
+    - kind: speech
+      speaker: host
+      text: 「你想問誰、問哪樁，報個由頭，我給你理。」
+- topic_id: ciaran_resident_naernel.topic_02
+  keyword: 記憶
+  label: 記憶
+  fallback:
+    scene_id: ciaran_resident_naernel.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「記這麼多，不會累嗎？」
+    - kind: speech
+      speaker: host
+      text: 「不累。記得住，才知道自己從哪來。谷裡人壽命長，忘了，就白活了這一趟。」
+    - kind: speech
+      speaker: host
+      text: 「有些記性帶著甜，有些帶著刺。我都收著，一句是一句，不肯錯半個字。」
+- topic_id: ciaran_resident_naernel.topic_03
+  keyword: 家人
+  label: 家人
+  fallback:
+    scene_id: ciaran_resident_naernel.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你家裡，都靠記性過活？」
+    - kind: speech
+      speaker: host
+      text: 「娘埃林溫說故事，妹妹寧內爾哄孩子，我記脈絡。仨人一處，就是谷裡一本活生生的書。」
+    - kind: narration
+      text: 她合上書卷，語氣裡有一分自持的沉。
+    - kind: speech
+      speaker: host
+      text: 「娘講，我補，妹妹傳。少了誰，這本子就缺頁。」
+- topic_id: ciaran_resident_naernel.topic_04
+  keyword: 名字
+  label: 名字
+  fallback:
+    scene_id: ciaran_resident_naernel.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「溫特爾松，是冬日松林的風聲？」
+    - kind: speech
+      speaker: host
+      text: 「冬松。風過松林，像一句拖長的歌。我家就住在歌聲最清的那棵樹下。」
+    - kind: narration
+      text: 她側過臉，像在辨認窗外那陣風。
+    - kind: speech
+      speaker: host
+      text: 「名是記號。你記住了，就找到這家。忘了，也就錯過了。」
+- topic_id: ciaran_resident_naernel.topic_05
+  keyword: 私語
+  label: 私語
+  requires:
+    kind: affinity_at_least
+    stage_key: trusted
+  unavailable: locked
+  refusal:
+    scene_id: ciaran_resident_naernel.topic_05_refusal
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: host
+      text: 「我記性雖好，交心的事也只說給配得上的人。」
+  fallback:
+    scene_id: ciaran_resident_naernel.topic_05_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你最想永遠記住的是哪一段？」
+    - kind: speech
+      speaker: host
+      text: 「是某個夏夜，我褪盡衣裳，躺在古樹的影裡，讓露水沿著鎖骨往下淌。有個人的唇追著那道涼，一路往下。我記得住每一寸，比記任何舊事都清楚。」
+    - kind: narration
+      text: 她聲音極穩，眼底卻軟了。
+    - kind: speech
+      speaker: host
+      text: 「好的記憶都帶著體溫。你交得過心，我才肯翻給你看。」
