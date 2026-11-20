@@ -86,7 +86,7 @@ topics:
       text: 「腳步。蛛怕震，你在那邊一跺地，整片網都要白費一季。收絲的人腳要像貓踩在水上。」
     - kind: speech
       speaker: host
-      text: 「所以谷裡的人在林邊都赤腳。涼是涼，皮糙些也不打緊。你願意的話，改天跟我走一趟，我教你踩。」
+      text: 「所以谷裡的人在林邊都赤腳。涼是涼，皮糙些也不打緊。」
 - topic_id: eolas_resident_liathiel.topic_06
   keyword: 私語
   label: 私語

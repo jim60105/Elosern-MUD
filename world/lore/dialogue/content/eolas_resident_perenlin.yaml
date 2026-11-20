@@ -2,8 +2,8 @@ schema_version: 1
 greeting: 佩倫林把一條濕布巾絞乾，抬眼望向你：「你是來泡泉子，還是順路問點谷裡的事？」
 topics:
 - topic_id: eolas_resident_perenlin.topic_01
-  keyword: 温泉
-  label: 温泉
+  keyword: 溫泉
+  label: 溫泉
   fallback:
     scene_id: eolas_resident_perenlin.topic_01_scene
     revision: r1

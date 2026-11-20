@@ -70,7 +70,7 @@ topics:
       text: 她說著，真的把腳在溪裡踩了踩。
     - kind: speech
       speaker: host
-      text: 「這裡什麼都好，就一個字沒變——誰都離不開水，也離不開人。」
+      text: 「這裡什麼都好，就一個字沒變，誰都離不開水，也離不開人。」
 - topic_id: eolas_resident_vaelara.topic_05
   keyword: 私語
   label: 私語

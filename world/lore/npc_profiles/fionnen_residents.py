@@ -1,13 +1,14 @@
 """NPC profiles owned by the ``fionnen_residents`` content slice.
 
-Fifteen chat-only resident profiles for 翠綠森林村, five households of three (a
+Fifteen chat-only resident profiles for 翠綠森林村 (five households of three; a
 mother and two daughters). Each card is grounded in the elf passages of
-``tmp/story_settings/world_info.md`` (全族皆為女性、無固定職業分工、無婚姻與正式
-教育、千年的壽命、對身體與性沒有羞恥概念、任何地點任何時間都可能進行性行為)，the
-斐歐恩族 appearance of the same source, ``docs/lore/overview.md`` 性愛與身體 and
-the 翠綠森林村 paragraphs of ``docs/lore/settlement-locations.md``. No leaf states an
-age, an apparent age or a count of years. Every resident authors her own dialogue
-table greeting, so each profile authors only the ``misunderstood`` voice line.
+``tmp/story_settings/world_info.md`` (an all-female branch with no fixed trades,
+no marriage or formal schooling, a lifespan of millennia, no shame about the
+body or sex, and sex possible anywhere at any time), the 斐歐恩族 appearance of
+the same source, ``docs/lore/overview.md`` 性愛與身體 and the 翠綠森林村 paragraphs
+of ``docs/lore/settlement-locations.md``. No leaf states an age, an apparent age
+or a count of years. Every resident authors her own dialogue table greeting, so
+each profile authors only the ``misunderstood`` voice line.
 """
 
 from world.lore.npc_card import NpcCard, NpcCardIdentity
@@ -24,7 +25,7 @@ ROWS: tuple[NpcProfile, ...] = (
                 ),
             ),
             appearance=(
-                "金髮在腦後紮成一束，碧眼沉靜，白皙的肌膚晒出一層淺金。她身量高，"
+                "金髮在腦後紮成一束，碧眼沉靜，白皙的肌膚曬出一層淺金。她身量高，"
                 "只著一件貼身的獵裝，拉弓時肩背的線條拉得筆直。"
             ),
             personality=(
@@ -100,7 +101,7 @@ ROWS: tuple[NpcProfile, ...] = (
                     "獵裝短短，跑起來衣襬和光裸的腿一道揚起。"
             ),
             personality=(
-                "活潑、好動，坐不住半刻。她說跑起來風貼著身子，比誰的懷抱都自由。"
+                "活潑、好動，閒不住半刻。她說跑起來風貼著身子，比誰的懷抱都自由。"
             ),
             speech_style=(
                 "語速快，句尾上揚，像一口氣沒喘完就接著說。"
@@ -131,7 +132,7 @@ ROWS: tuple[NpcProfile, ...] = (
                 ),
             ),
             appearance=(
-                "金髮盤成髻，碧眼柔和，白皙的肌膚在花間晒得透亮。她身形豐腴，衣裳"
+                "金髮盤成髻，碧眼柔和，白皙的肌膚在花間曬得透亮。她身形豐腴，衣裳"
                     "輕薄，俯身看蜂時，胸前的柔軟輕輕晃動，她毫不在意。"
             ),
             personality=(
@@ -415,7 +416,7 @@ ROWS: tuple[NpcProfile, ...] = (
                 ),
             ),
             appearance=(
-                "金髮編成短辮，碧眼晶亮，白皙的肌膚在葉間晒得泛紅。她個頭不高，身"
+                "金髮編成短辮，碧眼晶亮，白皙的肌膚在葉間曬得泛紅。她個頭不高，身"
                     "形輕盈，蹲在菜畦裡像一株開得正好的花。"
             ),
             personality=(

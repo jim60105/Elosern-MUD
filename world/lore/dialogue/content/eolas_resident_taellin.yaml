@@ -2,8 +2,8 @@ schema_version: 1
 greeting: 泰林把額前被蒸汽蒸得貼住的髮往耳後一別，笑著迎上來：「是要泡泉，還是問池子的事？我帶路。」
 topics:
 - topic_id: eolas_resident_taellin.topic_01
-  keyword: 温泉
-  label: 温泉
+  keyword: 溫泉
+  label: 溫泉
   fallback:
     scene_id: eolas_resident_taellin.topic_01_scene
     revision: r1
@@ -113,4 +113,4 @@ topics:
       text: 她說得眉飛色舞，酒窩漾開，像是正享受那陣風。
     - kind: speech
       speaker: host
-      text: 「這種舒服只有自己知道夠不夠。你哪天想試，我教你怎麼站著等風。」
+      text: 「這種舒服只有自己知道夠不夠。」

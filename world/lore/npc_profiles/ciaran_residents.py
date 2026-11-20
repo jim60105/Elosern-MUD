@@ -1,13 +1,14 @@
 """NPC profiles owned by the ``ciaran_residents`` content slice.
 
-Fifteen chat-only resident profiles for 暗影谷村, five households of three (a
+Fifteen chat-only resident profiles for 暗影谷村 (five households of three; a
 mother and two daughters). Each card is grounded in the elf passages of
-``tmp/story_settings/world_info.md`` (全族皆為女性、無固定職業分工、無婚姻與正式
-教育、千年的壽命、對身體與性沒有羞恥概念、任何地點任何時間都可能進行性行為)，the
-基亞蘭族 appearance of the same source, ``docs/lore/overview.md`` 性愛與身體 and
-the 暗影谷村 paragraphs of ``docs/lore/settlement-locations.md``. No leaf states an
-age, an apparent age or a count of years. Every resident authors her own dialogue
-table greeting, so each profile authors only the ``misunderstood`` voice line.
+``tmp/story_settings/world_info.md`` (an all-female branch with no fixed trades,
+no marriage or formal schooling, a lifespan of millennia, no shame about the
+body or sex, and sex possible anywhere at any time), the 基亞蘭族 appearance of
+the same source, ``docs/lore/overview.md`` 性愛與身體 and the 暗影谷村 paragraphs
+of ``docs/lore/settlement-locations.md``. No leaf states an age, an apparent age
+or a count of years. Every resident authors her own dialogue table greeting, so
+each profile authors only the ``misunderstood`` voice line.
 """
 
 from world.lore.npc_card import NpcCard, NpcCardIdentity
@@ -25,7 +26,7 @@ ROWS: tuple[NpcProfile, ...] = (
             ),
             appearance=(
                 "銀髮用草莖綰起，紅眸沉靜，褐色肌膚上常沾著草屑。她只裹一件鬆垮的粗"
-                "布衫，蹲在藥草園裡侍弄草葉，露出的肩背晒得發亮。"
+                "布衫，蹲在藥草園裡侍弄草葉，露出的肩背曬得發亮。"
             ),
             personality=(
                 "性子沉，凡事都先聞一聞、想一想。她信草不信話，誰身子哪裡不舒坦，她"
@@ -223,7 +224,7 @@ ROWS: tuple[NpcProfile, ...] = (
             ),
             social_connection=(
                 "她是布瑞米斯的么女，與長姊菲林同住；溪池邊洗衣時，總和科瑞爾‧拉文"
-                "伍德並排坐，一個不說話，另一個也不問。"
+                "伍德並排坐，都不說話，也不問。"
             ),
         ),
         age=280,

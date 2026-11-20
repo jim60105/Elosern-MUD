@@ -2,8 +2,8 @@ schema_version: 1
 greeting: 伊倫林從蒸騰的水汽裡轉過臉，像是剛被喊醒：「你找我有事？」
 topics:
 - topic_id: eolas_resident_yrenlin.topic_01
-  keyword: 温泉
-  label: 温泉
+  keyword: 溫泉
+  label: 溫泉
   fallback:
     scene_id: eolas_resident_yrenlin.topic_01_scene
     revision: r1
@@ -86,7 +86,7 @@ topics:
       text: 她閉上眼，像是真的在聽什麼。
     - kind: speech
       speaker: host
-      text: 「改天帶你去下一句。聽懂了，你也就把我家認下了。」
+      text: 「這歌得自己聽才曉得。聽懂了，你也就把我家認下了。」
 - topic_id: eolas_resident_yrenlin.topic_06
   keyword: 私願
   label: 私願
