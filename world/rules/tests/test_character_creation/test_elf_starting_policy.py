@@ -168,9 +168,6 @@ class ProfilePolicyTests(unittest.TestCase):
             axes["magic_power"].value_at_cap, ELF_MAGIC_CREATION_CAP
         )
 
-    @covers_requirement(
-        "player-stat-allocation::custom-elf-allocation-converts-points-to-starting-stats"
-    )
     def test_preset_and_custom_resolution_share_the_elf_policy(self):
         # One race-derived profile serves both entry paths: a preset card and
         # a custom elf of the same subrace cannot resolve different axes.
@@ -453,9 +450,6 @@ class SharedElfPresetAllocationTests(EvenniaTest):
     def _scope(self):
         return _elf_scope(self.race, self.subrace)
 
-    @covers_requirement(
-        "player-stat-allocation::custom-elf-allocation-converts-points-to-starting-stats"
-    )
     def test_preset_activation_and_companion_match_custom_activation(self):
         from world.lore.player_presets import StartingCompanion
         from world.rules.starting_companions import build_starting_companion
