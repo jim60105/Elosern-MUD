@@ -217,7 +217,14 @@ class InteractionReasonTests(unittest.TestCase):
         self.assertEqual(
             _INTERACTION_KINDS,
             frozenset(
-                {"talk", "engage", "service_shop", "service_guild", "service_church"}
+                {
+                    "talk",
+                    "engage",
+                    "service_shop",
+                    "service_guild",
+                    "service_church",
+                    "service_lodging",
+                }
             ),
         )
 

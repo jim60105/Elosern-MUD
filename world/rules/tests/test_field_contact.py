@@ -456,7 +456,22 @@ class SleepInterruptionTests(_ContactBase):
                       SleepPosture.FORCED)
         persisted = read_sleep_receipt(self.player)
         self.assertEqual(persisted.state, STATE_SLEEPING)
-        self.assertEqual(persisted.target_tick, 10000)
+        self.assertEqual(persisted.sleep_id, receipt.sleep_id)
+        self.assertEqual(persisted.kind, KIND_FORCED)
+        self.assertEqual(persisted.mode, MODE_FORCED_THRESHOLD)
+        self.assertEqual(persisted.limit_tick, 10000)
+        # The natural-wake boundary is the entry tick plus the authored
+        # threshold gap at the ordinary sleep rate; recovery moves the gap and
+        # the settled tick in step, so the absolute target must not move.
+        from world.rules.fatigue import FatigueActivity, get_policy
+
+        policy = get_policy()
+        gap = max(0, policy.wake_units - 50000)
+        rate = policy.rates[FatigueActivity.SLEEP]
+        seconds = (gap + rate - 1) // rate
+        self.assertEqual(
+            persisted.target_tick, min(receipt.limit_tick, receipt.entry_tick + seconds)
+        )
         # Only the real six-second enemy round's sleep recovery is paid; the
         # forced posture, target and threshold contract are untouched.
         self.assertEqual(

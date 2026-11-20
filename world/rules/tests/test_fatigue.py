@@ -135,6 +135,8 @@ class PolicyContractTests(TestCase):
                 FatigueActivity.FOOT_TRAVEL: -8,
                 FatigueActivity.AWAKE_COMBAT: -12,
                 FatigueActivity.SLEEP: 12,
+                FatigueActivity.PAID_SLEEP: 24,
+                FatigueActivity.WELL_RESTED_FOOT_TRAVEL: -6,
             },
         )
         self.assertEqual(
