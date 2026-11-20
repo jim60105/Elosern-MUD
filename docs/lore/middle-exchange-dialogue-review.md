@@ -117,3 +117,43 @@ This document records the line-by-line editorial and lore verification for the `
   - `npc_content_lint.py`: 0 errors, 0 warnings across all 3 files.
   - `lint.sh` (zh-TW guideline): 0 errors across all 3 files.
   - Execution limit note: Browser manual playback harness login is unavailable; offline tests and logic verification pass.
+
+---
+
+## 6. Rewrite (2026-11-20)
+
+Wholesale prose rewrite of the three hosts under `authored-dialogue-content-middle-exchange`. Every scene body, variant and greeting was replaced; all `topic_id`, `scene_id`, `keyword`, `label`, condition operands, variant priorities and speaker values are unchanged. Each rewritten scene moved `r2` → `r3`. Item display names were re-read from `content/items/` and corrected where the old prose drifted: `silver_hairpin` is 銀髮簪 (the old 素面銀髮簪 invented a qualifier), and `radiant_holy_emblem` is the 日輪聖徽 (the old 整塊白石雕鑿 invented a material). Adult frankness is available to all three hosts; the alchemist carries the strongest case and the jeweller keeps hers to bodies, gifts and vanity.
+
+### A. altoria_jeweller (艾蓮娜‧鴉丘)
+
+- **Opening Greeting** (r3): Puts down the polishing cloth and first weighs what the guest already wears, then invites viewing in daylight or laying keepsakes on the velvet mat.
+- `altoria_jeweller.topic_01` (飾品, r3): Actor asks what the glass case holds. Host names 銀髮簪, 狼牙項鍊 and 朝聖者銅符 with a reason each, then, on the actor's ring question, the 防禦戒指 with its full crystal. Causal bridge: the actor's second turn follows the ring out of the case. The closing line keeps the professional's eye on bodies and vanity — a piece worn long enough settles on the body like it belongs there.
+- `altoria_jeweller.topic_02` (鑲工, r3): The `protective_ring` variant (priority 10, condition unchanged) has the guest hold up their carried ring without claiming where it came from; the host reads the claw seat, the alloy and the crystal's mana flow, and warns only against hard blows. The fallback explains claw settings through 淨化吊墜, 無懼胸針 and 光輝聖徽, each named by its material and its registered effect.
+- `altoria_jeweller.topic_03` (奇物, r3): Actor hears of rare curios from 瑪爾特 next door. Host presents the imperial 儲物袋 and the 滑翔斗篷 woven from 精靈蛛絲, with prices left to the counter placards. The actor's second turn bridges from the pouch to the folded cloak.
+- `altoria_jeweller.topic_04` (收購, r3): Actor asks about selling old pieces. Host takes back any covered style with metal intact, then names 藥師珠串 and 迷情絲頸環 as the two that need a provenance answer first — one resin-pressed, one steeped in 迷情藥, stated plainly without moralising.
+
+### B. altoria_alchemist (希碧拉‧灰沼)
+
+- **Opening Greeting** (r3): Peers out from behind the shelves with green-stained fingers, asking about the injury or the expedition potions.
+- `altoria_alchemist.topic_01` (藥劑, r3): Actor asks about the bottled remedies. Host splits 治療藥水 from 強效治療藥水 by the wound they suit, then 魔力藥水 for the drained caster, with the hand-written dosage label and the don't-grab-the-wrong-bottle reminder. The actor's follow-up bridges from the bottles to the blue long-necks.
+- `altoria_alchemist.topic_02` (外敷, r3): Actor asks for topical remedies. Host presents 獸王國藥草膏 for bruising and 王國礦工提神湯 for the pit chill, with the actor's nose bridging to the second jar.
+- `altoria_alchemist.topic_03` (特殊, r3): Actor asks about the strong brews. Host names 迷情藥 plainly as a mild aphrodisiac (催情酊劑) that stirs desire and fails on the unwilling or strong-willed, and asks the usage question before any sale. The actor's follow-up is answered: it is worse than useless on the unwilling. The refusal to sell to anyone who will not say what it is for stays, and the red-label shelf is never self-served.
+- `altoria_alchemist.topic_04` (聖水, r3): Actor asks about 受洗聖水. Host refuses and sends the guest up the 聖階 to the 聖所 counter, keeping the church's blessing out of her own hands.
+
+### C. altoria_merchant_hall (尤斯汀‧柯德溫)
+
+- **Opening Greeting** (r3): Rises from the tariff table, greets with 閣下, and states at once that the chamber issues no escort commission and recruits no escorts.
+- `altoria_merchant_hall.topic_01` (商隊, r3): The morning variant (priority 10, `time_period` dawn–noon, condition unchanged) names the dawn-to-noon departure rush through 東門 and the clerk's manifest check, then the neutrality that recruits no guards and guarantees no cargo. The fallback explains the quarterly chalk schedule and refuses to broker passenger rides or private cargo.
+- `altoria_merchant_hall.topic_02` (貿易路線, r3): Actor asks how the routes divide. Host names 東門 and 東市 (貨棧街) for grain, glass and foreign coin, 工匠巷 iron through 市場街, and alchemy herbs through 東門, then sends route-safety questions to the 聖潔王都衛兵隊 at the gates.
+- `altoria_merchant_hall.topic_03` (委託, r3): Actor asks about caravan-protection work. Host states the hall keeps no board and no hire list because the chamber has no escort-commission charter, then, on the actor's where-then, redirects to the 冒險者公會 hall board at 公會前.
+- `altoria_merchant_hall.topic_04` (會務, r3): Actor asks about the chamber's duties. Host lists arbitrating guild interests, reviewing tariff codes and the seasonal account settlement, with the open tariff ledger on the window table for anyone to copy.
+
+### Final revision ledger
+
+| Host | Greeting | topic_01 | topic_02 | topic_03 | topic_04 |
+| --- | --- | --- | --- | --- | --- |
+| altoria_jeweller | r3 | r3 | r3 (variant + fallback) | r3 | r3 |
+| altoria_alchemist | r3 | r3 | r3 | r3 | r3 |
+| altoria_merchant_hall | r3 | r3 (variant + fallback) | r3 | r3 | r3 |
+
+Lint: `npc_content_lint.py` 0 errors for all three files (remaining warnings are the ordinary reduplicated verbs 看看/瞧瞧, the literal 落地, and 工匠巷, which the `--places` prompt flags but which resolves to the smith and tailor profile rows `工匠巷聖潔王都鍛造鋪`/`工匠巷聖潔王都裁縫坊`). `chinese-content-writing-guideline/lint.sh` 0 errors for all three (warnings are YAML keys and the same reduplications). `DIALOGUE_SNAPSHOT` length is 38.

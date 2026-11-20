@@ -99,3 +99,41 @@ Canonical Sources:
 - **Offline / Playback Verification Note**:
   - Fully verified offline via static dialogue compilation, schema validation, NPC content linter, and Chinese language linter.
   - Direct live browser manual playback was not executed in this headless worktree environment; offline contracts and command doc tests provide regression verification.
+
+---
+
+## Rewrite (2026-11-20)
+
+This pass records the final prose of the two commons hosts, `ciaran_elenis` and `ciaran_teliel`. Both greetings were rewritten. Every topic ID, scene ID, keyword and label is retained, and no topic declares `requires`, `unavailable`, or a formal `refusal` scene; the only conditional structure is Teliel's `blade_practitioner` variant. Both hosts are adults — Elenis apparent age 42, Teliel apparent age 28 — and the prose keeps them in the canon's frank but unrushed domestic register without drifting into explicitness. Elenis's `ciaran_elenis_home.topic_02` keeps its `predecessors: [ciaran_elenis_home.topic_01]` and `disclosure: pure_chain`, with no `requires`.
+
+### ciaran_elenis (艾莉妮斯‧達恩斯特瑞德爾)
+
+**Greeting (rewritten).** She sits barefoot among the old tree's roots, a strip of bark in her lap, and in her measured, unhurried voice invites the "小傢伙" to sit, stating plainly she has no errand to assign and no treasure to hand out — only the village's history, the forest's rules, and the half-remembered old things.
+
+1. `ciaran_elenis_home.topic_01` (keyword `村子`, label `村子`, fallback `…_scene`, **r3**). **Intent:** explain how the village came to settle in the valley bottom and how its people live without rulers. **Bridge:** the actor's opening question about how the village settled is answered at once — the tribe followed the mountain stream when its course shifted and simply lives by inclination; the follow-up "who decides when there's a dispute?" is motivated by the host's "no officials, no one rules" answer and is answered by the council under the old tree, leaving Elenis the one who only remembers.
+
+2. `ciaran_elenis_home.topic_02` (keyword `基亞蘭`, label `基亞蘭`, **r3**, `pure_chain`). **Intent:** ground the Ciaran line's devotion to the blade in enduring memory rather than stubbornness. **Bridge:** the actor reopens the prior topic ("你方才提起村子的來歷…") and asks why the Ciaran are sworn to the blade; the host answers with hilt-carved names and the remembered warmth of a held grip, and the follow-up about the younger generation is answered with 悠花 learning on the field under 泰莉爾's watch.
+
+3. `ciaran_elenis_home.topic_03` (keyword `森林`, label `森林`, **r3**). **Intent:** teach how a stranger walks the western ridge's dense forest without losing the way. **Bridge:** the actor asks how to avoid getting lost; the host answers that the forest recognises footsteps and that the way is kept in feet and back rather than eyes, which motivates the actor's "so respect is enough?" and the host's closing that the woods leave a way back for the ungrasping.
+
+4. `ciaran_elenis_home.topic_04` (keyword `往事`, label `往事`, **r3**). **Intent:** show that a long memory treasures small moments — children sliding on the frozen stream — over carved treaties. **Bridge:** the actor asks what she still remembers; she answers with the children laughing down the winter ice, and when the actor observes that small moments are what last, she closes with the stream-side advice to those who come to her burdened.
+
+### ciaran_teliel (泰莉爾‧菲溫德)
+
+**Greeting (rewritten).** She has just finished a set of forms at the field's edge, sweaty and barefoot, and scans the visitor's stance before stating the field is open day and night, the wooden blades stand by the door, and she takes no students and offers no shortcut.
+
+1. `ciaran_teliel_home.topic_01` (keyword `刀術`, label `刀術`). **Intent:** separate Ciaran bladecraft's momentum-and-flow doctrine from outside swordsmanship. **Bridge:** the opening question about the difference in paths is answered at once by the host's contrast of outside thrust-and-parry against whole-body turning, which motivates the follow-up about arm-versus-body coordination and its answer. **Variant `blade_practitioner`** (`when: kind: skill_owned`, `skill_key: basic_swordplay`, `min_proficiency: 1`, `priority: 10`, scene `ciaran_teliel_home.topic_01_swordsman_scene`, **r3**) recognises the callus-and-relaxed-shoulder tell before the same doctrine and closes that the body learns faster than the ear. **Fallback** (`ciaran_teliel_home.topic_01_scene`, **r3**) delivers the same doctrine to the unweaponed visitor and points at the generations of blade-marks on the boundary trees.
+
+2. `ciaran_teliel_home.topic_02` (keyword `練習`, label `練習`, **r3**). **Intent:** describe self-directed training with no classes and no hand-holding. **Bridge:** the actor asks about the rules for training; the host answers there are none beyond planting the feet, bending the knees and dropping the shoulders, which motivates the "do you correct nothing?" follow-up, answered by the body's own correction through wind resistance and wrist strain.
+
+3. `ciaran_teliel_home.topic_03` (keyword `練刀場`, label `練刀場`, **r3**). **Intent:** describe the drill ground's all-hours openness and where a real blade is found. **Bridge:** the actor asks who uses the field; the host answers day and night, wooden blades borrowed without leave and returned, which motivates the follow-up about the smith and its answer naming Hailiel across the field, whose freshly quenched blades Teliel tests for balance and grip.
+
+4. `ciaran_teliel_home.topic_04` (keyword `比劃`, label `比劃`, **r3**). **Intent (refusal carried in-scene):** refuse a spar outright and turn the asker to the dead trunks at the forest edge. **Bridge:** the actor asks for a demonstration match; the host declines in the same answer — no villager spars outsiders, and blades are not traveller amusement — which motivates the actor's apology and the host's redirection to the practice trunks. The refusal lives inside the fallback body, not a formal `refusal` scene.
+
+### Adult-voice pass (2026-11-20)
+
+This pass added an adult register to three scenes. IDs, conditions, variant priorities, `pure_chain`, buy-back boundaries and service semantics are all unchanged; the two hosts remain adults (Elenis apparent 42, Teliel apparent 28), and neither scene touches a host below 18. `ciaran_valwyn` and every Eolas host received no sexual content.
+
+- `ciaran_elenis_home.topic_04` → **r4**. The host's remembered-lover answer now runs to an explicit memory: a blade-forging woman who undressed her to a belt by the stream, her palm down Elenis's back and thigh, and the line "那晚我喘著要她慢些" — a remembered lover and frank desire in her own unhurried voice, closed by the advice to hold whoever you want before the warmth leaves.
+- `ciaran_teliel_home.topic_02` → **r4**. The answer now adds direct sexual talk in her own voice — "我大半是在床上教會別人這個道理，身子貼著身子，誰使力、誰發緊，一點都瞞不住" — folding the body's stiffening into the lesson on the blade.
+- `ciaran_teliel_home.topic_04` → **r4**. The spar refusal now carries body framing — "刀貼著刀，身子就貼著身子，我不拿這個招呼生人" — before the unchanged redirection to the dead trunks.

@@ -1,99 +1,99 @@
 schema_version: 1
-greeting: 溪畔小徑旁的石屋裡，夜綻花釀的甜香從灶邊漫出來。拉瑞內斯‧妮特布倫正把陶甕裡的糖漿舀進小罐，聽見腳步聲便轉過身來，用木碟托著一小盞夜綻花釀：「遠來的客人……先嚐一口吧。花要入夜才開，我守著它釀了一整季，坐下多聊幾句。」
+greeting: 溪畔小徑旁的石屋裡，夜綻花釀的甜香從灶邊漫出來。拉瑞內斯‧妮特布倫正把陶甕裡的糖漿舀進小罐，聽見腳步聲便回頭，托著一小盞花釀迎過來：「遠來的客人，先嚐一口。這花要等天全黑才開，我守了它一整季，才等到這一盞甜香。坐下吧，邊喝邊聊。」
 topics:
 - topic_id: ciaran_lareneth_home.topic_01
   keyword: 花饌
   label: 花饌
   fallback:
     scene_id: ciaran_lareneth_home.topic_01_scene
-    revision: r3
+    revision: r5
     lines:
     - kind: speech
       speaker: actor
-      text: 屋裡這股甜香和花蜜不太一樣，你甕裡釀的是什麼？
+      text: 屋裡這股甜香和外頭的花都不一樣，你甕裡浸的是什麼？
     - kind: narration
       text: 拉瑞內斯‧妮特布倫用細麻布擦淨指尖，把一個封了蠟的小陶罐往客人面前推了推。
     - kind: speech
       speaker: host
-      text: 「這是暗影谷夜綻花釀……谷裡的夜綻花要等天色全暗才開，花瓣一開就香得藏不住。我天一黑就提著籃子出門，趁花剛開的時候採下來。」
+      text: 「暗影谷夜綻花釀。谷裡的夜綻花天一黑就開，花瓣一綻，整片坡都是那股香，藏都藏不住。我提著籃子，趁花剛開那幾個鐘頭去採。」
     - kind: speech
       speaker: host
-      text: 「花浸進糖漿裡要放足一季，等香氣全化進糖裡才算成。急不得，早了就只剩甜味。」
+      text: 「採回來的花浸進糖漿，要放足一季，香氣全化進糖裡才算成。太早開封，就只剩甜，香還沒浸透。」
     - kind: speech
       speaker: actor
-      text: 原來得等這麼久。這釀好的花，吃起來是什麼滋味？
+      text: 一季才等得到一甕，嚐起來究竟是什麼滋味？
     - kind: speech
       speaker: host
-      text: 「入口先是糖的甜，過一會兒花的香才從喉嚨裡漫上來……配一杯淡茶正好。」
+      text: 「入口先是糖的甜，接著花的香才從喉頭浮上來。從前有個和我纏過整夜的情人，總說這味道像親完我的嘴，糖味還沒散。」
 - topic_id: ciaran_lareneth_home.topic_02
   keyword: 山產
   label: 山產
   fallback:
     scene_id: ciaran_lareneth_home.topic_02_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
-      text: 暗影谷周圍的山林裡，每個時節都能採到合用的山產嗎？
+      text: 暗影谷周圍的山林，什麼時節都能採到合用的東西嗎？
     - kind: narration
-      text: 拉瑞內斯‧妮特布倫轉頭望向窗外青翠的林木，唇角泛起溫和的笑意。
+      text: 她轉頭望向窗外，指尖在窗台上一劃，目光落向遠處青翠的林子。
     - kind: speech
       speaker: host
-      text: 「谷底的物產跟著時序轉變，四時送來的東西各不相同……春末採花，盛夏採野蜜，秋風起時採野果，雨季過後山澗邊滿是鮮蕈。」
+      text: 「谷底的物產跟著時序走，一季換一季。春末採花，盛夏追著野蜂採蜜，秋風一起果子就熟了，雨季過後山澗邊的蕈子成片冒出來。」
     - kind: speech
       speaker: host
-      text: 「蕈子採回來，串在竹籤上擱炭火烤透，就是暗影谷炭烤蕈串。走路的時候拿著吃，比什麼都實在。」
+      text: 「蕈子串上竹籤，擱炭火裡烤透，就是暗影谷炭烤蕈串。路上走著吃，比什麼都頂飽。」
     - kind: speech
       speaker: actor
       text: 要是跟你換的蕈串一時吃不完，或是釀罐還沒開封就帶不動了，能拿回來嗎？
     - kind: speech
       speaker: host
-      text: 「蕈串趁熱吃最好。釀罐只要封泥沒拆、罐身完整，原樣送回我這裡，我都替你收下……山林贈予族人的東西，不能浪費。」
+      text: 「蕈串趁熱吃最好。釀罐只要封泥沒拆、罐身完好，原樣送回我這兒，我都替你收下。山林給的東西，浪費不得。」
 - topic_id: ciaran_lareneth_home.topic_03
   keyword: 茶點
   label: 茶點
   fallback:
     scene_id: ciaran_lareneth_home.topic_03_scene
-    revision: r3
+    revision: r5
     lines:
     - kind: speech
       speaker: actor
-      text: 我看你窗邊矮凳上擺著木盤與陶壺，那些點心是特地備給客人的嗎？
+      text: 窗邊矮凳上擺著木盤和陶壺，那些茶點是備給路過的人嗎？
     - kind: narration
-      text: 拉瑞內斯‧妮特布倫提起爐邊溫著的泥壺，往木杯裡倒了一杯清澄的花茶。
+      text: 她提起爐邊溫著的泥壺，往木杯裡斟了一杯清澄的花茶，推到客人手邊。
     - kind: speech
       speaker: host
-      text: 「那是讓經過這條小徑的人歇腳的地方。走累了就進來坐下，喝杯花茶潤喉……擺著的花釀和蕈串也儘管取用，這原本就是村裡人互相關照的習慣。」
+      text: 「這條小徑挨著溪，走累的人常進來歇腳。坐下來喝口花茶潤喉，盤裡的花釀和蕈串也儘管取用。這是村裡互相照應的老習慣。」
     - kind: speech
       speaker: actor
-      text: 若想帶幾罐花釀和幾串蕈串上路饋贈友人，也能請你妥善打包嗎？
+      text: 想帶幾罐花釀、幾串蕈串上路送人，也能請你打包穩妥嗎？
     - kind: speech
       speaker: host
-      text: 「只要跟我說一聲，我會用厚樹葉襯底、細草繩綁緊，罐子穩當得很；蕈串用荷葉裹上，涼了也還香。」
-    - kind: speech
-      speaker: actor
-      text: 這樣包著走山路，真不怕磕碰嗎？
+      text: 「說一聲就行。厚樹葉襯底，細草繩綁緊，罐子穩當；蕈串用荷葉裹上，涼了也還香。」
     - kind: speech
       speaker: host
-      text: 「山路顛簸我曉得……綁緊了就不怕。喝完茶再啟程吧。」
+      text: 「我喜歡看人捧著杯子一口接一口喝。走得滿身汗，坐下來把身子鬆開，比什麼都好。」
 - topic_id: ciaran_lareneth_home.topic_04
   keyword: 口味
   label: 口味
   fallback:
     scene_id: ciaran_lareneth_home.topic_04_scene
-    revision: r3
+    revision: r5
     lines:
     - kind: speech
       speaker: actor
-      text: 聽說基亞蘭族平日調製飯食，口味和外頭的大城很不一樣？
+      text: 聽說基亞蘭族做飯的口味，和外頭大城不太一樣？
     - kind: narration
-      text: 拉瑞內斯‧妮特布倫指尖拂過竹篩裡晾乾的花瓣，眼神悠遠而寧靜。
+      text: 她拈起竹篩裡一片晾乾的花瓣，湊到鼻尖聞了聞，笑了。
     - kind: speech
       speaker: host
-      text: 「村裡做飲食偏重清淡、講究原味，甜多鹹少，圖的是留住食材本來的香氣……外頭王國的大城裡，聽說人們喜歡油重味濃，來到谷底恐怕會覺得太素雅了些。」
+      text: 「村裡做吃食圖清淡，甜多鹹少，要留住食材本來的香。外頭王國的大城愛下重油重鹽，進了谷裡，大概會嫌這兒的吃食太素。」
     - kind: speech
       speaker: actor
-      text: 你在夜綻花釀裡調的甜味，也是照這個心思拿捏嗎？
+      text: 你釀花時放的甜，也是照這個心思拿捏嗎？
     - kind: speech
       speaker: host
-      text: 「哪怕是釀花，糖我也只放最少的一點，糖下多了就蓋過花瓣原有的香氣。若是喜歡天然甘甜，帶一罐暗影谷夜綻花釀回去細品，最能喝出山谷的真滋味。」
+      text: 「糖只放最少的一點。下多了，花瓣的香就給壓住。想要那股天然的甘，就帶一罐暗影谷夜綻花釀回去，小口嚐。」
+    - kind: speech
+      speaker: host
+      text: 「嘗過我這兒甜味的人，夜裡都想再來。糖抹在嘴邊，舌尖一捲就沒了，我捨不得一口氣喝光。你今晚要是不趕路，留下來，我陪你喝到天亮。」

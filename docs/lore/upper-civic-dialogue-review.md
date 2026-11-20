@@ -102,3 +102,68 @@ Scholarly, structured, patient, pedantic register. Opens with "welcome", analyze
 - **Scene Shapes**: All formal scenes start with complete actor `speech` line, followed by host responses and stage narration, within 3–8 lines.
 - **Revision Tracking**: All authored scenes across all three hosts declare `revision: r2`.
 - **Offline / Browser Smoke Note**: In accordance with slice constraints, local browser manual login is non-operational and content slices add no test modules; offline data integrity is verified via `DIALOGUE_SNAPSHOT` and focused Evennia logic test execution.
+
+---
+
+## Rewrite (2026-11-20)
+
+This section records the prose rewrite of all three hosts under `authored-dialogue-content-upper-civic`. Every `topic_id`, `scene_id`, `keyword`, `label`, variant `when` condition, variant priority, and service semantics was preserved byte-for-byte; only the prose was replaced. No `refusal` scenes exist in any of the three files. The `altoria_academy.topic_04` keyword remains `求學` as established in the prior change. All authored scenes moved from `revision: r2` to `revision: r3`.
+
+### A. altoria_noble_watch (古利安‧鷹守)
+
+**Greeting rewrite**: The new greeting sets down the quill, adjusts the glasses, and states up front that the quarter sets no checkpoint, needs no registry, and that the watch handles patrol, fire safety, and household reports.
+
+1. `altoria_noble_watch.topic_01` (keyword: 貴族區, label: 貴族區):
+   - Variant `noble_visitor` (`social_identity_is: noble`, priority 10), `revision: r3`:
+     - Intent: a noble visitor asks whether the watch must verify identity or record titles at entry, and the host offers courteous reassurance that no pedigree check exists.
+     - Causal bridge: the host rises and answers the verification question directly (no title registry, no roadside checks), then hands mansion-gate procedure to each household and closes with 請自便. No heraldic document test is invented.
+   - Fallback `altoria_noble_watch.topic_01_scene`, `revision: r3`:
+     - Intent: an ordinary traveller asks whether a stranger may walk the quarter without reporting identity, and the host confirms open streets.
+     - Causal bridge: the host answers directly (open to all, patrol and fire tanks only, no origin checks), then separates mansion gates (household rules) from the streets (free to all), closing with 請自便.
+2. `altoria_noble_watch.topic_02` (keyword: 謁見, label: 謁見), fallback `revision: r3`:
+   - Intent: a visitor asks whether petitions and audiences pass through the post, and the host disclaims authority while describing the quiet, open palace forecourt.
+   - Causal bridge: the host answers with a wry self-deprecation that the watch forwards no letters and schedules no audience, then directs the guest down the avenue to the open forecourt and describes its stillness—answering the question while refusing the implied service, not as a separate refusal scene.
+3. `altoria_noble_watch.topic_03` (keyword: 衛所, label: 衛所), fallback `revision: r3`:
+   - Intent: a visitor asks what duties the post performs, and the host enumerates the three responsibilities and the boundary with the South Gate captain.
+   - Causal bridge: the host answers with the three duties (patrol, fire-tank checks, household reporting), then names the coordination with 托瓦德‧鄧堡 to delimit the watch's scope, closing with an offer of local information.
+4. `altoria_noble_watch.topic_04` (keyword: 委託, label: 委託), fallback `revision: r3`:
+   - Intent: a visitor asks where to find beast-clearing or guard work, and the host confirms the watch posts no bounties.
+   - Causal bridge: the host answers by stating no bounty board and no commissions, redirects to the guild hall notice board east of the central square, and distances the watch from private mansion arrangements.
+
+### B. altoria_drill_yard (伊沃‧高丘)
+
+**Greeting rewrite**: The new greeting shakes mud from the sleeves, asks whether the visitor came to watch or train, and warns up front that there are no shortcuts—only the dirt, the posts, and honest talk.
+
+1. `altoria_drill_yard.topic_01` (keyword: 修煉, label: 修煉), fallback `revision: r3`:
+   - Intent: a visitor asks about yard rules and hours, and the host confirms the ground and posts are open to anyone at any time.
+   - Causal bridge: the host answers the rules question directly (no schedule, no restrictions), offers free use of the posts, and closes with the bench for rest, keeping the turn on the question asked.
+2. `altoria_drill_yard.topic_02` (keyword: 考核, label: 考核), fallback `revision: r3`:
+   - Intent: a visitor asks whether the yard conducts rank-evaluation, and the host redirects grading to the guild.
+   - Causal bridge: the host answers that grading is the guild's matter and sends the visitor to the guild-hall counter east of the square, then warns to build basics first so the exam does not end in an early fall.
+3. `altoria_drill_yard.topic_03` (keyword: 切磋, label: 切磋), fallback `revision: r3`:
+   - Intent: a visitor asks whether opponents can be arranged for sparring, and the host refuses to recruit or provide partners.
+   - Causal bridge: the host declines outright (no partners, no recruiting), names the danger of live blades on dirt, and closes on the yard's one real virtue—the soft dirt sparing cracked skulls.
+4. `altoria_drill_yard.topic_04` (keyword: 教頭, label: 教頭), fallback `revision: r3`:
+   - Intent: a visitor asks whether the instructor teaches steps or power technique, and the host defers to honest sweat.
+   - Causal bridge: the host answers by defining the post as keeping the yard and weeding, disclaims fancy tricks and certificates, and turns the guest's attention to the marks they themselves earn on the wood.
+
+### C. altoria_academy (奧德溫‧薩契)
+
+**Greeting rewrite**: The new greeting erases a formula on the blackboard, turns to welcome the visitor, and invites a question on spell tiers, elements or affinity, affirming that the academy teaches knowledge and sells no shortcut.
+
+1. `altoria_academy.topic_01` (keyword: 魔法等級, label: 魔法等級):
+   - Variant `magic_scholar` (`skill_owned: magic_circle_comprehension >= 1`, priority 10), `revision: r3`:
+     - Intent: a scholar who knows magic circles asks how mana cost differs across tiers, and the host praises the question and answers from that shared ground.
+     - Causal bridge: the host opens with 問得好, ties the tiers to mana cost, lists the six tiers, and closes by pointing to the library's tier-ordered shelves—answering at the scholar's level without condescension.
+   - Fallback `altoria_academy.topic_01_scene`, `revision: r3`:
+     - Intent: a newcomer asks how the tiers in old books are categorized, and the host explains the tier system with concrete spell examples.
+     - Causal bridge: the host frames the question in two layers, lists the six tiers by mana cost, then walks from apprentice-rank spells (火焰箭, 水箭術, 風刃術, 治癒術) upward through 術師 and 大師 to the unpayable 主宰 and 神格, closing with the open, tier-ordered library.
+2. `altoria_academy.topic_02` (keyword: 元素, label: 元素), fallback `revision: r3`:
+   - Intent: a visitor asks how many elements exist and how each differs in use, and the host presents all eight with their operational roles.
+   - Causal bridge: the host manifests a soft light, states the eight elements as the first lesson, then gives each element's role (火 burn, 水 drain and return, 風 speed, 土 terrain and ward, 雷 initiative and stun, 冰 freeze, 光 heal and purify, 暗 weaken), closing on mana resonance over rote memorization.
+3. `altoria_academy.topic_03` (keyword: 親和, label: 親和), fallback `revision: r3`:
+   - Intent: a visitor asks where affinity differences come from, and the host explains the two layers of inborn and personal affinity without granting what the academy cannot give.
+   - Causal bridge: the host separates racial endowment (elves innate and fast, orcs strong but shallow of affinity) from personal elemental inclination, then states plainly that the academy cannot bestow affinity, only clarify a path.
+4. `altoria_academy.topic_04` (keyword: 求學, label: 求學), fallback `revision: r3`:
+   - Intent: a visitor asks how classes run and whether one tutor can take a single student, and the host explains open lectures while refusing private instruction.
+   - Causal bridge: the host denies single-tutor and private instruction, states lectures are open to all, grounds progress in daily reading and drilling, and closes by sending level assessment to the guild hall rather than the academy.

@@ -1,16 +1,16 @@
 schema_version: 1
-greeting: 伊斯爾林‧斯塔爾威維爾讓木梭停在經線之間，轉過身來。她身上的輕紗隨著動作滑開，她也沒去攏，只把手上一截線繞上指節：「進來呀。先說給我聽，你喜歡什麼樣的布貼在皮膚上？」
+greeting: 伊斯爾林‧斯塔爾威維爾讓木梭停在經線之間，轉過身來。身上那件輕紗跟著滑開，她也沒去攏，只把指上那截線繞回線軸：「進來呀。先告訴我，你喜歡什麼樣的布貼在皮膚上？」
 topics:
 - topic_id: fionnen_ithrlin_home.topic_01
   keyword: 獵衣
   label: 獵衣
   fallback:
     scene_id: fionnen_ithrlin_home.topic_01_scene
-    revision: r1
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
-      text: 「衣箱上那件摺好的衣裳，料子看起來很輕，那是獵衣嗎？」
+      text: 「箱上那件摺好的衣裳，料子看著很輕，是獵衣吧？」
     - kind: narration
       text: 她把獵衣從箱上取下來，抖開，讓布面在窗光裡透亮。
     - kind: speech
@@ -18,80 +18,80 @@ topics:
       text: 「森林葉織獵衣。線裡絞了林子裡耐扯的草，織得疏，跑起來不綁身子。」
     - kind: speech
       speaker: host
-      text: 「巨木之間的枝椏低，衣服太厚會勾住。這件貼著身體走，手一抬就過去了。」
+      text: 「巨木間的枝椏低，衣裳太厚會勾住。這件貼著身子走，跑熱了汗一浸，布就裹在皮膚上，手一抬就過去了。」
     - kind: speech
       speaker: actor
-      text: 「穿得這麼薄，林子裡的風不冷嗎？」
+      text: 「穿這麼薄，林子裡的風不冷嗎？」
     - kind: speech
       speaker: host
-      text: 「跑起來就暖了。停下來覺得冷，再披一件外衣，獵隊都這樣。」
+      text: 「跑起來就暖。汗滲進線裡，布貼著皮膚，涼風一吹正好。停下來覺得冷，再披一件外衣，獵隊都這麼穿。」
     - kind: speech
       speaker: host
-      text: 「你伸手摸腋下那一段，我留了活動的餘地，拉弓、攀枝都不扯。」
+      text: 「你摸一下腋下那一段，我留了活動的餘地，拉弓、攀枝都不扯。我自己進林子也穿它，汗出透了，布貼著腰、貼著腿，像第二層皮。」
 - topic_id: fionnen_ithrlin_home.topic_02
   keyword: 輕紗
   label: 輕紗
   fallback:
     scene_id: fionnen_ithrlin_home.topic_02_scene
-    revision: r1
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
-      text: 「你身上這件紗，薄得幾乎看不見，也是你自己織的嗎？」
+      text: 「你身上這件紗，薄得幾乎瞧不見，也是自己織的？」
     - kind: narration
-      text: 伊斯爾林‧斯塔爾威維爾捏起一角紗，讓它從指間滑下去，紗落回身上。
+      text: 伊斯爾林‧斯塔爾威維爾拈起一角紗，讓它從指間滑下去，落回身上。
     - kind: speech
       speaker: host
-      text: 「精靈森林輕紗。線趁天剛亮、露水還沒乾的時候收下來，這個時節才有。」
+      text: 「精靈森林輕紗。線趁天剛亮、露水還沒乾的時候收，這個時節才有。」
     - kind: speech
       speaker: host
-      text: 「露水凝成的線細，捻起來費工，可穿上身幾乎沒有重量，風一來就貼著皮膚走。」
+      text: 「露水凝成的線細，捻起來費工，可穿上身幾乎沒有重量。天一熱，前胸後背都濕透，它黏在乳上、黏在大腿，風一來貼著皮膚走，涼得人一激靈。」
     - kind: speech
       speaker: actor
-      text: 「過了季節，就織不出來了？」
+      text: 「這種露水線一年就一陣子吧？過了季節就織不出來了？」
     - kind: speech
       speaker: host
-      text: 「過了就沒有那樣的線。所以一個季節織不了多少，織完就等下一次露水。」
+      text: 「過了就沒有那樣的線，一季織不了多少，織完再等下一回露水。」
     - kind: speech
       speaker: host
-      text: 「你要試就伸手，摸過再決定。隔著一段距離看，看不出它好在哪裡喔。」
+      text: 「想試就伸手。隔著紗摸我，摸過你就曉得它好在哪；你別光站著瞧，我可會把你拉過來喔。」
 - topic_id: fionnen_ithrlin_home.topic_03
   keyword: 白衣
   label: 白衣
   fallback:
     scene_id: fionnen_ithrlin_home.topic_03_scene
-    revision: r1
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
-      text: 「架子最上層那件白色的精靈傳統服飾，跟其他衣服放在一起，是特別的日子穿的嗎？」
+      text: 「架子最上頭那件白色衣裳，跟別的衣裳放在一起，是特別日子才穿的嗎？」
     - kind: narration
-      text: 她把白衣取下，披在自己身前比了比，紗下的身形透得清楚。
+      text: 她把白衣取下來，往自己身前比了比，紗下的身形透得清楚。
     - kind: speech
       speaker: host
-      text: 「平常也穿。這件白衣村裡誰都穿，織得薄，皮膚透得到風，也看得見人。」
+      text: 「平常也穿。這件精靈傳統服飾村裡誰都穿，織得薄，皮膚透得到風，也瞧得見人。」
     - kind: speech
       speaker: host
-      text: 「村裡的人不覺得身體有哪裡需要遮。屋裡屋外都一樣，熱了就把衣服解開，想要的時候就靠在一起，像吃飯、像睡覺。」
+      text: 「身子有哪兒要遮？我們不這麼想。屋裡屋外一個樣，熱了就解衣裳，汗也不擦；想要了就把人拉上榻，跟吃飯一樣平常。」
     - kind: speech
       speaker: host
-      text: 「外頭來的人一開始不敢看，眼睛往旁邊躲。看久了就曉得，這裡沒有人會笑他。」
+      text: 「外頭來的人起先不敢看，眼睛往旁邊躲。待久了就曉得，這兒沒人會笑他。」
     - kind: speech
       speaker: actor
-      text: 「穿成這樣，是為了讓自己舒服嗎？」
+      text: 「穿成這樣，圖的是自己舒服？」
     - kind: speech
       speaker: host
-      text: 「是為了自己舒服。你要穿也可以，不穿也可以，這屋裡隨你。」
+      text: 「圖自己舒服，也圖別人瞧。我喜歡被看，有人盯著，我就迎著他的眼睛，看他能撐到哪。你這雙眼睛，就別躲了。」
 - topic_id: fionnen_ithrlin_home.topic_04
   keyword: 收回
   label: 收回
   fallback:
     scene_id: fionnen_ithrlin_home.topic_04_scene
-    revision: r1
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
-      text: 「衣裳穿舊了，或是不合身了，能帶回樹冠上給你嗎？」
+      text: 「衣裳穿舊了，或不合身了，能帶回樹冠上給你嗎？」
     - kind: speech
       speaker: host
       text: 「我織的衣裳，帶回來。線我挑開，洗淨了還能再用。」
@@ -100,12 +100,12 @@ topics:
       text: 「成色好的我算銅幣給你，破得厲害的我也收，線拆下來當經線。」
     - kind: speech
       speaker: actor
-      text: 「外頭買來的衣服呢？料子若是不錯，你也拆嗎？」
+      text: 「外頭買來的衣裳呢？料子要是不錯，你也拆嗎？」
     - kind: narration
-      text: 她把指上的線繞回線軸，搖了搖頭。
+      text: 她把指上的線繞回線軸，搖了搖手。
     - kind: speech
       speaker: host
       text: 「外頭的布我不拆。撚線、染布的手法都不同，混進我的線裡，整匹布就毀了。」
     - kind: speech
       speaker: host
-      text: 「留著自己穿，或帶回山外。樹冠上的線只認這片林子。」
+      text: 「留著自己穿，或帶回山外。樹冠上的線，只認這片林子。」

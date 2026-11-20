@@ -144,3 +144,62 @@ All three hosts maintain their canonical place assortment bindings without alter
   - Executed Traditional Chinese language linter with 0 errors across all owned files.
   - Verified condition references and presence of all 12 stable topic IDs via `world.rules.dialogue_references`.
   - Focused automated test suites in `world.lore` and `world.rules` executed green.
+
+---
+
+## Rewrite (2026-11-20)
+
+This pass records the final prose of the three crafts hosts, `ciaran_hailiel`, `ciaran_vethiel` and `ciaran_gwenaera`. All three greetings were rewritten. Every topic ID and scene ID is retained, and no topic declares `requires`, `unavailable`, or a formal `refusal` scene; the only conditional structure is Hailiel's `human_guest` variant, which keeps its `race_is: human` condition and `priority: 10`. All three hosts are adults — Hailiel, Vethiel and Gwenaera — so the prose is allowed to be grown-up and body-confident in the canon's register, and Vethiel's bare-shouldered weaving and frank talk about the body stay within the world's "no shame about the body" canon rather than being staged as anything explicit. Service semantics are preserved: no line delivers a free repair, commission, discount or price, and each host's buy-back still accepts only her own finished work and refuses outside goods, matching the current `assortments.py` shelves.
+
+### ciaran_hailiel (海莉爾‧斯塔爾法爾)
+
+**Greeting (rewritten).** She lifts a just-quenched blade blank onto the anvil, flicks the water from her fingers, and looks at the visitor's hands first, inviting them to the anvil to have their grip read before touching the blades.
+
+1. `ciaran_hailiel_home.topic_01` (keyword `鍛刀`, label `鍛刀`). **Intent:** explain how shadow steel is folded and hammered from fierce valley iron sand. **Bridge:** the actor asks how the blades are made; the host answers panning the sand and folding it over days, which motivates the follow-up about holding a finished blade and its answer to test the balance at the wrist. **Variant `human_guest`** (`when: kind: race_is`, `race_key: human`, `priority: 10`, scene `ciaran_hailiel_home.topic_01_human`, **r3**) meets a bowing courtly visitor and asks them to stand straight, then gives the same folding answer, closing on "天成這兩個字，外頭的人瞎編". **Fallback** (`ciaran_hailiel_home.topic_01_scene`, **r3**) delivers the same folding-and-quenching account without the courtliness.
+
+2. `ciaran_hailiel_home.topic_02` (keyword `影刀`, label `影刀`, **r3**). **Intent:** explain the paired short blade `暗影鋼刀‧影` and its first-frost quenching. **Bridge:** the actor asks about the shorter blade beside the anvil; the host answers it is the paired off-hand shadow blade, quenched in the first frost still hanging on the spring, which motivates the actor's "so a long-and-short pair turns better in the mountains?" and the host's main-hand/off-hand answer.
+
+3. `ciaran_hailiel_home.topic_03` (keyword `鐵料`, label `鐵料`, **r3**). **Intent (refusal carried in-scene):** refuse outside ore and explain the valley-sand-only supply. **Bridge:** the actor asks whether she will take outside raw iron; the host answers no — she pans every grain herself from the valley floor and a foreign mix ruins a whole charge, which motivates the follow-up about worn-out traded blades and the buy-back answer that takes only her own intact steel.
+
+4. `ciaran_hailiel_home.topic_04` (keyword `用刀`, label `用刀`, **r3**). **Intent:** explain how a blade's fit follows the body and points to Teliel's judgement. **Bridge:** the actor asks for her view of wielding from beside the drill field; the host answers that neighbour Teliel has the final say on whether a blade fits, and that the twin blades want both hands and flowing steps, which motivates the actor's "so an ill-fitting blade hurts its wielder" and the host's closing that she will not push a blade on the wrong hands.
+
+### ciaran_vethiel (維特希爾‧威爾德布瑞亞爾)
+
+**Greeting (rewritten).** She stops the wooden shuttle, turns from the warp with dyed thread around her fingers, and — baring her upper body without embarrassment — asks which colour the guest favours and offers to take a cloth down to feel against the skin.
+
+1. `ciaran_vethiel_home.topic_01` (keyword `織衣`, label `織衣`, **r4**). **Intent:** name the two dark-elf garments on her loom and the way she warps and plant-dyes every thread. **Bridge:** the actor asks what she weaves; the host answers she warps and dyes it all herself and names `精靈短袍傳統服飾` and `精靈戰鬥服飾`, which motivates the follow-up about how to choose and the answer to feel the weave against the skin rather than trust the eye.
+
+2. `ciaran_vethiel_home.topic_02` (keyword `戰衣`, label `戰衣`, **r3**). **Intent:** explain the ink-black battle dress's close cut for the forest. **Bridge:** the actor asks whether `精靈戰鬥服飾` suits a forest hunt; the host answers it hugs the body into the shadow and leaves the joints free, which motivates the follow-up about snagging on brush and the answer that the weft holds mountain fibre.
+
+3. `ciaran_vethiel_home.topic_03` (keyword `禮袍`, label `禮袍`, **r4**). **Intent:** place `精靈短袍傳統服飾` as the dark elves' own everyday dress and state the body's ease, then name the neighbours who make the white robe and the veil. **Bridge:** the actor asks whether the close-cut short robe is ceremonial; the host answers it is the Ciaran's own dress, open at the hem, and that a body is worth showing, which motivates the follow-up about the white silk robe and the mist veil, answered by naming 幽月谷村's white robe and the veil of 伊斯爾林‧斯塔爾威維爾 at 樹冠吊橋 in 翠綠森林村.
+
+4. `ciaran_vethiel_home.topic_04` (keyword `舊衣`, label `舊衣`, **r4**). **Intent (refusal carried in-scene):** take back only her own two garments and refuse outside cloth. **Bridge:** the actor asks whether worn clothes can come back; the host answers she unpicks sound thread from her own two garments to re-spin, which motivates the follow-up about city-bought clothes and the flat refusal to mix foreign weave into her loom.
+
+### ciaran_gwenaera (格威娜拉‧希爾維爾莉夫)
+
+**Greeting (rewritten).** She sits behind the work table twisting silver wire and, on seeing the visitor, holds up two just-finished silver flowers and asks them to pick a favourite, pointing at the finished pieces on the window cord and offering to look at anything that has come loose.
+
+1. `ciaran_gwenaera_home.topic_01` (keyword `綴飾`, label `綴飾`, **r3**). **Intent:** describe the hand-twisted silver, creek shells and ground crystal sand that make her ornaments. **Bridge:** the actor asks what she makes; the host answers she twists wire, gathers shells and grinds sand for the love of it, which motivates the follow-up about whether a traveller may take one and the answer that exchange runs by the village's usual way without haggling.
+
+2. `ciaran_gwenaera_home.topic_02` (keyword `晶符`, label `晶符`, **r3**). **Intent:** explain `三稜晶符` as a light-splitting charm, not a sealed relic. **Bridge:** the actor asks about the faceted crystal pendant; the host answers it splits light into three bands by the ancestral grinding method and holds no sealed spirit, only steady gathered light, which motivates the actor's "rare enough" and the host's offer of a cord-matched piece.
+
+3. `ciaran_gwenaera_home.topic_03` (keyword `耳環`, label `耳環`, **r4**). **Intent:** present `月牙耳環` as her most practised work, from the same silver batch as 瓦爾溫's pair. **Bridge:** the actor asks about the crescent loops on her ears; the host answers the crescent is the shape her fingers know, and that 瓦爾溫's pair came from the same batch of silver, which motivates the actor's "no wonder the whole village wears them" and the host's closing on airing them under the silver leaves.
+
+4. `ciaran_gwenaera_home.topic_04` (keyword `舊飾`, label `舊飾`, **r3**). **Intent (refusal carried in-scene):** mend and take back only her own charms, refusing outside metal. **Bridge:** the actor asks what to do with a snapped wire or an unwanted piece; the host answers she will re-mend her own work and buy back `三稜晶符` and `月牙耳環` for the silver, which motivates the follow-up about city-bought jewellery and the flat refusal to touch metal whose mix she cannot read.
+
+### Adult-voice pass (2026-11-20)
+
+This pass added an adult register across all three hosts. IDs, conditions, variant priorities, buy-back boundaries and service semantics are all unchanged; all three hosts are adults, so the prose is allowed body confidence and frank desire in their own voices. `ciaran_valwyn` and every Eolas host received no sexual content.
+
+- `ciaran_hailiel_home.topic_01` **fallback** → **r4** and **variant `human_guest`** → **r4**. Body confidence in the smith's own voice: sweat running down her forearm, "我一站就是大半天，汗浸透圍裙，也不想離開爐邊", the read of the visitor's grip ("你的手我瞄過了，握得實"), and, in the variant, "腰站穩了，再論刀好不好使".
+- `ciaran_hailiel_home.topic_02` → **r4**. The pass added no new sexual or body content here; the scene was lightly trimmed ("拈起那柄短刀" → "拈起短刀") and its revision bumped in the file-wide sweep.
+- `ciaran_hailiel_home.topic_03` → **r4**. No prose change from the prior pass; the revision was bumped in the sweep and the buy-back boundary (her own intact steel only) is unchanged.
+- `ciaran_hailiel_home.topic_04` → **r4**. Frank desire for Teliel's body in her own voice — "她一揮刀，腰往下沉，大腿繃緊，喘一聲就劈出去。我打一輩子的刀，也就愛她那副身子被刀帶著走的樣子" — beside the unchanged warning against an ill-fitting blade.
+- `ciaran_vethiel_home.topic_01` → **r5**. Body confidence — "熱了就光著，汗滴上經線也不躲" and "我的胸、我的腰，自己都穿過摸過，才敢掛上去" — matched by a greeting that now names the sweat on her bare chest and her ease under the visitor's gaze.
+- `ciaran_vethiel_home.topic_02` → **r4**. A remembered lover and bodily ease — "一出汗，布就溼貼在大腿和腰窩上" and "我也有個老相好，總穿它進林子……我替她鬆背上的釦".
+- `ciaran_vethiel_home.topic_03` → **r5**. Body confidence — outsiders "有的還會回頭偷看" and the neighbour's weaving "細得能勾人" — layered onto the unchanged placement of the white robe and the veil in the other villages.
+- `ciaran_vethiel_home.topic_04` → **r5**. One sensual line — "它貼過的身子，我也照樣待它" — beside the unchanged buy-back (her own two garments only) and the flat refusal of outside cloth.
+- `ciaran_gwenaera_home.topic_01` → **r4**. Body confidence — "飾品要貼著鎖骨、耳垂、手腕才好看，老掛在繩上不動，多寂寞".
+- `ciaran_gwenaera_home.topic_02` → **r4**. Body confidence — the charm "貼著皮膚，光就順著身子走" — kept on the non-relic framing.
+- `ciaran_gwenaera_home.topic_03` → **r5**. Body confidence and frank sensuality — "耳垂這地方最貪了。冰涼的銀貼上去，先是一激靈，等被身子焐熱了，就再也摘不下來" — with the offer to pin a pair on at the ear.
+- `ciaran_gwenaera_home.topic_04` → **r4**. No prose change from the prior pass; the revision was bumped in the sweep and the buy-back boundary (her own `三稜晶符` and `月牙耳環` only) is unchanged.

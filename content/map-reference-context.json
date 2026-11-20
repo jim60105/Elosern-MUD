@@ -256,7 +256,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "0112d4310bbba405cf046c75d7337bf410cffa5585978bee0725e35b23fb471e",
+  "fingerprint": "6b4f3867c37b725841b0952e9302de2e751fba9ea9100fdc8b9f7c3a3040b6f3",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -16492,14 +16492,14 @@
     "world/lore/npc_editorial_review.py": "9344e2b199fb4c2d83e2d18742aaa124b6eeb9a5585fa5afcc60fc0e8ecc3fdb",
     "world/lore/npc_profiles/__init__.py": "11fd39fc753e51807a6a62e59b845c14f08d8817dc97c5b55836e1f67351fc4c",
     "world/lore/npc_profiles/altoria_guild.py": "72101595652ffcf24792c878481f104aeb68ec6869d498f2a2d3c0682a4e4202",
-    "world/lore/npc_profiles/altoria_lower.py": "c362b29117139540747198bd4b149dd303a986d8537c867d6bc854b1c7a56a2c",
+    "world/lore/npc_profiles/altoria_lower.py": "1ffd92c9b9ca6833158f4cfcd0cd9b6ae9f0f9b0bafaf59a70815418424b5f87",
     "world/lore/npc_profiles/altoria_trade.py": "7cde680a460c0296cbf520ebcde315ae39ee139c6d4f06d16c64f23b8a0573d6",
     "world/lore/npc_profiles/altoria_upper.py": "05884758c9f7fd87f164a9e53891ae9ac15f24b829ceea8e44cb082fb9c6bf51",
     "world/lore/npc_profiles/ciaran_homes_a.py": "129a4303c9847e29f9d4a4026b3f4d8dbd30128f9b811bfe68583ce08f7a6149",
     "world/lore/npc_profiles/ciaran_homes_b.py": "2f04087bf97b6d5185f259e022d0b3df41916cae93e96cad0391fed4f5c3e7a8",
-    "world/lore/npc_profiles/eolas_homes_a.py": "531812d5e9443ee8715e67df2d54d25073f1b7f0c33ffdf52c1cd1a5216e6dee",
-    "world/lore/npc_profiles/eolas_homes_b.py": "88c0ba4750446cc28bcef34c5b48db26217d7430e3df40b2d3fdaf1e906b4650",
-    "world/lore/npc_profiles/fionnen_homes_a.py": "bd4d41d8c02051f9d184de1afa1f869a044754dc7e158343e94b92d7ed18697d",
+    "world/lore/npc_profiles/eolas_homes_a.py": "81fc3eafef27c1b353f226bd0be06a3664fe716bcbb70f9429fe54bd714bbf76",
+    "world/lore/npc_profiles/eolas_homes_b.py": "e797a1e86063efeaac4e91a344b7e0e0d06fbff35ed344b32139e9567a3dfdf8",
+    "world/lore/npc_profiles/fionnen_homes_a.py": "e2af43c8df5f31834841cb8592c16f31b1ab4b02243761826598187f1497c269",
     "world/lore/npc_profiles/fionnen_homes_b.py": "97d66e9bd5acdec25c6a9a353c3798abf936163b5fb92655fcc101064c05405a",
     "world/lore/npc_profiles/inventory.py": "47624e0e9ac49db999f3b882a02d391e3d9593691710dbab8537b611475aacad",
     "world/lore/npc_profiles/shape.py": "988fc9dea7ad2f706bef99f8d6df265e423802af79a76880b6099cd2ba2be4fa",

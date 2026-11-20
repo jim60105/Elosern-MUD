@@ -6,7 +6,7 @@ topics:
   label: 山谷
   fallback:
     scene_id: eolas_saelnel_home.topic_01_scene
-    revision: r1
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
@@ -22,19 +22,13 @@ topics:
       text: 「那洗身子的地方呢？」
     - kind: speech
       speaker: host
-      text: 「溫泉浴場在谷壁底下。石頭圍起幾座池子，洗身、洗衣、說話都在同一個池邊，沒有隔間，也沒有人守著。孩子們在水裡玩到天黑才肯回家。」
-    - kind: speech
-      speaker: actor
-      text: 「所以谷裡的事，幾乎都自己解決了。」
-    - kind: speech
-      speaker: host
-      text: 「外面的人需要什麼，村裡不曉得；谷裡需要的東西，族人自己做得出來。這樣的日子過得下去，也就不必去求誰。」
+      text: 「溫泉浴場在谷壁底下。熱水從岩縫裡冒出來，池邊沒有隔間，也沒有人守著。洗身、洗衣、交歡，都在同一池水裡。誰也不避誰，山外來的客人起先拘謹，脫了衣裳就不記得自己先前彆扭了。」
 - topic_id: eolas_saelnel_home.topic_02
   keyword: 圖書館
   label: 圖書館
   fallback:
     scene_id: eolas_saelnel_home.topic_02_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
@@ -48,17 +42,14 @@ topics:
     - kind: narration
       text: 她用指節敲了敲桌上那本翻開的書，紙頁邊角已經磨軟。
     - kind: speech
-      speaker: actor
-      text: 「那些筆記裡，有你自己寫的嗎？」
-    - kind: speech
       speaker: host
-      text: 「有不少。我讀過的書比大多數人多，寫下的也多。孩子，你要找什麼，我可以告訴你它在哪一排。」
+      text: 「身體的事也有人寫。哪種歡好最盡興、哪種姿勢到了哪一步會疼、該往哪兒用力，都一筆一筆記在架上。孩子，要找什麼，說一聲，我指給你它在哪一排。」
 - topic_id: eolas_saelnel_home.topic_03
   keyword: 外人
   label: 外人
   fallback:
     scene_id: eolas_saelnel_home.topic_03_scene
-    revision: r1
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
@@ -68,16 +59,13 @@ topics:
       text: 「不特別提防，也不特別歡喜。你走進來，就是走進來了；要待多久，看你自己的意思。」
     - kind: speech
       speaker: host
-      text: 「谷裡的日子大半由族人自己作主。白日裡做事，夜裡多半在做愛，這是族裡本來的樣子，來了客人也不會改。」
+      text: 「谷裡的日子照常過。白天做事，晚上就享受彼此的身子，這是族裡本來的樣子，有客人來也一樣。你留在溫泉浴場看，也不會有人來問你。」
     - kind: speech
       speaker: actor
-      text: 「那客人若是不習慣，比如在溫泉浴場不肯脫衣裳呢？」
+      text: 「那客人想在這裡住下呢？」
     - kind: speech
       speaker: host
-      text: 「那就穿著。池邊沒有人會多看一眼，也沒有人會問。孩子，這裡沒有人替你定規矩，你自己舒服就好。」
-    - kind: speech
-      speaker: host
-      text: 「族人對外頭的事知道得不多，也不覺得需要知道。你在谷裡，就和谷裡的人一樣過日子。」
+      text: 「那就住下。空著的石室多，吃的也夠。外人起初裹著衣裳進池子，過了幾夜也就肯脫下，和村人躺在一處。你自在了，他們也就自在。」
 - topic_id: eolas_saelnel_home.topic_04
   keyword: 往事
   label: 往事
@@ -86,7 +74,7 @@ topics:
   disclosure: pure_chain
   fallback:
     scene_id: eolas_saelnel_home.topic_04_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
@@ -98,10 +86,10 @@ topics:
       text: 她笑了一下，把書往桌角推得更遠些。
     - kind: speech
       speaker: host
-      text: 「蛛絲林也是後來才種起來。蛛剛到林子裡的時候不肯留，奈拉拉‧弗羅斯特威洛每日去林子邊坐著，坐到蛛自己結了網。」
+      text: 「枕邊的人換了又換，幾百年裡也數不清。我記得的是那些願意在夜裡留到天亮、又肯說聲再會的人。蛛絲林後來才種起來。種樹那年，我身邊躺的還是另一個。」
     - kind: speech
       speaker: actor
       text: 「聽起來，那時候的谷裡也很熱鬧。」
     - kind: speech
       speaker: host
-      text: 「熱鬧。谷底空地從前沒有那塊踩實的地方，村人出入都從那裡過，走久了就踩成現在這個樣子。孩子，你現在踩的這片地，比你想的還要舊。」
+      text: 「熱鬧。孩子，你現在踩的這片谷底空地，比你想的還要舊，也比你想的更懂得快活。」

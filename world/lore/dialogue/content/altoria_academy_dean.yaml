@@ -1,5 +1,5 @@
 schema_version: 1
-greeting: 學院的黑板前，奧德溫‧薩契院長擦去一行算式，放下粉筆回過身來：「歡迎。此刻並非授課時段，但隨時可以探討學問。位階、元素、親和，你想從何處問起？學院傳授的是知識，這裡可沒有捷徑。」
+greeting: 學院的黑板前，奧德溫‧薩契院長擦去一行算式，放下粉筆回過身來：「歡迎。此刻不是授課時段，但學問隨時可以談。法術位階、八種元素、親和之別，你想從哪一項問起？學院只傳知識，不賣捷徑。」
 topics:
 - topic_id: altoria_academy.topic_01
   keyword: 魔法等級
@@ -13,106 +13,109 @@ topics:
       min_proficiency: 1
     scene:
       scene_id: altoria_academy.topic_01_scholar_scene
-      revision: r2
+      revision: r3
       lines:
       - kind: speech
         speaker: actor
-        text: 「我學過一些魔法陣的基礎。想請問在法術位階裡，不同階層的魔力消耗到底差多少？」
+        text: 「我學過魔法陣的基礎。想請問法術位階之間，魔力消耗究竟差了多少？」
       - kind: narration
-        text: 奧德溫‧薩契推了推鼻樑上的圓框眼鏡，眼神中流露出一絲讚許的笑意。
+        text: 奧德溫‧薩契推了推圓框眼鏡，眼底浮起一點讚許。
       - kind: speech
         speaker: host
-        text: 「問得好。懂得解析法陣，就知道每一道咒文的位階不同，消耗的魔力也跟著往上加。」
+        text: 「問得好。懂得解析法陣，就曉得每道咒文落在哪一位階，消耗的魔力也隨之遞增。」
       - kind: speech
         speaker: host
-        text: 「典籍記載的法術位階依消耗劃分為初級、中級、高級、超級與究極，越往深處，所需的魔力越是難以計量。」
+        text: 「典籍按消耗把法術分作學徒、術師、大師、賢者、主宰、神格六等。越往深處，一次施法要付出的魔力越是驚人。」
       - kind: speech
         speaker: host
-        text: 「書庫深處的圖書都依這個順序陳列，但學院只講解法理；想往更高深的系譜走，還是得靠日復一日的練習。」
+        text: 「書庫深處的藏書就按這個次序陳列。學院只講法理，往更高深的系譜走，仍得靠一日一日的練習。」
   fallback:
     scene_id: altoria_academy.topic_01_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
-      text: 「初學魔法，想請問典籍裡常說的法術位階，究竟是怎麼劃分的？」
+      text: 「剛接觸魔法，想請問典籍裡常提的法術位階，到底是怎麼分的？」
     - kind: narration
-      text: 奧德溫‧薩契拿起板擦在黑板邊敲了兩下，指著身後條理分明的板書。
+      text: 奧德溫‧薩契拿起板擦，在黑板邊緣敲了兩下。
     - kind: speech
       speaker: host
-      text: 「這個問題分兩層。首先是法術消耗的位階，由淺入深分為初級、中級、高級、超級與究極。」
+      text: 「這個問題分兩層。先說位階，它按一次施法要消耗的魔力來分，由淺入深是學徒、術師、大師、賢者、主宰、神格。」
     - kind: speech
       speaker: host
-      text: 「初級階是火球、水箭、風刃、治癒術與身體強化這類基礎法術；中級階起，才能施展火焰風暴、冰牆與飛行術。」
+      text: 「學徒階是火焰箭、水箭術、風刃術、治癒術這類入門法術。到了術師階，才輪到火焰風暴、冰牆術、飛行術。」
     - kind: speech
       speaker: host
-      text: 「高級階方能施展熔岩術、暴風雪、高級治癒與統御術；超級階有龍炎術、地震術與神聖光輝；究極階只留在典籍最深處，世上幾乎無人觸及。學院書庫依階序藏書，任何訪客都可以自由閱覽探究。」
+      text: 「再往上，大師階有熔岩術、暴風雪、高級治癒；賢者階有龍炎術、地震術、神聖光輝。主宰與神格兩階，需要的魔力大到尋常法師一次也付不起，典籍只記其名，世上沒幾個人施展得出來。」
+    - kind: speech
+      speaker: host
+      text: 「學院書庫依階序藏書，誰都可以進門翻閱。」
 - topic_id: altoria_academy.topic_02
   keyword: 元素
   label: 元素
   fallback:
     scene_id: altoria_academy.topic_02_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
-      text: 「世上流轉的元素共有哪幾種？施展起來各有什麼不同？」
+      text: 「世上流轉的元素有幾種？每一種施展起來又有什麼不同？」
     - kind: narration
-      text: 奧德溫‧薩契在示範桌前站定，掌心浮起一團溫和的白光。
+      text: 奧德溫‧薩契走到示範桌前，攤開掌心，一團溫和的白光浮了上來。
     - kind: speech
       speaker: host
-      text: 「元素共有八種，是學院入門的第一堂課。」
+      text: 「元素有八種，是學院的入門第一課。」
     - kind: speech
       speaker: host
-      text: 「火擅長爆發與灼燒；水能牽動魔力潮汐；風加快動作與閃避；土操控地形、護住身體；雷講究先發制人；冰讓對手遲緩、定住腳步。」
+      text: 「火主爆發與灼燒；水會奪走對手的魔力，再還給己方；風讓人更快，也更難被擊中；土能改變地形，也能護住身子。」
     - kind: speech
       speaker: host
-      text: 「光元素專精於治療與淨化；暗元素則司掌削弱與侵蝕。八者各有其獨特偏向，相輔相成。」
+      text: 「雷講究搶先出手，麻痺對手；冰讓敵人遲緩，直到凍在原地；光專司治療與淨化；暗則削弱對手、奪人氣力。」
     - kind: speech
       speaker: host
-      text: 「典籍背得再滾瓜爛熟，也唯有親手引導過一次魔力共鳴，才能真正明白元素怎麼運作。」
+      text: 「八種各有偏向，也互相搭配。要把元素摸透，得親手引導過一次魔力共鳴，光背書沒用。」
 - topic_id: altoria_academy.topic_03
   keyword: 親和
   label: 親和
   fallback:
     scene_id: altoria_academy.topic_03_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
-      text: 「常聽人說每個人對魔法的親和不同，這種差別是怎麼來的？」
+      text: 「常聽人說每個人的魔法親和不同，這差別是怎麼來的？」
     - kind: narration
-      text: 奧德溫‧薩契雙手負於身後，神情變得嚴肅而專注。
+      text: 奧德溫‧薩契雙手負在身後，神情認真起來。
     - kind: speech
       speaker: host
       text: 「問得好，這個問題分兩層。」
     - kind: speech
       speaker: host
-      text: 「第一層是種族稟賦。精靈一族天生親近魔力之源，研習各系法理的速度，其他種族都比不上。獸人則體魄強健，親和卻有限。」
+      text: 「第一層是種族稟賦。精靈天生親近魔力，學各系法理的速度勝過其他種族；獸人體魄強健，親和卻淺。」
     - kind: speech
       speaker: host
-      text: 「第二層是個人的屬性偏向。若體質與特定元素相契合，施展對應咒文時就更加順暢；若是缺乏親和，修煉起來就倍加艱辛。」
+      text: 「第二層是你個人的屬性偏向。若身子與某種元素相合，施展對應的咒文就順；相剋的元素，練起來加倍費勁。」
     - kind: speech
       speaker: host
-      text: 「天資是生來既定之物，學院無法憑空賜予親和，但能引導你認清自身的長處與道路。」
+      text: 「天資生來就定，學院不能憑空給人親和，只能幫你認清自己的長處，把路走穩。」
 - topic_id: altoria_academy.topic_04
   keyword: 求學
   label: 求學
   fallback:
     scene_id: altoria_academy.topic_04_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
-      text: 「學院的課是怎麼上的？能不能請一位導師單獨帶著我學？」
+      text: 「學院的課怎麼上？能不能請一位導師單獨帶我一個人學？」
     - kind: narration
-      text: 奧德溫‧薩契整了整衣袍，扶正眼鏡，神色格外坦率平靜。
+      text: 奧德溫‧薩契整了整衣袍，扶正眼鏡，答得平靜。
     - kind: speech
       speaker: host
-      text: 「學院沒有把學生交到某一位導師手上的規矩，也沒有私下傳授的門路。課在講堂裡上，誰走進來都能聽。」
+      text: 「學院不把學生交到哪一位導師手裡，也沒有私下傳授的門路。課在講堂上開，誰走進來都能聽。」
     - kind: speech
       speaker: host
-      text: 「咒文也好，劍術也好，都得自己一天一天讀、一天一天練。學院只把學識整理出來，那些苦功沒有人代得了。」
+      text: 「咒文也好，劍術也好，都得自己一天一天讀、一天一天練。學院只把學識理清楚擺出來，那苦功沒人能替你下。」
     - kind: speech
       speaker: host
-      text: 「想驗證自己練到什麼程度，得去中央廣場東側的冒險者公會參加考核，評定實力的權限在他們那裡。」
+      text: 「想驗證自己練到什麼程度，去中央廣場東側的冒險者公會應考。評定實力的權限在公會，不在學院。」

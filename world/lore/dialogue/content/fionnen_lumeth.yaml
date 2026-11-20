@@ -1,99 +1,99 @@
 schema_version: 1
-greeting: 盧梅斯‧布瑞特莉夫正把一鍋熬好的蜜從灶上端下來。她伸指蘸了一下，舉到客人面前，「先嚐。這鍋蜜裡放了早上採的花瓣，花香還留著。」等客人看過那層蜜，她才笑著問：「你來找蜜，還是有別的事呀？」
+greeting: 盧梅斯‧布瑞特莉夫正把一鍋熬好的蜜從灶上端下來，指尖往鍋裡一蘸，湊到你嘴邊，「先嚐一口。這鍋裡是今早採的花瓣，香都還在。」她等著，也不收手，笑起來眼尾都往上挑，「你來找蜜呀，還是專程來看我？」
 topics:
 - topic_id: fionnen_lumeth_home.topic_01
   keyword: 養蜂
   label: 養蜂
   fallback:
     scene_id: fionnen_lumeth_home.topic_01_scene
-    revision: r2
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
-      text: 「花蕊蜜園的蜂，都是你在照顧嗎？」
+      text: 「花蕊蜜園這些蜂，都是你在照看嗎？」
     - kind: narration
-      text: 她把鍋擱到一旁的石板上，走到窗邊，蜂箱就擱在外頭的樹蔭下。
+      text: 她把鍋擱到石板上，走到窗邊，蜂箱就排在樹蔭底下。
     - kind: speech
       speaker: host
-      text: 「蜂箱在畦邊，花開到哪裡，牠們就飛到哪裡。我做的事只是把箱子擺對位置，別讓雨淋進去。」
+      text: 「是呀。蜂箱擱在畦邊，花開到哪兒，牠們就飛到哪兒。我呀，只負責把箱子擺對地方，別讓雨淋進去。」
     - kind: speech
       speaker: host
-      text: 「森林百花蜜一年收幾回，看花期。開得旺的那一年，蜜裡嚐得出很多種花；開得少，味道就單純一些。」
+      text: 「森林百花蜜一年收幾回，全看花期。開得旺，蜜裡嚐得出好多種花；開得少，味兒就純一點。」
     - kind: speech
       speaker: actor
-      text: 「收蜜的時候，蜂不會螫你嗎？」
+      text: 「收蜜的時候，蜂不螫你嗎？」
     - kind: speech
       speaker: host
-      text: 「會呀，蜂會繞著人轉。動作慢一點，牠們曉得你無意搶蜜，也就不理你了。」
+      text: 「會繞著人轉呀。動作慢些，牠們知道你沒想搶蜜，就自己忙去了，懶得理你。我收蜜收得慢，牠們認我，多半只來聞聞我沾著蜜的手腕。」
 - topic_id: fionnen_lumeth_home.topic_02
   keyword: 蜜漬
   label: 蜜漬
   fallback:
     scene_id: fionnen_lumeth_home.topic_02_scene
-    revision: r1
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
-      text: 「精靈蜜漬花蕊是怎麼做的？」
+      text: 「精靈蜜漬花蕊是怎麼做的呀？」
     - kind: narration
       text: 她從架上取下一罐，掀開布，裡頭的花瓣還透著光。
     - kind: speech
       speaker: host
-      text: 「花瓣洗乾淨，晾到沒有水氣，再和蜜一起下鍋。火不能大，一滾就要離火，花瓣才不會爛。」
+      text: 「花瓣洗乾淨，晾到沒水氣，再跟蜜一塊兒下鍋。火不能大，一滾就得離火，不然花瓣就爛了。」
     - kind: speech
       speaker: host
-      text: 「煮好的裝進罐裡封起來，放到涼。冬天拿出來，配熱水或配麵包都好。」
+      text: 「熬好裝罐封口。你聞，春天的香，甜裡帶一點青。我封罐前總要舔一下木勺，嚐嚐是哪一枝花的味道。」
     - kind: speech
       speaker: actor
-      text: 「所以這一罐是今年春天的花？」
+      text: 「這一罐，你自己也捨得拿來賣？」
     - kind: speech
       speaker: host
-      text: 「春天的最香。夏天雨多，花瓣薄，煮起來容易散，我就少做一點。」
+      text: 「捨得呀。好東西光自己吃多沒趣。你含一小塊，花瓣在舌尖上化開，甜味順著喉嚨往下走。嚐過的人，回頭多半分不清自己惦的是蜜，還是我這根手指。」
 - topic_id: fionnen_lumeth_home.topic_03
   keyword: 蜜漬房
   label: 蜜漬房
   fallback:
     scene_id: fionnen_lumeth_home.topic_03_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「蜜漬房是村裡共用的地方嗎？」
+      text: 「蜜漬房是村裡大家共用的嗎？」
     - kind: narration
-      text: 她朝花圃那頭比了一下，蜜漬房就在幾棵樹之外。
+      text: 她朝花圃那頭比了比，蜜漬房就在幾棵樹後頭。
     - kind: speech
       speaker: host
-      text: 「是。灶和鍋都在那裡，誰要熬什麼就拿去用。村裡要吃的甜食，也都放在那幾格架子上。」
+      text: 「是呀。灶和鍋都在那兒，誰要熬什麼就拿去用。村裡要吃的甜食，都放在那幾格架上。」
     - kind: speech
       speaker: actor
-      text: 「在那裡拿東西，要留銅幣嗎？」
+      text: 「在那兒拿東西，要留銅幣嗎？」
     - kind: speech
       speaker: host
-      text: 「蜜漬房裡的東西不收銅幣。村裡的人取自己需要的量，不夠了再一起做。」
+      text: 「蜜漬房裡頭不收銅幣。誰缺什麼就取多少，不夠了大家再一塊兒做。」
     - kind: speech
       speaker: host
-      text: 「客人想帶走我熬的蜜，就到我家來找我，用銅幣換。這樣你曉得哪一罐出自誰的手。」
+      text: 「客人想帶走我熬的蜜，就上我家來，用銅幣換。這樣你才知道哪一罐出自誰的手，吃得安心。」
 - topic_id: fionnen_lumeth_home.topic_04
   keyword: 收回
   label: 收回
   fallback:
     scene_id: fionnen_lumeth_home.topic_04_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「我帶走的蜜和飯食，用不完還能拿回來嗎？」
+      text: 「我從你這兒帶走的蜜和飯食，用不完能拿回來嗎？」
     - kind: speech
       speaker: host
-      text: 「森林百花蜜、精靈蜜漬花蕊和普通餐食，用不上都可以拿來，我看過成色算銅幣給你。」
+      text: 「森林百花蜜、精靈蜜漬花蕊，還有普通餐食，用不上就拿來，我瞧過成色，算銅幣給你。」
     - kind: speech
       speaker: host
-      text: 「其他的吃食我沒備，也就不收。架上只放我自己熬和自己做的東西，別人的擺進來，我也分不出好壞。」
+      text: 「別的吃食我沒備，也就不收。我架上只放自己熬、自己做的東西，別人家的混進來，我分不出好壞。」
     - kind: speech
       speaker: actor
       text: 「那我從山外帶回來的甜食呢？」
     - kind: narration
-      text: 她搖了搖頭，把手上那罐放回架上。
+      text: 她搖了頭，把手裡那罐擱回架上。
     - kind: speech
       speaker: host
-      text: 「你帶回來的就自己留著。那些不是我的架子上的東西，收了我也沒地方擺。」
+      text: 「你自己留著呀。那不是我架子上的東西，收了我也沒地方擱，白佔一塊地。」

@@ -1,36 +1,36 @@
 schema_version: 1
-greeting: 織機的聲音停下來，奈拉拉‧弗羅斯特威洛把木梭擱在經線上，轉過身。屋裡很靜，她開口時聲音也低：「腳步放輕一點，蛛剛結好新網。進來是想看絲，還是想看那件白衣？要看就自己取下來摸，線在我手上不會斷。」她身上那件白衣只搭在一邊肩上，說話時也沒有去攏。
+greeting: 織機的聲音停下來，奈拉拉‧弗羅斯特威洛把木梭擱上經線，轉過身。她身上那件白衣薄得能透光，只搭在一邊肩上，涼風穿過時，布面貼出一邊乳房的形狀，她也不去攏。「腳步放輕一點，蛛剛結好新網。」她說，聲音低得像怕驚動什麼，「進屋是想貼一綑絲線，還是想換件白衣？要摸就自己取下來，這料子貼上身子，才曉得合不合你。」
 topics:
 - topic_id: eolas_naelara_home.topic_01
   keyword: 養蛛
   label: 養蛛
   fallback:
     scene_id: eolas_naelara_home.topic_01_scene
-    revision: r1
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
-      text: 「林子裡的蛛是你在照顧的嗎？牠們平日吃什麼、怎麼結網？」
-    - kind: narration
-      text: 奈拉拉‧弗羅斯特威洛伸手把門邊一束絲線理順，動作很輕。
+      text: 「林子裡的蛛是你在照顧的嗎？牠們平日吃什麼，又怎麼在這谷裡結出這麼密的網？」
     - kind: speech
       speaker: host
       text: 「蛛不吃我給的東西，牠們自己抓林子裡的小蟲。我能做的只有不讓牠們受驚。」
     - kind: speech
       speaker: host
-      text: 「腳步重一次，一張網就毀了。去年秋天有人在林子邊跑過去，我少收了一整季的絲。」
+      text: 「腳步重一次，一張網就毀了。去年秋天有人從林子邊跑過去，我少收了一整季的絲。」
+    - kind: narration
+      text: 她捻起門邊一根斷絲，舉到光裡，絲線細得幾乎看不見。
     - kind: speech
       speaker: actor
       text: 「一張網要多久才結得回來？」
     - kind: speech
       speaker: host
-      text: 「快的隔一夜，慢的要等牠自己願意。所以我寧可多繞幾步路，也不催牠。」
+      text: 「快的隔一夜，慢的要等牠自己願意。所以我寧可多繞幾步路，也不催牠。母蛛吐絲是為了自己，不為誰催。」
 - topic_id: eolas_naelara_home.topic_02
   keyword: 蛛絲
   label: 蛛絲
   fallback:
     scene_id: eolas_naelara_home.topic_02_scene
-    revision: r1
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
@@ -42,7 +42,10 @@ topics:
       speaker: host
       text: 「我把絲抽成線，線再上機。織衣剩下的線頭我留著補網，一點也不浪費。」
     - kind: narration
-      text: 她把一綑絲放到客人面前，絲在光裡泛著很淡的銀色。
+      text: 她把一綑絲放到客人面前，絲在光裡泛著很淡的銀色，摸上去涼而滑。
+    - kind: speech
+      speaker: host
+      text: 「你伸手碰一下，這股涼會順著指腹爬上手腕。貼身衣裳就該是這觸感，綁在身上，像被涼水裹著。」
     - kind: speech
       speaker: actor
       text: 「帶出山谷，這一綑能換到多少？」
@@ -54,44 +57,41 @@ topics:
   label: 白衣
   fallback:
     scene_id: eolas_naelara_home.topic_03_scene
-    revision: r1
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
-      text: 「那件白色的精靈傳統服飾薄得幾乎透光，穿在身上不會太露嗎？」
+      text: 「那件白色的精靈傳統服飾薄得幾乎透光，為什麼要織得這麼薄？」
     - kind: narration
-      text: 奈拉拉‧弗羅斯特威洛把架上的白衣抖開，披在自己身前比了比，布下的身形看得分明。
+      text: 奈拉拉‧弗羅斯特威洛把架上的白衣抖開，就著窗光垂下來，布面薄得能數出對面幾根手指。
     - kind: speech
       speaker: host
-      text: 「這件就是村人平日穿的那件，從這片林子收的絲織成。織得薄，是為了讓身體透氣，也讓人看得清楚。」
+      text: 「谷裡潮，織薄一點，風走得過去，汗也乾得快。可它薄成這樣，為的是讓身子露得出來。」
     - kind: speech
       speaker: host
-      text: 「身子本來就沒有需要遮的地方。族裡的人赤著身體走來走去，誰也不會多看一眼；性愛也一樣，想要的時候就做，像呼吸、像吃飯。」
-    - kind: speech
-      speaker: host
-      text: 「外頭來的人若覺得太透，那是他把自己的規矩帶進谷裡。你在這裡穿不穿，都隨你。」
+      text: 「谷裡的人不藏身體，也不藏做愛。做愛像呼吸，口渴了就喝，想要了就彼此要。這衣裳穿在身上像多一層皮膚，脫下來是另一種樂趣，兩種我都不避。」
     - kind: speech
       speaker: actor
-      text: 「這麼說，你們穿得少，是因為根本不覺得需要多穿？」
+      text: 「外頭來的人，頭一回見了總要嚇一跳吧？」
     - kind: speech
       speaker: host
-      text: 「就是這樣。你穿上它，皮膚碰得到風，才曉得這件布好在哪裡。」
+      text: 「會。山外的人把自己裹得密不透風，見了這副光景，反而先自個兒臉紅。可住久了還會回頭看，夜裡有人留在我這織機邊，天亮才回自己的石室。」
 - topic_id: eolas_naelara_home.topic_04
   keyword: 收回
   label: 收回
   fallback:
     scene_id: eolas_naelara_home.topic_04_scene
-    revision: r1
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
-      text: 「如果絲用不完，或是衣裳穿舊了，還能帶回這裡嗎？」
+      text: 「絲要是用不完，衣裳買了沒穿，能拿回來給你嗎？」
     - kind: speech
       speaker: host
-      text: 「我織的線、我裁的衣，沒有用過的都可以拿回來，我收下會算銅幣給你。」
+      text: 「我織的線、我裁的衣，沒用過的都可以拿回來，我收下會算銅幣給你。」
     - kind: speech
       speaker: host
-      text: 「別處織的布我不收。線怎麼撚、用什麼染，我都摸不透，混進我的線裡只會壞了整架。」
+      text: 「它貼過誰的身子，我都認得出來。別處織的布我不收，線怎麼撚、用什麼染，我都摸不透，混進我的線裡只會壞了整架。」
     - kind: speech
       speaker: actor
       text: 「外頭帶來的布料，真的一件都不行？」

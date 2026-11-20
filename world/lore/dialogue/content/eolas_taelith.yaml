@@ -1,12 +1,12 @@
 schema_version: 1
-greeting: 泰莉斯‧恩貝爾莉夫把手上的窯灰在圍布上抹掉，從坯架邊拿起一枚剛涼下來的琉璃墜，湊到門口的光裡：「你看，這顆的顏色燒出來了喔。進來坐，窯邊最暖。你是來看琉璃，還是來看燈？」她把墜子遞過來，指尖還帶著窯火的熱。
+greeting: 泰莉斯‧恩貝爾莉夫把手上的窯灰在圍布上抹掉，從坯架邊捏起一枚剛涼下來的琉璃墜，湊到門口的光裡。「你看，這顆的顏色燒出來了喔。」她走過來，前臂還覆著一層薄灰，衣服給窯火烘得汗濕，貼在腰上，她也不在乎，「進來坐，窯邊最暖。你是來看琉璃，還是來看燈？」
 topics:
 - topic_id: eolas_taelith_home.topic_01
   keyword: 窯火
   label: 窯火
   fallback:
     scene_id: eolas_taelith_home.topic_01_scene
-    revision: r1
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
@@ -18,51 +18,54 @@ topics:
       speaker: host
       text: 「火不能一直猛，要看坯的厚薄。厚的多等一會，薄的快進快出，不然就裂。」
     - kind: speech
+      speaker: host
+      text: 「守窯的夜裡，我一身都被火烘得透紅，汗流到腰窩再往下，內衣都貼在皮肉上。可那熱從皮膚滲進骨頭，比跟人睡還暖。」
+    - kind: speech
       speaker: actor
-      text: 「燒窯的時候，你就一直守在這裡？」
+      text: 「燒窯的時候，你一直守在這裡？」
     - kind: speech
       speaker: host
-      text: 「守著。火候跑掉一次，一整架的坯就白做了。守到出窯，我才回去睡。」
+      text: 「守著。火候跑掉一次，一整架的坯就白做。守到出窯，我才回去睡。」
 - topic_id: eolas_taelith_home.topic_02
   keyword: 琉璃墜
   label: 琉璃墜
   fallback:
     scene_id: eolas_taelith_home.topic_02_scene
-    revision: r1
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「你頸上那枚幽月琉璃墜是自己燒的嗎？戴著它有什麼用？」
     - kind: speech
       speaker: host
-      text: 「自己燒的喔。琉璃在火裡定形，戴在身上，施法的時候心比較定，魔力也走得穩。」
+      text: 「自己燒的喔。琉璃在火裡定形，戴在身上施法，心比較定，魔力也走得穩。」
+    - kind: speech
+      speaker: host
+      text: 「可老實講，我喜歡的是它貼在皮膚上的感覺。夏天流滿身汗，它跟著在鎖骨和乳溝間滑來滑去，涼一下、熱一下，舒服得很喔。」
     - kind: narration
-      text: 她把墜子從頸間取下，放在掌心，琉璃裡的光隨著手勢移動。
+      text: 她把墜子從頸間取下，放進掌心，琉璃裡的光隨手勢流動。
     - kind: speech
       speaker: actor
       text: 「所以它只讓你靜得下來，擋不了什麼？」
     - kind: speech
       speaker: host
-      text: 「差不多啦。它不替我擋什麼，也不替我施法。我只是喜歡它貼在皮膚上的感覺。」
-    - kind: speech
-      speaker: host
-      text: 「夏天流汗的時候，它跟著滑來滑去，很舒服喔。」
+      text: 「差不多啦。它不替我擋什麼，就是不讓我心慌。燒窯、施法，手上有一件摸慣、有點像身體溫度的東西，心就定。」
 - topic_id: eolas_taelith_home.topic_03
   keyword: 魔法燈
   label: 魔法燈
   fallback:
     scene_id: eolas_taelith_home.topic_03_scene
-    revision: r1
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「架上的魔法燈，燈罩是這裡燒的？拿到深林裡真的管用嗎？」
     - kind: speech
       speaker: host
-      text: 「罩子由這裡吹成，玻璃薄，光透得遠。深林獸徑再往北走，樹密得看不見路，沒有燈會迷路啦。」
+      text: 「罩子由這裡吹成，玻璃薄，所以光透得遠。深林獸徑再往北走，樹密得看不見路，沒有燈就會迷路啦。」
     - kind: speech
       speaker: host
-      text: 「裡頭的光由別人點，我只管外面這一層。罩子沒裂，光就散得開。」
+      text: 「裡頭的光由別人點，我只管外面這一層。罩子薄得能透出裡頭的火，像隔著一層玻璃看燭心跳，暖黃的光照在身上，我才捨得半夜起來添坯。」
     - kind: speech
       speaker: actor
       text: 「燒壞的罩子多嗎？」
@@ -74,7 +77,7 @@ topics:
   label: 收回
   fallback:
     scene_id: eolas_taelith_home.topic_04_scene
-    revision: r1
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
@@ -84,7 +87,7 @@ topics:
       text: 「我燒的琉璃，沒有裂的都可以拿回來，我算銅幣給你。燈也一樣，罩子完好我才收。」
     - kind: speech
       speaker: host
-      text: 「別處帶來的玻璃和燈我不收喔。火候不一樣，混進我的窯裡只會壞一爐。」
+      text: 「別處帶來的玻璃和燈我不收喔。火候不一樣，混進我的窯裡只會壞一爐。我這雙手只認自個兒窯裡燒出的東西，出窯那時還燙著手。」
     - kind: speech
       speaker: actor
       text: 「有一點小裂痕，也不能收？」

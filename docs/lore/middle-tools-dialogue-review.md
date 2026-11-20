@@ -94,3 +94,43 @@ Aligned to the refined standard with enthusiastic conversational tone, attentive
 - **Prohibited Patterns**: Zero instances of 「您」, sentence-final 「的，」/「的。」, or calques (折入, 回填, 落地, 賦能).
 - **Scene Shapes**: All formal scenes start with complete actor `speech` line, followed by host responses and stage narration, within 3–8 lines.
 - **Revision Tracking**: All authored scenes across all three hosts declare `revision: r2`.
+
+---
+
+## 6. Rewrite (2026-11-20)
+
+Wholesale prose rewrite of the three hosts under `authored-dialogue-content-middle-tools`. Every scene body, variant and greeting was replaced; all `topic_id`, `scene_id`, `keyword`, `label`, condition operands, variant priorities and speaker values are unchanged. Each rewritten scene moved `r2` → `r3`. Item display names were re-read from `content/items/` and corrected where the old prose drifted: `camp_ward_kit` is 露營魔導具 (not 營地防護石), `dragon_scale_fragment` is 龍鱗碎片 (not 地龍鱗片), `knight_platemail` is 騎士全套板甲, `archmage_mending_robe` is 大術師補綴長袍. The tailor's adult frankness is confined to the vestment cut and fit; the merchant and smith stay salt-of-the-earth traders with no body focus.
+
+### A. altoria_general_store (瑪爾特‧金秤)
+
+- **Opening Greeting** (r3): Ledger, charcoal marks, then the same out-or-return opener, now split by the board price for gear versus the scale for appraisal.
+- `altoria_general_store.topic_01` (賣什麼, r3): Actor asks what the shop sells. Host lists 魔法燈, 附魔羅盤, 迷宮探照符 and 露營魔導具 (the camp warding kit, named by what it unfolds into), then 粗鐵礦 and 魔獸結晶 as smithing material. Actor's discount question is answered with the board-price refusal and the thirty-year brass scale. Causal bridge: the actor's second turn follows the item list directly.
+- `altoria_general_store.topic_02` (材料, r3): Actor asks about buy-back and the rate. Host answers with the declared materials (哥布林耳朵, 史萊姆黏液, 巨魔尖牙, 地龍鱗片) weighed on the brass scale. The actor's follow-up "那你架上也有稀罕的材料賣嗎" bridges to the top-shelf rare goods: 魔導晶核, 龍鱗碎片 and 精靈蛛絲 from the central mountains.
+- `altoria_general_store.topic_03` (行頭, r3): First-trip advice, each item earning its purpose: 魔法燈 for the dark, 附魔羅盤 for lost paths, 迷宮探照符 for the stretch ahead, 露營魔導具 for a wind-and-rain-proof tent, 通訊法螺 to find a separated companion. Actor's "第一次出城" is answered before the topic closes.
+- `altoria_general_store.topic_04` (飾品藥水, r3): Actor asks about accessories and remedies; host redirects to 艾蓮娜's 首飾坊 (隔壁) and 希碧拉's 鍊金坊 (東市). The follow-up about 受洗聖水 bridges to 大神殿's 聖所 counter. The nun's bodily-offering line was dropped to keep the merchant plain.
+
+### B. altoria_forge (維爾登‧黑潭)
+
+- **Opening Greeting** (r3): Hammer on the anvil, the weapon-and-dominant-hand question kept laconic.
+- `altoria_forge.topic_01` (兵器, r3): Actor asks for a self-defence blade. Host lists 普通劍, 鐵短刀, 狩獵擲斧, then 獵手長弓 and 見習術師法杖 for reach, with the board price on the door. Actor's quality question is answered with river-water quenching, the leather grip and the thumbnail-and-tap test. The "絕不會誤事" boast was dropped.
+- `altoria_forge.topic_02` (好貨, r3): Actor asks for the best. Host names 騎士制式長劍 from the training-ground orders, then, on the actor's follow-up, the 魔導長劍 with the enchanter's infused essence described as provenance, not an offered service.
+- `altoria_forge.topic_03` (賣鐵, r3): Actor asks about selling old weapons; host accepts intact weapons and refuses raw ore, sending 粗鐵礦 to 瑪爾特's 雜貨店 scales on 市場街.
+- `altoria_forge.topic_04` (保養, r3): The `basic_swordplay` variant (priority 10, condition unchanged) recognises the swordsman's grip and calluses and gives cleaning, oiling, whetstone and discard advice; the fallback keeps the two whetstones and the no-repair, no-rejoin rule.
+
+### C. altoria_tailor (妮絲塔‧狐溪)
+
+- **Opening Greeting** (r3): Surfaces from the fabric, sizes up the guest's cut, asks where the journey leads.
+- `altoria_tailor.topic_01` (衣甲, r3): Actor asks for road armour. Host presents 硬皮甲 and 鎖子甲 (every iron ring from the smith next door), then 術師長袍, 鐵盾 and 騎士全套板甲 on the actor's caster-and-squire follow-up.
+- `altoria_tailor.topic_02` (旅裝, r3): Fit against chafing (肩頭勒緊, 褲襠磨腿), a well-fitted 皮甲 over three rough sets, and 大術師補綴長袍 for academy casters, each reason given.
+- `altoria_tailor.topic_03` (禮服, r3): The noble variant (priority 10, condition unchanged) keeps the formal register and the temple order line; the fallback names the 修女聖袍 open front to the navel with the 聖徽細鏈 waist, and the 聖女聖袍 sheer silk, plus the discreet custom lace fitting. The 光明女神 ritual attribution was dropped in favour of the registry's own "聖女親手繡成" wording.
+- `altoria_tailor.topic_04` (收購, r3): Actor asks about old armour and clothes; host takes back what she sold, undoes the old seams and re-tans them, with the wash-before-you-bring rule.
+
+### Final revision ledger
+
+| Host | Greeting | topic_01 | topic_02 | topic_03 | topic_04 |
+| --- | --- | --- | --- | --- | --- |
+| altoria_merchant | r3 | r3 | r3 | r3 | r3 |
+| altoria_blacksmith | r3 | r4 | r4 | r3 | r3 (variant + fallback) |
+| altoria_tailor | r3 | r3 | r3 | r3 (variant + fallback) | r3 |
+
+Lint: `npc_content_lint.py` 0 errors for all three files (0 warnings for the merchant and smith; the tailor's `北大道` is a `--places` prompt, grounded in the tailor's own room description `content/maps/interiors/altoria_tailor.yaml`). `chinese-content-writing-guideline/lint.sh` 0 errors for all three (warnings are YAML keys and ordinary dialogue question marks).

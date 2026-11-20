@@ -1,90 +1,96 @@
 schema_version: 1
-greeting: 藥草園旁的石屋裡瀰漫著微苦回甘的草木香氣。妮瑞斯‧米斯特瓦勒把藥爐的風口關小，轉過身仔細端詳你的步態與肩背：「身上沒帶重傷吧？那就好。這爐剛熬透，暗影谷解毒草露、強效治療藥水與魔力藥水都妥善裝進罐裡了，打算帶幾罐上路防身就直接跟我說喔。」
+greeting: 藥草園旁的石屋裡，熬藥的苦香混著一點回甘的草木味。妮瑞斯‧米斯特瓦勒把藥爐風口關小，回頭把你從頭到腳掃了一遍：「傷口在哪，我一眼就看得出來。沒見血，好。這爐剛熬透，暗影谷解毒草露、強效治療藥水跟魔力藥水都裝進罐了。要帶幾罐上路防身，就跟我直說。」
 topics:
 - topic_id: ciaran_nireth_home.topic_01
   keyword: 調藥
   label: 調藥
   fallback:
     scene_id: ciaran_nireth_home.topic_01_scene
-    revision: r4
+    revision: r5
     lines:
     - kind: speech
       speaker: actor
-      text: 屋裡這些陶罐與火爐，就是你平日熬製藥水的地方嗎？
+      text: 屋裡這些陶罐和火爐，就是你平日熬藥的地方嗎？
     - kind: narration
-      text: 妮瑞斯‧米斯特瓦勒拿布巾按了按額角滲出的細汗，目光掃過爐台上排列整齊的藥瓶。
+      text: 她拿布巾按了按額角的汗，目光掃過爐台上排得齊整的藥瓶。
     - kind: speech
       speaker: host
-      text: 「藥草全是我每天清晨在門前園子裡採摘，火候依著族裡長輩傳下來的法子，用慢火細煨一整天。精靈天生不受瘟病侵害，筋骨也結實，可魔力枯竭不分族裔，誰遇上都凶險喔。」
+      text: 「我每天清晨在門前園子裡現摘藥草，摘回來照族裡長輩傳下的法子，小火慢煨一整天。精靈天生不染瘟病，筋骨也結實，可魔力枯竭不分族裔，誰碰上都凶險。」
     - kind: speech
       speaker: actor
-      text: 你在這裡常備的藥，主要能應對哪些凶險情況？
+      text: 你這兒常備的藥，主要應付哪幾種情形？
     - kind: speech
       speaker: host
-      text: 「我手邊常備的就這幾樣。暗影谷解毒草露解掉誤食或咬傷帶來的毒；強效治療藥水封住傷口止血、續接筋骨；魔力藥水補回耗竭的魔力。藥效確實穩妥，絕不誇大。」
+      text: 「就這三樣。暗影谷解毒草露解誤食跟蟲蛇咬傷的毒；強效治療藥水止血、接骨、續筋；魔力藥水把耗空的魔力補回來。藥效我說到哪，就做到哪，絕不吹。」
 - topic_id: ciaran_nireth_home.topic_02
   keyword: 重傷
   label: 重傷
   fallback:
     scene_id: ciaran_nireth_home.topic_02_scene
-    revision: r2
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
-      text: 如果遭遇魔獸撕咬或兵刃重創，該用哪種藥劑應急？
+      text: 要是碰上魔獸撕咬或兵刃重創，該用哪一罐應急？
     - kind: narration
-      text: 妮瑞斯‧米斯特瓦勒從木架上取下一個封著紅繩的陶瓶，神情十分鄭重。
+      text: 她從木架上取下一瓶繫著紅繩的陶罐，神情鄭重。
     - kind: speech
       speaker: host
-      text: 「那得用這罐繫著紅繩的強效治療藥水。真傷及臟腑或是筋骨斷裂，仰頭喝下一整罐，藥力才能迅速穩住生機。若是尋常擦傷破皮，用井水洗淨敷點草灰就能癒合，可別隨意糟蹋藥喔。」
+      text: 「紅繩這罐是強效治療藥水。傷到臟腑、斷了筋骨，仰頭喝一整罐，藥力才穩住生機。我見過腸子流出來還自己縫回去的族人，這罐專為那種傷熬。」
+    - kind: speech
+      speaker: host
+      text: 「尋常擦傷破皮，井水洗過、敷點草灰就癒合，別拿好藥糟蹋。」
     - kind: speech
       speaker: actor
-      text: 準備出外歷練的話，能向你換幾罐帶在身上防範萬一嗎？
+      text: 要出外歷練，能跟你換幾罐帶在身邊防個萬一嗎？
     - kind: speech
       speaker: host
-      text: 「要帶去防身自然可以，照定好的價目留下銅幣便成。記得收妥在腰包內層，危急關頭才拿出來救命，平時切莫貪圖省事胡亂吞服。」
+      text: 「帶去防身自然行，照定好的價留下銅幣就是。收進腰包內層，臨到要命關頭才拿出來喝，平常別貪省事胡亂灌。」
 - topic_id: ciaran_nireth_home.topic_03
   keyword: 魔力
   label: 魔力
   fallback:
     scene_id: ciaran_nireth_home.topic_03_scene
-    revision: r2
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
-      text: 施展法術過度而魔力枯竭時，喝你調製的藥水真能平復過來嗎？
+      text: 施法過度、魔力耗空的時候，喝你熬的藥水真能緩過來嗎？
     - kind: narration
-      text: 妮瑞斯‧米斯特瓦勒指了指另一側繫著藍繩的小釉罐，語氣篤定。
+      text: 她指了指另一側繫著藍繩的小釉罐，語氣篤定。
     - kind: speech
       speaker: host
-      text: 「藍繩這罐便是魔力藥水。施法者若感到精神疲乏、體內魔力見底，拔開木塞飲用，乾涸的魔力便能逐步回湧。精靈日常若是魔力損耗過劇，同樣也是靠它平復元氣。」
+      text: 「藍繩這罐是魔力藥水。施法的人感到精神乏了、體內魔力見底，拔開木塞喝下去，乾涸的魔力就回得過來。精靈平日法力耗得凶，也靠它補回來。」
     - kind: speech
       speaker: actor
-      text: 要熬出一爐質地純淨的魔力藥水，你在藥草園裡平日都是怎麼照料的？
+      text: 這種虛乏和太累，你一眼怎麼瞧得出來？
     - kind: speech
       speaker: host
-      text: 「清晨天未明就得去剪藥草的新梢，趁著晨露未散放進陶鼎。火候全靠爐膛餘燼恆溫細煨，急躁不得。只要園子裡的草苗生得旺盛，多熬幾鼎備著，總能讓需要的人取用啊。」
+      text: 「臉色發白、步子虛浮，夜裡沒睡夠的樣子，我都瞧得出來。有的族人貪歡，纏到天亮才肯歇，隔天軟著腿來找我討藥。我一聞她身上的氣味，就知道她前一晚跟誰滾過了。」
+    - kind: speech
+      speaker: host
+      text: 「要熬出乾淨的一爐，天沒亮就去剪藥草的新梢，趁晨露還掛著放進陶鼎。火候靠爐膛餘燼恆溫細煨，急不來。」
 - topic_id: ciaran_nireth_home.topic_04
   keyword: 藥草
   label: 藥草
   fallback:
     scene_id: ciaran_nireth_home.topic_04_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
-      text: 如果有旅人從外地採得奇花異草，能拿來賣給你入藥調劑嗎？
+      text: 有旅人從外地採來奇花異草，能拿來賣給你入藥嗎？
     - kind: narration
-      text: 妮瑞斯‧米斯特瓦勒擺了擺沾著草汁的手掌，語氣十分堅決。
+      text: 她擺了擺沾著草汁的手掌，語氣很堅決。
     - kind: speech
       speaker: host
-      text: 「外頭送來的生草我一概不收。採摘離根隔了幾日、曬乾時沾了風塵雜氣，藥性走失便會害人。我的藥只用這片藥草園親手培植的植株，根葉的來歷我都清楚。」
+      text: 「外頭送來的生草我一概不收。草離了根幾日，藥性就開始散；曬乾時再沾上風塵雜氣，吃下肚反會害人。我熬藥的草全在自家園子裡種，每一株的根葉來歷我都清楚。」
     - kind: speech
       speaker: host
-      text: 「園子裡那畦解毒草，搗過之後浸成暗影谷解毒草露。被毒蟲咬到、誤食了毒蕈，飲下就能把毒壓下去。」
+      text: 「園裡那畦解毒草，搗過浸成暗影谷解毒草露。被毒蟲咬到、誤食毒蕈，喝下去就能把毒壓住。」
     - kind: speech
       speaker: actor
-      text: 要是換去的成藥始終沒機會用上，也能完好帶回來交還給你嗎？
+      text: 要是換去的藥始終沒用上，能完好帶回來還你嗎？
     - kind: speech
       speaker: host
-      text: 「瓶塞蠟封完好的藥罐，你原封不動帶回來，我都照數收回，銅幣也會依規矩折算退你。調出來的好藥就該留給真正遇難受傷的人，擱在箱底發霉可不行喔。」
+      text: 「只要瓶塞的蠟封完好，原封不動帶回來，我照數收回，銅幣按規矩折算退你。好藥得留給真正遭難的人，擱在箱底發霉可不成。」

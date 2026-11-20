@@ -1,5 +1,5 @@
 schema_version: 1
-greeting: 講台邊的艾莉安娜‧寒水主祭合上經冊，晨光從她身後的高窗落進大殿。她抬起頭，語氣平和：「願平安與你同在，旅人。日課、祝禱，或是想問聖所與商店的事，都可以在這裡說。大殿、聖所和商店都敞開著，你想問哪一處，我都照實回答。」
+greeting: 艾莉安娜‧寒水主祭合上手裡的經冊，晨光從她身後的高窗落進大殿。她抬起頭，朝你頷首：「願平安與你同在，旅人。日課、祝禱、聖所、商店，你想問哪一處，我都照實回答。」
 topics:
 - topic_id: altoria_temple.topic_01
   keyword: 禮拜
@@ -12,106 +12,106 @@ topics:
       race_key: elf
     scene:
       scene_id: altoria_temple.topic_01_scene_elf
-      revision: r2
+      revision: r3
       lines:
       - kind: speech
         speaker: actor
-        text: 「我想了解大殿日課的時間，精靈要是過來，有什麼特別的規矩嗎？」
+        text: 「大殿的日課是什麼時候？進殿的訪客，有沒有要守的規矩？」
       - kind: narration
-        text: 艾莉安娜‧寒水注視著眼前的客人，雙手交疊在胸前，躬身行禮。
+        text: 艾莉安娜‧寒水雙手交疊在胸前，朝你躬身行禮。
       - kind: speech
         speaker: host
-        text: 「願平安與你同在，尊貴的精靈旅人。教會聖典記載，始祖光明女神將歡愉視為生命本源與恩賜，這座神殿的信仰傳承自斐歐恩族。」
+        text: 「願平安與你同在，尊貴的精靈旅人。這座神殿敬奉的光明女神是斐歐恩一脈的始祖，我們的日課與服儀都承自那條血脈。你踏進這裡，就是回到女神親族身邊。」
       - kind: speech
         speaker: host
-        text: 「晨鐘之後與日落之前，長椅隨你挑選。想坐下來聽講道，或是想在殿裡走動、在陽光下安靜坐著，都隨你的心意。」
+        text: 「晨鐘之後、日落之前，長椅任你挑。想聽講道就坐下，想在殿裡走動、在陽光下安靜待著，都隨你心意。」
       - kind: speech
         speaker: actor
-        text: 「既然這樣，我就隨意參觀了。」
+        text: 「聽起來，我在這裡能完全自在。」
       - kind: speech
         speaker: host
-        text: 「請便。如果有話想單獨跟我談，我都在講台邊，隨時可以過來。」
+        text: 「正是。想獨處，殿裡隨你走；有話想跟我談，我在講台邊，隨時都在。」
   fallback:
     scene_id: altoria_temple.topic_01_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
-      text: 「我想詢問大殿日課的時間與規矩，來聽講需要先登記嗎？」
+      text: 「日課是什麼時候？我想來聽講，要先登記身分嗎？」
     - kind: narration
-      text: 艾莉安娜‧寒水走下講台階梯，在長椅旁停下腳步。
+      text: 艾莉安娜‧寒水走下講台階，在長椅旁停下腳步。
     - kind: speech
       speaker: host
-      text: 「不用登記，也不用報上身分。日課在晨鐘之後與日落之前，都在講台前舉行。進門找個空位坐下就算參與，想聽多久都可以。」
+      text: 「不必登記，也不必報上名姓。日課在晨鐘之後、日落之前，都在講台前舉行。進門找個空位坐下，聽多久都行。」
     - kind: speech
       speaker: actor
-      text: 「要是還沒受洗入教，也可以進來坐著聽嗎？」
+      text: 「我還沒受洗入教，也能坐下來聽嗎？」
     - kind: speech
       speaker: host
-      text: 「當然可以。進門的人都是客人，想聽講道就留到鐘聲停歇；如果心裡有事想單獨談談，我都在這裡聽你說。要是以後想正式入教，再找我辦理入教儀式。」
+      text: 「自然可以。進殿的都是客人，想聽就留到鐘聲停歇；心裡有事想談，我在這裡聽著。哪天想正式入教，再來找我辦入教儀式。」
 - topic_id: altoria_temple.topic_02
   keyword: 祝禱
   label: 祝禱
   fallback:
     scene_id: altoria_temple.topic_02_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
-      text: 「出遠門前如果想求個平安，向主祭請求祝禱要收多少奉獻？」
+      text: 「出遠門前想求個平安，請主祭祝禱要奉獻多少？」
     - kind: narration
-      text: 艾莉安娜‧寒水搖了搖頭，把腰間掛著的念珠拿在手裡。
+      text: 艾莉安娜‧寒水搖了頭，把腰間念珠托在掌心裡。
     - kind: speech
       speaker: host
-      text: 「祝禱與平安祝福都在講台邊進行，不收分文。你只要站在講台旁，我就會替你向光明祈求庇護，願你旅途平安。」
+      text: 「祝禱不收分文。你站到講台邊，我就為你向光明祈求庇護，願你一路平安。」
     - kind: speech
       speaker: actor
-      text: 「要是出城沾了不乾淨的瘴氣或邪氣，也能在這裡洗去嗎？」
+      text: 「要是出城沾了穢氣，也能在這裡洗淨嗎？」
     - kind: speech
       speaker: host
-      text: 「要是沾了邪氣，可以用受洗聖水洗淨。聖水由我親手用光魔法祝聖過，不過裝瓶的聖水放在聖所的商店櫃上，由執事保管。祈禱找我，買水去旁邊櫃檯。」
+      text: 「沾了穢氣，用受洗聖水洗淨。那些水由我親手以光魔法祝聖，裝瓶之後放在聖所的商店櫃上，由執事羅海西亞看管。祈禱找我，買水到旁邊櫃檯。」
 - topic_id: altoria_temple.topic_03
   keyword: 聖所
   label: 聖所
   fallback:
     scene_id: altoria_temple.topic_03_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
-      text: 「聖所是在大殿旁邊嗎？聽說裡面的服事也是教會的一份事工。」
+      text: 「聖所就在大殿旁邊嗎？裡面的服事，也是教會的一份事工？」
     - kind: narration
-      text: 艾莉安娜‧寒水轉向左邊敞開的走廊，神色坦然。
+      text: 艾莉安娜‧寒水望向左手邊敞開的走廊，語氣坦然，沒有半分遮掩。
     - kind: speech
       speaker: host
-      text: 「聖所就在大殿左手邊，同一個屋簷下。教會以性愛為修道之途，修女與修士奉獻肉身服事信眾，這件事在全大陸都知道，跟酒館賣酒一樣平常。」
+      text: 「聖所就在大殿左手邊，同一個屋簷下。教會把肉體的結合當成敬拜，修女與修士以身子事奉信眾，這件事全大陸都知道，跟酒館倒酒一樣平常。」
     - kind: speech
       speaker: host
-      text: 「聖職人員會用光魔法調理身體、做好避孕，過程清楚乾淨，不用覺得難以開口。禮拜、聖所與商店是同一份信仰生活的三個去處，都在這座屋頂底下。」
+      text: 「事奉前後，他們都以光魔法調理身子、做好避孕，過程乾淨妥當。你若想安排，順著走廊過去，門內就有值守的修女，房間、時段和你要的服事都當面講定。」
     - kind: speech
       speaker: actor
-      text: 「如果想安排那邊的服事，該找誰接洽？」
+      text: 「這麼說來，禮拜與聖所是同一份信仰，只是事奉的方式不同。」
     - kind: speech
       speaker: host
-      text: 「順著走廊走過去，聖所門內就有值守的修女接待，房間與時段都會當面跟你談好。」
+      text: 「正是。禮拜、聖所、商店是同一份信仰生活的三處，全在這座屋簷下。哪一處敞開，你就往哪一處去。」
 - topic_id: altoria_temple.topic_04
   keyword: 商店
   label: 商店
   fallback:
     scene_id: altoria_temple.topic_04_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
-      text: 「大殿裡好像有在賣東西的櫃檯，主要賣些什麼？」
+      text: 「大殿裡好像有個賣東西的櫃檯，都賣些什麼？」
     - kind: narration
-      text: 艾莉安娜‧寒水朝裡廳方向指了指。
+      text: 艾莉安娜‧寒水朝裡廳的方向抬了抬手。
     - kind: speech
       speaker: host
       text: 「商店在裡廳，由聖所執事羅海西亞‧芬威克掌管。受洗聖水、禮器與修道用的物件，都在她的櫃上。」
     - kind: speech
       speaker: actor
-      text: 「想買聖水的話，直接找執事拿就行了嗎？」
+      text: 「想買聖水，直接找她拿就行嗎？」
     - kind: speech
       speaker: host
-      text: 「對，價錢寫在櫃邊的牌子上，挑好拿到櫃前跟她結算。要是對器具用法有疑問，她都會仔細告訴你。買好了東西想再求個平安，隨時回來找我。」
+      text: 「價錢寫在櫃邊的牌子上，挑好了拿到櫃前跟她結算。器具的用法她也會逐一講明。東西買齊了，想再求個平安，隨時回大殿找我。」

@@ -128,3 +128,47 @@ This document records the line-by-line editorial and lore verification for the `
   - `chinese-content lint.sh`: 0 errors.
   - `DIALOGUE_SNAPSHOT`: Exactly 25 profiles discovered.
 - **Playback Harness Note**: In accordance with the change specifications, manual browser playback harness was not run due to broken local browser harness login; offline test modules, static codec checks, and contract gates verified the complete dataset.
+
+---
+
+## Rewrite (2026-11-20)
+
+This section records the prose rewrite of both hosts under `authored-dialogue-content-upper-faith`. Every `topic_id`, `scene_id`, `keyword`, `label`, variant `when` condition, variant priority, and service/assortment semantics was preserved byte-for-byte; only the prose was replaced. No `refusal` scenes exist in either file. All authored scenes moved from `revision: r2` to `revision: r3`.
+
+### A. altoria_high_priestess (艾莉安娜‧寒水)
+
+**Greeting rewrite**: The new greeting closes the lectionary in the morning light and names all four counters under one roof, signalling that the host will answer plainly on any of them.
+
+1. `altoria_temple.topic_01` (keyword: 禮拜, label: 禮拜):
+   - Variant `elf_kin_worship` (`kind: race_is`, `race_key: elf`, priority 10), `revision: r3`:
+     - Intent: an elven guest asks about lection times and house rules, and the host welcomes them as returning to the goddess's own kin.
+     - Causal bridge: the host bows and answers the schedule point directly (晨鐘之後、日落之前), then the follow-up 「聽起來，我在這裡能完全自在」 is motivated as the guest's reaction and is answered with an open invitation to sit, walk, or talk. No racial over-explanation; the lineage is stated plainly.
+   - Fallback `altoria_temple.topic_01_scene`, `revision: r3`:
+     - Intent: a traveller asks the lection schedule and whether registration is required, and the host removes every barrier.
+     - Causal bridge: the host steps to the pews and answers directly (no registration, no name, morning bell to sunset); the second turn 「我還沒受洗入教，也能坐下來聽嗎」 is the guest's own follow-up and is answered by confirming open seating and pointing to the formal initiation as an optional next step.
+2. `altoria_temple.topic_02` (keyword: 祝禱, label: 祝禱), fallback `revision: r3`:
+   - Intent: a traveller asks the price of a journey-safety blessing, and the host declares prayer free while directing bottled water to the shop counter.
+   - Causal bridge: the host answers the fee question first (祝禱不收分文), then the guest's miasma concern turns the topic to 受洗聖水, which the host answers and uses to bridge to the deacon's counter and topic_04.
+3. `altoria_temple.topic_03` (keyword: 聖所, label: 聖所), fallback `revision: r3`:
+   - Intent: a traveller asks whether the sanctuary sits beside the hall and is part of the ministry, and the host states the frank canon without evasion.
+   - Causal bridge: the host answers placement and ministry plainly, comparing bodily service to a tavern pouring wine, then states light-magic contraception and points down the corridor; the guest's synthesis 「禮拜與聖所是同一份信仰」 is the closing confirmation, answered by naming the three counters of one faith.
+4. `altoria_temple.topic_04` (keyword: 商店, label: 商店), fallback `revision: r3`:
+   - Intent: a traveller asks what the in-hall goods counter sells, and the host introduces Deacon Rohaisya as its keeper.
+   - Causal bridge: the host names the deacon and her stock, then the guest's 「想買聖水，直接找她拿就行嗎」 is answered with board pricing and usage guidance, closing with an invitation back to the hall for prayer.
+
+### B. altoria_sanctum_deacon (羅海西亞‧芬威克)
+
+**Greeting rewrite**: The new greeting flips a ledger page and asks whether the purchase is self-use or a gift, listing 聖水, 禮器 and 貼身用 goods with board pricing, and offers to arrange sanctuary service directly.
+
+1. `altoria_sanctum.topic_01` (keyword: 賣什麼, label: 賣什麼), fallback `revision: r3`:
+   - Intent: a shopper asks what the counter sells and how the shelves are grouped, and the host enumerates the full assortment.
+   - Causal bridge: the host splits the wares into wearable, concealed, and usable categories and ranks 受洗聖水 on the top shelf; the guest's price/discount follow-up is answered with fixed 不二價 board pricing and an invitation to ask.
+2. `altoria_sanctum.topic_02` (keyword: 聖水, label: 聖水), fallback `revision: r3`:
+   - Intent: a traveller asks how to use and keep the blessed water on the road, and the host shows the bottle and its label.
+   - Causal bridge: the host answers cleansing by wiping wrist and forehead, then the guest's storage question is answered by the tight cork; the host closes by splitting free hall prayer from paid bottled water.
+3. `altoria_sanctum.topic_03` (keyword: 禮器, label: 禮器), fallback `revision: r3`:
+   - Intent: a shopper asks how censer and mist are paired in use, and the host explains home and ceremonial use plus the buy-back policy.
+   - Causal bridge: the host answers usage first, then states the clean buy-back; the guest's 「連用過的也能拿回來換」 is answered with cash refund for intact goods.
+4. `altoria_sanctum.topic_04` (keyword: 聖所事務, label: 聖所事務), fallback `revision: r3`:
+   - Intent: a visitor asks how to arrange sanctuary service, and the host hands them to the duty nuns with the consent rule.
+   - Causal bridge: the host points to the corridor and states that rooms, times and services are agreed by mutual consent, adds light-magic care and contraception, and splits prayer (main hall) from goods (the counter); the guest's 「兩邊各管一邊」 is answered with 各司其職.

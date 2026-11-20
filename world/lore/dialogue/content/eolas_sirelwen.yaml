@@ -1,12 +1,12 @@
 schema_version: 1
-greeting: 希瑞爾溫‧布瑞特瓦特爾從一塊石板前抬頭，指尖還沾著墨。她把石板往旁一擱，指向木架：「你來得正好。八種元素裡，你比較喜歡哪一種？架上的杖隨你看，要試就試，燒焦了也不用你賠。」說著她把被火燎過的衣襟拉開透氣，胸口一片讓火烤紅的痕跡，她也不急著遮。
+greeting: 希瑞爾溫‧布瑞特瓦特爾從一塊石板前抬頭，指尖還沾著墨。她把石板往旁一擱，把被火燎過的衣襟拉開透氣，胸口一片被火烤紅的痕跡和一道舊疤一起露在風裡，她也不急著遮。「你來得正好。八種元素裡，你比較喜歡哪一種？架上的杖隨你看，要試就試，燒焦了也不用你賠。」
 topics:
 - topic_id: eolas_sirelwen_home.topic_01
   keyword: 法術
   label: 法術
   fallback:
     scene_id: eolas_sirelwen_home.topic_01_scene
-    revision: r1
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
@@ -16,19 +16,19 @@ topics:
       text: 「元素法術。火的燒、冰的凍、雷的劈，全往那塊地上招呼。離住屋遠一點，屋子才保得住。」
     - kind: speech
       speaker: host
-      text: 「試之前我先寫下要試什麼，試完再記下實際的變化。真正有用的東西多半在第二次失敗裡。」
+      text: 「試之前我先寫下要試什麼，試完再記下實際的變化。真正有用的東西，多半在第二次失敗裡。」
     - kind: speech
       speaker: actor
       text: 「失敗也算有用的話，你們怎麼知道哪一次算成功？」
     - kind: speech
       speaker: host
-      text: 「看它下一次還能不能重來。只靈一次的法術，我當它沒成。」
+      text: 「看它下一次還能不能重來。只靈一次的法術，我當它沒成。心也一樣，一次新鮮的熱鬧留不住我，我追的是能反覆要的那種滋味。」
 - topic_id: eolas_sirelwen_home.topic_02
   keyword: 短杖
   label: 短杖
   fallback:
     scene_id: eolas_sirelwen_home.topic_02_scene
-    revision: r1
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
@@ -38,9 +38,10 @@ topics:
       text: 「谷裡的老枝，去皮、陰乾，再按元素的性子修長短。木頭認得住魔力，導起來比空手順。」
     - kind: speech
       speaker: host
-      text: 「它不會替你唸咒，也不會自己生出魔力。可是魔力順著杖身走，同一道法術出手會更沉，耗在你身上的力氣也少一些。」
-    - kind: narration
-      text: 她從架上取下一支杖，遞過來時杖身還帶著木頭的氣味。
+      text: 「它不會替你唸咒，也不會自己生出魔力。可魔力順著杖身走，出手更沉，耗在你身上的力氣也少一些。」
+    - kind: speech
+      speaker: host
+      text: 「等你把魔力逼到指尖，那股麻從掌心一路竄上胳膊，像有熱水流過骨頭，比空手舒服得多。」
     - kind: speech
       speaker: actor
       text: 「所以剛開始學的人拿它，是為了少燒壞自己的手？」
@@ -52,45 +53,47 @@ topics:
   label: 元素
   fallback:
     scene_id: eolas_sirelwen_home.topic_03_scene
-    revision: r1
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「聽說幻童精靈對每一種元素都親近，是真的嗎？你自己試起來是什麼感覺？」
     - kind: speech
       speaker: host
-      text: 「八種都摸得到，但沒有一種不需要代價。火要你忍得住燙，水要你肯放掉力氣，風最難，它不聽話。」
+      text: 「八種都摸得到，但沒有一種不需要代價。火要你忍得住燙，水要你肯放掉力氣，風最難，因為它不聽話。」
     - kind: speech
       speaker: host
-      text: 「我試過同時引兩種元素，結果整間屋子燒起來。那一次我學到的是自己的身體能撐到哪裡。」
+      text: 「我試過同時引兩種元素，整間屋子燒起來。那一次我才曉得自己燙到什麼程度該停手，也曉得身子能撐到哪裡。」
+    - kind: narration
+      text: 她攤開掌心，掌心有一道燒傷留下的舊疤，她用另一手拇指揉過去。
     - kind: speech
       speaker: host
-      text: 「法術折騰完，人會累，也會鬆。剩下的力氣我常拿來做別的事，身體被折騰過一遍，夜裡反而更清楚自己要什麼。」
+      text: 「試完的當晚最難熬。魔力耗空，皮膚還燒得發燙，那股熱和想要一個人的熱混在一處，得有人把身子貼上來，把那股熱一起澆滅。那夜我纏著人，纏到天亮才放手。」
     - kind: speech
       speaker: actor
-      text: 「你這樣講，好像練法術和別的事在你看來差不多。」
+      text: 「所以你們說親近，只是每一種都練得起來，練起來一樣要付代價？」
     - kind: speech
       speaker: host
-      text: 「都是把身體用到極限，再從極限裡回來。差別只在燒不燒得壞。」
+      text: 「對。親近是說門都開著，代價要自己付。我這些疤，就是付過的部分。」
 - topic_id: eolas_sirelwen_home.topic_04
   keyword: 收回
   label: 收回
   fallback:
     scene_id: eolas_sirelwen_home.topic_04_scene
-    revision: r1
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
-      text: 「用不上的杖，或是削壞的杖，能拿回來給你嗎？」
+      text: 「用不上的杖，能拿回來給你嗎？」
     - kind: speech
       speaker: host
       text: 「我削的杖，沒有折斷的都可以拿回來，我收下算銅幣。斷了的就別帶了，我燒掉。」
     - kind: speech
       speaker: host
-      text: 「外面買來的杖我不收。木頭不認得我，我也不知道它先前導過什麼。」
+      text: 「外面買來的杖我不收。木頭不認得我，我也不知道它先前導過什麼，握過誰的手。」
     - kind: speech
       speaker: actor
       text: 「如果只是杖頭磨損，還能修嗎？」
     - kind: speech
       speaker: host
-      text: 「磨損的我自己再修一支就好。你手上那支留著用，真的不能用了再拿來。」
+      text: 「磨損的我自己再修一支就好。你手上那支留著用，真不能用了再拿來。」

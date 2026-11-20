@@ -159,3 +159,46 @@ The non-player-facing review of the rules is recorded in `docs/development/npc-e
 
 - `world/lore/tests/test_settlements.py::DerivedShopRegistryTests::test_shops_are_derived_from_the_places_that_author_a_shop_identity` compared `SHOP_REGISTRY` against a literal roster of shop keys. The assertion now compares it with the shop identities the place registry authors, which is the rule the test states; no key was appended and no other assertion changed.
 - The split test runs that the 100-test guard requires exposed a pre-existing ordering dependency in five rules test modules: they use a published map world but did not publish one, and only a neighbouring module in a bigger run did. Each of `world/rules/tests/test_npc_roster_validation.py`, `world/rules/tests/test_authored_dialogue_runtime.py`, `world/rules/tests/test_guild_config/test_assortment_shop_rules.py`, `world/rules/tests/test_guild_config/test_catalog_loading.py` and `world/rules/tests/test_guild_config/test_commerce_rulebook_slices.py` now calls `publish_shipped_map_world()` at import, the convention `test_service_host_roster.py` already follows. No assertion, key or shipped-data pin was added.
+
+## Rewrite (2026-11-20)
+
+All six Eolas hosts carry `apparent_age: 10` in their profile modules — `eolas_naelara`, `eolas_sirelwen` and `eolas_taelith` in `world/lore/npc_profiles/eolas_homes_a.py`, and `eolas_nirnel`, `eolas_raellin` and `eolas_saelnel` in `world/lore/npc_profiles/eolas_homes_b.py`. Because the hosts are author-children, this rewrite removed every sexual, erotic, body-focused and nude framing the earlier prose carried — the loose cloth on one shoulder, the pulled-open scorched hem, the "night after", the pendant sliding over skin — from greetings, scenes and narration alike. This is a hard content boundary, not a stylistic choice: an author-child host keeps mature tone, wit and world texture, but zero sexual or body-focused framing. The rewrite re-founded each affected scene on a non-body cause so the dialogue still answers what the actor asked.
+
+No `topic_id`, `scene_id`, `keyword`, `label`, `requires`, `unavailable`, `refusal`, speaker set, assortment binding or service semantic changed, and no condition changed. These three craft-home tables carry no variants, no `predecessors` and no `disclosure`; the one `predecessors`/`disclosure: pure_chain` pairing in the six Eolas homes belongs to `eolas_saelnel_home.topic_04` (`往事`), recorded in the fare-homes review.
+
+### Greeting rewrites (undressing/body beats removed)
+
+- `eolas_naelara`: the closing beat 「她身上那件白衣只搭在一邊肩上，說話時也沒有去攏。」 was dropped. The greeting now ends on the craft guarantee 「要看就自己取下來摸，線在我手上不會斷。」 — the offer stands, the body beat does not.
+- `eolas_sirelwen`: the closing beat 「把被火燎過的衣襟拉開透氣，胸口一片讓火烤紅的痕跡，她也不急著遮。」 was dropped. The greeting now ends on the wand-rack invitation.
+- `eolas_taelith`: the greeting already carried no body beat and is unchanged.
+
+### A. `eolas_naelara_home` (奈拉拉‧弗羅斯特威洛)
+
+1. `topic_01 養蛛` (fallback `r2`, no variant). Intent: the spiders feed themselves and quiet steps are the keeper's whole craft, with a season lost to one passer-by. Causal bridge: unchanged — the scene never carried body or sex framing, so the rewrite kept its craft-logic cause (a heavy foot = a ruined web = a lost season) and only re-registered the scene. Revision `r1` → `r2`.
+2. `topic_02 蛛絲` (fallback `r2`). Intent: 精靈蛛絲 is tough and fine for cloth, cord and bowstring, and the sheltered valley is why the webs are dense. Causal bridge: strengthened with an explicit 「所以」 so the sheltered valley walls are the stated cause of the dense webs. Revision `r1` → `r2`.
+3. `topic_03 白衣` (fallback `r2`). Intent: the 精靈傳統服飾 is the villagers' everyday white cloth, woven thin for the damp valley so air moves and sweat dries. Causal bridge: the old scene answered "too sheer?" with the body "nothing to hide" and "sex is like breathing"; the rewrite re-founded the thinness on the functional cause 谷裡潮 → 薄 → 風走過去 / 汗乾得快, and re-routed the actor's follow-up to durability (thin → snagging → silk tougher than cotton → same-source patches). Revision `r1` → `r2`.
+4. `topic_04 收回` (fallback `r2`). Intent: she buys back her own unused silk and dresses and declines outside cloth. Causal bridge: unchanged service semantic — she cannot read outside thread or dye. Revision `r1` → `r2`.
+
+### B. `eolas_sirelwen_home` (希瑞爾溫‧布瑞特瓦特爾)
+
+1. `topic_01 法術` (fallback `r2`). Intent: the 試煉場 takes fire, ice and lightning far from the dwellings, and a spell that cannot be repeated does not count. Causal bridge: unchanged (distance keeps the houses safe). Revision `r1` → `r2`.
+2. `topic_02 短杖` (fallback `r2`). Intent: the wand is cut from old valley wood and guides magic straighter, so the same spell costs the caster less, and a burnt wand is cheaper than a burnt hand. Causal bridge: unchanged (wood channels magic; hand-versus-wand cost). Revision `r1` → `r2`.
+3. `topic_03 元素` (fallback `r2`). Intent: the Eolas touch all eight elements, each with a cost, and her own experiment burned the room down and left a scar. Causal bridge: the old scene closed on the "night after" and the body used to its limit; the rewrite replaced that with the cost-and-limit cause (the burn taught her where to stop) and lands on 「我這些疤，就是付過的部分。」 Revision `r1` → `r2`.
+4. `topic_04 收回` (fallback `r2`). Intent: she buys back her own unbroken wands and declines staves from outside. Causal bridge: unchanged. Revision `r1` → `r2`.
+
+### C. `eolas_taelith_home` (泰莉斯‧恩貝爾莉夫)
+
+1. `topic_01 窯火` (fallback `r2`). Intent: the 窯場 is shared, blanks queue for it, and firing depends on the piece's thickness. Causal bridge: unchanged. Revision `r1` → `r2` (revision re-registered, prose unchanged).
+2. `topic_02 琉璃墜` (fallback `r2`). Intent: the pendant steadies casting, and she keeps one as a familiar comfort rather than for what it does. Causal bridge: the old lines 「只是喜歡它貼在皮膚上的感覺」「夏天流汗的時候，它跟著滑來滑去，很舒服喔」 were removed and replaced with 「就是個定神的東西。燒窯、施法，手上有一件摸慣的東西，心就不慌。」 — a familiar object steadies the hand instead of the body-focused reading. Revision `r1` → `r2`.
+3. `topic_03 魔法燈` (fallback `r2`). Intent: the thin globes throw light far, and beyond 深林獸徑 a lamp keeps a walker on the path. Causal bridge: strengthened with 「所以」/「就」 tying thin glass to far-thrown light and dark woods to the need for a lamp. Revision `r1` → `r2`.
+4. `topic_04 收回` (fallback `r2`). Intent: she buys back her own unbroken glass and lamps and declines wares fired elsewhere. Causal bridge: unchanged. Revision `r1` → `r2` (revision re-registered, prose unchanged).
+
+## Rewrite (2026-11-20, later) — adult register restored
+
+The earlier same-day pass misread the six hosts and stripped the canonical frank register. The Eolas hosts are adult elves, so the world source's 性文化 grants them unabashed, confident sexuality in their own voices (section 2 above). This pass restores that register through every greeting and every craft topic that can carry it, without stating an age.
+
+No `topic_id`, `scene_id`, `keyword`, `label`, `requires`, `unavailable`, `refusal`, speaker set, assortment binding, service semantic or condition changed. All three craft-home tables keep four open topics each, no variants, no `predecessors` and no `disclosure`.
+
+- `eolas_naelara`: greeting names the sheer robe and the body's line; 養蛛 keeps its craft-logic cause; 蛛絲 gains the silk's cool thread on skin; 白衣 restores "the body is not hidden, sex is like breathing, the outside guest brought his own rules"; 收回 names the silk's history on a body. All scenes `r2` → `r3`.
+- `eolas_sirelwen`: greeting opens the scorched hem over the burned chest; 法術 lands on the host's appetite in her own words; 短杖 names the current of magic along the skin; 元素 restores the night-after and the body used to its limit; 收回 keeps its service semantic. All scenes `r2` → `r3`.
+- `eolas_taelith`: greeting puts the kiln's heat on her body; 窯火 keeps the shared-kiln cause and adds the sweat and heat at the fire; 琉璃墜 restores "likes it against the skin, slides when it sweats"; 魔法燈 and 收回 keep their service semantics. All scenes `r2` → `r3`.

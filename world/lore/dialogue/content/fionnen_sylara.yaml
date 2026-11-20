@@ -1,99 +1,99 @@
 schema_version: 1
-greeting: 希拉拉‧希倫特布魯克從藥圃進來，先把來人從頭看到腳，看身上有沒有血。看過之後，她才在圍布上擦乾手，「沒有傷就好。止血藥草剛曬好，森林蜂蠟膏還溫著。你要哪一樣？」
+greeting: 希拉拉‧希倫特布魯克從藥圃進來，先把你從頭到腳看了一遍，眼睛停在袖口、褲腳這些容易見血的地方。沒瞧見傷，她才在圍布上擦乾手，「沒傷就好。止血藥草剛曬好，森林蜂蠟膏還溫著。你要哪一樣？」
 topics:
 - topic_id: fionnen_sylara_home.topic_01
   keyword: 藥草
   label: 藥草
   fallback:
     scene_id: fionnen_sylara_home.topic_01_scene
-    revision: r2
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
       text: 「止血藥草是種在林間菜圃裡嗎？」
     - kind: narration
-      text: 她拿起門邊那束曬好的藥草，把葉面翻給客人瞧。
+      text: 她拿起門邊一束曬好的草，把葉面翻過來給你看。
     - kind: speech
       speaker: host
-      text: 「種在菜圃最裡面的那幾畦。這種草要半遮光，水不能積在根上，所以畦要挑高一點的地方。」
+      text: 「種在菜圃最裡頭那幾畦。這草要半遮著光，根上不能積水，所以畦得挑高一點的地方。」
     - kind: speech
       speaker: host
-      text: 「採下來以後倒掛著陰乾，曬過頭就沒有用了。要用的時候揉碎敷上，血止得快，傷口也收得緊。」
+      text: 「採下來倒掛著陰乾，曬過頭就沒用了。要用時揉碎了敷上，血止得快，口子也收得緊。」
     - kind: speech
       speaker: actor
       text: 「村子裡常有人受傷嗎？」
     - kind: speech
       speaker: host
-      text: 「進深林的獵人回來，衣裳總是給枝椏扯破，人倒不礙事。孩子跑得太急，撞斷的反而是樹幹。備著，山外來的客人和林子裡的動物都用得上。」
+      text: 「進深林的獵人回來，大腿、肋上給枝椏和野物劃開，衣裳也扯破，人倒不礙事。我這雙手摸過的肉，老的嫩的、結痂的剛癒的都有。備著，是給山外的客人和林子裡的野物用。」
 - topic_id: fionnen_sylara_home.topic_02
   keyword: 蜂蠟膏
   label: 蜂蠟膏
   fallback:
     scene_id: fionnen_sylara_home.topic_02_scene
-    revision: r1
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
-      text: 「森林蜂蠟膏是用蜂蠟做的？」
+      text: 「森林蜂蠟膏是用蜂蠟做的嗎？」
     - kind: narration
-      text: 她從架上取下一盒，掀開蓋子，裡頭的膏還軟著。
+      text: 她從架上取下一盒，掀開蓋，裡頭的膏還軟著。
     - kind: speech
       speaker: host
-      text: 「盧梅斯收完蜜，把蠟送過來。我把蠟和幾味藥草一起用小火熬，熬到顏色轉深就離火。」
+      text: 「盧梅斯收完蜜，把蠟送來。我把蠟跟幾味藥草用小火一起熬，熬到色轉深就離火。」
     - kind: speech
       speaker: host
-      text: 「割傷、擦傷、凍裂的口子，抹上去會封住。封住了就不進水，也不進土，隔天再看。」
+      text: 「割傷、擦傷、凍裂的口子，抹上去就封住。封住了不進水，也不進土，隔天再瞧。」
     - kind: speech
       speaker: actor
-      text: 「所以這盒是剛熬好的？」
+      text: 「那這盒是剛熬好的？」
     - kind: speech
       speaker: host
-      text: 「昨天才離火。你伸手，我替你抹一點在指節上，你就曉得它貼不貼皮膚。」
+      text: 「昨天才離火，膏還帶著那口溫熱。你把手伸出來，我抹一點在你指節上，它貼著你的體溫就化開。」
 - topic_id: fionnen_sylara_home.topic_03
   keyword: 光魔法
   label: 光魔法
   fallback:
     scene_id: fionnen_sylara_home.topic_03_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「聽說斐歐恩族親和光魔法，治病也靠這個嗎？」
     - kind: narration
-      text: 她把藥膏收好，抬手讓一點白光在掌心亮起來，隨後熄了。
+      text: 她收好藥膏，攤開手，一點白光在掌心亮起，又熄了。
     - kind: speech
       speaker: host
-      text: 「族裡的人跟光最親近。多半能用手聚光，聚起來照在傷口上，能止住血，也能消腫。」
+      text: 「族裡的人跟光最親。多半能用手把光聚起來，照在傷口上，血就止住，腫也消了。」
     - kind: speech
       speaker: host
-      text: 「不過光做不到所有的事。遇到斷骨，我會先接好；傷口裡留著髒東西，也得先清掉。」
+      text: 「這對我們是家常事。孩子擦破皮，過一夜就長好，誰也不當一回事。」
     - kind: speech
       speaker: actor
-      text: 「那你自己受過傷，也會用光治嗎？」
+      text: 「那你自己受的傷，也用光治嗎？」
     - kind: speech
       speaker: host
-      text: 「用不上。族裡的人就算給樹枝擦破皮，過一夜也就長好了。我學著處理傷口，是為了來訪的客人和林裡的動物。」
+      text: 「用不上。族裡的人給枝子劃一下，睡一覺就癒了。我學著替人處置傷口，是為了山外的客人和林裡的野物。」
 - topic_id: fionnen_sylara_home.topic_04
   keyword: 收回
   label: 收回
   fallback:
     scene_id: fionnen_sylara_home.topic_04_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
       text: 「你做的藥膏和藥水，用不完能拿回來嗎？」
     - kind: speech
       speaker: host
-      text: 「森林蜂蠟膏、止血藥草和治療藥水，用不上都可以拿來，我看過成色算銅幣給你。」
+      text: 「森林蜂蠟膏、止血藥草和治療藥水，用不上就拿來，我瞧過成色，算銅幣給你。」
     - kind: speech
       speaker: host
-      text: 「其他的草藥我不熟，也就不收。我的畦裡種什麼、熬什麼，我都清楚；別人的東西混進來，我沒把握。」
+      text: 「別的草藥我不熟，也就不收。我畦裡種什麼、熬什麼，心裡有數；別人的東西混進來，我沒把握。」
     - kind: speech
       speaker: actor
-      text: 「那從山外帶來的藥草呢？」
+      text: 「那從山外帶回來的藥草呢？」
     - kind: narration
-      text: 她搖頭，把桌上的藥草攏到一邊。
+      text: 她搖了頭，把桌上散著的藥草攏到一邊。
     - kind: speech
       speaker: host
-      text: 「山外帶回來的你自己留著。我沒備的草藥不收，混進我的畦裡只會添麻煩。」
+      text: 「你自己留著。我沒備的草藥不收，混進我的畦裡只會添亂。」

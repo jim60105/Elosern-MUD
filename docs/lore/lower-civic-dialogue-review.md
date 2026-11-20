@@ -64,3 +64,56 @@ Review date: 2026-10-26.
 - Punctuation: Full-width punctuation marks throughout; single space between CJK and alphanumeric characters.
 - Banned terms check: Zero occurrences of 「您」; zero sentence-final 「的，/的。」; zero calques; zero 中式武俠 terms.
 - Linter execution: `sh /home/jim60105/.agents/skills/chinese-content-writing-guideline/scripts/lint.sh` produced `0 error(s)` on both YAML files.
+
+## 5. Rewrite (2026-11-20)
+
+Whole-slice prose rewrite to fix causal coherence, drop the flat/AI phrasing, and let the two
+adult hosts speak with the world's frankness. No `topic_id`, `scene_id`, `keyword`, `label`,
+condition, variant, priority, predecessor, disclosure or speaker changed. Service behaviour
+unchanged: the bathhouse still runs no mechanism and the text still denies that soaking heals
+anything; the guardhouse still posts no work and grants no patrol assignment, discount or
+exemption.
+
+### altoria_bathhouse (伊莎貝爾‧葦沼, 44)
+
+- greeting: rewritten. The keeper folds hot towels and calls the newcomer 「新來的」, states the
+  one rule and the hot river water, and invites questions while her work waits.
+- `topic_01` 規矩 r2→r3 (fallback, `elf_guest`), r2→r4 (`high_exposure`) — intent: the 男左女右 rule and
+  the stone partition, the lockers, and no mud in the pool. The elf variant keeps the canonical
+  ease with nudity met by respect, not scandal; the exposure variant hands a dry towel over a
+  scant dress, naming the draft and the gate guards' questioning, then lets the guest undress
+  inside. Bridge: each variant opens with the actor asking the rules and the host answers before
+  any turn; the two variants keep their conditions and priorities (20 / 10).
+- `topic_02` 精靈 r2→r3 — intent: ~300 elves continent-wide, the elven absence of shame against
+  the human-and-beastfolk ethic of covering up, and the other bathers' awe. Bridge: the actor
+  asks whether elves bathe by different rules, and the host answers with the rarity, then the
+  contrast, then her own "who is right I cannot say".
+- `topic_03` 泡湯 r2→r4 — intent: heated river water over round stones, no magical healing, and a
+  redirect to 東市's 鍊金坊 for real wounds. Bridge: the actor asks whether soaking cures all ills,
+  the host describes the honest relief, then answers the myth directly and names 治療藥水.
+- `topic_04` 歇息 r2→r3 — intent: hall benches and water for cooling down, 爐火旅店 for a full
+  night's sleep. Bridge: the actor asks whether there is a place to lie down, the host offers the
+  benches, then points to 溫弗蕾德's inn.
+
+### altoria_guardhouse (托瓦德‧鄧堡, 45)
+
+- greeting: rewritten. The captain turns from the south-gate window, states his charge, and
+  states up front that the post issues no commission and posts no bounty.
+- `topic_01` 進城 r2→r3 — intent: canonical street and landmark names in order. Bridge: the actor
+  asks how to read the city, the host traces 南大道 to 中央廣場, then 公會前, 市場街, 大道北段
+  and 聖階, and closes with the wooden signposts.
+- `topic_02` 差事 r2→r3 — intent: the post issues no work and redirects to the guild board. Bridge:
+  the actor asks for 討伐 or 巡守 work, the host refuses, redirects to 冒險者公會, and separates
+  private mutual aid from official duty.
+- `topic_03` 治安 r2→r3 — intent: patrolling guards in blue tabards keep order and trade disputes
+  stay out of the post's remit. Bridge: the actor asks about order and where to take a dispute,
+  the host answers the patrol, then draws the line at price haggling and gambling.
+- `topic_04` 過夜 r2→r3 — intent: a bare bench here, 爐火旅店 and 醉月酒館 in 客棧巷 for sleep.
+  Bridge: the actor asks for a clean inn, the host offers the bench, then names the inn and
+  tavern and sends the traveller on before dark.
+
+Proper nouns all resolve to registry rows: 南大道, 中央廣場, 公會前, 大道北段, 聖階, 市場街,
+客棧巷, 東市, 爐火旅店, 醉月酒館, 冒險者公會, 大神殿, 王宮, and the 治療藥水 item display name.
+爐火旅店 and 醉月酒館 resolve to their `doorway_key` rows in `content/maps/interiors/`; the
+`--places` warnings for those two names are the lint's heuristic missing the doorway key, not
+an invented name. 治療藥水 is the registered healing potion sold by 希碧拉‧灰沼 at 東市's 鍊金坊.
