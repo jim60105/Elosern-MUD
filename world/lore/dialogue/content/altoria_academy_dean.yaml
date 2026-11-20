@@ -1,5 +1,5 @@
 schema_version: 1
-greeting: 學院的黑板前，奧德溫‧薩契院長擦去一行算式，放下粉筆回過身來：「歡迎。此刻不是授課時段，但學問隨時可以談。法術位階、八種元素、親和之別，你想從哪一項問起？學院只傳知識，不賣捷徑。」
+greeting: 學院的黑板前，奧德溫‧薩契院長擦去一行算式，放下粉筆回過身來：「歡迎。此刻不是授課時段，但學問隨時可以談。法術位階、八種元素、親和之別，你想從哪一項問起？學院只傳知識，不授捷徑。」
 topics:
 - topic_id: altoria_academy.topic_01
   keyword: 魔法等級
@@ -13,7 +13,7 @@ topics:
       min_proficiency: 1
     scene:
       scene_id: altoria_academy.topic_01_scholar_scene
-      revision: r3
+      revision: r4
       lines:
       - kind: speech
         speaker: actor
@@ -25,13 +25,16 @@ topics:
         text: 「問得好。懂得解析法陣，就曉得每道咒文落在哪一位階，消耗的魔力也隨之遞增。」
       - kind: speech
         speaker: host
-        text: 「典籍按消耗把法術分作學徒、術師、大師、賢者、主宰、神格六等。越往深處，一次施法要付出的魔力越是驚人。」
+        text: 「典籍按消耗把法術分作初級、中級、高級、超級、究極五階。越往深處，一次施法要付出的魔力越是驚人。」
+      - kind: speech
+        speaker: host
+        text: 「初級階是火球、水箭、風刃、治癒術、身體強化；中級階有火焰風暴、冰牆、飛行術；高級階有熔岩術、暴風雪、高級治癒、統御術；超級階有龍炎術、地震術、神聖光輝。究極階只記其名，對人類而言幾乎不可能施展。」
       - kind: speech
         speaker: host
         text: 「書庫深處的藏書就按這個次序陳列。學院只講法理，往更高深的系譜走，仍得靠一日一日的練習。」
   fallback:
     scene_id: altoria_academy.topic_01_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
@@ -40,13 +43,13 @@ topics:
       text: 奧德溫‧薩契拿起板擦，在黑板邊緣敲了兩下。
     - kind: speech
       speaker: host
-      text: 「這個問題分兩層。先說位階，它按一次施法要消耗的魔力來分，由淺入深是學徒、術師、大師、賢者、主宰、神格。」
+      text: 「這個問題分兩層。先說位階，它按一次施法要消耗的魔力來分，由淺入深是初級、中級、高級、超級、究極。」
     - kind: speech
       speaker: host
-      text: 「學徒階是火焰箭、水箭術、風刃術、治癒術這類入門法術。到了術師階，才輪到火焰風暴、冰牆術、飛行術。」
+      text: 「初級階是火球、水箭、風刃、治癒術、身體強化這類入門法術。中級階有火焰風暴、冰牆、飛行術。」
     - kind: speech
       speaker: host
-      text: 「再往上，大師階有熔岩術、暴風雪、高級治癒；賢者階有龍炎術、地震術、神聖光輝。主宰與神格兩階，需要的魔力大到尋常法師一次也付不起，典籍只記其名，世上沒幾個人施展得出來。」
+      text: 「高級階有熔岩術、暴風雪、高級治癒、統御術；超級階有龍炎術、地震術、神聖光輝。究極階所需的魔力，對人類而言幾乎不可能施展，典籍只記其名。」
     - kind: speech
       speaker: host
       text: 「學院書庫依階序藏書，誰都可以進門翻閱。」
