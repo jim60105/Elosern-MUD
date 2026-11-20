@@ -6,6 +6,8 @@ ordinary item-use boundary: ordered multi-gauge recovery under the ordinary
 caps, exactly one consumed serving, and a combat refusal that writes nothing.
 """
 
+from tools.spec_traceability import covers_requirement
+
 from world.lore.items import (
     ItemIconKey,
     ItemKind,
@@ -67,6 +69,9 @@ class FoodRecoveryUseTests(_ItemUseTestCase):
         getattr(self.actor.traits, gauge).current = maximum - missing
         return maximum - missing, maximum
 
+    @covers_requirement(
+        "item-use-resolution::recovery-food-is-an-out-of-combat-consumable"
+    )
     def test_committed_serving_restores_gauges_in_profile_order(self):
         hp_before, hp_max = self.drain("hp", 3)
         mp_before, _ = self.drain("mp", 40)
@@ -91,6 +96,9 @@ class FoodRecoveryUseTests(_ItemUseTestCase):
             [("hp", 3), ("mp", _RATION_MP), ("sp", _RATION_SP)],
         )
 
+    @covers_requirement(
+        "item-use-resolution::recovery-food-is-an-out-of-combat-consumable"
+    )
     def test_combat_attempt_refuses_without_consuming_or_restoring(self):
         self.drain("hp", 5)
         self.drain("mp", 5)
