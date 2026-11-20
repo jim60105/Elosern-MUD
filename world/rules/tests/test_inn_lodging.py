@@ -8,7 +8,7 @@ from evennia.utils.test_resources import EvenniaTest
 
 from typeclasses.components import Lodging
 from typeclasses.npcs import NPC
-from typeclasses.rooms import LodgingGuestRoom, Room
+from typeclasses.rooms import LodgingGuestRoom
 from world.rules import city_sleep, lodging
 from world.rules.clock import AdvanceSource, WorldClock, get_world_clock
 from world.rules.fatigue import (
@@ -43,12 +43,34 @@ from world.rules.time_skip import (
     continue_sleep,
     enter_sleep,
 )
-from world.tests.geography_fixture import publish_shipped_map_world
+TEST_INN = "test_inn"
+TEST_INNKEEPER = "test_innkeeper"
+TEST_SHOP = "test_shop"
+TEST_SHELTER = "test_shelter"
+TEST_CITY = "test_city"
+TEST_VILLAGE = "test_village"
+
+
+def _place(key, settlement, *, lodging_capability=False):
+    components = (
+        (SimpleNamespace(type="lodging", kwargs={}),)
+        if lodging_capability
+        else ()
+    )
+    return SimpleNamespace(
+        key=key,
+        settlement_key=settlement,
+        components=components,
+    )
+
+
+def _interiors(*keys):
+    return SimpleNamespace(rooms={key: object() for key in keys})
 
 
 def _host(room):
     host = create_object(NPC, key="旅店老闆", location=room)
-    component = Lodging.create(host, service_id="altoria_innkeeper")
+    component = Lodging.create(host, service_id=TEST_INNKEEPER)
     host.components.add(component)
     component = host.components.get(Lodging.get_component_slot())
     component.service_binding = "place"
@@ -59,13 +81,30 @@ def _host(room):
 class LodgingCheckInTests(EvenniaTest):
     def setUp(self):
         super().setUp()
-        publish_shipped_map_world()
         self.player = self.char1
         self.player.race = "human"
         self.player.apply_race_baseline()
         self.player.location = self.room1
         self.player.db.wallet = 200
-        self.room1.tags.add("altoria_lodging")
+        self.room1.tags.add(TEST_INN)
+        place = _place(TEST_INN, TEST_CITY, lodging_capability=True)
+        places = patch.object(
+            city_sleep, "_place_for_room", return_value=place
+        )
+        places.start()
+        self.addCleanup(places.stop)
+        lobby_key = patch.object(
+            lodging, "_lobby_place_key", return_value=TEST_INN
+        )
+        lobby_key.start()
+        self.addCleanup(lobby_key.stop)
+        interiors = patch.object(
+            city_sleep,
+            "_published_interiors",
+            return_value=_interiors(TEST_INN),
+        )
+        interiors.start()
+        self.addCleanup(interiors.stop)
         self.host = _host(self.room1)
 
     def _companion(self, key, location=None):
@@ -176,7 +215,7 @@ class LodgingCheckInTests(EvenniaTest):
         self.assertIsNone(lodging.read_booking(self.room1))
         self.assertIsNone(read_access(self.player))
         self.assertIsNone(read_access(companion))
-        room = lodging.read_guest_room(self.room1, "altoria_lodging")
+        room = lodging.read_guest_room(self.room1, TEST_INN)
         if room is not None:
             self.assertFalse(real(companion, room))
 
@@ -184,13 +223,30 @@ class LodgingCheckInTests(EvenniaTest):
 class PaidSleepTests(EvenniaTest):
     def setUp(self):
         super().setUp()
-        publish_shipped_map_world()
         self.player = self.char1
         self.player.race = "human"
         self.player.apply_race_baseline()
         self.player.location = self.room1
         self.player.db.wallet = 100
-        self.room1.tags.add("altoria_lodging")
+        self.room1.tags.add(TEST_INN)
+        place = _place(TEST_INN, TEST_CITY, lodging_capability=True)
+        places = patch.object(
+            city_sleep, "_place_for_room", return_value=place
+        )
+        places.start()
+        self.addCleanup(places.stop)
+        lobby_key = patch.object(
+            lodging, "_lobby_place_key", return_value=TEST_INN
+        )
+        lobby_key.start()
+        self.addCleanup(lobby_key.stop)
+        interiors = patch.object(
+            city_sleep,
+            "_published_interiors",
+            return_value=_interiors(TEST_INN),
+        )
+        interiors.start()
+        self.addCleanup(interiors.stop)
         self.host = _host(self.room1)
 
     def _check_in(self):
@@ -266,14 +322,38 @@ class PaidSleepTests(EvenniaTest):
 class CitySleepPolicyTests(EvenniaTest):
     def setUp(self):
         super().setUp()
-        publish_shipped_map_world()
         self.player = self.char1
         self.player.race = "human"
         self.player.apply_race_baseline()
         self.player.location = self.room1
+        places_by_room = {
+            TEST_SHOP: _place(TEST_SHOP, TEST_CITY),
+            TEST_SHELTER: _place(TEST_SHELTER, TEST_VILLAGE),
+        }
+        places = patch.object(
+            city_sleep,
+            "_place_for_room",
+            side_effect=lambda room, room_id: places_by_room.get(room_id),
+        )
+        places.start()
+        self.addCleanup(places.stop)
+        interiors = patch.object(
+            city_sleep,
+            "_published_interiors",
+            return_value=_interiors(TEST_SHOP, TEST_SHELTER),
+        )
+        interiors.start()
+        self.addCleanup(interiors.stop)
+        city = patch.object(
+            city_sleep,
+            "_city_location",
+            side_effect=lambda key: key == TEST_CITY,
+        )
+        city.start()
+        self.addCleanup(city.stop)
 
     def test_city_interior_refuses_while_village_interior_and_outdoors_stay_open(self):
-        self.room1.tags.add("altoria_tavern")
+        self.room1.tags.add(TEST_SHOP)
         self.assertEqual(
             city_sleep.classify_room(self.room1).kind,
             city_sleep.SleepLocation.REFUSED,
@@ -281,8 +361,8 @@ class CitySleepPolicyTests(EvenniaTest):
         with self.assertRaises(SleepRefused):
             enter_sleep(self.player, mode="duration", seconds=60)
 
-        self.room1.tags.remove("altoria_tavern")
-        self.room1.tags.add("ciaran_shelter")
+        self.room1.tags.remove(TEST_SHOP)
+        self.room1.tags.add(TEST_SHELTER)
         self.assertEqual(
             city_sleep.classify_room(self.room1).kind,
             city_sleep.SleepLocation.OPEN,
@@ -293,8 +373,8 @@ class CitySleepPolicyTests(EvenniaTest):
     def test_patrol_ends_street_nap_and_refuses_same_day_again(self):
         place = city_sleep.SleepPlace(
             city_sleep.SleepLocation.STREET,
-            settlement_key="capital_altoria",
-            street="capital_altoria:test_street",
+            settlement_key=TEST_CITY,
+            street=f"{TEST_CITY}:test_street",
         )
         with patch.object(city_sleep, "classify_room", return_value=place):
             entry = enter_sleep(self.player, mode="duration", seconds=10000)
@@ -324,7 +404,6 @@ class CitySleepPolicyTests(EvenniaTest):
                 enter_sleep(self.player, mode="duration", seconds=60)
 
     def test_patrol_does_not_wake_a_forced_sleeper(self):
-        self.room1.tags.add("altoria_tavern")
         write_fatigue_state(self.player, 0, SleepPosture.FORCED)
         clock = get_world_clock()
         clock.advance(3600, AdvanceSource.SKIP, (self.player,))
@@ -336,8 +415,8 @@ class CitySleepPolicyTests(EvenniaTest):
     def test_another_bodys_advance_still_ends_the_nap_at_the_patrol(self):
         place = city_sleep.SleepPlace(
             city_sleep.SleepLocation.STREET,
-            settlement_key="capital_altoria",
-            street="capital_altoria:test_street",
+            settlement_key=TEST_CITY,
+            street=f"{TEST_CITY}:test_street",
         )
         with patch.object(city_sleep, "classify_room", return_value=place):
             enter_sleep(self.player, mode="duration", seconds=10000)
@@ -377,8 +456,8 @@ class CitySleepPolicyTests(EvenniaTest):
     def test_street_nap_shows_only_a_general_warning(self):
         place = city_sleep.SleepPlace(
             city_sleep.SleepLocation.STREET,
-            settlement_key="capital_altoria",
-            street="capital_altoria:test_street",
+            settlement_key=TEST_CITY,
+            street=f"{TEST_CITY}:test_street",
         )
         with patch.object(city_sleep, "classify_room", return_value=place):
             outcome = begin_sleep(self.player, mode="duration", seconds=600)
