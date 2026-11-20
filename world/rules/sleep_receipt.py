@@ -749,7 +749,9 @@ def forced_wake_seconds(entity: Any) -> int:
     return math.ceil(gap / rate)
 
 
-def recovery_target_tick(entity: Any, receipt: SleepReceipt, tick: int) -> int:
+def recovery_target_tick(
+    entity: Any, receipt: SleepReceipt, tick: int, *, cap_street: bool = True
+) -> int:
     """Return the next recovery boundary under the receipt's unchanged cap.
 
     A recovery target is reevaluated against the body's current unmet needs, so
@@ -773,7 +775,11 @@ def recovery_target_tick(entity: Any, receipt: SleepReceipt, tick: int) -> int:
         nap = read_street_nap(entity)
     except ValueError:  # observability: ignore R2: a malformed nap binding cannot cap a target; the ordinary receipt target stays authoritative
         nap = None
-    if nap is not None and nap["sleep_id"] == receipt.sleep_id:
+    if (
+        cap_street
+        and nap is not None
+        and nap["sleep_id"] == receipt.sleep_id
+    ):
         target = min(target, int(nap["patrol_tick"]))
     return target
 

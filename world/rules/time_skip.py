@@ -146,6 +146,7 @@ MISSING_DURATION_MESSAGE = "指定時長的睡眠需要一個時長，例如 sle
 STALE_SLEEP_MESSAGE = "這次睡眠已經更新，請依目前狀態重新操作。"
 PARTY_MEMBER_INELIGIBLE_MESSAGE = "隊伍中有成員目前無法入睡：{member}。"
 PARTY_MEMBER_MISSING_RECEIPT_MESSAGE = "隊伍中有成員的睡眠紀錄缺失：{member}。"
+INTERRUPTED_SLEEP_MESSAGE = "睡眠被打斷了。"
 
 
 def render_handoff_offer_message(candidates: Any) -> str:
@@ -860,6 +861,7 @@ def enter_sleep(
         raise SleepRefused("already_asleep", CONTINUE_SLEEP_MESSAGE)
     tick = int(get_world_clock().tick)
     snapshots = None
+    booking_snapshot = None
     try:
         with transaction.atomic():
             # Lock and re-read the authoritative posture before constructing
@@ -882,6 +884,12 @@ def enter_sleep(
                 if place.kind is city_sleep.SleepLocation.GUEST_ROOM
                 else None
             )
+            if paid_context is not None:
+                lobby, _booking = paid_context
+                booking_snapshot = (
+                    lobby,
+                    attribute_snapshot(lobby, lodging.BOOKING_ATTRIBUTE),
+                )
             accepted, partial = _accepted_sleep_seconds(
                 member,
                 mode,
@@ -951,6 +959,11 @@ def enter_sleep(
         # partially committed sleep posture or receipt behind.
         if snapshots is not None:
             _restore_sleep_surfaces(member, snapshots)
+        if booking_snapshot is not None:
+            lobby, booking_state = booking_snapshot
+            restore_attribute_best_effort(
+                lobby, lodging.BOOKING_ATTRIBUTE, booking_state
+            )
         raise
     candidates = _handoff_candidates(member)
     return SleepEntry(
@@ -1201,12 +1214,18 @@ def continue_sleep(
         summary=(
             render_skip_summary(elapsed, list(events))
             + (
+                f" {INTERRUPTED_SLEEP_MESSAGE}"
+                if final is not None and final.state == STATE_INTERRUPTED
+                else ""
+            )
+            + (
                 f" {PARTIAL_RECOVERY_MESSAGE}"
                 if final is not None and final.partial and not final.sleeping
                 else ""
             )
         ),
-        interrupted=any(event.interactive for event in events),
+        interrupted=any(event.interactive for event in events)
+        or bool(final is not None and final.state == STATE_INTERRUPTED),
     )
     _record(result)
     if continuation is None:
@@ -1771,16 +1790,23 @@ def continue_owner_sleep(
         interrupted=interrupted,
         summary=summary,
     )
+    final_receipt = read_sleep_receipt(commander)
+    completed_receipt = bool(
+        final_receipt is not None and final_receipt.state == STATE_COMPLETED
+    )
+    interrupted = interrupted or bool(
+        final_receipt is not None and final_receipt.state == STATE_INTERRUPTED
+    )
     result = SkipResult(
         operation_id=base_operation,
         requested_seconds=int(receipt.accepted_seconds),
         elapsed_seconds=total_elapsed,
         events=tuple(all_events),
         voluntary=receipt.kind == KIND_VOLUNTARY,
-        woke=continuation == CONTINUATION_COMPLETE,
+        woke=continuation == CONTINUATION_COMPLETE and completed_receipt,
         body_id=int(commander.pk),
         sleep_id=receipt.sleep_id,
-        completed=continuation == CONTINUATION_COMPLETE,
+        completed=continuation == CONTINUATION_COMPLETE and completed_receipt,
         partial=bool(receipt.partial),
         summary=summary or None,
         interrupted=interrupted,
@@ -1796,20 +1822,28 @@ def _owner_result_from_decision(
 ) -> SkipResult:
     """Reconstruct one durably completed/paused owner operation."""
     continuation = str(decision["continuation"])
+    try:
+        receipt = read_sleep_receipt(commander)
+    except SleepReceiptError:  # observability: ignore R2: an unreadable receipt is reported as a replayed paused result, never fabricated as success
+        receipt = None
+    completed_receipt = bool(
+        receipt is not None and receipt.state == STATE_COMPLETED
+    )
     return SkipResult(
         operation_id=str(decision["owner_operation_id"]),
         requested_seconds=0,
         elapsed_seconds=int(decision["elapsed_seconds"]),
         events=(),
         voluntary=True,
-        woke=continuation == CONTINUATION_COMPLETE,
+        woke=continuation == CONTINUATION_COMPLETE and completed_receipt,
         body_id=int(commander.pk),
         sleep_id=decision["sleep_id"],
-        completed=continuation == CONTINUATION_COMPLETE,
+        completed=continuation == CONTINUATION_COMPLETE and completed_receipt,
         partial=False,
         summary=decision["summary"] or None,
         replayed=True,
-        interrupted=bool(decision["interrupted"]),
+        interrupted=bool(decision["interrupted"])
+        or bool(receipt is not None and receipt.state == STATE_INTERRUPTED),
         continuation=continuation,
     )
 
@@ -2123,7 +2157,11 @@ def enter_party_sleep(
     planned: list[
         tuple[Any, SleepReceipt, int, bool, int, Any, Any]
     ] = []
+    paid_entries: list[tuple[Any, Any]] = []
+    paid_lobby = None
+    paid_booking = None
     snapshots = None
+    booking_snapshots: dict[int, tuple[Any, Any]] = {}
     try:
         with transaction.atomic():
             _lock_members(members)
@@ -2191,6 +2229,9 @@ def enter_party_sleep(
                         place,
                     )
                 )
+                if paid_context is not None:
+                    paid_entries.append((member, receipt))
+                    paid_lobby, paid_booking = paid_context
             if not planned:
                 raise SleepRefused("already_asleep", PARTY_SLEEP_NOTHING_MESSAGE)
             body_ids = [int(member.pk) for member, *_ in planned]
@@ -2204,6 +2245,13 @@ def enter_party_sleep(
                 commander,
                 _sleep_surface_snapshot(commander),
             )
+            if paid_lobby is not None:
+                booking_snapshots[id(paid_lobby)] = (
+                    paid_lobby,
+                    attribute_snapshot(
+                        paid_lobby, lodging.BOOKING_ATTRIBUTE
+                    ),
+                )
             for (
                 member,
                 receipt,
@@ -2218,12 +2266,7 @@ def enter_party_sleep(
                 )
                 write_sleep_receipt(member, receipt)
                 project_fatigue_status(member)
-                if paid_context is not None:
-                    lobby, booking = paid_context
-                    lodging.bind_paid_sleep(
-                        member, receipt, lobby=lobby, booking=booking
-                    )
-                elif place.kind is city_sleep.SleepLocation.STREET:
+                if place.kind is city_sleep.SleepLocation.STREET:
                     from world.rules.rest_bonuses import write_street_nap
 
                     write_street_nap(
@@ -2231,11 +2274,19 @@ def enter_party_sleep(
                         **city_sleep.street_nap_binding(receipt, place, tick),
                     )
                     city_sleep.mark_street_napper(member)
+            if paid_entries and paid_lobby is not None and paid_booking is not None:
+                lodging.bind_paid_sleeps(
+                    paid_entries, lobby=paid_lobby, booking=paid_booking
+                )
             write_party_operation(commander, operation, body_ids)
             bump_sleep_view_generation(commander)
     except Exception:
         for member, member_snapshots in (snapshots or {}).values():
             _restore_sleep_surfaces(member, member_snapshots)
+        for lobby, booking_state in booking_snapshots.values():
+            restore_attribute_best_effort(
+                lobby, lodging.BOOKING_ATTRIBUTE, booking_state
+            )
         raise
     entries = tuple(
         SleepEntry(

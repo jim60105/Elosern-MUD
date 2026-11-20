@@ -41,6 +41,7 @@ from world.rules.time_skip import (
     SleepRefused,
     begin_sleep,
     continue_sleep,
+    enter_party_sleep,
     enter_sleep,
 )
 TEST_INN = "test_inn"
@@ -167,19 +168,17 @@ class LodgingCheckInTests(EvenniaTest):
         intruder = create_object(
             self.player.__class__, key="未登記旅客", location=self.room1
         )
-        messages = []
-        intruder.msg = messages.append
         self.assertFalse(intruder.move_to(room))
         self.assertIs(intruder.location, self.room1)
         self.assertNotIn(intruder, room.contents)
-        self.assertTrue(messages)
 
-        self.player.move_to(self.room1)
+        self.assertTrue(self.player.move_to(self.room1))
         booking = lodging.read_booking(self.room1)
         self.assertIsNotNone(booking)
         self.assertNotIn(int(self.player.pk), booking["guest_ids"])
         self.assertIsNone(read_access(self.player))
-        companion.move_to(self.room1)
+        self.assertTrue(companion.move_to(self.room1))
+        lodging.release_access_on_departure(companion)
         self.assertIsNone(lodging.read_booking(self.room1))
 
     def test_repeated_stay_reuses_one_persistent_room(self):
@@ -299,6 +298,30 @@ class PaidSleepTests(EvenniaTest):
         paid = full_recovery_seconds(self.player, paid=True)
         self.assertGreater(ordinary, 0)
         self.assertEqual(paid, (ordinary + 1) // 2)
+
+    def test_party_paid_sleep_binds_every_guest_in_one_booking(self):
+        companion = create_object(NPC, key="同伴", location=self.room1)
+        companion.race = "human"
+        companion.apply_race_baseline()
+        join_party(companion, self.player)
+        write_fatigue_state(companion, 360000, SleepPosture.AWAKE)
+        self._check_in()
+        outcome = enter_party_sleep(self.player, mode="duration", seconds=60)
+        self.assertIsNone(outcome.result)
+        booking = lodging.read_booking(self.room1)
+        self.assertIsNotNone(booking)
+        self.assertEqual(
+            set(booking["paid"]),
+            {str(int(self.player.pk)), str(int(companion.pk))},
+        )
+        self.assertEqual(
+            read_paid_sleep(self.player)["sleep_id"],
+            booking["paid"][str(int(self.player.pk))],
+        )
+        self.assertEqual(
+            read_paid_sleep(companion)["sleep_id"],
+            booking["paid"][str(int(companion.pk))],
+        )
 
     def test_paid_sleep_actually_fills_all_four_resources_faster(self):
         self._check_in()
@@ -432,6 +455,27 @@ class CitySleepPolicyTests(EvenniaTest):
             read_sleep_receipt(self.player).state, STATE_INTERRUPTED
         )
         self.assertEqual(read_street_refusals(self.player), {place.street: 0})
+
+    def test_out_of_scope_nap_completes_at_its_own_deadline(self):
+        place = city_sleep.SleepPlace(
+            city_sleep.SleepLocation.STREET,
+            settlement_key=TEST_CITY,
+            street=f"{TEST_CITY}:test_street",
+        )
+        with patch.object(city_sleep, "classify_room", return_value=place):
+            enter_sleep(self.player, mode="duration", seconds=600)
+        other = create_object(self.player.__class__, key="路人", location=self.room2)
+        clock = get_world_clock()
+        clock.advance(
+            3600,
+            AdvanceSource.SKIP,
+            (other,),
+            mental=plan_for((other,)),
+        )
+        receipt = read_sleep_receipt(self.player)
+        self.assertEqual(receipt.state, STATE_COMPLETED)
+        self.assertIsNone(read_street_nap(self.player))
+        self.assertEqual(read_street_refusals(self.player), {})
 
     def test_patrol_arithmetic_is_authored_and_deterministic(self):
         policy = city_sleep.get_policy()

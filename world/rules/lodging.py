@@ -826,18 +826,43 @@ def bind_paid_sleep(
     entity: Any, receipt: Any, *, lobby: Any, booking: Mapping[str, Any]
 ) -> None:
     """Bind one accepted receipt to the booking's single paid sleep."""
+    bind_paid_sleeps(((entity, receipt),), lobby=lobby, booking=booking)
+
+
+def bind_paid_sleeps(
+    entries: Sequence[tuple[Any, Any]],
+    *,
+    lobby: Any,
+    booking: Mapping[str, Any],
+) -> None:
+    """Bind every accepted party receipt in one atomic booking update."""
     paid = dict(booking["paid"])
-    paid[str(int(entity.pk))] = receipt.sleep_id
+    for entity, receipt in entries:
+        paid[str(int(entity.pk))] = receipt.sleep_id
     updated = dict(booking)
     updated["paid"] = paid
     write_booking(lobby, updated)
-    write_paid_sleep(
-        entity,
-        sleep_id=receipt.sleep_id,
-        booking_id=updated["booking_id"],
-        place_key=updated["place_key"],
-        room_id=int(updated["room_id"]),
-    )
+    for entity, receipt in entries:
+        write_paid_sleep(
+            entity,
+            sleep_id=receipt.sleep_id,
+            booking_id=updated["booking_id"],
+            place_key=updated["place_key"],
+            room_id=int(updated["room_id"]),
+        )
+
+
+def lobby_for_entity(entity: Any) -> Any | None:
+    """The inn lobby whose booking owns ``entity``'s guest access, if any."""
+    try:
+        access = read_access(entity)
+    except ValueError:  # observability: ignore R2: an unusable access record names no lobby
+        access = None
+    if access is not None:
+        return _lobby_for_place(access["place_key"])
+    room = getattr(entity, "location", None)
+    lobby_id = getattr(room, "lodging_lobby_id", None)
+    return _room_by_pk(lobby_id)
 
 
 def release_access_on_departure(entity: Any, *, destination: Any = None) -> None:
@@ -915,12 +940,14 @@ __all__ = [
     "ROOM_ID_ATTRIBUTE",
     "SERVICE_SCHEDULE_KIND",
     "bind_paid_sleep",
+    "bind_paid_sleeps",
     "check_in_message",
     "clear_booking",
     "clear_pending_quote",
     "confirm_check_in",
     "ensure_guest_room",
     "may_enter_guest_room",
+    "lobby_for_entity",
     "paid_sleep_context",
     "quote_for",
     "quote_message",

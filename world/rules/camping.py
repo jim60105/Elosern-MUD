@@ -562,6 +562,14 @@ def _commit_entry(
     bodies = _unique((commander, actor, *present_party_scope(commander)))
     snapshots = [(body, _sleep_surface_snapshot(body)) for body in bodies]
     dream_before = attribute_snapshot(commander, "dream_surface")
+    from world.rules.lodging import BOOKING_ATTRIBUTE, lobby_for_entity
+
+    booking_lobby = lobby_for_entity(commander)
+    booking_before = (
+        None
+        if booking_lobby is None
+        else attribute_snapshot(booking_lobby, BOOKING_ATTRIBUTE)
+    )
     control_before = snapshot_party_control(commander, actor) if possessed else None
     owner_before = _snapshot_owner_control(commander) if possessed else None
     dream_entered = False
@@ -638,6 +646,10 @@ def _commit_entry(
         for body, body_snapshots in snapshots:
             _restore_sleep_surfaces(body, body_snapshots)
         restore_attribute_best_effort(commander, "dream_surface", dream_before)
+        if booking_lobby is not None and booking_before is not None:
+            restore_attribute_best_effort(
+                booking_lobby, BOOKING_ATTRIBUTE, booking_before
+            )
         if possessed and control_before is not None:
             if owner_before is not None:
                 _restore_owner_control(commander, owner_before)

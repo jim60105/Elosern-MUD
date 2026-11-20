@@ -92,3 +92,7 @@
 - id: payer_absent
   section: message
   value: 你的身體不在這裡，無法登記住宿。
+
+- id: street_interrupted
+  section: message
+  value: 巡守的腳步聲靠近，把你從街上喚醒。

@@ -254,8 +254,3 @@ class LodgingGuestRoom(Room):
             arriving_object, source_location, **kwargs
         )
 
-    def at_object_leave(self, obj, destination, **kwargs):
-        super().at_object_leave(obj, destination, **kwargs)
-        from world.rules.lodging import release_access_on_departure
-
-        release_access_on_departure(obj, destination=destination)

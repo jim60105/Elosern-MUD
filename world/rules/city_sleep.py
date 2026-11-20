@@ -166,6 +166,7 @@ def _build_policy(rows: list[SectionedRule]) -> CitySleepPolicy:
         "checkin_confirmed",
         "no_lodging_service",
         "payer_absent",
+        "street_interrupted",
     }
     if set(messages) != required_messages:
         raise CitySleepError(
@@ -482,6 +483,9 @@ def _interrupt_state(
     transaction.on_commit(
         lambda context=context: log_info("street_nap_interrupted", context=context)
     )
+    transaction.on_commit(
+        lambda entity=entity: entity.msg(message("street_interrupted"))
+    )
 
 
 def interrupt_active_street_nap(
@@ -558,12 +562,14 @@ def _settle_out_of_scope_nap(body: Any, start_tick: int, end_tick: int) -> Sched
         unmark_street_napper(body)
         clear_street_nap(body)
         return None
-    patrol = nap["patrol_tick"]
-    if patrol > int(end_tick):
-        return None
-    if recovery_target_tick(body, receipt, int(start_tick)) < patrol:
-        # The accepted deadline (mode/dawn/recovery) came first; no patrol
-        # interruption is owed and the ordinary completion path owns the wake.
+    patrol = int(nap["patrol_tick"])
+    natural = recovery_target_tick(
+        body, receipt, int(start_tick), cap_street=False
+    )
+    target = min(patrol, natural)
+    if target > int(end_tick):
+        # This advance does not reach the nap's own next boundary; the nap's
+        # cursor and recovery stay for the interval that actually commits.
         return None
     state = read_optional_fatigue_state(body)
     if state is None or state.posture is not SleepPosture.VOLUNTARY:
@@ -571,14 +577,14 @@ def _settle_out_of_scope_nap(body: Any, start_tick: int, end_tick: int) -> Sched
         clear_street_nap(body)
         return None
     from_tick = max(int(receipt.settled_through_tick), int(receipt.entry_tick))
-    if patrol > from_tick:
-        settle_gauge_regeneration((body,), patrol - from_tick)
+    if target > from_tick:
+        settle_gauge_regeneration((body,), target - from_tick)
         settle_fatigue_intervals(
             (
                 FatigueInterval(
                     body,
                     FatigueActivity.SLEEP,
-                    patrol - from_tick,
+                    target - from_tick,
                     state,
                     IntervalCompletion.INTERRUPTIBLE,
                 ),
@@ -589,10 +595,18 @@ def _settle_out_of_scope_nap(body: Any, start_tick: int, end_tick: int) -> Sched
     receipt = read_sleep_receipt(body)
     if receipt is None:
         return None
-    _interrupt_state(body, receipt, patrol, street=nap["street"])
+    if natural < patrol:
+        # The accepted deadline came first; complete the ordinary wake.
+        from world.rules.clock import _reconcile_sleep_receipt
+
+        _reconcile_sleep_receipt(body, target)
+        clear_street_nap(body, sleep_id=receipt.sleep_id)
+        unmark_street_napper(body)
+        return None
+    _interrupt_state(body, receipt, target, street=nap["street"])
     return ScheduledEvent(
         _PATROL_EVENT,
-        int(patrol),
+        target,
         {
             "char": int(getattr(body, "pk", 0) or 0),
             "street": nap["street"],
@@ -631,6 +645,7 @@ def city_patrol_surfaces(
             tuple(FATIGUE_ATTRIBUTE_SURFACES)
             + tuple(SLEEP_RECEIPT_SURFACES)
             + tuple(REST_BONUS_SURFACES)
+            + (("traits", "traits"),)
         ):
             attributes[(key, category)] = attribute_snapshot(body, key, category)
         surfaces[id(body)] = SurfaceSnapshot(attributes=attributes)
@@ -638,7 +653,15 @@ def city_patrol_surfaces(
         if owner is not body and id(owner) not in surfaces:
             refusal_key = "city_street_refusals"
             surfaces[id(owner)] = SurfaceSnapshot(
-                attributes={(refusal_key, None): attribute_snapshot(owner, refusal_key)}
+                attributes={
+                    (refusal_key, None): attribute_snapshot(owner, refusal_key),
+                    ("sleep_view_decision", None): attribute_snapshot(
+                        owner, "sleep_view_decision"
+                    ),
+                    ("sleep_camp_operation", None): attribute_snapshot(
+                        owner, "sleep_camp_operation"
+                    ),
+                }
             )
     return surfaces
 

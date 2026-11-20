@@ -141,6 +141,12 @@ class PlayerCharacter(LivingEntity):
             from world.quests.encounter_dispatch import activate_for_move
 
             activate_for_move(self)
+        from world.rules.movement_settlement import settlement_owns_movement
+
+        if not settlement_owns_movement(self):
+            from world.rules.lodging import release_access_on_departure
+
+            release_access_on_departure(self)
 
     def at_post_puppet(self, **kwargs) -> None:
         """Synchronize the returning owner's eligible encounters.

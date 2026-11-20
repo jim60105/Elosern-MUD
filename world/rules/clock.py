@@ -844,7 +844,9 @@ def _schedule_voluntary_wake(entity: Any, receipt: SleepReceipt, revision: int) 
     )
 
 
-def _reconcile_sleep_receipt(entity: Any, end_tick: int) -> bool:
+def _reconcile_sleep_receipt(
+    entity: Any, end_tick: int, *, award_eligible: bool = True
+) -> bool:
     """Advance one body's receipt to ``end_tick`` and complete a due wake.
 
     The reconciliation runs inside the owning clock transaction and never
@@ -906,7 +908,11 @@ def _reconcile_sleep_receipt(entity: Any, end_tick: int) -> bool:
     write_sleep_receipt(entity, updated)
     if woke:
         _schedule_voluntary_wake(entity, updated, updated.revision)
-        if updated.kind == KIND_VOLUNTARY:
+        if (
+            updated.kind == KIND_VOLUNTARY
+            and award_eligible
+            and int(end_tick) <= int(target)
+        ):
             _award_well_rested_if_qualified(
                 entity, updated, end_tick, paid=paid_sleep
             )
@@ -1120,7 +1126,11 @@ def _settle_indivisible_member(
             start_tick=start_tick,
         )
         commits.extend(settlement.commits)
-    _reconcile_sleep_receipt(entity, start_tick + sleeping_seconds)
+    _reconcile_sleep_receipt(
+        entity,
+        start_tick + sleeping_seconds,
+        award_eligible=sleeping_seconds >= seconds,
+    )
     remaining = seconds - sleeping_seconds
     if remaining <= 0:
         return
@@ -1227,7 +1237,10 @@ def _awake_practice_seconds(
         if state is None:
             eligible[id(entity)] = seconds
             continue
-        if plan.activity_for(entity) is not FatigueActivity.SLEEP:
+        if plan.activity_for(entity) not in (
+            FatigueActivity.SLEEP,
+            FatigueActivity.PAID_SLEEP,
+        ):
             eligible[id(entity)] = seconds
             continue
         if state.posture is SleepPosture.VOLUNTARY:
@@ -1289,6 +1302,13 @@ def _run_stages(
         clock.tick,
     )
     events: list[ScheduledEvent] = []
+    if source is AdvanceSource.COMBAT:
+        # A combat advance deliberately does not run the ordinary mental
+        # settlement, but its gauge regeneration still moves every sleeper's
+        # interval: reconcile each receipt to the same cursor so a street nap
+        # is not credited or charged twice by the patrol source later.
+        for entity in entities:
+            _reconcile_sleep_receipt(entity, clock.tick + seconds)
     if source is not AdvanceSource.COMBAT:
         _settle_mental(seconds, mental, clock.tick, sleep_offsets)
         _settle_buffs_and_decay(entities, seconds, start_tick=clock.tick)
@@ -1628,6 +1648,14 @@ def _restore_advance_registry(
             _flush_deleted_instance(obj)
             continue
         restored.append(obj)
+        try:
+            obj.tags.reset_cache()
+        except Exception as error:  # observability: ignore R2: best-effort cache reset on a rollback path
+            log_warn(
+                "rollback_restore_failed",
+                exc=error,
+                context={"stage": "tag_cache", "obj": str(obj)},
+            )
         for key, category in snapshot.attributes:
             _restore_registry_attribute(
                 obj,
