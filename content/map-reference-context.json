@@ -256,7 +256,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "2f56da6616e0837585e11448647bb13d52571efaa7b309c3ba470ad3cf5742fc",
+  "fingerprint": "6b01a6a51a3bc816021048816aad925c4577db84c8d332b456b2212e25e25580",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -16497,13 +16497,13 @@
     "world/lore/npc_profiles/altoria_upper.py": "05884758c9f7fd87f164a9e53891ae9ac15f24b829ceea8e44cb082fb9c6bf51",
     "world/lore/npc_profiles/ciaran_homes_a.py": "129a4303c9847e29f9d4a4026b3f4d8dbd30128f9b811bfe68583ce08f7a6149",
     "world/lore/npc_profiles/ciaran_homes_b.py": "2f04087bf97b6d5185f259e022d0b3df41916cae93e96cad0391fed4f5c3e7a8",
-    "world/lore/npc_profiles/ciaran_residents.py": "c9014e6bf53666771fc84ca4620a11c42ae86c607db814ce4eae261d9b6cf08a",
+    "world/lore/npc_profiles/ciaran_residents.py": "815c3ed0d8b73293f4bdccbd26c606d6c65b255e0a6923179a5e49c306fb322e",
     "world/lore/npc_profiles/eolas_homes_a.py": "81fc3eafef27c1b353f226bd0be06a3664fe716bcbb70f9429fe54bd714bbf76",
     "world/lore/npc_profiles/eolas_homes_b.py": "e797a1e86063efeaac4e91a344b7e0e0d06fbff35ed344b32139e9567a3dfdf8",
-    "world/lore/npc_profiles/eolas_residents.py": "a046b68518c420197823a04854409f387e67dd213dd4d6ce9aa98b6790e90ad9",
+    "world/lore/npc_profiles/eolas_residents.py": "ab257cc2b8ce9baac0891ecb850ea2f258ef34a4b24d04c2f5418ea7a0a875d1",
     "world/lore/npc_profiles/fionnen_homes_a.py": "e2af43c8df5f31834841cb8592c16f31b1ab4b02243761826598187f1497c269",
     "world/lore/npc_profiles/fionnen_homes_b.py": "97d66e9bd5acdec25c6a9a353c3798abf936163b5fb92655fcc101064c05405a",
-    "world/lore/npc_profiles/fionnen_residents.py": "6083d8261f33bbcbd4e2d9933119a1dc43c86e1887939f91158e0102fea989a3",
+    "world/lore/npc_profiles/fionnen_residents.py": "5f103b87ae54128e7d36b9ee3a15a20727463de5a178c390ec34055d19f1ea22",
     "world/lore/npc_profiles/inventory.py": "197ba60ffbd16ec587c04173e400f27d764c4ddc54dc6feb9f852e69bd2dfdd1",
     "world/lore/npc_profiles/shape.py": "988fc9dea7ad2f706bef99f8d6df265e423802af79a76880b6099cd2ba2be4fa",
     "world/lore/npc_tiers.py": "ed743d369ecb394ffe1dbcd8d9bf04d25a93b2e4d6d7f98ac7c3c54b373a219c",
