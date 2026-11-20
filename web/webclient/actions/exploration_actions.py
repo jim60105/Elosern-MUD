@@ -1619,15 +1619,27 @@ def _wait_adapter(
         return _rejected("skip_failed", "無法跳過時間。")
     if sleep:
         if outcome.message is not None:
-            actor.msg(outcome.message)
-            return _success("slept", outcome.message, AFFECTED_FULL)
+            message = outcome.message
+            warning = getattr(outcome, "warning", None)
+            if warning is not None:
+                message = f"{message}\n{warning}"
+            actor.msg(message)
+            return _success("slept", message, AFFECTED_FULL)
         result = outcome.result
         if result is None:
-            return _success("slept", "已接受睡眠。", AFFECTED_FULL)
+            message = "已接受睡眠。"
+            warning = getattr(outcome, "warning", None)
+            if warning is not None:
+                message = f"{message}\n{warning}"
+            return _success("slept", message, AFFECTED_FULL)
         elapsed = result.elapsed_seconds
     else:
         elapsed = result.elapsed_seconds
     message = render_skip_summary(elapsed, result.events)
+    if sleep:
+        warning = getattr(outcome, "warning", None)
+        if warning is not None:
+            message = f"{message}\n{warning}"
     offer = accepted_wait_handoff_offer(actor)
     if offer is not None:
         message = f"{message}\n{offer}"
@@ -1681,6 +1693,9 @@ def _sleep_party_adapter(
             getattr(error, "message", None) or "目前無法選擇全員一起睡眠。",
         )
     message = getattr(outcome, "message", None) or "在場成員已進入睡眠。"
+    warning = getattr(outcome, "warning", None)
+    if warning is not None:
+        message = f"{message}\n{warning}"
     actor.msg(message)
     return _success("sleep_party", message, AFFECTED_FULL)
 

@@ -251,10 +251,14 @@ def _party_status(
             has_awake = True
             try:
                 _party_member_eligible(member)
+                from world.rules import city_sleep, lodging
+
+                city_sleep.require_voluntary_sleep(member)
+                paid = lodging.paid_sleep_context(member) is not None
             except SleepRefused as error:  # observability: ignore R2: the stable refusal IS the party availability reason
                 return False, error.message
             accepted, _partial = _accepted_sleep_seconds(
-                member, mode, seconds, tick=tick
+                member, mode, seconds, tick=tick, paid=paid
             )
             if accepted > 0:
                 has_unmet = True

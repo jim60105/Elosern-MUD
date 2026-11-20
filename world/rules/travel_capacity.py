@@ -40,6 +40,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from world.rules.fatigue import FatigueStage, SleepPosture, read_optional_fatigue_state
+from world.rules.rest_bonuses import read_walking_allowance
 from world.rules.travel_cost import (
     MovementPreflightRefused,
     TraversalStatus,
@@ -101,12 +102,23 @@ def read_capacity_snapshot(
     """
 
     states = tuple(
-        TravellerState.from_state(
-            read_optional_fatigue_state(member), member_id=getattr(member, "pk", None)
-        )
+        _traveller_state(member)
         for member in source_present_members(actor, location, origin)
     )
     return CapacitySnapshot(travellers=states)
+
+
+def _traveller_state(member: Any) -> TravellerState:
+    """One capacity traveller, carrying its remaining walking allowance."""
+    try:
+        allowance = read_walking_allowance(member)
+    except ValueError:  # observability: ignore R2: a malformed allowance grants no discount in this preview
+        allowance = 0
+    return TravellerState.from_state(
+        read_optional_fatigue_state(member),
+        member_id=getattr(member, "pk", None),
+        allowance_seconds=allowance,
+    )
 
 
 def capacity_by_stage(

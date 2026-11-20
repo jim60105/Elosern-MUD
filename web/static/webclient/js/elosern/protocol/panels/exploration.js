@@ -329,7 +329,7 @@ function validateExplorationServiceRoute(value, identity) {
     }
     return { kind: value.kind, npc_id: value.npc_id, topic_id: value.topic_id };
   }
-  if (value.command !== "church join") {
+  if (!["church join", "lodging"].includes(value.command)) {
     throw new Error("a command route names the one supported command");
   }
   if (value.section !== undefined || value.topic_id !== undefined) {

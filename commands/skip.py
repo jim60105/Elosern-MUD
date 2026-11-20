@@ -63,6 +63,12 @@ def _with_handoff_offer(caller, message: str) -> str:
     return message if question is None else f"{message}\n{question}"
 
 
+def _with_sleep_warning(outcome, message: str) -> str:
+    """Append the generic street-nap warning (never a patrol time)."""
+    warning = getattr(outcome, "warning", None)
+    return message if warning is None else f"{message}\n{warning}"
+
+
 # ``rest <duration> [practice <skill>]``: a duration token plus an optional
 # declared-practice clause naming a skill key (whitespace-free by contract).
 _REST_ARGS_RE = re.compile(
@@ -343,8 +349,11 @@ class CmdSleep(Command):
                 self.caller.msg(
                     _with_handoff_offer(
                         self.caller,
-                        getattr(outcome, "message", None)
-                        or _SLEEP_ACCEPTED_MESSAGE,
+                        _with_sleep_warning(
+                            outcome,
+                            getattr(outcome, "message", None)
+                            or _SLEEP_ACCEPTED_MESSAGE,
+                        ),
                     )
                 )
                 return
@@ -362,20 +371,31 @@ class CmdSleep(Command):
             self.caller.msg(error.message)
             return
         if outcome.message is not None:
-            self.caller.msg(_with_handoff_offer(self.caller, outcome.message))
+            self.caller.msg(
+                _with_handoff_offer(
+                    self.caller,
+                    _with_sleep_warning(outcome, outcome.message),
+                )
+            )
             return
         result = outcome.result
         if result is None:
             self.caller.msg(
-                _with_handoff_offer(self.caller, _SLEEP_ACCEPTED_MESSAGE)
+                _with_handoff_offer(
+                    self.caller,
+                    _with_sleep_warning(outcome, _SLEEP_ACCEPTED_MESSAGE),
+                )
             )
             return
         self.caller.msg(
             _with_handoff_offer(
                 self.caller,
-                result.summary
-                or _render_skip_summary(
-                    result.elapsed_seconds, list(result.events)
+                _with_sleep_warning(
+                    outcome,
+                    result.summary
+                    or _render_skip_summary(
+                        result.elapsed_seconds, list(result.events)
+                    ),
                 ),
             )
         )
@@ -391,7 +411,7 @@ class CmdSleep(Command):
         from world.rules.possession import PossessionGateError, PossessionWriteError
 
         try:
-            commit_sleep_entry(
+            committed = commit_sleep_entry(
                 self.caller,
                 scope=scope,
                 mode=mode,
@@ -409,7 +429,9 @@ class CmdSleep(Command):
         except (PossessionGateError, PossessionWriteError):
             self.caller.msg("目前無法選擇全員一起睡眠。")
             return
-        self.caller.msg("你進入睡眠，並進入了夢境。")
+        warning = getattr(committed.get("outcome"), "warning", None)
+        message = "你進入睡眠，並進入了夢境。"
+        self.caller.msg(message if warning is None else f"{message}\n{warning}")
 
 
 class CmdWaitUntil(Command):

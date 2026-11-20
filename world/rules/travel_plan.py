@@ -68,10 +68,12 @@ from world.rules.fatigue import (
     IntervalCompletion,
     SleepPosture,
     fatigue_stage,
+    get_policy,
     predict_interval,
     read_optional_fatigue_state,
 )
 from world.rules.map_knowledge import revealed_in_bounds
+from world.rules.rest_bonuses import ALLOWANCE_ATTRIBUTE, read_walking_allowance
 from world.rules.travel_cost import (
     MovementPreflightRefused,
     flight_waives_wilderness_charge,
@@ -153,17 +155,28 @@ class TravellerState:
     reserve_units: int | None
     posture: SleepPosture | None
     member_id: int | None = None
+    allowance_seconds: int = 0
 
     @classmethod
     def from_state(
-        cls, state: FatigueState | None, *, member_id: int | None = None
+        cls,
+        state: FatigueState | None,
+        *,
+        member_id: int | None = None,
+        allowance_seconds: int = 0,
     ) -> "TravellerState":
         if state is None:
-            return cls(reserve_units=None, posture=None, member_id=member_id)
+            return cls(
+                reserve_units=None,
+                posture=None,
+                member_id=member_id,
+                allowance_seconds=0,
+            )
         return cls(
             reserve_units=state.reserve_units,
             posture=state.posture,
             member_id=member_id,
+            allowance_seconds=max(0, int(allowance_seconds)),
         )
 
     def detached(self) -> "_DetachedTraveller":
@@ -172,18 +185,33 @@ class TravellerState:
         return _DetachedTraveller(_DetachedAttributes(self))
 
     def advance(self, seconds: int) -> "TravellerState":
-        """This state after ``seconds`` of foot travel (pure prediction)."""
+        """This state after ``seconds`` of foot travel (pure prediction).
+
+        The consumed reserve is exactly ``6*min(t, a) + 8*max(0, t - a)`` for
+        the remaining allowance ``a``, matching the clock settlement that
+        splits the same interval at the allowance boundary.
+        """
 
         if self.reserve_units is None or self.posture is None:
             return self
-        prediction = predict_interval(
-            FatigueState(reserve_units=self.reserve_units, posture=self.posture),
-            FatigueActivity.FOOT_TRAVEL,
-            seconds,
-            completion=IntervalCompletion.INDIVISIBLE,
+        policy = get_policy()
+        ordinary = int(policy.rates[FatigueActivity.FOOT_TRAVEL])
+        rested = int(policy.rates[FatigueActivity.WELL_RESTED_FOOT_TRAVEL])
+        rested_seconds = min(int(seconds), int(self.allowance_seconds))
+        reserve = (
+            int(self.reserve_units)
+            + ordinary * int(seconds)
+            + (rested - ordinary) * rested_seconds
         )
         return TravellerState.from_state(
-            prediction.end, member_id=self.member_id
+            FatigueState(
+                reserve_units=min(policy.max_units, max(0, reserve)),
+                posture=(
+                    SleepPosture.FORCED if reserve <= 0 else SleepPosture.AWAKE
+                ),
+            ),
+            member_id=self.member_id,
+            allowance_seconds=max(0, int(self.allowance_seconds) - int(seconds)),
         )
 
     def stage(self) -> FatigueStage | None:
@@ -205,6 +233,8 @@ class _DetachedAttributes:
         self._state = state
 
     def has(self, key: str) -> bool:
+        if key == ALLOWANCE_ATTRIBUTE:
+            return True
         if key == RESERVE_ATTRIBUTE:
             return self._state.reserve_units is not None
         if key == POSTURE_ATTRIBUTE:
@@ -212,6 +242,8 @@ class _DetachedAttributes:
         return False
 
     def get(self, key: str, default: Any = None) -> Any:
+        if key == ALLOWANCE_ATTRIBUTE:
+            return self._state.allowance_seconds
         if key == RESERVE_ATTRIBUTE and self._state.reserve_units is not None:
             return self._state.reserve_units
         if key == POSTURE_ATTRIBUTE and self._state.posture is not None:
@@ -331,8 +363,16 @@ def read_travel_snapshot(actor: Any) -> TravelSnapshot:
             # Canonical movement preflight refuses a malformed physiology, so
             # the query reports the same refusal instead of an internal error.
             raise TravelPlanRefused(PLAN_PARTY_CANNOT_TRAVEL) from error
+        try:
+            allowance = read_walking_allowance(member)
+        except ValueError:
+            allowance = 0
         states.append(
-            TravellerState.from_state(state, member_id=getattr(member, "pk", None))
+            TravellerState.from_state(
+                state,
+                member_id=getattr(member, "pk", None),
+                allowance_seconds=allowance,
+            )
         )
 
     clock = read_world_clock()

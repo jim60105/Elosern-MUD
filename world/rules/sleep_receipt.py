@@ -678,14 +678,32 @@ def write_camp_operation(entity: Any, value: Mapping[str, Any]) -> dict[str, Any
     return clean
 
 
-def full_recovery_seconds(entity: Any) -> int:
+def _paid_recovery_active(entity: Any) -> bool:
+    """Whether the body's current accepted sleep is a paid lodging sleep."""
+    try:
+        receipt = read_sleep_receipt(entity)
+    except SleepReceiptError:  # observability: ignore R2: an unusable receipt is never a paid sleep; the ordinary calculation stays authoritative
+        return False
+    if receipt is None:
+        return False
+    from world.rules.rest_bonuses import paid_sleep_active
+
+    return paid_sleep_active(entity, receipt)
+
+
+def full_recovery_seconds(entity: Any, *, paid: bool | None = None) -> int:
     """Return the uncapped seconds to full HP/MP/SP and mental reserve.
 
     The caller owns the configured cap; the uncapped value is what lets a
     capped recovery report a truthful partial target instead of claiming full
     restoration. A body without constructed physiology contributes no mental
-    requirement, matching the existing calculation.
+    requirement, matching the existing calculation. ``paid=True`` applies the
+    authored doubled positive rates before a receipt exists (entry planning);
+    ``None`` reads the body's current paid binding.
     """
+    if paid is None:
+        paid = _paid_recovery_active(entity)
+    recovery_scale = 2.0 if paid else 1.0
     seconds = 0
     traits = getattr(entity, "traits", None)
     if traits is not None:
@@ -693,7 +711,7 @@ def full_recovery_seconds(entity: Any) -> int:
             gauge = getattr(traits, key, None)
             if gauge is None:
                 continue
-            rate = float(getattr(gauge, "rate", 0))
+            rate = float(getattr(gauge, "rate", 0)) * recovery_scale
             value = float(getattr(gauge, "value", getattr(gauge, "current", 0)))
             maximum = float(getattr(gauge, "max", value))
             if rate > 0 and value < maximum:
@@ -702,7 +720,11 @@ def full_recovery_seconds(entity: Any) -> int:
     if state is not None:
         policy = get_policy()
         gap = max(0, policy.max_units - state.reserve_units)
-        sleep_rate = policy.rates[FatigueActivity.SLEEP]
+        sleep_rate = policy.rates[
+            FatigueActivity.PAID_SLEEP
+            if paid
+            else FatigueActivity.SLEEP
+        ]
         if sleep_rate > 0:
             seconds = max(seconds, math.ceil(gap / sleep_rate))
     return seconds
@@ -737,10 +759,23 @@ def recovery_target_tick(entity: Any, receipt: SleepReceipt, tick: int) -> int:
     """
     if receipt.mode in (MODE_DURATION, MODE_UNTIL_DAWN):
         # A declared deadline is retained exactly; the cap is already in it.
-        return receipt.target_tick
-    if receipt.mode == MODE_FORCED_THRESHOLD:
-        return min(receipt.limit_tick, tick + forced_wake_seconds(entity))
-    return min(receipt.limit_tick, tick + full_recovery_seconds(entity))
+        target = receipt.target_tick
+    elif receipt.mode == MODE_FORCED_THRESHOLD:
+        target = min(receipt.limit_tick, tick + forced_wake_seconds(entity))
+    else:
+        target = min(receipt.limit_tick, tick + full_recovery_seconds(entity))
+    # A voluntary street nap is capped at its authored patrol boundary so the
+    # accepted interval, every explicit continuation and every preview stop
+    # before the patrol can be credited as ordinary sleep.
+    try:
+        from world.rules.rest_bonuses import read_street_nap
+
+        nap = read_street_nap(entity)
+    except ValueError:  # observability: ignore R2: a malformed nap binding cannot cap a target; the ordinary receipt target stays authoritative
+        nap = None
+    if nap is not None and nap["sleep_id"] == receipt.sleep_id:
+        target = min(target, int(nap["patrol_tick"]))
+    return target
 
 
 def next_sleep_offset(

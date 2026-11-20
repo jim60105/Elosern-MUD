@@ -126,6 +126,9 @@ def camp_preflight(actor: Any, mode: str, seconds: int | None = None) -> dict[st
         commander = resolve_commander(actor)
     except PartyScopeError as error:
         raise SleepRefused(CODE_PARTY_UNAVAILABLE, REASON_NOT_CONTROLLING) from error
+    from world.rules.city_sleep import require_voluntary_sleep
+
+    require_voluntary_sleep(commander, transport="camp")
     enabled, message = _party_status(
         commander, actor=actor, mode=mode, seconds=duration
     )
@@ -572,12 +575,19 @@ def _commit_entry(
                 entry = enter_sleep(
                     actor, operation_id=operation_id, mode=mode, seconds=seconds
                 )
+                from world.rules.city_sleep import sleep_location_warning
+
                 outcome = SleepOutcome(
                     entry,
                     None,
                     None,
                     entries=(entry,) if entry.receipt is not None else (),
                     receipts=(entry.receipt,) if entry.receipt is not None else (),
+                    warning=(
+                        None
+                        if entry.receipt is None
+                        else sleep_location_warning(entry.member)
+                    ),
                 )
             else:
                 outcome = begin_all_party_sleep(

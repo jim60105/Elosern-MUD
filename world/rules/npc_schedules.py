@@ -60,7 +60,14 @@ _ENTRY_FIELDS = frozenset({"tick_offset", "kind", "target", "state"})
 _KINDS = ("move", "state")
 _BLOCKING_STATES = frozenset({"busy", "resting"})
 _INTERACTION_KINDS = frozenset(
-    {"talk", "engage", "service_shop", "service_guild", "service_church"}
+    {
+        "talk",
+        "engage",
+        "service_shop",
+        "service_guild",
+        "service_church",
+        "service_lodging",
+    }
 )
 SCHEDULE_BLOCKED_REASON = "她現在正忙著，沒有理會你。"
 

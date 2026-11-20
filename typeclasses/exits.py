@@ -80,6 +80,9 @@ def after_successful_movement(
         wilderness_source_coordinates=wilderness_source_coordinates,
         wilderness_name=wilderness_name,
     )
+    from world.rules.lodging import release_access_on_departure
+
+    release_access_on_departure(traversing_object)
     from world.quests.room_observation import observe_arrival_lore
 
     observe_arrival_lore(

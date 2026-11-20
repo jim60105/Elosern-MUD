@@ -34,6 +34,7 @@ from world.rules.fatigue import (
 from world.rules.quantum import SETTLEMENT_QUANTUM_SECONDS
 from world.rules.progression import grant_study_practice_xp
 from world.rules.pleasure import saintess_trickle_step
+from world.rules.rest_bonuses import SURFACES as REST_BONUS_SURFACES
 from world.rules.sexual_state import (
     DECAY_CONFIG,
     PLEASURE_CONFIG,
@@ -43,6 +44,7 @@ from world.rules.sexual_state import (
 )
 from world.rules.sexual_transitions import apply_event
 from world.rules.sleep_receipt import (
+    KIND_VOLUNTARY,
     MODE_RECOVERY,
     SLEEP_RECEIPT_SURFACES,
     STATE_COMPLETED,
@@ -108,6 +110,10 @@ _STAGE_ORDER = (
     "correspondence_delivery",
     "instance_reclamation",
     "monster_site_lifecycle",
+    # City patrols settle street naps another body's advance would otherwise
+    # carry past the authored patrol boundary. It runs after every arrival and
+    # schedule stage and before field contact, which still owns the endpoint.
+    "city_sleep_patrol",
     # Field contact admits only at the interval endpoint, after every arrival,
     # birth and idle departure of that same tick has settled: it is the last
     # boundary stage so an accepted contact owns the final committed state.
@@ -381,7 +387,33 @@ def _gauge_at_rest(gauge: Any) -> bool:
     )
 
 
-def _settle_gauge_regen(entities: Iterable[Any], elapsed_seconds: int) -> None:
+def _paid_sleep_prefix(entity: Any, start_tick: int, elapsed_seconds: int) -> int:
+    """The part of this interval spent in an accepted paid sleep.
+
+    Paid lodging doubles every positive gauge recovery rate for the sleeping
+    prefix only. The rest of the window (after the accepted wake) uses the
+    ordinary rate, so a long advance can never credit paid regeneration to an
+    awake body.
+    """
+    if elapsed_seconds <= 0:
+        return 0
+    try:
+        receipt = read_sleep_receipt(entity)
+    except SleepReceiptError:  # observability: ignore R2: an unusable receipt is never a paid sleep; ordinary settlement keeps its existing path
+        return 0
+    from world.rules.rest_bonuses import paid_sleep_active
+
+    if not paid_sleep_active(entity, receipt):
+        return 0
+    offset = next_sleep_offset(entity, receipt, int(start_tick))
+    if offset is None:
+        return int(elapsed_seconds)
+    return max(0, min(int(elapsed_seconds), int(offset)))
+
+
+def _settle_gauge_regen(
+    entities: Iterable[Any], elapsed_seconds: int, start_tick: int = 0
+) -> None:
     for entity in entities:
         # A resting body is the common case for an unobserved population, and
         # one gauge write stores its entire trait record.
@@ -417,7 +449,11 @@ def _settle_gauge_regen(entities: Iterable[Any], elapsed_seconds: int) -> None:
             # of the same total duration: floor(lost) + floor(lost) == floor(2*lost)
             # only when the per-advance fraction is carried, never dropped.
             carried = float(getattr(gauge, "regen_remainder", 0.0))
-            continuous = _gauge_value(gauge) + carried + rate * elapsed_seconds
+            paid_seconds = _paid_sleep_prefix(entity, start_tick, elapsed_seconds)
+            effective_seconds = paid_seconds * 2 + (elapsed_seconds - paid_seconds)
+            continuous = (
+                _gauge_value(gauge) + carried + rate * effective_seconds
+            )
             if continuous >= maximum:
                 updates.append((key, round(maximum), 0.0))
             else:
@@ -466,7 +502,7 @@ def _settle_gauge_regen(entities: Iterable[Any], elapsed_seconds: int) -> None:
 
 
 def settle_gauge_regeneration(
-    entities: Iterable[Any], elapsed_seconds: int
+    entities: Iterable[Any], elapsed_seconds: int, start_tick: int = 0
 ) -> None:
     """Reuse the canonical closed-form gauge writer for an owning source.
 
@@ -475,7 +511,7 @@ def settle_gauge_regeneration(
     regeneration equal to an unobserved one. The caller owns the enclosing
     transaction and surface snapshot.
     """
-    _settle_gauge_regen(entities, elapsed_seconds)
+    _settle_gauge_regen(entities, elapsed_seconds, start_tick)
 
 
 def _activity_member_mode(entity: Any) -> str | None:
@@ -826,12 +862,25 @@ def _reconcile_sleep_receipt(entity: Any, end_tick: int) -> bool:
         return False
     if not receipt.sleeping:
         return False
+    # A city patrol on an active street nap takes precedence over the natural
+    # deadline, including an exact tie: the nap ends interrupted and the
+    # party's remaining-day refusal is recorded. The patrol source settles
+    # nappers outside this advance's scope; this branch owns the in-scope one.
+    if state.posture is SleepPosture.VOLUNTARY:
+        from world.rules.city_sleep import interrupt_active_street_nap
+
+        if interrupt_active_street_nap(entity, receipt, end_tick):
+            return True
     target = recovery_target_tick(entity, receipt, end_tick)
     due = target <= end_tick
     woke = False
+    paid_sleep = False
     new_state = receipt.state
     partial = receipt.partial
     if due and state.posture is SleepPosture.VOLUNTARY:
+        from world.rules.rest_bonuses import paid_sleep_active
+
+        paid_sleep = paid_sleep_active(entity, receipt)
         write_fatigue_state(entity, state.reserve_units, SleepPosture.AWAKE)
         project_fatigue_status(entity)
         woke = True
@@ -857,7 +906,68 @@ def _reconcile_sleep_receipt(entity: Any, end_tick: int) -> bool:
     write_sleep_receipt(entity, updated)
     if woke:
         _schedule_voluntary_wake(entity, updated, updated.revision)
+        if updated.kind == KIND_VOLUNTARY:
+            _award_well_rested_if_qualified(
+                entity, updated, end_tick, paid=paid_sleep
+            )
+    elif new_state != STATE_SLEEPING:
+        from world.rules.rest_bonuses import clear_paid_sleep
+
+        clear_paid_sleep(entity)
     return woke
+
+
+def _all_recovery_gauges_full(entity: Any) -> bool:
+    """Whether HP, MP, SP and mental reserve are simultaneously full."""
+    from world.rules.fatigue import get_policy
+
+    traits = getattr(entity, "traits", None)
+    if traits is None:
+        return False
+    for key in GAUGE_KEYS:
+        gauge = getattr(traits, key, None)
+        if gauge is None:
+            return False
+        if float(getattr(gauge, "current", gauge.value)) < float(gauge.max):
+            return False
+    state = read_optional_fatigue_state(entity)
+    if state is None:
+        return False
+    return state.reserve_units >= get_policy().max_units
+
+
+def _award_well_rested_if_qualified(
+    entity: Any, receipt: SleepReceipt, end_tick: int, *, paid: bool
+) -> bool:
+    """Grant the two-hour allowance once on a committed qualifying wake."""
+    from world.rules.rest_bonuses import (
+        award_walking_allowance,
+        clear_paid_sleep,
+    )
+
+    if not paid:
+        return False
+    elapsed = int(end_tick) - int(receipt.entry_tick)
+    if elapsed > 0 and _all_recovery_gauges_full(entity):
+        granted = award_walking_allowance(entity, receipt.sleep_id)
+    else:
+        granted = False
+    # The single paid sleep is spent either way; no later sleep in the same
+    # booking may reuse it.
+    clear_paid_sleep(entity)
+    if granted:
+        context = {
+            "char": str(getattr(entity, "pk", "?")),
+            "sleep": receipt.sleep_id,
+            "tick": int(end_tick),
+            "allowance_seconds": 7200,
+        }
+        transaction.on_commit(
+            lambda context=context: log_info(
+                "well_rested_granted", context=context
+            )
+        )
+    return granted
 
 
 def _settle_interruptible_member(
@@ -873,8 +983,16 @@ def _settle_interruptible_member(
     cursor = start_tick
     for _ in range(16):
         activity = plan.activity_for(entity)
+        step_limit = remaining
+        if activity is FatigueActivity.FOOT_TRAVEL:
+            from world.rules.rest_bonuses import read_walking_allowance
+
+            allowance = read_walking_allowance(entity)
+            if allowance > 0:
+                activity = FatigueActivity.WELL_RESTED_FOOT_TRAVEL
+                step_limit = min(remaining, allowance)
         prediction = predict_interval(
-            state, activity, remaining, completion=IntervalCompletion.INTERRUPTIBLE
+            state, activity, step_limit, completion=IntervalCompletion.INTERRUPTIBLE
         )
         step = prediction.applicable_seconds
         settlement = settle_fatigue_intervals(
@@ -928,12 +1046,54 @@ def _settle_indivisible_member(
         and state.posture is SleepPosture.VOLUNTARY
     ):
         voluntary_deadline = next_sleep_offset(entity, receipt, start_tick)
+    activity = plan.activity_for(entity)
+    if activity is FatigueActivity.FOOT_TRAVEL:
+        from world.rules.rest_bonuses import read_walking_allowance
+
+        allowance = read_walking_allowance(entity)
+        if allowance > 0:
+            prefix = min(seconds, allowance)
+            settlement = settle_fatigue_intervals(
+                (
+                    FatigueInterval(
+                        entity,
+                        FatigueActivity.WELL_RESTED_FOOT_TRAVEL,
+                        prefix,
+                        state,
+                        plan.completion,
+                    ),
+                ),
+                context={"stage": "mental_settlement"},
+                start_tick=start_tick,
+            )
+            commits.extend(settlement.commits)
+            remaining = seconds - prefix
+            if remaining <= 0:
+                return
+            awake_state = _mental_state_or_none(entity)
+            if awake_state is None:
+                return
+            settlement = settle_fatigue_intervals(
+                (
+                    FatigueInterval(
+                        entity,
+                        FatigueActivity.FOOT_TRAVEL,
+                        remaining,
+                        awake_state,
+                        plan.completion,
+                    ),
+                ),
+                context={"stage": "mental_settlement"},
+                start_tick=start_tick + prefix,
+            )
+            commits.extend(settlement.commits)
+            return
     if voluntary_deadline is None or voluntary_deadline >= seconds:
         settlement = settle_fatigue_intervals(
             (
                 FatigueInterval(
                     entity,
-                    plan.activity_for(entity),
+                    activity,
                     seconds,
                     state,
                     plan.completion,
@@ -950,7 +1110,7 @@ def _settle_indivisible_member(
             (
                 FatigueInterval(
                     entity,
-                    plan.activity_for(entity),
+                    activity,
                     sleeping_seconds,
                     state,
                     IntervalCompletion.INDIVISIBLE,
@@ -1126,6 +1286,7 @@ def _run_stages(
             if _activity_member_mode(entity) is None
         ),
         seconds,
+        clock.tick,
     )
     events: list[ScheduledEvent] = []
     if source is not AdvanceSource.COMBAT:
@@ -1178,7 +1339,7 @@ _ADVANCE_ENTITY_SURFACES: tuple[tuple[str, str | None], ...] = (
     ("practice_booking", None),
 ) + FATIGUE_ATTRIBUTE_SURFACES + SLEEP_RECEIPT_SURFACES + tuple(
     (f"decay_elapsed__{field}", "sexual_state") for field in DECAY_CONFIG
-)
+) + tuple(REST_BONUS_SURFACES)
 
 
 def _snapshot_clock_tick(clock: "WorldClock") -> tuple[int, tuple[bool, Any] | None]:

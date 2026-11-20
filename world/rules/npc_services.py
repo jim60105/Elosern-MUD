@@ -27,6 +27,7 @@ from typeclasses.components import (
     ChurchHost,
     GuildExamReception,
     GuildStaff,
+    Lodging,
     Merchant,
     ScriptedDialogue,
 )
@@ -68,6 +69,8 @@ SERVICE_SECTIONS = ("shop", "registration", "board", "report", "rank")
 
 #: The one text command an entry may pre-fill. The player still submits it.
 CHURCH_JOIN_COMMAND = "church join"
+LODGING_COMMAND = "lodging"
+COMMAND_ROUTE_COMMANDS = frozenset({CHURCH_JOIN_COMMAND, LODGING_COMMAND})
 
 PROJECTION_FAILED_EVENT = "npc_services_projection_failed"
 
@@ -145,8 +148,8 @@ class ServiceRoute:
             if self.section is not None or self.command is not None:
                 raise ValueError("a dialogue route carries only its topic_id")
         else:
-            if self.command != CHURCH_JOIN_COMMAND:
-                raise ValueError("a command route names the one supported command")
+            if self.command not in COMMAND_ROUTE_COMMANDS:
+                raise ValueError("a command route names a supported command")
             if self.section is not None or self.topic_id is not None:
                 raise ValueError("a command route carries only its command")
 
@@ -391,6 +394,24 @@ def _native_rows(
                 or _church_reason(actor, npc, church),
             )
         )
+
+    lodging = _component(npc, Lodging)
+    if lodging is not None:
+        groups.append(
+            (
+                [
+                    (
+                        "lodging.stay",
+                        "住宿",
+                        ServiceRoute(ROUTE_COMMAND, npc_id, command=LODGING_COMMAND),
+                    )
+                ],
+                lambda actor, control: control
+                or _service_gate_reason(
+                    actor, npc, lodging, schedule_kind="service_lodging"
+                ),
+            )
+        )
     return groups
 
 
@@ -630,6 +651,8 @@ def native_entry_count(type_keys: Any) -> int:
     if "guild_exam_reception" in keys:
         count += 1
     if "church_host" in keys:
+        count += 1
+    if "lodging" in keys:
         count += 1
     return count
 

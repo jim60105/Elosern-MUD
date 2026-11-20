@@ -28,6 +28,7 @@ from typeclasses.components import (
     ChurchHost,
     GuildExamReception,
     GuildStaff,
+    Lodging,
     Merchant,
     QuestIssuer,
     ScriptedDialogue,
@@ -53,6 +54,7 @@ COMPONENT_TYPES: dict[str, type] = {
     "scripted_dialogue": ScriptedDialogue,
     "quest_issuer": QuestIssuer,
     "church_host": ChurchHost,
+    "lodging": Lodging,
 }
 
 #: Fields the runtime owns. Authored data can never set them: the assembly is
@@ -72,6 +74,7 @@ REQUIRED_KWARGS: dict[str, frozenset[str]] = {
     "scripted_dialogue": frozenset({"dialogue_key"}),
     "quest_issuer": frozenset({"service_id"}),
     "church_host": frozenset({"service_id", "church", "initial_arousal"}),
+    "lodging": frozenset({"service_id"}),
 }
 
 #: Authored kwargs a type accepts but does not require. ``issuer_key`` stays
@@ -88,6 +91,7 @@ OPTIONAL_KWARGS: dict[str, frozenset[str]] = {
 #: gate fails closed on.
 REQUIRED_BINDING = frozenset(
     {"merchant", "guild_staff", "guild_exam_reception", "quest_issuer", "church_host"}
+    | {"lodging"}
 )
 
 _ENTRY_FIELDS = frozenset({"type", "kwargs", "binding"})

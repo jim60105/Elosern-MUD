@@ -1,0 +1,94 @@
+# Inn lodging and city voluntary-sleep policy (OpenSpec change
+# add-inn-lodging; approved design
+# docs/superpowers/specs/2026-11-20-inn-lodging-design.md).
+#
+# One sectioned table, interpreted by world/rules/city_sleep.py and
+# world/rules/lodging.py through the shared loader family
+# (world/rules/rulebook/schema.py::load_sectioned_rules). Every row carries a
+# unique `id` and a `section`; the owning module fails closed on any deviation.
+#
+# `price`: the whole-party check-in price, integer copper per present guest.
+# `allowance`: the well-rested foot-travel allowance a qualifying paid sleep
+#   grants, in game seconds (two hours).
+# `patrol`: deterministic city-patrol coverage. Patrols occur at
+#   `phase_offset_seconds` after each game-day start and then every
+#   `interval_seconds`; the interval must tile one game day exactly. No
+#   random roll, real-time wait or per-street schedule exists.
+# `message`: player-facing prose. The street warning deliberately discloses no
+#   patrol time.
+
+- id: price_per_guest_copper
+  section: price
+  value: 20
+
+- id: well_rested_allowance_seconds
+  section: allowance
+  value: 7200
+
+- id: patrol_interval_seconds
+  section: patrol
+  value: 10800
+
+- id: patrol_phase_offset_seconds
+  section: patrol
+  value: 3600
+
+- id: street_warning
+  section: message
+  value: 街上不是過夜的地方；巡守隨時可能經過，把你從睡夢中喚醒。
+
+- id: street_refusal
+  section: message
+  value: 今晚你們已經在這一帶被巡守喚醒過了，天亮前不能再在這裡打盹。
+
+- id: city_sleep_refused
+  section: message
+  value: 這裡不是可以過夜的地方；城裡過夜得找旅店。
+
+- id: lobby_requires_booking
+  section: message
+  value: 旅店的大廳不是過夜的地方；請先向旅店老闆登記住宿。
+
+- id: guest_sleep_requires_booking
+  section: message
+  value: 這間客房目前沒有你的住宿登記，無法在此過夜。
+
+- id: guest_sleep_spent
+  section: message
+  value: 你這次住宿的睡眠已經用過了；若要再住一晚，請重新登記。
+
+- id: camp_in_city
+  section: message
+  value: 城裡不能紮營；要找地方過夜，請向旅店登記客房。
+
+- id: booking_overlap
+  section: message
+  value: 這間旅店今晚已經有房客了，請等他們離開後再登記。
+
+- id: quote_stale
+  section: message
+  value: 住宿的人數或價格已經改變，請重新詢問住宿。
+
+- id: blocked_guest
+  section: message
+  value: 隊伍中有成員目前無法進入客房：{member}。
+
+- id: unauthorized_entry
+  section: message
+  value: 這間客房只開放給登記住宿的旅客。
+
+- id: quote_line
+  section: message
+  value: "{host}：住一晚每人 {price} 銅幣。\n在場旅客：{names}（共 {count} 人，合計 {total} 銅幣）。\n你目前有 {wallet} 銅幣。\n確認請輸入 lodging confirm。"
+
+- id: checkin_confirmed
+  section: message
+  value: "{host}：你們住進了客房。共 {count} 人，付了 {total} 銅幣。"
+
+- id: no_lodging_service
+  section: message
+  value: 這裡沒有提供住宿。
+
+- id: payer_absent
+  section: message
+  value: 你的身體不在這裡，無法登記住宿。

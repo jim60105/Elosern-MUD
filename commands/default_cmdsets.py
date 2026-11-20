@@ -67,6 +67,7 @@ from commands.guild import (
 from commands.invite import CmdInvite
 from commands.leave import CmdLeave
 from commands.lore import CmdLore
+from commands.lodging import CmdLodging
 from commands.npc_services import CmdServices
 from commands.possess import CmdHandoff, CmdPossess, CmdUnpossess
 from commands.party_views import CmdMemberSkills, CmdMemberStatus
@@ -250,6 +251,7 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         self.add(CmdHandoff)
         self.add(CmdLore)
         self.add(CmdServices)
+        self.add(CmdLodging)
         self.add(CmdBackground)
         self.add(CmdPersonaPersonality)
         self.add(CmdPersonaLifeStory)
@@ -293,6 +295,8 @@ POSSESSED_DENYLIST = (
     CmdLineage,
     # Re-possession
     CmdPossess,
+    # Lodging is an owner-body service decision.
+    CmdLodging,
 )
 
 

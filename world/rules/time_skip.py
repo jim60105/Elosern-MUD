@@ -36,6 +36,7 @@ from world.rules.clock import (
     build_advance_snapshot_registry,
     get_world_clock,
 )
+from world.rules import city_sleep, lodging
 from world.rules.fatigue import (
     FATIGUE_ATTRIBUTE_SURFACES,
     FatigueActivity,
@@ -49,6 +50,7 @@ from world.rules.fatigue import (
     sleep_blocks_actions,
     write_fatigue_state,
 )
+from world.rules.rest_bonuses import SURFACES as REST_BONUS_SURFACES
 from world.rules.mental_time import (
     plan_for,
     planned_seconds,
@@ -252,6 +254,8 @@ class SleepOutcome:
     message: str | None = None
     entries: tuple[SleepEntry, ...] = ()
     receipts: tuple[SleepReceipt, ...] = ()
+    #: The generic, schedule-free street-nap warning (never a patrol time).
+    warning: str | None = None
 
 
 BOOKING_IN_COMBAT_MESSAGE = "戰鬥中無法排入修煉。"
@@ -386,9 +390,9 @@ def seconds_to_full_regen(entity: Any) -> int:
     return min(full_recovery_seconds(entity), MAX_SKIP_SECONDS)
 
 
-def _uncapped_recovery_seconds(entity: Any) -> int:
+def _uncapped_recovery_seconds(entity: Any, *, paid: bool = False) -> int:
     """The uncapped recovery requirement used to report a truthful partial."""
-    return full_recovery_seconds(entity)
+    return full_recovery_seconds(entity, paid=paid)
 
 
 def seconds_to_natural_wake(entity: Any) -> int | None:
@@ -744,13 +748,14 @@ def _accepted_sleep_seconds(
     duration_seconds: int | None,
     *,
     tick: int | None = None,
+    paid: bool = False,
 ) -> tuple[int, bool]:
     """Return ``(bounded accepted seconds, capped-partial flag)`` for one entry."""
     if mode == MODE_DURATION:
         return int(duration_seconds or 0), False
     if mode == MODE_UNTIL_DAWN:
         return seconds_until_dawn(_current_tick() if tick is None else tick), False
-    raw = _uncapped_recovery_seconds(member)
+    raw = _uncapped_recovery_seconds(member, paid=paid)
     return min(raw, MAX_SKIP_SECONDS), raw > MAX_SKIP_SECONDS
 
 
@@ -764,7 +769,11 @@ def _owner_id_for(member: Any) -> int | None:
 
 def _sleep_surface_snapshot(member: Any) -> dict[str, tuple[bool, Any]]:
     """Snapshot every durable surface one sleep entry/interval can write."""
-    surfaces = tuple(FATIGUE_ATTRIBUTE_SURFACES) + tuple(SLEEP_RECEIPT_SURFACES)
+    surfaces = (
+        tuple(FATIGUE_ATTRIBUTE_SURFACES)
+        + tuple(SLEEP_RECEIPT_SURFACES)
+        + tuple(REST_BONUS_SURFACES)
+    )
     return {
         f"{key}::{category}": attribute_snapshot(member, key, category)
         for key, category in surfaces
@@ -778,7 +787,9 @@ def _restore_sleep_surfaces(
     surfaces = {
         f"{key}::{category}": (key, category)
         for key, category in (
-            tuple(FATIGUE_ATTRIBUTE_SURFACES) + tuple(SLEEP_RECEIPT_SURFACES)
+            tuple(FATIGUE_ATTRIBUTE_SURFACES)
+            + tuple(SLEEP_RECEIPT_SURFACES)
+            + tuple(REST_BONUS_SURFACES)
         )
     }
     for marker, snapshot in snapshots.items():
@@ -865,8 +876,18 @@ def enter_sleep(
             if current.posture is SleepPosture.VOLUNTARY:
                 _receipt_for(member)
                 raise SleepRefused("already_asleep", CONTINUE_SLEEP_MESSAGE)
+            place = city_sleep.require_voluntary_sleep(member)
+            paid_context = (
+                lodging.paid_sleep_context(member)
+                if place.kind is city_sleep.SleepLocation.GUEST_ROOM
+                else None
+            )
             accepted, partial = _accepted_sleep_seconds(
-                member, mode, duration, tick=tick
+                member,
+                mode,
+                duration,
+                tick=tick,
+                paid=paid_context is not None,
             )
             if accepted <= 0:
                 # An already-met recovery target must not invent elapsed sleep
@@ -909,6 +930,19 @@ def enter_sleep(
             )
             write_sleep_receipt(member, receipt)
             project_fatigue_status(member)
+            if paid_context is not None:
+                lobby, booking = paid_context
+                lodging.bind_paid_sleep(
+                    member, receipt, lobby=lobby, booking=booking
+                )
+            elif place.kind is city_sleep.SleepLocation.STREET:
+                from world.rules.rest_bonuses import write_street_nap
+
+                write_street_nap(
+                    member,
+                    **city_sleep.street_nap_binding(receipt, place, tick),
+                )
+                city_sleep.mark_street_napper(member)
             if _owner_id_for(member) == int(member.pk):
                 bump_sleep_view_generation(member)
     except Exception:
@@ -1339,6 +1373,9 @@ def interrupt_sleep_for_contact(
             partial=True,
         ),
     )
+    from world.rules.rest_bonuses import clear_paid_sleep
+
+    clear_paid_sleep(body, sleep_id=receipt.sleep_id)
     _revoke_sleep_continuations(body)
 
 
@@ -1917,13 +1954,25 @@ def begin_sleep(
         return SleepOutcome(entry, result, ALREADY_RECOVERED_MESSAGE)
     if entry.handoff_offered:
         return SleepOutcome(
-            entry, None, render_handoff_offer_message(entry.handoff_candidates)
+            entry,
+            None,
+            render_handoff_offer_message(entry.handoff_candidates),
+            warning=city_sleep.sleep_location_warning(entry.member),
         )
     if _owner_id_for(entry.member) == int(entry.member.pk):
         # The owner's accepted sleep must first offer its owner-only dream
         # decision; no recovery interval may commit before that answer.
-        return SleepOutcome(entry, None, None)
-    return SleepOutcome(entry, continue_sleep(actor, entry))
+        return SleepOutcome(
+            entry,
+            None,
+            None,
+            warning=city_sleep.sleep_location_warning(entry.member),
+        )
+    return SleepOutcome(
+        entry,
+        continue_sleep(actor, entry),
+        warning=city_sleep.sleep_location_warning(entry.member),
+    )
 
 
 def _party_member_eligible(member: Any) -> None:
@@ -2030,27 +2079,6 @@ def enter_party_sleep(
     commander = resolve_commander(actor)
     members = present_party_scope(actor)
     tick = int(get_world_clock().tick)
-    planned: list[tuple[Any, SleepReceipt, int, bool]] = []
-    entry_plan = plan_party_entry(members, mode, duration, tick=tick)
-    for member, accepted, partial in entry_plan.planned:
-        sleep_id = uuid4().hex
-        receipt = SleepReceipt(
-            sleep_id=sleep_id,
-            body_id=int(member.pk),
-            owner_id=int(commander.pk),
-            kind=KIND_VOLUNTARY,
-            mode=mode,
-            entry_tick=tick,
-            target_tick=tick + accepted,
-            limit_tick=tick + accepted,
-            settled_through_tick=tick,
-            revision=0,
-            state=STATE_SLEEPING,
-            accepted_seconds=accepted,
-            partial=partial,
-            entry_operation_id=operation_id or sleep_id,
-        )
-        planned.append((member, receipt, accepted, partial))
     operation = operation_id or uuid4().hex
     try:
         prior = read_party_operation(commander)
@@ -2092,29 +2120,80 @@ def enter_party_sleep(
                     receipt for _, receipt in stored if receipt is not None
                 ),
             )
-    if not planned:
-        raise SleepRefused("already_asleep", PARTY_SLEEP_NOTHING_MESSAGE)
-    body_ids = [int(member.pk) for member, *_ in planned]
+    planned: list[
+        tuple[Any, SleepReceipt, int, bool, int, Any, Any]
+    ] = []
     snapshots = None
     try:
         with transaction.atomic():
             _lock_members(members)
-            admission: list[tuple[Any, Any, Any, int, bool]] = []
-            for member, receipt, accepted, partial in planned:
+            for member in members:
+                if getattr(member, "_is_deleted", False):
+                    continue
+                _party_member_eligible(member)
                 current = read_optional_fatigue_state(member)
-                if current is None:  # pragma: no cover - preflight checked it
+                if current is None:
                     raise SleepRefused(
                         "missing_physiology", MISSING_PHYSIOLOGY_MESSAGE
                     )
-                # Re-read under the lock: a sleep posture another request
-                # committed first keeps its own accepted identity.
                 if current.posture is SleepPosture.VOLUNTARY:
-                    raise SleepRefused("already_asleep", CONTINUE_SLEEP_MESSAGE)
+                    if _receipt_for(member) is None:
+                        name = str(getattr(member, "key", member.pk))
+                        raise SleepRefused(
+                            MISSING_RECEIPT_CODE,
+                            PARTY_MEMBER_MISSING_RECEIPT_MESSAGE.format(member=name),
+                        )
+                    # An existing accepted plan keeps its own target and
+                    # identity; this entry never replaces it.
+                    continue
                 if current.posture is SleepPosture.FORCED:
-                    raise SleepRefused("forced_sleep", FORCED_SLEEP_MESSAGE)
-                admission.append(
-                    (member, receipt, current.reserve_units, accepted, partial)
+                    continue
+                place = city_sleep.require_voluntary_sleep(member)
+                paid_context = (
+                    lodging.paid_sleep_context(member)
+                    if place.kind is city_sleep.SleepLocation.GUEST_ROOM
+                    else None
                 )
+                accepted, partial = _accepted_sleep_seconds(
+                    member,
+                    mode,
+                    duration,
+                    tick=tick,
+                    paid=paid_context is not None,
+                )
+                if accepted <= 0:
+                    continue
+                sleep_id = uuid4().hex
+                receipt = SleepReceipt(
+                    sleep_id=sleep_id,
+                    body_id=int(member.pk),
+                    owner_id=int(commander.pk),
+                    kind=KIND_VOLUNTARY,
+                    mode=mode,
+                    entry_tick=tick,
+                    target_tick=tick + accepted,
+                    limit_tick=tick + accepted,
+                    settled_through_tick=tick,
+                    revision=0,
+                    state=STATE_SLEEPING,
+                    accepted_seconds=accepted,
+                    partial=partial,
+                    entry_operation_id=operation or sleep_id,
+                )
+                planned.append(
+                    (
+                        member,
+                        receipt,
+                        accepted,
+                        partial,
+                        current.reserve_units,
+                        paid_context,
+                        place,
+                    )
+                )
+            if not planned:
+                raise SleepRefused("already_asleep", PARTY_SLEEP_NOTHING_MESSAGE)
+            body_ids = [int(member.pk) for member, *_ in planned]
             # Snapshot only after every admission revalidation: a refusal that
             # wrote nothing must never restore a competing committed plan.
             snapshots = {
@@ -2125,12 +2204,33 @@ def enter_party_sleep(
                 commander,
                 _sleep_surface_snapshot(commander),
             )
-            for member, receipt, reserve_units, _, _ in admission:
+            for (
+                member,
+                receipt,
+                accepted,
+                partial,
+                reserve_units,
+                paid_context,
+                place,
+            ) in planned:
                 write_fatigue_state(
                     member, reserve_units, SleepPosture.VOLUNTARY
                 )
                 write_sleep_receipt(member, receipt)
                 project_fatigue_status(member)
+                if paid_context is not None:
+                    lobby, booking = paid_context
+                    lodging.bind_paid_sleep(
+                        member, receipt, lobby=lobby, booking=booking
+                    )
+                elif place.kind is city_sleep.SleepLocation.STREET:
+                    from world.rules.rest_bonuses import write_street_nap
+
+                    write_street_nap(
+                        member,
+                        **city_sleep.street_nap_binding(receipt, place, tick),
+                    )
+                    city_sleep.mark_street_napper(member)
             write_party_operation(commander, operation, body_ids)
             bump_sleep_view_generation(commander)
     except Exception:
@@ -2150,14 +2250,23 @@ def enter_party_sleep(
             partial=partial,
             receipt=receipt,
         )
-        for member, receipt, accepted, partial in planned
+        for member, receipt, accepted, partial, _reserve, _paid, _place in planned
+    )
+    warning = (
+        city_sleep.message("street_warning")
+        if any(
+            place.kind is city_sleep.SleepLocation.STREET
+            for *_rest, place in planned
+        )
+        else None
     )
     return SleepOutcome(
         None,
         None,
         PARTY_SLEEP_ACCEPTED_MESSAGE,
         entries=entries,
-        receipts=tuple(receipt for _, receipt, _, _ in planned),
+        receipts=tuple(receipt for _, receipt, *_rest in planned),
+        warning=warning,
     )
 
 

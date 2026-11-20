@@ -227,3 +227,35 @@ class InstanceRoom(SceneArchetypeMixin, QuestObservableRoomMixin, ObjectParent, 
         if any(isinstance(occupant, PlayerCharacter) for occupant in self.contents):
             return False
         return True
+
+
+class LodgingGuestRoom(Room):
+    """One inn's persistent private guest room (inn-lodging).
+
+    The room is a real, stable place owned by its inn rather than an ephemeral
+    instance: later stays reuse the same object and later stories can refer to
+    it. Entry is authorized by the active booking at the relocation boundary,
+    so an ordinary exit traversal and a party follower are refused equally.
+    The way out is never gated.
+    """
+
+    lodging_place_key: str | None = AttributeProperty(default=None, autocreate=False)
+    lodging_lobby_id: int | None = AttributeProperty(default=None, autocreate=False)
+
+    def at_pre_object_receive(self, arriving_object, source_location, **kwargs):
+        from world.rules.lodging import may_enter_guest_room
+
+        if not may_enter_guest_room(arriving_object, self):
+            from world.rules.city_sleep import message
+
+            arriving_object.msg(message("unauthorized_entry"))
+            return False
+        return super().at_pre_object_receive(
+            arriving_object, source_location, **kwargs
+        )
+
+    def at_object_leave(self, obj, destination, **kwargs):
+        super().at_object_leave(obj, destination, **kwargs)
+        from world.rules.lodging import release_access_on_departure
+
+        release_access_on_departure(obj, destination=destination)

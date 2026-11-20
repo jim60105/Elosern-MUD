@@ -83,9 +83,10 @@ ROWS: tuple[PlaceDefinition, ...] = (
         ),
     ),
     # 溫弗蕾德‧古林's inn shares the lane and its doorstep with the tavern.
-    # Her rooms host rest, sleep and practice exactly as those commands
-    # work anywhere else. The room is narrative, never a mechanism, and
-    # the lodging fee the document marks 〔提案〕 stays un-invented.
+    # Her rooms now offer the paid lodging the inn-lodging change authors:
+    # one whole-party check-in and one private guest room per inn. Rest and
+    # practice inside the lobby keep their ordinary rules; sleep belongs to a
+    # booked guest room.
     PlaceDefinition(
         key="altoria_lodging",
         settlement_key="capital_altoria",
@@ -98,6 +99,11 @@ ROWS: tuple[PlaceDefinition, ...] = (
         host_profile_key="altoria_innkeeper",
         assortment_keys=(),
         components=(
+            capability(
+                "lodging",
+                binding=place_bound("altoria_lodging"),
+                service_id="altoria_innkeeper",
+            ),
             capability(
                 "scripted_dialogue",
                 binding=place_bound("altoria_lodging"),

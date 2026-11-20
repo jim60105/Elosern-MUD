@@ -89,6 +89,7 @@ from world.rules.buffs import (
     apply_buff,
     entity_active_buffs,
 )
+from world.rules.rest_bonuses import ALLOWANCE_ATTRIBUTE, consume_walking_allowance
 from world.rules.rulebook.schema import SectionedRule, load_sectioned_rules
 from world.rules.surfaces import (
     attribute_snapshot,
@@ -109,6 +110,7 @@ FATIGUE_ATTRIBUTE_SURFACES: tuple[tuple[str, str | None], ...] = (
     (RESERVE_ATTRIBUTE, None),
     (POSTURE_ATTRIBUTE, None),
     (BUFF_CACHE_ATTRIBUTE, None),
+    (ALLOWANCE_ATTRIBUTE, None),
 )
 
 RULEBOOK_PATH = Path(__file__).parent / "rulebook" / "fatigue.yaml"
@@ -159,6 +161,10 @@ class FatigueActivity(StrEnum):
     FOOT_TRAVEL = "foot_travel"
     AWAKE_COMBAT = "awake_combat"
     SLEEP = "sleep"
+    #: A qualifying paid lodging sleep; every positive restore rate doubles.
+    PAID_SLEEP = "paid_sleep"
+    #: Foot travel inside the well-rested allowance; consumes 25% less.
+    WELL_RESTED_FOOT_TRAVEL = "well_rested_foot_travel"
 
 
 class FatigueStage(StrEnum):
@@ -437,12 +443,25 @@ def _build_policy(rows: Iterable[SectionedRule]) -> FatiguePolicy:
     for activity, rate in rates.items():
         if rate == 0:
             raise _rulebook_error(f"rate for {activity.value!r} must be non-zero")
-        if activity is FatigueActivity.SLEEP and rate < 0:
-            raise _rulebook_error("the sleep rate must restore reserve")
-        if activity is not FatigueActivity.SLEEP and rate > 0:
+        if activity in (FatigueActivity.SLEEP, FatigueActivity.PAID_SLEEP):
+            if rate < 0:
+                raise _rulebook_error("the sleep rates must restore reserve")
+            continue
+        if rate > 0:
             raise _rulebook_error(
                 f"the {activity.value!r} rate must consume reserve"
             )
+    if rates[FatigueActivity.PAID_SLEEP] != 2 * rates[FatigueActivity.SLEEP]:
+        raise _rulebook_error(
+            "paid sleep must restore exactly twice the ordinary sleep rate"
+        )
+    if 4 * rates[FatigueActivity.WELL_RESTED_FOOT_TRAVEL] != 3 * rates[
+        FatigueActivity.FOOT_TRAVEL
+    ]:
+        raise _rulebook_error(
+            "well-rested foot travel must consume exactly three quarters of "
+            "the ordinary foot-travel rate"
+        )
 
     if len(bands) != len(_AWAKE_STAGES):
         raise _rulebook_error(
@@ -667,10 +686,16 @@ def _require_completion(completion: Any) -> IntervalCompletion:
 
 def _require_compatible(state: FatigueState, activity: FatigueActivity) -> None:
     if state.posture is SleepPosture.AWAKE:
-        if activity is FatigueActivity.SLEEP:
+        if activity in (FatigueActivity.SLEEP, FatigueActivity.PAID_SLEEP):
             raise FatigueStateError(
                 FatigueRejectReason.ACTIVITY_POSTURE_MISMATCH,
                 "an awake body cannot settle a sleeping interval",
+            )
+    elif state.posture is SleepPosture.VOLUNTARY:
+        if activity not in (FatigueActivity.SLEEP, FatigueActivity.PAID_SLEEP):
+            raise FatigueStateError(
+                FatigueRejectReason.ACTIVITY_POSTURE_MISMATCH,
+                f"a sleeping body cannot settle a {activity.value} interval",
             )
     elif activity is not FatigueActivity.SLEEP:
         raise FatigueStateError(
@@ -878,8 +903,10 @@ def next_fatigue_boundary(
     state = _require_state(state, resolved)
     activity = _require_activity(activity)
     _require_compatible(state, activity)
-    if activity is FatigueActivity.SLEEP:
+    if activity in (FatigueActivity.SLEEP, FatigueActivity.PAID_SLEEP):
         if state.posture is SleepPosture.VOLUNTARY or in_combat:
+            return None
+        if activity is FatigueActivity.PAID_SLEEP:
             return None
         offset = Fraction(
             max(0, resolved.wake_units - state.reserve_units),
@@ -950,7 +977,7 @@ def predict_interval(
 
     posture = state.posture
     transition = TransitionReason.NONE
-    if activity is FatigueActivity.SLEEP:
+    if activity in (FatigueActivity.SLEEP, FatigueActivity.PAID_SLEEP):
         if state.posture is SleepPosture.FORCED and not suppress_wake and (
             state.reserve_units >= resolved.wake_units
             or reserve >= resolved.wake_units
@@ -1222,6 +1249,16 @@ def settle_fatigue_intervals(
                 # disagrees with the persisted physiology.
                 project_fatigue_status(interval.entity, prediction.end, policy)
                 _sync_sleep_receipt(interval.entity, prediction, start_tick)
+                if interval.activity in (
+                    FatigueActivity.FOOT_TRAVEL,
+                    FatigueActivity.WELL_RESTED_FOOT_TRAVEL,
+                ) and prediction.seconds > 0:
+                    # Only committed foot travel spends the allowance. The
+                    # enclosing clock splits the interval at its exact
+                    # exhaustion boundary and labels the prefix well-rested.
+                    consume_walking_allowance(
+                        interval.entity, prediction.seconds
+                    )
             for interval, prediction in planned:
                 if prediction.end == prediction.start:
                     continue
