@@ -103,7 +103,7 @@ def _axis_for(
 def _raw_increment_axes(
     bounds: dict[str, tuple[int, int]]
 ) -> tuple[StartingAxis, ...]:
-    """Every axis spends one point per stat unit (preset and non-elf custom)."""
+    """Every axis spends one point per stat unit (every non-elf profile)."""
     return tuple(
         _axis_for(
             axis,

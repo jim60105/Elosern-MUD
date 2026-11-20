@@ -256,7 +256,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "6a5fe3edcc2e0d92d5e35fdb5f2da3d4f9a26c43e9f50ffc0304e8e68bc0c900",
+  "fingerprint": "913fdf0c626646d6437773b8181f74807ec9841c5507af51128ae7f90c1edefb",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -16823,7 +16823,7 @@
     "world/rules/spell_conditions.py": "76f567b6f19671550b20a4c40d54721ef26ad2356eeca8be8410b1ebae63807e",
     "world/rules/start_location.py": "05b7019e8d8325da4b3a1a4855b8b156c80d7c42d1b501c787a1e34849bd34ae",
     "world/rules/starting_companions.py": "c3620c30054c787f1747bddee53c45951be8a20b176a0f700af7bd61ca340c5b",
-    "world/rules/starting_policy.py": "046bd77ef6e8ede60eeac144574dd048aeb70bb9f0cb665961bd35931d45dd90",
+    "world/rules/starting_policy.py": "d1156288bfcf1ff4ce30e881ba452eb75b9032320062ff438d8c184818e4962a",
     "world/rules/state_derived_roll.py": "a2750faa8d5e9eeeddcd20a7c711e4d76be0b13a7f8dae6413f84f0c3ecfce99",
     "world/rules/state_reactions.py": "488f3d36ba86ee9c2e0694c2c5835c114926c270715d53c1a36afa3e9ed9c89d",
     "world/rules/status_display.py": "615ef85f36c071cc2e44b776f621820dbdfd780460ef40e536559c2b956ab2ea",

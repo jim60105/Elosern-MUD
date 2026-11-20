@@ -170,7 +170,13 @@ class PresetAuthoringGuideContractTests(unittest.TestCase):
         # states that the magic points are converted.
         self.assertIn("點數上限", guide)
         self.assertIn("自訂建立與模板卡共用同一套", guide)
-        self.assertIn("點數換算成魔力值", guide)
+        step0 = guide.split("### Step 0", 1)[1].split("### Step 1", 1)[0]
+        self.assertIn(
+            'resolve_starting_profile("human", "human_plains")', step0
+        )
+        self.assertIn("elf_profile.budget)    # 75", step0)
+        self.assertIn("magic.point_cap)       # 75", step0)
+        self.assertIn("magic.value_for(15))   # 120", step0)
 
 
 if __name__ == "__main__":
