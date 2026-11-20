@@ -325,5 +325,54 @@ class AuthoredDialogueContractTests(unittest.TestCase):
         self.assertTrue(any("empty" in problem for problem in _table_problems(mute, "table t_mute")))
 
 
+class ShippedResidentContentContractTests(unittest.TestCase):
+    """Every shipped resident row resolves the references it authors.
+
+    The rows themselves are authored content; the resident vocabulary already
+    enforces the literal stat band and the race-permitted sex at construction.
+    This contract adds only the cross-registry joins a sync consumes: each
+    row's profile, home room with its authored exterior, schedule template and
+    conditional dialogue table, and that every elven village carries residents.
+    """
+
+    @covers_requirement(
+        "npc-residents::the-three-elven-villages-carry-their-authored-residents"
+    )
+    def test_every_shipped_resident_resolves_its_authored_references(self):
+        from world.lore.races import SUBRACE_REGISTRY
+        from world.rules.npc_schedules import get_rulebook
+        from world.tests.geography_fixture import publish_shipped_interiors
+
+        self.assertTrue(RESIDENT_REGISTRY, "the resident registry ships no row")
+        interiors = publish_shipped_interiors()
+        templates = {template.key for template in get_rulebook().templates}
+        villages: set[str] = set()
+        for key, resident in RESIDENT_REGISTRY.items():
+            with self.subTest(resident=key):
+                self.assertEqual(resident.key, key)
+                self.assertIn(resident.profile_key, NPC_PROFILE_REGISTRY)
+                subrace = SUBRACE_REGISTRY[resident.subrace]
+                self.assertEqual(subrace.race_key, resident.race)
+                settlement = subrace.home_anchor_key
+                self.assertTrue(settlement, f"{key} subrace names no settlement")
+                villages.add(settlement)
+                home = interiors.room(resident.home_room)
+                self.assertIsNotNone(home, f"{key} home {resident.home_room!r} is unauthored")
+                exterior = interiors.exteriors.get(resident.home_room)
+                self.assertIsNotNone(
+                    exterior, f"{key} home {resident.home_room!r} declares no exterior"
+                )
+                self.assertEqual(exterior.settlement, settlement)
+                self.assertIn(resident.schedule_template, templates)
+                if resident.dialogue_key is not None:
+                    self.assertIn(resident.dialogue_key, DIALOGUE_ROWS)
+        elven_villages = {
+            subrace.home_anchor_key
+            for subrace in SUBRACE_REGISTRY.values()
+            if subrace.race_key == "elf" and subrace.home_anchor_key
+        }
+        self.assertEqual(villages, elven_villages)
+
+
 if __name__ == "__main__":
     unittest.main()
