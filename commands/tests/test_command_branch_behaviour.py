@@ -564,7 +564,7 @@ class CharacterCreationCommandBranchTests(TestCase):
 
     def test_wizard_non_yes_confirmation_cancels(self):
         command = _command(CmdCharacter, "create")
-        profile = SimpleNamespace(bounds=(), budget=0)
+        profile = SimpleNamespace(axes=(), budget=0)
         open_synthetic_scope(self, "races", "subraces")
         with patch("commands.character_creation.resolve_starting_profile", return_value=profile), patch(
             "commands.character_creation.max_affinity_elements", return_value=1
