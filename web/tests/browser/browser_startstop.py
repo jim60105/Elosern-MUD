@@ -289,6 +289,13 @@ def at_server_start():
     def _synth_startup_step(name, run, **kwargs):
         if name == "sync_guild_economy":
             return None
+        if name == "sync_residents":
+            # The shipped resident slices name shipped subrace, settlement,
+            # room and profile vocabulary that a t_-only installed catalog
+            # cannot resolve. No browser journey exercises authored residents;
+            # the mechanism stays covered by
+            # world.rules.tests.test_resident_sync.
+            return None
         if name == "map_world_adoption":
             # The authored settlement/interior sources name the shipped scene
             # vocabulary and the shipped settlement identities, so a candidate

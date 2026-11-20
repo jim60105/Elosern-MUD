@@ -125,11 +125,13 @@ def _make_valid_synthetic_universe(tmp_dir: Path):
         quest_templates=quest_templates,
         examples_dir=tmp_dir,
         adventurers={},
+        residents={},
     )
     inventory = tuple(NpcSource(kind=kind, key=key, owner="test_slice") for kind, key in sorted(derived))
 
     return {
         "adventurers": {},
+        "residents": {},
         "places": places,
         "dialogue_rows": dialogue_rows,
         "player_presets": player_presets,

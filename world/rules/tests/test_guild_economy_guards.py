@@ -117,6 +117,7 @@ class NoGenerativeImportTests(unittest.TestCase):
             "world.quests.bootstrap.sync_quest_runtime": "sync_quest_runtime",
             "world.rules.guild_economy.sync_guild_economy": "sync_guild_economy",
             "world.rules.npc_schedules.sync_npc_schedules": "sync_npc_schedules",
+            "world.rules.resident_sync.sync_residents": "sync_residents",
         }
         patchers = [
             patch("world.rules.clock.get_world_clock"),

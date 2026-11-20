@@ -329,6 +329,8 @@ class BoundedFailureDegradeTests(PromptFixture):
         ), patch("world.quests.bootstrap.sync_quest_runtime"), patch(
             "world.rules.guild_economy.sync_guild_economy"
         ), patch(
+            "world.rules.resident_sync.sync_residents"
+        ), patch(
             "world.rules.clock.get_world_clock"
         ), patch("world.art.service.art_sync_all"), patch(
             "web.webclient.presentation.art_push.connect_art_push"
