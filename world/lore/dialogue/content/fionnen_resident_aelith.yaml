@@ -1,0 +1,102 @@
+schema_version: 1
+greeting: 艾莉斯從花間抬起頭，指尖還沾著蜜：「是來看蜂，還是嚐一口？」
+topics:
+- topic_id: fionnen_resident_aelith.topic_01
+  keyword: 蜂
+  label: 蜂
+  fallback:
+    scene_id: fionnen_resident_aelith.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「這園子裡的蜂，都聽你的？」
+    - kind: speech
+      speaker: host
+      text: 「說不上聽話，是認我的氣味。我輕手輕腳，不驚牠們，牠們也不蜇我。養久了，就像一家人。」
+    - kind: narration
+      text: 一隻蜂落在她手腕上，她也不趕，只由著牠爬。
+    - kind: speech
+      speaker: host
+      text: 「蜂不騙人。你待牠好，牠就給你甜。谷裡人也是這個理。」
+- topic_id: fionnen_resident_aelith.topic_02
+  keyword: 蜜
+  label: 蜜
+  fallback:
+    scene_id: fionnen_resident_aelith.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你們的百花蜜，為什麼這麼甜？」
+    - kind: speech
+      speaker: host
+      text: 「花好，水好，日子也慢。蜂一朵一朵採，蜜一勺一勺存。急不來，甜才留得住。」
+    - kind: speech
+      speaker: host
+      text: 「這蜜入口，先甜後香。你要是倦了、慌了，來一勺，心就定了。」
+- topic_id: fionnen_resident_aelith.topic_03
+  keyword: 家人
+  label: 家人
+  fallback:
+    scene_id: fionnen_resident_aelith.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「花蕊蜜園，都是你們仨在忙？」
+    - kind: speech
+      speaker: host
+      text: 「是。大女兒邁特希斯熬蜜漬花蕊，小女兒賽莉爾採蜜。我管蜂。仨人一天到晚沾著花粉，甜到骨子裡。」
+    - kind: narration
+      text: 她掸了掸肩上的花粉，笑得柔軟。
+    - kind: speech
+      speaker: host
+      text: 「夜裡收了工，一人一勺蜜，就著月光吃。那甜，比什麼都撫人。」
+- topic_id: fionnen_resident_aelith.topic_04
+  keyword: 名字
+  label: 名字
+  fallback:
+    scene_id: fionnen_resident_aelith.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「希爾維爾布魯克，是銀溪的意思？」
+    - kind: speech
+      speaker: host
+      text: 「銀溪。月夜林溪泛著銀光，流過花圃。這家守著這片花和水，就取了它。」
+    - kind: narration
+      text: 她朝不遠處那條泛光的小溪望去。
+    - kind: speech
+      speaker: host
+      text: 「花要水，蜜要花。你往後見著那溪，就找到這家。」
+- topic_id: fionnen_resident_aelith.topic_05
+  keyword: 私語
+  label: 私語
+  requires:
+    kind: affinity_at_least
+    stage_key: trusted
+  unavailable: locked
+  refusal:
+    scene_id: fionnen_resident_aelith.topic_05_refusal
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: host
+      text: 「蜜之外的心事，得等你吃慣了我這勺甜，再說。」
+  fallback:
+    scene_id: fionnen_resident_aelith.topic_05_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你最甜的時刻，是什麼樣？」
+    - kind: speech
+      speaker: host
+      text: 「是暑天泡完溪，身上還涼，有人把我按進花叢，用沾了蜜的手，順著我的鎖骨往下抹。蜂在頭上嗡嗡，花在身下碎，甜味漫得到處都是。」
+    - kind: narration
+      text: 她眼底浮起一片蜜色，聲音軟得化不開。
+    - kind: speech
+      speaker: host
+      text: 「蜜會勾人。你嚐過我這口蜜，就捨不得走了。」

@@ -1,0 +1,102 @@
+schema_version: 1
+greeting: 阿拉瑞斯拄著鋤頭，直起腰：「有事？我手上全是泥，別嫌。」
+topics:
+- topic_id: eolas_resident_alarith.topic_01
+  keyword: 翻土
+  label: 翻土
+  fallback:
+    scene_id: eolas_resident_alarith.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「翻土有什麼門道？」
+    - kind: speech
+      speaker: host
+      text: 「鋤要下得深，土才鬆。翻了不壓，根才透氣。翻土翻出了我這條胳膊。」
+    - kind: narration
+      text: 她拍了拍鋤柄，胳膊上的肌肉繃了一下。
+    - kind: speech
+      speaker: host
+      text: 「把土翻順了，種什麼都成。人也一樣，悶著不發，鋤開了一口氣，就活了。」
+- topic_id: eolas_resident_alarith.topic_02
+  keyword: 採收
+  label: 採收
+  fallback:
+    scene_id: eolas_resident_alarith.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「採收是最累的活吧？」
+    - kind: speech
+      speaker: host
+      text: 「累，可也痛快。彎腰一路拔，回頭看，身後齊整得很。那種踏實，比躺在誰懷裡還沉。」
+    - kind: speech
+      speaker: host
+      text: 「收完先沖汗，再煮一鍋豆子，一家人分著吃。力氣使盡了，飯才香，人也睡得死。」
+- topic_id: eolas_resident_alarith.topic_03
+  keyword: 家人
+  label: 家人
+  fallback:
+    scene_id: eolas_resident_alarith.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你娘和你妹妹也天天來？」
+    - kind: speech
+      speaker: host
+      text: 「來。娘布瑞米爾管種，妹妹翁德溫認得每株草，我翻土。仨人一塊下田，一塊收工。」
+    - kind: narration
+      text: 她朝菜畦另一頭抬了抬下巴，那兒有個蹲著的身影。
+    - kind: speech
+      speaker: host
+      text: 「妹妹那人，拔草能拔出神。你跟她講話，得先喊三聲。」
+- topic_id: eolas_resident_alarith.topic_04
+  keyword: 名字
+  label: 名字
+  fallback:
+    scene_id: eolas_resident_alarith.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「『格林拉德』這姓，是你們自己取的？」
+    - kind: speech
+      speaker: host
+      text: 「這姓傳自祖輩。春來坡上青得發亮，像一條綠穀，就定下了。地是根，姓是枝，都長在這片土裡。」
+    - kind: narration
+      text: 她把鋤頭往土裡一插，雙手搭在鋤柄上。
+    - kind: speech
+      speaker: host
+      text: 「你要種東西，往後這幾畦就是活榜樣。看多了，就懂了。」
+- topic_id: eolas_resident_alarith.topic_05
+  keyword: 私語
+  label: 私語
+  requires:
+    kind: affinity_at_least
+    stage_key: trusted
+  unavailable: locked
+  refusal:
+    scene_id: eolas_resident_alarith.topic_05_refusal
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: host
+      text: 「我悶，話不走心。等我把你當自家人了，再講。」
+  fallback:
+    scene_id: eolas_resident_alarith.topic_05_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你這麼能幹，也想要人照顧嗎？」
+    - kind: speech
+      speaker: host
+      text: 「想。收工那夜，我頂想有個人給我擦擦背，把僵住的肩一點點揉開。力氣全交出去，由人擺布，那才叫痛快。」
+    - kind: narration
+      text: 她垂下眼，搓了搓指節上的厚繭。
+    - kind: speech
+      speaker: host
+      text: 「我這身子是幹活的料，可不是石頭。又熱又軟，樣樣都懂。」

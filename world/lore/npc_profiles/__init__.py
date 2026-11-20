@@ -31,10 +31,13 @@ from world.lore.npc_profiles.altoria_guild import ROWS as ALTORIA_GUILD_ROWS  # 
 from world.lore.npc_profiles.altoria_upper import ROWS as ALTORIA_UPPER_ROWS  # noqa: E402
 from world.lore.npc_profiles.ciaran_homes_a import ROWS as CIARAN_HOMES_A_ROWS  # noqa: E402
 from world.lore.npc_profiles.ciaran_homes_b import ROWS as CIARAN_HOMES_B_ROWS  # noqa: E402
+from world.lore.npc_profiles.ciaran_residents import ROWS as CIARAN_RESIDENTS_ROWS  # noqa: E402
 from world.lore.npc_profiles.eolas_homes_a import ROWS as EOLAS_HOMES_A_ROWS  # noqa: E402
 from world.lore.npc_profiles.eolas_homes_b import ROWS as EOLAS_HOMES_B_ROWS  # noqa: E402
+from world.lore.npc_profiles.eolas_residents import ROWS as EOLAS_RESIDENTS_ROWS  # noqa: E402
 from world.lore.npc_profiles.fionnen_homes_a import ROWS as FIONNEN_HOMES_A_ROWS  # noqa: E402
 from world.lore.npc_profiles.fionnen_homes_b import ROWS as FIONNEN_HOMES_B_ROWS  # noqa: E402
+from world.lore.npc_profiles.fionnen_residents import ROWS as FIONNEN_RESIDENTS_ROWS  # noqa: E402
 
 
 def assemble_profile_registry(
@@ -90,10 +93,13 @@ PROFILE_SLICES: tuple[tuple[str, tuple[NpcProfile, ...]], ...] = (
     ("altoria_upper", ALTORIA_UPPER_ROWS),
     ("ciaran_homes_a", CIARAN_HOMES_A_ROWS),
     ("ciaran_homes_b", CIARAN_HOMES_B_ROWS),
+    ("ciaran_residents", CIARAN_RESIDENTS_ROWS),
     ("eolas_homes_a", EOLAS_HOMES_A_ROWS),
     ("eolas_homes_b", EOLAS_HOMES_B_ROWS),
+    ("eolas_residents", EOLAS_RESIDENTS_ROWS),
     ("fionnen_homes_a", FIONNEN_HOMES_A_ROWS),
     ("fionnen_homes_b", FIONNEN_HOMES_B_ROWS),
+    ("fionnen_residents", FIONNEN_RESIDENTS_ROWS),
 )
 
 #: The slice labels the assembly declares, in order.

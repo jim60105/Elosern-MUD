@@ -1,0 +1,102 @@
+schema_version: 1
+greeting: 瑞拉拉頭也不抬，梭子在織機上穿得飛快：「有事就說，我這手停不下來。」
+topics:
+- topic_id: ciaran_resident_rellara.topic_01
+  keyword: 織布
+  label: 織布
+  fallback:
+    scene_id: ciaran_resident_rellara.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你織布怎麼這麼快？」
+    - kind: speech
+      speaker: host
+      text: 「這手，天天練就。我打小上機，梭子一穿一扣，布就往外長。谷裡要緊的布，多半先找我，慢不得。」
+    - kind: narration
+      text: 她腳踩踏板，身子跟著梭子一送一收，像一段停不下來的節奏。
+    - kind: speech
+      speaker: host
+      text: 「手上快了，心裡也痛快。你坐近點，別讓線絆著。」
+- topic_id: ciaran_resident_rellara.topic_02
+  keyword: 花色
+  label: 花色
+  fallback:
+    scene_id: ciaran_resident_rellara.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你們織的花色，都打哪兒來？」
+    - kind: speech
+      speaker: host
+      text: 「看坡上的葉、溪裡的波，還有誰夜裡說的一句情話。娘染出底，我織出紋，妹妹分好線，就成了一匹。」
+    - kind: speech
+      speaker: host
+      text: 「有的花樣，是為一個人而織。織進去，就等著那人穿在身上。」
+- topic_id: ciaran_resident_rellara.topic_03
+  keyword: 家人
+  label: 家人
+  fallback:
+    scene_id: ciaran_resident_rellara.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你家裡，誰的手藝最好？」
+    - kind: speech
+      speaker: host
+      text: 「娘的染最穩，妹妹的線分得最準，我的織最快。仨人合起來，才有一匹好布。分開，誰都成不了。」
+    - kind: narration
+      text: 她手上沒停，嘴角卻揚了揚。
+    - kind: speech
+      speaker: host
+      text: 「夜裡收了工，仨人擠在窗前看新布。那時候，比織成什麼都高興。」
+- topic_id: ciaran_resident_rellara.topic_04
+  keyword: 名字
+  label: 名字
+  fallback:
+    scene_id: ciaran_resident_rellara.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「特魯松，是筆直的松？」
+    - kind: speech
+      speaker: host
+      text: 「真松。直挺，不歪。我家做布也這脾氣，紋路正，不繞彎子。」
+    - kind: narration
+      text: 她比了比織機上繃直的經線。
+    - kind: speech
+      speaker: host
+      text: 「直人配直布。你直來直往，這織房就容得下你。」
+- topic_id: ciaran_resident_rellara.topic_05
+  keyword: 私語
+  label: 私語
+  requires:
+    kind: affinity_at_least
+    stage_key: trusted
+  unavailable: locked
+  refusal:
+    scene_id: ciaran_resident_rellara.topic_05_refusal
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: host
+      text: 「我織得快，心事卻藏得深。等我把你認下，再說。」
+  fallback:
+    scene_id: ciaran_resident_rellara.topic_05_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你最想織給誰？」
+    - kind: speech
+      speaker: host
+      text: 「織給一個夜裡會來的人。一匹貼身的薄布，裹住她的腰和肩，再親手為她解開。我織了又拆，拆了又織，只為那雙手摸上來的剎那。」
+    - kind: narration
+      text: 她手下終於慢了半拍，像是想起了誰。
+    - kind: speech
+      speaker: host
+      text: 「布織進的是念頭。你哪天成了我的念頭，我就給你織一匹。」

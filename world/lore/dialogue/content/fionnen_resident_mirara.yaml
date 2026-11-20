@@ -1,0 +1,102 @@
+schema_version: 1
+greeting: 米拉拉從菜畦裡抬起頭，懷裡抱著一把嫩菜：「你來啦？我正摘菜呢。」
+topics:
+- topic_id: fionnen_resident_mirara.topic_01
+  keyword: 採菜
+  label: 採菜
+  fallback:
+    scene_id: fionnen_resident_mirara.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「採菜也有時辰講究？」
+    - kind: speech
+      speaker: host
+      text: 「有。趁露水沒散，菜最嫩。日頭一高，就蔫了。我清早上圃，一株一株摘，摘滿一簍才回家。」
+    - kind: narration
+      text: 她抖了抖懷裡的菜，露水珠子滾了一地。
+    - kind: speech
+      speaker: host
+      text: 「菜要趁鮮。人也一樣，趕早不趕晚。你要嚐，這把最嫩。」
+- topic_id: fionnen_resident_mirara.topic_02
+  keyword: 圃子
+  label: 圃子
+  fallback:
+    scene_id: fionnen_resident_mirara.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「這圃子裡，你最喜歡什麼？」
+    - kind: speech
+      speaker: host
+      text: 「最喜歡春天，菜苗剛破土，綠得發亮。那時候我整天泡在圃裡，拔草、看蟲，一步也捨不得走。」
+    - kind: speech
+      speaker: host
+      text: 「姊姊說我像株菜，晒晒太陽就長。我也愛這麼待著，跟地貼得近。」
+- topic_id: fionnen_resident_mirara.topic_03
+  keyword: 家人
+  label: 家人
+  fallback:
+    scene_id: fionnen_resident_mirara.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你家裡，誰最疼你？」
+    - kind: speech
+      speaker: host
+      text: 「姊姊伊斯爾溫。她澆水總記得留我一瓢，我晒暈了，她就把我拉到樹蔭下。我闖了禍，她替我兜著。」
+    - kind: narration
+      text: 她笑得眼睛彎成月牙。
+    - kind: speech
+      speaker: host
+      text: 「娘管得寬，姊姊管得細。一家人裡，數我最受寵。」
+- topic_id: fionnen_resident_mirara.topic_04
+  keyword: 名字
+  label: 名字
+  fallback:
+    scene_id: fionnen_resident_mirara.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「孫希斯佩爾，是日光的低語？」
+    - kind: speech
+      speaker: host
+      text: 「日語。晌午的陽光落在菜葉上，帶著暖意，像在跟我說悄悄話。這家就認了它。」
+    - kind: narration
+      text: 她伸出手，接住一縷漏下來的日光。
+    - kind: speech
+      speaker: host
+      text: 「這名字我喜歡，念起來就暖。你午後來，我帶你晒太陽。」
+- topic_id: fionnen_resident_mirara.topic_05
+  keyword: 私語
+  label: 私語
+  requires:
+    kind: affinity_at_least
+    stage_key: trusted
+  unavailable: locked
+  refusal:
+    scene_id: fionnen_resident_mirara.topic_05_refusal
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: host
+      text: 「我的小秘密，只跟常陪我晒太陽的人說。」
+  fallback:
+    scene_id: fionnen_resident_mirara.topic_05_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你最開心的時刻，是什麼樣？」
+    - kind: speech
+      speaker: host
+      text: 「是摘滿一簍菜，蹲在圃邊喘氣，有人從身後蒙住我的眼睛，讓我猜她是誰。我笑著往後一倒，正好跌進她懷裡，兩個人一齊滾進菜畦，壓扁了一片綠。」
+    - kind: narration
+      text: 她臉頰發紅，眼裡全是那天的笑。
+    - kind: speech
+      speaker: host
+      text: 「開心靠種，也靠玩。你哪天跟我滾一回菜畦，就懂了。」

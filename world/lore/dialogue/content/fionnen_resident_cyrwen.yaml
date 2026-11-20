@@ -1,0 +1,102 @@
+schema_version: 1
+greeting: 基爾溫正削著一支箭桿，抬起頭：「做箭的事？等我削完這支。」
+topics:
+- topic_id: fionnen_resident_cyrwen.topic_01
+  keyword: 做箭
+  label: 做箭
+  fallback:
+    scene_id: fionnen_resident_cyrwen.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「一支好箭，是怎麼做出來的？」
+    - kind: speech
+      speaker: host
+      text: 「選直的木料，削出桿，再裝羽、磨尖。每一道都考眼力和手勁，差一點，箭出去就飄。」
+    - kind: narration
+      text: 她舉起箭桿，湊到眼前校直，再接著削。
+    - kind: speech
+      speaker: host
+      text: 「谷裡的箭，多半出自我手。你射過就曉得，順不順手。」
+- topic_id: fionnen_resident_cyrwen.topic_02
+  keyword: 手藝
+  label: 手藝
+  fallback:
+    scene_id: fionnen_resident_cyrwen.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你這手藝，是跟誰學的？」
+    - kind: speech
+      speaker: host
+      text: 「跟我娘。她拉弓，我造箭，一張一弛，正好補全。做了多年，閉著眼也削得直。」
+    - kind: speech
+      speaker: host
+      text: 「手藝這東西，急不來。你靜得下心，它才肯教你。」
+- topic_id: fionnen_resident_cyrwen.topic_03
+  keyword: 家人
+  label: 家人
+  fallback:
+    scene_id: fionnen_resident_cyrwen.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你家裡，誰射得最好？」
+    - kind: speech
+      speaker: host
+      text: 「我娘。小妹妹奈瑞斯跑得快，撿箭送箭，就是坐不住。我夾在中間，只管把箭做好，讓她們射個痛快。」
+    - kind: narration
+      text: 她笑了笑，手上的刀沒停。
+    - kind: speech
+      speaker: host
+      text: 「一家人各有各的用。夜裡回屋，娘試箭，妹妹說笑，我在旁聽著。」
+- topic_id: fionnen_resident_cyrwen.topic_04
+  keyword: 名字
+  label: 名字
+  fallback:
+    scene_id: fionnen_resident_cyrwen.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「戈爾德莉夫，就是秋日的金葉？」
+    - kind: speech
+      speaker: host
+      text: 「金葉。秋天滿林金黃，葉子落在靶道上，我掃箭時常撿到。」
+    - kind: narration
+      text: 她從腳邊拈起一片枯葉，夾進木料堆裡。
+    - kind: speech
+      speaker: host
+      text: 「這名字暖，像秋天。你往後秋天來，靶道最漂亮。」
+- topic_id: fionnen_resident_cyrwen.topic_05
+  keyword: 私語
+  label: 私語
+  requires:
+    kind: affinity_at_least
+    stage_key: trusted
+  unavailable: locked
+  refusal:
+    scene_id: fionnen_resident_cyrwen.topic_05_refusal
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: host
+      text: 「削箭之外的話，得等你我熟了，我才肯多說。」
+  fallback:
+    scene_id: fionnen_resident_cyrwen.topic_05_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你最安靜的時刻，會想些什麼？」
+    - kind: speech
+      speaker: host
+      text: 「想有個人，坐在我對面，看我削一支箭，就那麼看到天黑。等我收了刀，她用指尖順著我的手腕，一路摸到掌心，像在稱我的手藝。」
+    - kind: narration
+      text: 她垂眼，拇指無意識地摩挲著刀柄。
+    - kind: speech
+      speaker: host
+      text: 「手藝做到極處，也盼有人懂。你懂了，就是知音。」

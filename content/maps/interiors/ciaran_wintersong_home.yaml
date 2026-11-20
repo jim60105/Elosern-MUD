@@ -1,0 +1,19 @@
+# Permanent interior authored source (schema version 1).
+# A 暗影谷村 resident family home (溫特爾松 household), opening onto the
+# village's shared public node.
+version: 1
+kind: interior
+id: ciaran_wintersong_home
+rooms:
+  ciaran_wintersong_home:
+    name_zh: 溫特爾松的家
+    desc_zh: 木屋挨著村中廣場，屋裡擺著幾張矮凳和一面繡了一半的掛幔，火塘常溫著一壺水。孩子來聽故事時席地坐，一家三口就在人堆裡把夜講長。
+    scene_archetype: tavern_interior
+connections: []
+exterior:
+  settlement: elven_village_ciaran
+  node: village_plaza
+  room: ciaran_wintersong_home
+  doorway_key: 溫特爾松的家
+  doorway_aliases:
+  - wintersong

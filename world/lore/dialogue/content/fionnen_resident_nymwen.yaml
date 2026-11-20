@@ -1,0 +1,102 @@
+schema_version: 1
+greeting: 寧溫停下鑿子，抹了把木屑：「木頭的事問我。你要做什麼？」
+topics:
+- topic_id: fionnen_resident_nymwen.topic_01
+  keyword: 木工
+  label: 木工
+  fallback:
+    scene_id: fionnen_resident_nymwen.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「木作空地，都做哪些東西？」
+    - kind: speech
+      speaker: host
+      text: 「弓、橋板、木器，樣樣都有。木料堆在樹下，刨花落一地。村裡缺什麼，就來這兒做什麼。」
+    - kind: narration
+      text: 她掄起錘，一聲一聲，敲得穩當。
+    - kind: speech
+      speaker: host
+      text: 「木頭不騙人。你待它實，它才成器。人也一樣，得實打實。」
+- topic_id: fionnen_resident_nymwen.topic_02
+  keyword: 做弓
+  label: 做弓
+  fallback:
+    scene_id: fionnen_resident_nymwen.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「谷裡的弓，都是你這兒做的？」
+    - kind: speech
+      speaker: host
+      text: 「大半是。選料、整形、上弦，一道一道磨。一把好弓，拉起來順，放出去脆。獵隊出獵，都來我這兒挑。」
+    - kind: speech
+      speaker: host
+      text: 「弓認主人的手。你哪天想要，我替你量身做一把。」
+- topic_id: fionnen_resident_nymwen.topic_03
+  keyword: 家人
+  label: 家人
+  fallback:
+    scene_id: fionnen_resident_nymwen.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你家裡，都做木工？」
+    - kind: speech
+      speaker: host
+      text: 「大女兒倫溫刻花，小女兒埃倫林織補。我管大件。仨人一處，就是木作空地的全部。」
+    - kind: narration
+      text: 她朝空地那頭兩個低頭的身影望了一眼。
+    - kind: speech
+      speaker: host
+      text: 「一家人靠這雙手。你缺什麼，說一聲，我們仨琢磨著給你做出來。」
+- topic_id: fionnen_resident_nymwen.topic_04
+  keyword: 名字
+  label: 名字
+  fallback:
+    scene_id: fionnen_resident_nymwen.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「哈克菲特赫爾，是鷹羽的意思？」
+    - kind: speech
+      speaker: host
+      text: 「鷹羽。獵鷹換羽時，羽毛落在空地上，輕輕一旋。這家守著這片地，就取了它。」
+    - kind: narration
+      text: 她撿起一根木刨花，在指間撚了撚。
+    - kind: speech
+      speaker: host
+      text: 「這名，是天上落下的禮物。你往後秋天來，也能撿到幾根。」
+- topic_id: fionnen_resident_nymwen.topic_05
+  keyword: 私語
+  label: 私語
+  requires:
+    kind: affinity_at_least
+    stage_key: trusted
+  unavailable: locked
+  refusal:
+    scene_id: fionnen_resident_nymwen.topic_05_refusal
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: host
+      text: 「木屑裡的心事，只跟一起流過汗的人說。」
+  fallback:
+    scene_id: fionnen_resident_nymwen.topic_05_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你最舒坦的時刻，是什麼樣？」
+    - kind: speech
+      speaker: host
+      text: 「是做完工，滿身木屑，泡進林溪洗個透。有個人在岸上等我，把我拉起來，拿乾布把我從頭擦到腳，擦得我又熱又軟。」
+    - kind: narration
+      text: 她語氣沉下來，眼裡有火。
+    - kind: speech
+      speaker: host
+      text: 「幹活的累，要有人收尾。你懂這雙手，就懂我。」

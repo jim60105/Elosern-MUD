@@ -1,0 +1,118 @@
+schema_version: 1
+greeting: 佩倫林把一條濕布巾絞乾，抬眼望向你：「你是來泡泉子，還是順路問點谷裡的事？」
+topics:
+- topic_id: eolas_resident_perenlin.topic_01
+  keyword: 温泉
+  label: 温泉
+  fallback:
+    scene_id: eolas_resident_perenlin.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「這兒的溫泉有幾座池子？都一樣燙嗎？」
+    - kind: speech
+      speaker: host
+      text: 「靠石壁那口最燙，燙得旁人一伸手就縮；外頭這幾口溫些，洗衣、洗頭都趁手。你要怕燙，就從最外頭那口開始泡。」
+    - kind: narration
+      text: 她抬手往谷壁方向一指，水汽順著她的臂彎往上浮。
+    - kind: speech
+      speaker: host
+      text: 「泡著泡著身子軟了，人就想說話。谷裡的人不避諱裸著，你來多幾次也就習慣了。」
+- topic_id: eolas_resident_perenlin.topic_02
+  keyword: 谷裡
+  label: 谷裡
+  fallback:
+    scene_id: eolas_resident_perenlin.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「谷裡的人一天都做些什麼？」
+    - kind: speech
+      speaker: host
+      text: 「想吃想睡，想做愛，想泡泉。白天各自忙，夜裡都到這兒來，把一天的話洗乾淨了才肯散。」
+    - kind: speech
+      speaker: host
+      text: 「做愛像吃飯，餓了就找誰湊一頓。谷裡不藏這個，你要問哪家的事，問了便是。」
+- topic_id: eolas_resident_perenlin.topic_03
+  keyword: 家人
+  label: 家人
+  fallback:
+    scene_id: eolas_resident_perenlin.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你一個人住這兒？」
+    - kind: speech
+      speaker: host
+      text: 「兩個女兒跟我同住。大的泰林手快，泉邊誰滑了她頭一個衝過去；小的伊倫林愛泡最燙那口，一泡就是半天。」
+    - kind: narration
+      text: 提到女兒，她眼裡浮起一點暖意，手上的布巾絞得慢了下來。
+    - kind: speech
+      speaker: host
+      text: 「一家人忙完，夜裡並排泡著，話說盡了才回屋。你想要哪件衣裳，找泰林量身子就成。」
+- topic_id: eolas_resident_perenlin.topic_04
+  keyword: 名字
+  label: 名字
+  fallback:
+    scene_id: eolas_resident_perenlin.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「『溫德松』這名字有什麼來歷嗎？」
+    - kind: speech
+      speaker: host
+      text: 「谷裡人取名，常取自住的地方。這家守泉子，白氣從水裡升起來，像風在松林裡哼歌，就成了溫德松。」
+    - kind: narration
+      text: 她伸手攪了攪水面，看漣漪散開。
+    - kind: speech
+      speaker: host
+      text: 「名字不是死物。往後換了住處、成了人，也能再換。你叫它，它知道你心裡怎麼想。」
+- topic_id: eolas_resident_perenlin.topic_05
+  keyword: 季節
+  label: 季節
+  fallback:
+    scene_id: eolas_resident_perenlin.topic_05_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「這池子到了冬天不會冷嗎？」
+    - kind: speech
+      speaker: host
+      text: 「這泉打岩裡發出來，一到冬天更燙，白氣整座谷都瞧得見。天冷時，人都往最裡頭那口擠，貼著身子取暖，話也不用多說。」
+    - kind: speech
+      speaker: host
+      text: 「要愛起來，冬天最好。熱泉泡著，涼風吹在汗上，那滋味你試一回就忘不掉。」
+- topic_id: eolas_resident_perenlin.topic_06
+  keyword: 私語
+  label: 私語
+  requires:
+    kind: affinity_at_least
+    stage_key: trusted
+  unavailable: locked
+  refusal:
+    scene_id: eolas_resident_perenlin.topic_06_refusal
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: host
+      text: 「這種心事，我不對頭一次來的人說。等你在這池子邊多坐幾回，我再告訴你。」
+  fallback:
+    scene_id: eolas_resident_perenlin.topic_06_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你最喜歡這兒的哪個時候？」
+    - kind: speech
+      speaker: host
+      text: 「夜深人散，最後只賸我一個，泡在最燙那口池裡。水貼著全身，一波一波往上推，我就讓自己整個沉下去，由著那股熱揉到指尖。」
+    - kind: narration
+      text: 她閉了閉眼，像是那池水的熱又漫了回來。
+    - kind: speech
+      speaker: host
+      text: 「一個人也有快活，兩個人的又是另一種。等你哪天想知道了，我一件件說給你聽。」

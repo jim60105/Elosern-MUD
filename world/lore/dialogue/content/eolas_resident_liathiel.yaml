@@ -1,0 +1,118 @@
+schema_version: 1
+greeting: 莉亞特希爾把一綹絲在指間繞了半圈，抬起眼：「你是想問絲，還是到谷裡來探路？」
+topics:
+- topic_id: eolas_resident_liathiel.topic_01
+  keyword: 絲
+  label: 絲
+  fallback:
+    scene_id: eolas_resident_liathiel.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「這谷裡的絲是怎麼來的？」
+    - kind: speech
+      speaker: host
+      text: 「蛛結網，谷裡人收。蛛林那幾棵樹上，網一結一整片；收的時辰要挑得準，早了絲短，晚了絲脆。」
+    - kind: narration
+      text: 她把指間的絲一截截放長，又收了回來。
+    - kind: speech
+      speaker: host
+      text: 「一根好絲，扯到斷之前會先繃緊，再脆響。你懂這一句，就曉得這谷裡的活計了。」
+- topic_id: eolas_resident_liathiel.topic_02
+  keyword: 白衣
+  label: 白衣
+  fallback:
+    scene_id: eolas_resident_liathiel.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「村人身上那件白衣，都是用這絲織的？」
+    - kind: speech
+      speaker: host
+      text: 「是。織得薄，薄得透光，是怕勾到蛛網，也是谷裡人不愛把身子藏起來。你穿了就曉得，風貼著皮走，涼得像水。」
+    - kind: speech
+      speaker: host
+      text: 「誰想要一件衣裳，拿銅幣換就成。這谷不設鋪子，誰手裡有，就分給誰。」
+- topic_id: eolas_resident_liathiel.topic_03
+  keyword: 家人
+  label: 家人
+  fallback:
+    scene_id: eolas_resident_liathiel.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「這屋裡還住了誰？」
+    - kind: speech
+      speaker: host
+      text: 「兩個女兒。大的芬林餵蛛，林子裡每窩蛛的脾氣她都摸得透；小的布倫內爾運絲，一捆一捆往谷底背。」
+    - kind: narration
+      text: 她朝林子的方向抬了抬下巴，聲音放得又低了些。
+    - kind: speech
+      speaker: host
+      text: 「一家三口，話都不多。天黑了，就坐在一塊，把白天撿到的好絲擺出來分。」
+- topic_id: eolas_resident_liathiel.topic_04
+  keyword: 名字
+  label: 名字
+  fallback:
+    scene_id: eolas_resident_liathiel.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「『沙多瓦勒』這個姓，是什麼意思？」
+    - kind: speech
+      speaker: host
+      text: 「就是影谷。幽月谷月亮起來的時候，谷壁的影子順著溪水疊成一道，這家就住在那一帶。」
+    - kind: narration
+      text: 她伸手比了比谷壁的方向，指尖在半空停了一下。
+    - kind: speech
+      speaker: host
+      text: 「姓跟著住處走。哪天搬了家，這姓也就留給下一戶。」
+- topic_id: eolas_resident_liathiel.topic_05
+  keyword: 收絲
+  label: 收絲
+  fallback:
+    scene_id: eolas_resident_liathiel.topic_05_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「收絲最要緊的是什麼？」
+    - kind: speech
+      speaker: host
+      text: 「腳步。蛛怕震，你在那邊一跺地，整片網都要白費一季。收絲的人腳要像貓踩在水上。」
+    - kind: speech
+      speaker: host
+      text: 「所以谷裡的人在林邊都赤腳。涼是涼，皮糙些也不打緊。你願意的話，改天跟我走一趟，我教你踩。」
+- topic_id: eolas_resident_liathiel.topic_06
+  keyword: 私語
+  label: 私語
+  requires:
+    kind: affinity_at_least
+    stage_key: trusted
+  unavailable: locked
+  refusal:
+    scene_id: eolas_resident_liathiel.topic_06_refusal
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: host
+      text: 「這種體己話，我只對交過心的人講。你再多來幾回，再說。」
+  fallback:
+    scene_id: eolas_resident_liathiel.topic_06_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你有沒有只屬於自己的喜好？」
+    - kind: speech
+      speaker: host
+      text: 「有。收完的絲還鮮的時候，貼在皮膚上最滑，像有一條涼水順著腰往下流。我常把那根最勻的留給自己，夜裡貼著肩膀睡。」
+    - kind: narration
+      text: 她眼底柔和下來，指腹又捻了捻那根絲。
+    - kind: speech
+      speaker: host
+      text: 「東西再好，也得有人懂得摸。你哪天懂了這種滑，就明白我的意思。」

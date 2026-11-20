@@ -1,0 +1,102 @@
+schema_version: 1
+greeting: 維拉拉蹲在溪邊，把一件白衣在水裡抖開，回頭衝你一笑：「喲，來啦。是要洗衣服，還是聊兩句？」
+topics:
+- topic_id: eolas_resident_vaelara.topic_01
+  keyword: 洗衣
+  label: 洗衣
+  fallback:
+    scene_id: eolas_resident_vaelara.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「這衣裳在水裡，怎麼洗得這麼白？」
+    - kind: speech
+      speaker: host
+      text: 「水涼，力道勻，先泡軟了再搓。谷裡的水是活水，洗出來的衣裳都透亮。私心和汗味，都由它沖走。」
+    - kind: narration
+      text: 她把漂遠的衣角撈回來，水花濺上了她的下巴。
+    - kind: speech
+      speaker: host
+      text: 「手泡涼了，心也靜了。你要洗什麼，扔過來，我順手。」
+- topic_id: eolas_resident_vaelara.topic_02
+  keyword: 溪邊
+  label: 溪邊
+  fallback:
+    scene_id: eolas_resident_vaelara.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「溪邊都這麼熱鬧嗎？」
+    - kind: speech
+      speaker: host
+      text: 「白天人多，擔水洗衣都在這。到了日頭偏西，就剩些貪涼的人，脫乾淨往水裡一躺。我也不例外。」
+    - kind: speech
+      speaker: host
+      text: 「這兒沒土也沒牆，皮和皮碰見了，都平常。你別臊，臊了反倒好笑。」
+- topic_id: eolas_resident_vaelara.topic_03
+  keyword: 家人
+  label: 家人
+  fallback:
+    scene_id: eolas_resident_vaelara.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你獨個洗衣，家人呢？」
+    - kind: speech
+      speaker: host
+      text: 「娘約洛溫擔水，姊姊阿拉妮斯看槽。我最小，就洗衣。一家人各占一段溪，喊一聲都聽得見。」
+    - kind: narration
+      text: 她捋了捋濕髮，露出半邊光潔的肩。
+    - kind: speech
+      speaker: host
+      text: 「悶了我就唱歌，姊姊在岸上跟著哼。你哪天聽見，順著歌聲來，就是我。」
+- topic_id: eolas_resident_vaelara.topic_04
+  keyword: 名字
+  label: 名字
+  fallback:
+    scene_id: eolas_resident_vaelara.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你們家這姓，是清水的意思？」
+    - kind: speech
+      speaker: host
+      text: 「清水。水清得見底，石子一顆一顆。我喜歡光腳踩在裡頭，涼得腳心發癢，像有人搔著。」
+    - kind: narration
+      text: 她說著，真的把腳在溪裡踩了踩。
+    - kind: speech
+      speaker: host
+      text: 「這裡什麼都好，就一個字沒變——誰都離不開水，也離不開人。」
+- topic_id: eolas_resident_vaelara.topic_05
+  keyword: 私語
+  label: 私語
+  requires:
+    kind: affinity_at_least
+    stage_key: trusted
+  unavailable: locked
+  refusal:
+    scene_id: eolas_resident_vaelara.topic_05_refusal
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: host
+      text: 「我話多，可心底那口井，只給走得近的人舀。再熟一點。」
+  fallback:
+    scene_id: eolas_resident_vaelara.topic_05_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你有沒有哪一天，特別想被人抱？」
+    - kind: speech
+      speaker: host
+      text: 「有。溪水漲起來、齊到我腰那天，我就想有個人從後面攬住我，一塊在水裡顛。水替兩人托著，誰都不用出力，只消貼著。」
+    - kind: narration
+      text: 她臉頰微紅，卻笑得毫不扭捏。
+    - kind: speech
+      speaker: host
+      text: 「浸在水裡的滋味最軟。你哪天也脫了衣裳，試一回就曉得。」

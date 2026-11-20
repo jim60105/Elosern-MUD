@@ -1,0 +1,118 @@
+schema_version: 1
+greeting: 芬林從林子裡鑽出來，放輕了步子：「有話到谷裡說，別驚了蛛。」
+topics:
+- topic_id: eolas_resident_fenlin.topic_01
+  keyword: 蛛
+  label: 蛛
+  fallback:
+    scene_id: eolas_resident_fenlin.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「林裡那些蛛，都是你在養？」
+    - kind: speech
+      speaker: host
+      text: 「養說不上，是照看。哪一窩愛吃什麼、哪一窩天冷就懶，我都記得。它們認聲，我哼著調進去，它們才不起網。」
+    - kind: narration
+      text: 她挽了挽袖子，露出小臂上幾道蛛絲拂出的細痕。
+    - kind: speech
+      speaker: host
+      text: 「你不先放輕步子，話到一半，整片網都震蕩了。蛛和這谷裡的人一樣，愛靜。」
+- topic_id: eolas_resident_fenlin.topic_02
+  keyword: 養蛛
+  label: 養蛛
+  fallback:
+    scene_id: eolas_resident_fenlin.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「蛛吃了什麼，才有這麼好的絲？」
+    - kind: speech
+      speaker: host
+      text: 「吃林子裡的露水和些小蟲。老一輩說，蛛糞養樹，樹又餵蛛，一圈一圈自己轉。」
+    - kind: speech
+      speaker: host
+      text: 「我餵的其實是耐心。一窩蛛受驚，補半個月的網都補不回那一口氣。跟哄人一個理，急了辦不好。」
+- topic_id: eolas_resident_fenlin.topic_03
+  keyword: 家人
+  label: 家人
+  fallback:
+    scene_id: eolas_resident_fenlin.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你們一家人，各管什麼？」
+    - kind: speech
+      speaker: host
+      text: 「娘管抽絲，我管餵蛛，妹妹布倫內爾管搬運。天亮數網，天黑補網，一天就過去了。」
+    - kind: narration
+      text: 她撿起一片落在肩上的蛛絲，對著光看了看。
+    - kind: speech
+      speaker: host
+      text: 「夜裡一家人挨著睡，誰也不跟誰客氣。你要尋安靜，就來林子裡站一站。」
+- topic_id: eolas_resident_fenlin.topic_04
+  keyword: 名字
+  label: 名字
+  fallback:
+    scene_id: eolas_resident_fenlin.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你們家為什麼叫沙多瓦勒？」
+    - kind: speech
+      speaker: host
+      text: 「影谷。月照下來，谷底有整道整道的影。我跟娘說，那影子像一張沒織完的網，風一吹就在動。」
+    - kind: narration
+      text: 她朝谷壁望了一眼，像在找那張看不見的網。
+    - kind: speech
+      speaker: host
+      text: 「名是住處，不是名分。你記著這家的活計，比記著姓還實。」
+- topic_id: eolas_resident_fenlin.topic_05
+  keyword: 谷裡
+  label: 谷裡
+  fallback:
+    scene_id: eolas_resident_fenlin.topic_05_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「谷裡的人也像蛛一樣愛靜嗎？」
+    - kind: speech
+      speaker: host
+      text: 「白天各忙一頭，輕手輕腳；入了夜才放開。泉邊、窯旁，想湊一塊就湊一塊。夜裡的事，谷裡從來不背著人。」
+    - kind: speech
+      speaker: host
+      text: 「你待久了就懂。這兒沒有見不得光的事。連誰和誰睡過，都像風一樣飄在街面上。」
+- topic_id: eolas_resident_fenlin.topic_06
+  keyword: 私語
+  label: 私語
+  requires:
+    kind: affinity_at_least
+    stage_key: trusted
+  unavailable: locked
+  refusal:
+    scene_id: eolas_resident_fenlin.topic_06_refusal
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: host
+      text: 「林子裡的事我都肯說，只有這一件，得等你我熟了。」
+  fallback:
+    scene_id: eolas_resident_fenlin.topic_06_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你有沒有想過，不做這些了，去做點別的？」
+    - kind: speech
+      speaker: host
+      text: 「沒想過。只有一樣，我想哪天把衣服全脫了，一個人躺進最燙的泉裡，讓水的勁頭把我最裡頭也燙透。」
+    - kind: narration
+      text: 她說得極輕，像是怕驚了誰。
+    - kind: speech
+      speaker: host
+      text: 「這種事，要自己嚐才曉得滋味。來日方長，不怕沒機會。」

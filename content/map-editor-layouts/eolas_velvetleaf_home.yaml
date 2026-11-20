@@ -1,0 +1,5 @@
+version: 1
+kind: layout
+id: eolas_velvetleaf_home
+positions:
+  eolas_velvetleaf_home: {x: 0, y: 0}

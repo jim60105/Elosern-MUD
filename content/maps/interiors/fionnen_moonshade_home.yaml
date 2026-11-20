@@ -1,0 +1,19 @@
+# Permanent interior authored source (schema version 1).
+# A 翠綠森林村 resident family home (蒙斯哈德 household), opening onto the
+# village's shared public node.
+version: 1
+kind: interior
+id: fionnen_moonshade_home
+rooms:
+  fionnen_moonshade_home:
+    name_zh: 蒙斯哈德的家
+    desc_zh: 樹屋緊靠林間光庭，窗正對著村裡最高的那棵樹，屋角擺著看雲辨風的小物：一罐鳥羽、幾片磨薄的石片。一家人輪著上瞭望枝，回來就在窗邊把天象說給彼此聽。
+    scene_archetype: tavern_interior
+connections: []
+exterior:
+  settlement: elven_village_fionnen
+  node: light_court
+  room: fionnen_moonshade_home
+  doorway_key: 蒙斯哈德的家
+  doorway_aliases:
+  - moonshade

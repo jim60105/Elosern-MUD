@@ -1,0 +1,102 @@
+schema_version: 1
+greeting: 約洛溫把擔子在地上墩穩，直起腰：「是要水，還是問路？」
+topics:
+- topic_id: eolas_resident_iolowen.topic_01
+  keyword: 水
+  label: 水
+  fallback:
+    scene_id: eolas_resident_iolowen.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「溪源的水，跟別處有什麼不同？」
+    - kind: speech
+      speaker: host
+      text: 「打岩縫裡滲出來，清，也甜。泡茶、洗傷、栽東西，都用它。這谷靠它活，也靠它把人湊在一處。」
+    - kind: narration
+      text: 她拎起桶，斜著給你看了看裡頭的水。
+    - kind: speech
+      speaker: host
+      text: 「口渴了跟我上溪源，現舀一口，涼到心裡。比你在外頭問十個人還頂用。」
+- topic_id: eolas_resident_iolowen.topic_02
+  keyword: 擔水
+  label: 擔水
+  fallback:
+    scene_id: eolas_resident_iolowen.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「這擔子壓不壞肩嗎？」
+    - kind: speech
+      speaker: host
+      text: 「壓不壞。走了半生，兩條胳膊都硬了。水軟，勁靠練，身子才真。」
+    - kind: speech
+      speaker: host
+      text: 「谷裡人不嬌氣。累了就往泉裡一躺，讓水把身子頂著。你哪天挑不動了，去泡一泡，比什麼都解乏。」
+- topic_id: eolas_resident_iolowen.topic_03
+  keyword: 家人
+  label: 家人
+  fallback:
+    scene_id: eolas_resident_iolowen.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你家裡人也擔水？」
+    - kind: speech
+      speaker: host
+      text: 「大女兒阿拉妮斯看引水槽，哪條溝堵了、哪段槽漏了，都歸她；小女兒維拉拉在溪邊洗衣裳。我管擔。」
+    - kind: narration
+      text: 她擦了擦額角，目光朝溪水的方向望去。
+    - kind: speech
+      speaker: host
+      text: 「這一家，離了水就散。夜裡人歸齊，灶上水開著，話也開了。」
+- topic_id: eolas_resident_iolowen.topic_04
+  keyword: 名字
+  label: 名字
+  fallback:
+    scene_id: eolas_resident_iolowen.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「『克莉爾瓦特爾』，是清水的意思？」
+    - kind: speech
+      speaker: host
+      text: 「清水。溪源那水，清得能數石子。這家守著它，也就拿它做了姓。」
+    - kind: narration
+      text: 她捧了一捧水，任它從指縫漏回桶裡。
+    - kind: speech
+      speaker: host
+      text: 「水留不住，姓也一樣。你在谷裡住，往後舀水的手，就是你自己。」
+- topic_id: eolas_resident_iolowen.topic_05
+  keyword: 私語
+  label: 私語
+  requires:
+    kind: affinity_at_least
+    stage_key: trusted
+  unavailable: locked
+  refusal:
+    scene_id: eolas_resident_iolowen.topic_05_refusal
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: host
+      text: 「我話實，可也得認了你這人才說。先喝水，再談心。」
+  fallback:
+    scene_id: eolas_resident_iolowen.topic_05_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你最想念的是哪一段日子？」
+    - kind: speech
+      speaker: host
+      text: 「是許久前一個大旱季，溪源都見了底。夜裡我守著那條細流，有個人無聲無息地伏在我身上，把汗滴進我頸窩。那一夜，水和我都活過來了。」
+    - kind: narration
+      text: 她揚起臉，像在嘗那夜留到現在的渴。
+    - kind: speech
+      speaker: host
+      text: 「人渴久了，才懂水的甜。你記著這句話，往後睡得踏實。」

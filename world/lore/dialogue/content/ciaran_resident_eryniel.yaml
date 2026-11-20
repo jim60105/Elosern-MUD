@@ -1,0 +1,102 @@
+schema_version: 1
+greeting: 埃瑞妮爾從夜色裡走出來，聲音壓得低：「有話說，別點燈，驚了夜草。」
+topics:
+- topic_id: ciaran_resident_eryniel.topic_01
+  keyword: 夜草
+  label: 夜草
+  fallback:
+    scene_id: ciaran_resident_eryniel.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「為什麼有的草，偏要在夜裡採？」
+    - kind: speech
+      speaker: host
+      text: 「天一黑它們才開口，露水一打，性子最足。白天摘回去，就是一捧沒魂的枯草。」
+    - kind: narration
+      text: 她蹲下身，就著稀薄的月光，撥開一片草葉。
+    - kind: speech
+      speaker: host
+      text: 「我認它們，它們也認我。你在夜裡待久了，眼睛就開了。」
+- topic_id: ciaran_resident_eryniel.topic_02
+  keyword: 夜路
+  label: 夜路
+  fallback:
+    scene_id: ciaran_resident_eryniel.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「一個人在夜裡上山，不怕嗎？」
+    - kind: speech
+      speaker: host
+      text: 「白天人怕黑，夜裡人才看清東西。我不怕獸，也不怕鬼，就怕有人冒失地點燈，把一夜的草都驚了。」
+    - kind: speech
+      speaker: host
+      text: 「谷裡的夜不只有草。有人趁黑在林子裡交纏，喘聲混著蟲鳴。我走過，聽半句，不回頭。」
+- topic_id: ciaran_resident_eryniel.topic_03
+  keyword: 家人
+  label: 家人
+  fallback:
+    scene_id: ciaran_resident_eryniel.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你一個人在夜裡忙，家人不擔心？」
+    - kind: speech
+      speaker: host
+      text: 「娘薩拉拉種草，妹妹希爾溫熬藥。她們知道我幾時回。天快亮時，我踏進門，鍋裡的水正好開。」
+    - kind: narration
+      text: 她語氣淡淡，眼底卻有暖意。
+    - kind: speech
+      speaker: host
+      text: 「一家人都靠夜。我採，娘配，妹妹熬。少了誰，那鍋藥都不成。」
+- topic_id: ciaran_resident_eryniel.topic_04
+  keyword: 名字
+  label: 名字
+  fallback:
+    scene_id: ciaran_resident_eryniel.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「索爾恩伍德，就是那圈棘木？」
+    - kind: speech
+      speaker: host
+      text: 「是。棘木圍著園子，入夜更黑，我摸黑都能順著它的刺走回家。」
+    - kind: narration
+      text: 她伸出手，指腹在虛空裡比了比那排刺。
+    - kind: speech
+      speaker: host
+      text: 「夜裡看不清字，摸到刺，就到家了。這姓，是給夜路的人認路的記號。」
+- topic_id: ciaran_resident_eryniel.topic_05
+  keyword: 私語
+  label: 私語
+  requires:
+    kind: affinity_at_least
+    stage_key: trusted
+  unavailable: locked
+  refusal:
+    scene_id: ciaran_resident_eryniel.topic_05_refusal
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: host
+      text: 「夜裡的話，只跟一起走過夜路的人說。」
+  fallback:
+    scene_id: ciaran_resident_eryniel.topic_05_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你夜裡獨處，最想要的是什麼？」
+    - kind: speech
+      speaker: host
+      text: 「想有個人，跟我一樣不怕黑，摸到草叢裡來。不點燈，只憑手和氣味，一寸寸認我。露水打濕了皮膚，也分不清是誰的汗。」
+    - kind: narration
+      text: 她仰起臉，任月光落在她鎖骨上。
+    - kind: speech
+      speaker: host
+      text: 「黑裡沒有眼睛，只有身子。那才最真。」

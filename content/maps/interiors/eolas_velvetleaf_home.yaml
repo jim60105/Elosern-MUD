@@ -1,0 +1,19 @@
+# Permanent interior authored source (schema version 1).
+# A 幽月谷村 resident family home (維爾維特莉夫 household), opening onto the
+# village's shared public node.
+version: 1
+kind: interior
+id: eolas_velvetleaf_home
+rooms:
+  eolas_velvetleaf_home:
+    name_zh: 維爾維特莉夫的家
+    desc_zh: 岩屋在谷底空地上方第一排，門口的繩上晾著剛織好的白布，風一來輕輕翻動。屋裡的織機貼著窗擺，布匹疊在石檯上，一牆都是布的顏色。
+    scene_archetype: tavern_interior
+connections: []
+exterior:
+  settlement: elven_village_eolas
+  node: valley_floor
+  room: eolas_velvetleaf_home
+  doorway_key: 維爾維特莉夫的家
+  doorway_aliases:
+  - velvetleaf

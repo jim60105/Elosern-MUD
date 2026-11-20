@@ -1,0 +1,102 @@
+schema_version: 1
+greeting: 倫溫放下刻刀，吹去木粉，抬起頭：「有事嗎？我正刻到緊要處。」
+topics:
+- topic_id: fionnen_resident_lumwyn.topic_01
+  keyword: 刻花
+  label: 刻花
+  fallback:
+    scene_id: fionnen_resident_lumwyn.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「木器上的花，都是你刻的？」
+    - kind: speech
+      speaker: host
+      text: 「多半是。一鑿一鑿，順著木紋走。刻壞一處，整塊就廢了。這活考眼，也考心。」
+    - kind: narration
+      text: 她指尖沿著剛刻出的紋路，輕輕撫過去。
+    - kind: speech
+      speaker: host
+      text: 「花長在木頭裡，我把它們放出來。你湊近看，紋路裡有魂。」
+- topic_id: fionnen_resident_lumwyn.topic_02
+  keyword: 手藝
+  label: 手藝
+  fallback:
+    scene_id: fionnen_resident_lumwyn.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你刻花的手藝，跟誰學的？」
+    - kind: speech
+      speaker: host
+      text: 「跟我娘。她做弓，我刻花，一張一弛。刻著刻著，就刻出自己的脾性。」
+    - kind: speech
+      speaker: host
+      text: 「手藝像熬糖，急不得。你一坐一整天，才熬得出那點精細。」
+- topic_id: fionnen_resident_lumwyn.topic_03
+  keyword: 家人
+  label: 家人
+  fallback:
+    scene_id: fionnen_resident_lumwyn.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你家裡，就你性子最靜？」
+    - kind: speech
+      speaker: host
+      text: 「是。娘寧溫揮錘，妹妹埃倫林滿場跑。就我坐得住，一鑿一鑿。一家人裡，我是那個收尾的人。」
+    - kind: narration
+      text: 她笑了笑，笑紋極淺。
+    - kind: speech
+      speaker: host
+      text: 「妹妹總把我刻好的花拿去串花環。隨她，我刻就是了。」
+- topic_id: fionnen_resident_lumwyn.topic_04
+  keyword: 名字
+  label: 名字
+  fallback:
+    scene_id: fionnen_resident_lumwyn.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「哈克菲特赫爾，是那幾根鷹羽？」
+    - kind: speech
+      speaker: host
+      text: 「鷹羽。換羽時落在木料上，我刻花刻累了，就撿一根，看它的紋。」
+    - kind: narration
+      text: 她從木料堆上拈起一片羽，湊到眼前。
+    - kind: speech
+      speaker: host
+      text: 「羽毛的紋路，跟木紋一樣。你靜下心，就分得出。」
+- topic_id: fionnen_resident_lumwyn.topic_05
+  keyword: 私語
+  label: 私語
+  requires:
+    kind: affinity_at_least
+    stage_key: trusted
+  unavailable: locked
+  refusal:
+    scene_id: fionnen_resident_lumwyn.topic_05_refusal
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: host
+      text: 「刻進木頭的心事，只給看得懂紋路的人。」
+  fallback:
+    scene_id: fionnen_resident_lumwyn.topic_05_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你最想要的陪伴，是什麼樣？」
+    - kind: speech
+      speaker: host
+      text: 「是有個人，坐在我對面，看我刻完一朵花。她不催，也不說話，就那麼陪著。等最後一鑿落下，她用指尖順著我腕上的木屑，一路摸到我的手心。」
+    - kind: narration
+      text: 她聲音輕下去，像怕驚了那朵花。
+    - kind: speech
+      speaker: host
+      text: 「精細的活，要配一個安靜的人。你懂這份靜，就懂我。」

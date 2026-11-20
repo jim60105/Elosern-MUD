@@ -1,11 +1,182 @@
-"""幽月谷村 resident slice (elven-resident-npcs-content fills this row set).
+"""幽月谷村 resident slice: the village's fifteen chat-only residents.
 
-``PUBLIC_NODE`` is the settlement node the village's residents walk to on the
-shared ``resident`` schedule; leave it ``None`` while ``ROWS`` is empty.
+``PUBLIC_NODE`` is the settlement node every resident's home doorway opens onto
+and the node the shared ``resident`` schedule's ``market_square`` leg walks to.
+The fifteen residents form five households of three (a mother and two
+daughters); each household shares one surname and one home room. Stats are
+literal in-band elf baselines (hp/mp/sp 10000, physical 70–95, magic 100–200);
+no learning or body-enhancement multiplier is baked into a stored value.
 """
 
 from world.lore.residents.shape import Resident
 
 SETTLEMENT_KEY = "elven_village_eolas"
-PUBLIC_NODE: str | None = None
-ROWS: tuple[Resident, ...] = ()
+PUBLIC_NODE: str | None = "valley_floor"
+
+ROWS: tuple[Resident, ...] = (
+    Resident(
+        key="eolas_resident_perenlin",
+        name="佩倫林‧溫德松",
+        profile_key="eolas_resident_perenlin",
+        race="elf",
+        subrace="eolas",
+        sex="female",
+        stats={"hp": 10000, "mp": 10000, "sp": 10000, "atk_phys": 70, "agility": 70, "defense": 70, "magic_power": 100},
+        home_room="eolas_windsong_home",
+        dialogue_key="eolas_resident_perenlin",
+    ),
+    Resident(
+        key="eolas_resident_taellin",
+        name="泰林‧溫德松",
+        profile_key="eolas_resident_taellin",
+        race="elf",
+        subrace="eolas",
+        sex="female",
+        stats={"hp": 10000, "mp": 10000, "sp": 10000, "atk_phys": 77, "agility": 81, "defense": 83, "magic_power": 117},
+        home_room="eolas_windsong_home",
+        dialogue_key="eolas_resident_taellin",
+    ),
+    Resident(
+        key="eolas_resident_yrenlin",
+        name="伊倫林‧溫德松",
+        profile_key="eolas_resident_yrenlin",
+        race="elf",
+        subrace="eolas",
+        sex="female",
+        stats={"hp": 10000, "mp": 10000, "sp": 10000, "atk_phys": 84, "agility": 92, "defense": 70, "magic_power": 134},
+        home_room="eolas_windsong_home",
+        dialogue_key="eolas_resident_yrenlin",
+    ),
+    Resident(
+        key="eolas_resident_liathiel",
+        name="莉亞特希爾‧沙多瓦勒",
+        profile_key="eolas_resident_liathiel",
+        race="elf",
+        subrace="eolas",
+        sex="female",
+        stats={"hp": 10000, "mp": 10000, "sp": 10000, "atk_phys": 91, "agility": 77, "defense": 83, "magic_power": 151},
+        home_room="eolas_shadowvale_home",
+        dialogue_key="eolas_resident_liathiel",
+    ),
+    Resident(
+        key="eolas_resident_fenlin",
+        name="芬林‧沙多瓦勒",
+        profile_key="eolas_resident_fenlin",
+        race="elf",
+        subrace="eolas",
+        sex="female",
+        stats={"hp": 10000, "mp": 10000, "sp": 10000, "atk_phys": 72, "agility": 88, "defense": 70, "magic_power": 168},
+        home_room="eolas_shadowvale_home",
+        dialogue_key="eolas_resident_fenlin",
+    ),
+    Resident(
+        key="eolas_resident_bremnel",
+        name="布倫內爾‧沙多瓦勒",
+        profile_key="eolas_resident_bremnel",
+        race="elf",
+        subrace="eolas",
+        sex="female",
+        stats={"hp": 10000, "mp": 10000, "sp": 10000, "atk_phys": 79, "agility": 73, "defense": 83, "magic_power": 185},
+        home_room="eolas_shadowvale_home",
+        dialogue_key="eolas_resident_bremnel",
+    ),
+    Resident(
+        key="eolas_resident_quennel",
+        name="奎內爾‧維爾維特莉夫",
+        profile_key="eolas_resident_quennel",
+        race="elf",
+        subrace="eolas",
+        sex="female",
+        stats={"hp": 10000, "mp": 10000, "sp": 10000, "atk_phys": 86, "agility": 84, "defense": 70, "magic_power": 101},
+        home_room="eolas_velvetleaf_home",
+        dialogue_key="eolas_resident_quennel",
+    ),
+    Resident(
+        key="eolas_resident_niriel",
+        name="妮瑞爾‧維爾維特莉夫",
+        profile_key="eolas_resident_niriel",
+        race="elf",
+        subrace="eolas",
+        sex="female",
+        stats={"hp": 10000, "mp": 10000, "sp": 10000, "atk_phys": 93, "agility": 95, "defense": 83, "magic_power": 118},
+        home_room="eolas_velvetleaf_home",
+        dialogue_key="eolas_resident_niriel",
+    ),
+    Resident(
+        key="eolas_resident_caeleth",
+        name="凱勒斯‧維爾維特莉夫",
+        profile_key="eolas_resident_caeleth",
+        race="elf",
+        subrace="eolas",
+        sex="female",
+        stats={"hp": 10000, "mp": 10000, "sp": 10000, "atk_phys": 74, "agility": 80, "defense": 70, "magic_power": 135},
+        home_room="eolas_velvetleaf_home",
+        dialogue_key="eolas_resident_caeleth",
+    ),
+    Resident(
+        key="eolas_resident_iolowen",
+        name="約洛溫‧克莉爾瓦特爾",
+        profile_key="eolas_resident_iolowen",
+        race="elf",
+        subrace="eolas",
+        sex="female",
+        stats={"hp": 10000, "mp": 10000, "sp": 10000, "atk_phys": 81, "agility": 91, "defense": 83, "magic_power": 152},
+        home_room="eolas_clearwater_home",
+        dialogue_key="eolas_resident_iolowen",
+    ),
+    Resident(
+        key="eolas_resident_aranith",
+        name="阿拉妮斯‧克莉爾瓦特爾",
+        profile_key="eolas_resident_aranith",
+        race="elf",
+        subrace="eolas",
+        sex="female",
+        stats={"hp": 10000, "mp": 10000, "sp": 10000, "atk_phys": 88, "agility": 76, "defense": 70, "magic_power": 169},
+        home_room="eolas_clearwater_home",
+        dialogue_key="eolas_resident_aranith",
+    ),
+    Resident(
+        key="eolas_resident_vaelara",
+        name="維拉拉‧克莉爾瓦特爾",
+        profile_key="eolas_resident_vaelara",
+        race="elf",
+        subrace="eolas",
+        sex="female",
+        stats={"hp": 10000, "mp": 10000, "sp": 10000, "atk_phys": 95, "agility": 87, "defense": 83, "magic_power": 186},
+        home_room="eolas_clearwater_home",
+        dialogue_key="eolas_resident_vaelara",
+    ),
+    Resident(
+        key="eolas_resident_bremiel",
+        name="布瑞米爾‧格林拉德",
+        profile_key="eolas_resident_bremiel",
+        race="elf",
+        subrace="eolas",
+        sex="female",
+        stats={"hp": 10000, "mp": 10000, "sp": 10000, "atk_phys": 76, "agility": 72, "defense": 70, "magic_power": 102},
+        home_room="eolas_greenglade_home",
+        dialogue_key="eolas_resident_bremiel",
+    ),
+    Resident(
+        key="eolas_resident_alarith",
+        name="阿拉瑞斯‧格林拉德",
+        profile_key="eolas_resident_alarith",
+        race="elf",
+        subrace="eolas",
+        sex="female",
+        stats={"hp": 10000, "mp": 10000, "sp": 10000, "atk_phys": 83, "agility": 83, "defense": 83, "magic_power": 119},
+        home_room="eolas_greenglade_home",
+        dialogue_key="eolas_resident_alarith",
+    ),
+    Resident(
+        key="eolas_resident_ondwyn",
+        name="翁德溫‧格林拉德",
+        profile_key="eolas_resident_ondwyn",
+        race="elf",
+        subrace="eolas",
+        sex="female",
+        stats={"hp": 10000, "mp": 10000, "sp": 10000, "atk_phys": 90, "agility": 94, "defense": 70, "magic_power": 136},
+        home_room="eolas_greenglade_home",
+        dialogue_key="eolas_resident_ondwyn",
+    ),
+)

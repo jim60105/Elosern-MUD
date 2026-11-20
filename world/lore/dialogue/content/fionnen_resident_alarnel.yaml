@@ -1,0 +1,102 @@
+schema_version: 1
+greeting: 阿拉爾內爾把弓弦一撥，抬眼望你：「是來射箭，還是問路？」
+topics:
+- topic_id: fionnen_resident_alarnel.topic_01
+  keyword: 射箭
+  label: 射箭
+  fallback:
+    scene_id: fionnen_resident_alarnel.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「射箭最要緊的是什麼？」
+    - kind: speech
+      speaker: host
+      text: 「站穩，心定，眼只盯著靶心那一點。手一抖，箭就偏。我教人，先教他們把呼吸沉下去。」
+    - kind: narration
+      text: 她搭箭、引弦，一氣呵成，箭釘在靶心輕輕一顫。
+    - kind: speech
+      speaker: host
+      text: 「射箭和做愛一個理，急了就空，定住才中。你想學，我從站姿教起。」
+- topic_id: fionnen_resident_alarnel.topic_02
+  keyword: 弓
+  label: 弓
+  fallback:
+    scene_id: fionnen_resident_alarnel.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「谷裡的弓，都用什麼做？」
+    - kind: speech
+      speaker: host
+      text: 「好木料，配著絞緊的弦。一張弓做得好，拉起來順，放出去脆。獵隊出獵，都挑趁手的帶。」
+    - kind: speech
+      speaker: host
+      text: 「弓跟人處久了，認主人的手。你哪天也有一張，就會懂這份貼。」
+- topic_id: fionnen_resident_alarnel.topic_03
+  keyword: 家人
+  label: 家人
+  fallback:
+    scene_id: fionnen_resident_alarnel.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你家裡人都射箭？」
+    - kind: speech
+      speaker: host
+      text: 「大女兒基爾溫做箭，小女兒奈瑞斯撿箭、送箭。我拉弓，她倆跟在我身後。一家人都在靶道上。」
+    - kind: narration
+      text: 她望向靶道盡頭那個跑動的身影。
+    - kind: speech
+      speaker: host
+      text: 「谷裡的孩子也來學，熱鬧。你要靜，就等散了再來。」
+- topic_id: fionnen_resident_alarnel.topic_04
+  keyword: 名字
+  label: 名字
+  fallback:
+    scene_id: fionnen_resident_alarnel.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「戈爾德莉夫，是金葉的意思？」
+    - kind: speech
+      speaker: host
+      text: 「金葉。秋來林子一片金，風一過，葉子簌簌往下落。這家住在光庭邊，看得最清。」
+    - kind: narration
+      text: 她伸手接住一片打旋落下的葉子。
+    - kind: speech
+      speaker: host
+      text: 「名是住處送的一份禮。你常來，也分得到這片金。」
+- topic_id: fionnen_resident_alarnel.topic_05
+  keyword: 私語
+  label: 私語
+  requires:
+    kind: affinity_at_least
+    stage_key: trusted
+  unavailable: locked
+  refusal:
+    scene_id: fionnen_resident_alarnel.topic_05_refusal
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: host
+      text: 「箭以外的心事，只對交得過心的人講。你多來拉幾回弓。」
+  fallback:
+    scene_id: fionnen_resident_alarnel.topic_05_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你最享受哪一箭？」
+    - kind: speech
+      speaker: host
+      text: 「是黃昏收弓，最後一箭脫手，我整個人也跟著放空。有個人在靶道邊等我，把我拉進林子，抵在樹上，讓我喘得比射箭還急。」
+    - kind: narration
+      text: 她聲音低下去，目光卻銳利如弦。
+    - kind: speech
+      speaker: host
+      text: 「弓弦繃久了，也盼著被誰鬆開。你懂這張弓，就懂我。」

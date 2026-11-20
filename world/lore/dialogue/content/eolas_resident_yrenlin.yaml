@@ -1,0 +1,118 @@
+schema_version: 1
+greeting: 伊倫林從蒸騰的水汽裡轉過臉，像是剛被喊醒：「你找我有事？」
+topics:
+- topic_id: eolas_resident_yrenlin.topic_01
+  keyword: 温泉
+  label: 温泉
+  fallback:
+    scene_id: eolas_resident_yrenlin.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「為什麼你特別喜歡最燙的那口池子？」
+    - kind: speech
+      speaker: host
+      text: 「燙到骨頭都忘了自己。泡在裡頭，什麼都想不起來，只剩水一下一下裹著你。」
+    - kind: narration
+      text: 她垂眼看著水面，指尖在水裡畫著圈。
+    - kind: speech
+      speaker: host
+      text: 「外頭太吵，這裡最靜。你身子受得住，就來陪我坐一坐。」
+- topic_id: eolas_resident_yrenlin.topic_02
+  keyword: 谷裡
+  label: 谷裡
+  fallback:
+    scene_id: eolas_resident_yrenlin.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「谷裡的人都跟你一樣安靜嗎？」
+    - kind: speech
+      speaker: host
+      text: 「不。就我話少，娘和姊姊都愛說。晚上人都到泉邊來，把白天的話倒進水裡，我就在旁邊聽。」
+    - kind: speech
+      speaker: host
+      text: 「聽多了就明白，誰昨夜在誰那兒過夜、誰又想換個人。這兒沒秘密，我也只撿著聽。」
+- topic_id: eolas_resident_yrenlin.topic_03
+  keyword: 家人
+  label: 家人
+  fallback:
+    scene_id: eolas_resident_yrenlin.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你一個人住嗎？」
+    - kind: speech
+      speaker: host
+      text: 「跟娘佩倫林、姊姊泰林同住。娘管池子，姊姊遞布，我呢，就泡在水裡，替她們把最燙那口試準了。」
+    - kind: narration
+      text: 她抿了抿唇，像是為自己的游手好閒辯白。
+    - kind: speech
+      speaker: host
+      text: 「谷裡的人看對眼了就結伴，夜裡誰去誰那兒過夜都不瞞。你問起誰，我大多都認得。」
+- topic_id: eolas_resident_yrenlin.topic_04
+  keyword: 白氣
+  label: 白氣
+  fallback:
+    scene_id: eolas_resident_yrenlin.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你總盯著水面上的白氣看，是在看什麼？」
+    - kind: speech
+      speaker: host
+      text: 「看它像有了身子，升起來又散掉。泡熱的人從水裡出來，身上也冒這樣的白氣，像多了一層衣裳。」
+    - kind: speech
+      speaker: host
+      text: 「我喜歡看人這樣光著站在霧裡，頭髮和肩膀蒙著一層水色。你見過嗎？很好看。」
+- topic_id: eolas_resident_yrenlin.topic_05
+  keyword: 名字
+  label: 名字
+  fallback:
+    scene_id: eolas_resident_yrenlin.topic_05_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「『溫德松』這名字，你自己喜歡嗎？」
+    - kind: speech
+      speaker: host
+      text: 「喜歡。松林會唱歌，風一過，整片都在哼。這家守水，也分得到那點歌聲。」
+    - kind: narration
+      text: 她閉上眼，像是真的在聽什麼。
+    - kind: speech
+      speaker: host
+      text: 「改天帶你去下一句。聽懂了，你也就把我家認下了。」
+- topic_id: eolas_resident_yrenlin.topic_06
+  keyword: 私願
+  label: 私願
+  requires:
+    kind: affinity_at_least
+    stage_key: trusted
+  unavailable: locked
+  refusal:
+    scene_id: eolas_resident_yrenlin.topic_06_refusal
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: host
+      text: 「我還沒跟你熟到能說這個。你再多來泡幾回吧。」
+  fallback:
+    scene_id: eolas_resident_yrenlin.topic_06_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你有沒有什麼只為自己留的小願望？」
+    - kind: speech
+      speaker: host
+      text: 「我想在一個下雪的夜裡，獨自泡在最燙的池中，讓水沒過下巴。天上的雪落進霧裡，我還看得見自己呼出的白氣。」
+    - kind: narration
+      text: 她眼裡難得地發亮，像是那場雪已經落在她頭上。
+    - kind: speech
+      speaker: host
+      text: 「要是那夜你在，別出聲。陪著我就好。」

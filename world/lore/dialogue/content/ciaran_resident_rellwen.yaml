@@ -1,0 +1,102 @@
+schema_version: 1
+greeting: 瑞爾溫從池邊直起身，抹了把臉上的水，朝你笑：「是來洗身，還是洗衣裳？」
+topics:
+- topic_id: ciaran_resident_rellwen.topic_01
+  keyword: 溪池
+  label: 溪池
+  fallback:
+    scene_id: ciaran_resident_rellwen.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「溪池浴場，是全村一起用嗎？」
+    - kind: speech
+      speaker: host
+      text: 「是。洗身、洗衣、泡水，都在這。上游洗菜，下游洗衣，想泡就脫了衣裳往暖池裡一躺。沒人分什麼你我。」
+    - kind: narration
+      text: 她往水裡撩了一把，水花濺得老高。
+    - kind: speech
+      speaker: host
+      text: 「這兒沒牆也沒簾，皮和皮見了都平常。你泡一回，就知道谷裡人為什麼不害臊。」
+- topic_id: ciaran_resident_rellwen.topic_02
+  keyword: 洗衣
+  label: 洗衣
+  fallback:
+    scene_id: ciaran_resident_rellwen.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你一天要洗多少衣裳？」
+    - kind: speech
+      speaker: host
+      text: 「數不清。誰把髒衣裳往池邊一放，我槌了、搓了，晾乾再還回去。累是累，可有水聲陪著，也不悶。」
+    - kind: speech
+      speaker: host
+      text: 「人把心事也帶到池邊來。我一邊洗，一邊聽，谷裡的事，比誰都清楚。」
+- topic_id: ciaran_resident_rellwen.topic_03
+  keyword: 家人
+  label: 家人
+  fallback:
+    scene_id: ciaran_resident_rellwen.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你家裡人都來這兒忙？」
+    - kind: speech
+      speaker: host
+      text: 「大女兒科瑞爾力氣大，槌衣；小女兒邁特希爾心細，疊布。我管洗。仨人一天到晚泡在水裡。」
+    - kind: narration
+      text: 她朝池邊那兩個身影努了努嘴。
+    - kind: speech
+      speaker: host
+      text: 「一家人濕淋淋地回家，身上都是水的涼氣。你要找人，池邊一喊就應。」
+- topic_id: ciaran_resident_rellwen.topic_04
+  keyword: 名字
+  label: 名字
+  fallback:
+    scene_id: ciaran_resident_rellwen.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「拉文伍德，是鴉林的意思？」
+    - kind: speech
+      speaker: host
+      text: 「鴉林。入夜鴉在林子上空盤，翅膀拍得啪啪響。我家靠著這片池子，夜裡聽得最清。」
+    - kind: narration
+      text: 她側耳，像在聽那陣翅聲。
+    - kind: speech
+      speaker: host
+      text: 「鴉是夜的信差。你夜裡來，我指給你看那幾隻。」
+- topic_id: ciaran_resident_rellwen.topic_05
+  keyword: 私語
+  label: 私語
+  requires:
+    kind: affinity_at_least
+    stage_key: trusted
+  unavailable: locked
+  refusal:
+    scene_id: ciaran_resident_rellwen.topic_05_refusal
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: host
+      text: 「我話多，可也不是誰都交底。你多來泡幾回，再說。」
+  fallback:
+    scene_id: ciaran_resident_rellwen.topic_05_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你最自在的時刻，是什麼樣？」
+    - kind: speech
+      speaker: host
+      text: 「是收工後，我獨自泡進最暖那池，水沒過胸口。有個人在對岸看我，看得我渾身發燙，我才招手叫她下來。水一動，身子就貼上了，分不清是誰的熱。」
+    - kind: narration
+      text: 她聲音沉下去，眼裡卻亮著。
+    - kind: speech
+      speaker: host
+      text: 「水最懂怎麼讓人軟。你泡過，就離不開了。」

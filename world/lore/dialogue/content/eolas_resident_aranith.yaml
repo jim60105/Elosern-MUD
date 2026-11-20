@@ -1,0 +1,102 @@
+schema_version: 1
+greeting: 阿拉妮斯正蹲在引水槽邊，抬起頭：「有話說，邊走邊講，我手裡這水不能停。」
+topics:
+- topic_id: eolas_resident_aranith.topic_01
+  keyword: 引水
+  label: 引水
+  fallback:
+    scene_id: eolas_resident_aranith.topic_01_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「這水槽是你修的？」
+    - kind: speech
+      speaker: host
+      text: 「是我看。哪段淤了、哪段漏了，我一摸就曉。槽老了，得常補，不然水一散，谷裡的菜畦就渴。」
+    - kind: narration
+      text: 她拾起一片落葉，順手丟進身側的石縫。
+    - kind: speech
+      speaker: host
+      text: 「水這東西，得讓它順著走。你跟它較勁，它就漫你一腳；順著了，整座谷都聽它安排。」
+- topic_id: eolas_resident_aranith.topic_02
+  keyword: 溪源
+  label: 溪源
+  fallback:
+    scene_id: eolas_resident_aranith.topic_02_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「溪源熱鬧嗎？」
+    - kind: speech
+      speaker: host
+      text: 「清早最熱鬧。擔水、洗菜、飲牲口的人，都擠在那一小片。水聲大，人嗓也大。到了正午，就剩我和幾個補槽的人。」
+    - kind: speech
+      speaker: host
+      text: 「也有不為取水、只想湊個熱鬧的人。谷裡人不怕擠，皮貼著皮也不在乎。你嫌吵，就挑個沒人的早晨去。」
+- topic_id: eolas_resident_aranith.topic_03
+  keyword: 家人
+  label: 家人
+  fallback:
+    scene_id: eolas_resident_aranith.topic_03_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你家裡人都住在這兒？」
+    - kind: speech
+      speaker: host
+      text: 「是。娘約洛溫擔水，妹妹維拉拉洗衣。我管槽。一家人全泡在水裡，連說話都帶水汽。」
+    - kind: narration
+      text: 她笑了笑，露出腕上一道被晒出的分界。
+    - kind: speech
+      speaker: host
+      text: 「夜裡誰也不早睡。灶火、水聲、鼾聲混一起，親得很。」
+- topic_id: eolas_resident_aranith.topic_04
+  keyword: 名字
+  label: 名字
+  fallback:
+    scene_id: eolas_resident_aranith.topic_04_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「『克莉爾瓦特爾』這姓呢？」
+    - kind: speech
+      speaker: host
+      text: 「清水。這家守水，谷裡的水都打溪源過。清得見底，就把這兩個字放進了姓。」
+    - kind: narration
+      text: 她掬起一捧水，低頭照了照自己的臉。
+    - kind: speech
+      speaker: host
+      text: 「水會照人。你湊近點，也能從水裡瞧見自己。」
+- topic_id: eolas_resident_aranith.topic_05
+  keyword: 私語
+  label: 私語
+  requires:
+    kind: affinity_at_least
+    stage_key: trusted
+  unavailable: locked
+  refusal:
+    scene_id: eolas_resident_aranith.topic_05_refusal
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: host
+      text: 「我得先信了你，才把心裡那點事倒出來。再處處看。」
+  fallback:
+    scene_id: eolas_resident_aranith.topic_05_scene
+    revision: r1
+    lines:
+    - kind: speech
+      speaker: actor
+      text: 「你整天守著水，會不會也想要人陪？」
+    - kind: speech
+      speaker: host
+      text: 「想。最想的是只把腳浸在水裡，頭枕著誰的膝，讓那人的手貼著我額頭。水從腳底涼上來，人從耳畔暖下去。」
+    - kind: narration
+      text: 她終於停下手裡的活，直起身看向你。
+    - kind: speech
+      speaker: host
+      text: 「我這人悶，可就這一樣，悶到太久了。你要是懂水，就懂我。」
