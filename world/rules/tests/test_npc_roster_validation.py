@@ -474,6 +474,9 @@ class SyntheticNpcRosterValidationTests(unittest.TestCase):
         self._add_resident(dialogue_key="t_resident_dialogue")
         validate_npc_roster(**self.synth)
 
+    @covers_requirement(
+        "npc-residents::residents-participate-in-source-inventory-and-roster-integrity"
+    )
     def test_each_resident_reference_fault_is_reported_by_key(self):
         for label, overrides, expected in (
             (
@@ -506,6 +509,9 @@ class SyntheticNpcRosterValidationTests(unittest.TestCase):
                 self.assertIn("t_resident", message)
                 self.assertIn(expected, message)
 
+    @covers_requirement(
+        "npc-residents::residents-participate-in-source-inventory-and-roster-integrity"
+    )
     def test_a_resident_profile_shared_with_another_resident_is_reported(self):
         profile = self._add_resident()
         self.synth["residents"]["t_resident_2"] = SimpleNamespace(
@@ -564,6 +570,9 @@ class SyntheticNpcRosterValidationTests(unittest.TestCase):
         self.assertIn("answered by 2 owners", message)
         self.assertIn("t_resident", message)
 
+    @covers_requirement(
+        "npc-residents::residents-participate-in-source-inventory-and-roster-integrity"
+    )
     def test_a_resident_owned_table_resolves_the_resident_slice(self):
         profile = self._add_resident(dialogue_key="t_resident_dialogue")
         owners = derive_shipped_source_owners(

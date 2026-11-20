@@ -11,6 +11,8 @@ import unittest
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
+from tools.spec_traceability import covers_requirement
+
 from elosern_map_core.references import settlement_node_ref
 
 from typeclasses.exits import Exit
@@ -66,6 +68,9 @@ class ResidentPublicRouteTests(EvenniaTest):
         self.patch.start()
         self.addCleanup(self.patch.stop)
 
+    @covers_requirement(
+        "npc-residents::residents-live-in-their-home-and-move-on-a-schedule"
+    )
     def test_route_returns_home_public_and_its_own_frontage(self):
         route = resolve_public_route("t_resident_home", self.settlement, self.public_node)
         self.assertIs(route["home"], self.home)

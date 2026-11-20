@@ -92,6 +92,9 @@ class NpcSourceInventoryContractTests(unittest.TestCase):
             with self.subTest(kind=row.kind, key=row.key):
                 self.assertIn(row.kind, SOURCE_KINDS)
 
+    @covers_requirement(
+        "npc-residents::residents-participate-in-source-inventory-and-roster-integrity"
+    )
     def test_resident_rows_are_derived_from_the_resident_registry(self):
         # The live registry is empty until the content change lands; a
         # synthetic mapping proves the derivation is wired rather than absent.

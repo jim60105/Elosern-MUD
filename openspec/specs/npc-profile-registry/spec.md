@@ -54,7 +54,7 @@ A machine-readable inventory SHALL list every shipped NPC source with the slice 
 
 #### Scenario: The inventory enumerates every source kind
 - **WHEN** the shipped NPC sources are inventoried
-- **THEN** the inventory lists each place host, each dialogue table, each branch-qualified persistent adventurer, each starting-companion declaration, each offline quest template occupant, and each shipped NPC import example
+- **THEN** the inventory lists each place host, each dialogue table, each branch-qualified persistent adventurer, each authored resident, each starting-companion declaration, each offline quest template occupant, and each shipped NPC import example
 
 #### Scenario: Additive normal-person source passes independently
 - **WHEN** a persistent-adventurer source with a valid distinct profile/age pair is added
@@ -62,7 +62,11 @@ A machine-readable inventory SHALL list every shipped NPC source with the slice 
 
 #### Scenario: Persistent adventurer sources are inventoried kinds
 - **WHEN** the shipped NPC sources are inventoried
-- **THEN** the inventory lists each persistent_adventurer source alongside every place host, dialogue table, starting-companion declaration, offline quest template occupant, and shipped NPC import example
+- **THEN** the inventory lists each persistent_adventurer source alongside every place host, dialogue table, resident, starting-companion declaration, offline quest template occupant, and shipped NPC import example
+
+#### Scenario: An unlisted resident fails the check
+- **WHEN** a resident is added to a village resident slice without an inventory row
+- **THEN** the inventory check fails naming that resident's key
 
 ### Requirement: The shipped NPC roster is validated as complete before the game starts
 Before any world synchronization at server start, the system SHALL validate the complete shipped NPC roster and SHALL abort startup when any check fails, reporting every violation with its source kind, source key, and profile or preset key. The same validation SHALL be runnable in tests without a server.
@@ -80,7 +84,7 @@ Before any world synchronization at server start, the system SHALL validate the 
 - **THEN** validation fails naming each profile or preset and the missing voice field
 
 #### Scenario: An orphan profile is reported
-- **WHEN** a synthetic profile is registered that no hosted place or persistent examiner identity references
+- **WHEN** a synthetic profile is registered that no hosted place, persistent adventurer or resident references
 - **THEN** validation fails naming the orphan profile
 
 #### Scenario: All violations are reported together
@@ -110,12 +114,12 @@ Before any world synchronization at server start, the system SHALL validate the 
 - **THEN** each must carry a valid compact card
 
 #### Scenario: Each dialogue table has exactly one profiled host
-- **WHEN** the roster validation pairs dialogue tables with hosted places
-- **THEN** every dialogue table is answered by exactly one profiled hosted place
+- **WHEN** the roster validation pairs dialogue tables with their authored owners
+- **THEN** every dialogue table is answered by exactly one owner: a profiled hosted place, or a profiled resident whose `dialogue_key` names it, and never both
 
 #### Scenario: Scripted hosts and companion presets author their voice
 - **WHEN** the roster validation checks voice authorship
-- **THEN** every profile behind a scripted-dialogue host authors a misunderstanding reply and no greeting (its table greeting is the single source), and every companion partner preset authors a non-empty `speech_style` and `greeting`
+- **THEN** every profile behind a scripted-dialogue host authors a misunderstanding reply and no greeting (its table greeting is the single source), every resident with a dialogue table follows the same rule, every resident without one authors an offline greeting, and every companion partner preset authors a non-empty `speech_style` and `greeting`
 
 #### Scenario: Additive normal-person source passes independently
 - **WHEN** a persistent-adventurer source with a valid distinct profile/age pair is added
@@ -124,6 +128,10 @@ Before any world synchronization at server start, the system SHALL validate the 
 #### Scenario: Persistent adventurers must resolve to valid cards
 - **WHEN** the roster validation walks every persistent-adventurer source
 - **THEN** each must resolve to a profile with a valid compact card
+
+#### Scenario: Resident sources are validated before any write
+- **WHEN** a resident references an unregistered profile, a missing dialogue table, a profile shared with another source, or an unknown schedule template
+- **THEN** validation fails naming the resident key and the offending reference, and no world synchronization runs
 
 ### Requirement: Every shipped host and examiner profile authors a bounded age pair
 Each shipped persistent-adventurer, place-host and guild-examiner profile SHALL author explicit canonical `age` and `apparent_age` integers, rejecting booleans and values outside inclusive 0..10000. Invalid authored ages SHALL reject source loading/preflight before creation writes and name the owning profile.

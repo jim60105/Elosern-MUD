@@ -14,6 +14,8 @@ from unittest.mock import patch
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
+from tools.spec_traceability import covers_requirement
+
 from typeclasses.exits import Exit
 from typeclasses.npcs import LLMNPC
 from typeclasses.rooms import Room
@@ -183,6 +185,9 @@ class ResidentSyncTests(EvenniaTest):
             public_nodes=public_nodes or {"t_hollow_tarn": "t_public_node"},
         )
 
+    @covers_requirement(
+        "npc-residents::resident-construction-is-persistent-and-chat-capable"
+    )
     def test_first_sync_creates_a_complete_chat_only_resident(self):
         profile = _profile("t_resident_profile", greeting="t-greeting")
         resident = _resident("t_resident_a", "t_resident_profile", home="t_home")
@@ -225,6 +230,9 @@ class ResidentSyncTests(EvenniaTest):
         self.assertIsNone(live.service_binding)
         self.assertIsNone(live.anchor_room_id)
 
+    @covers_requirement(
+        "npc-residents::residents-live-in-their-home-and-move-on-a-schedule"
+    )
     def test_a_new_resident_starts_home_and_walks_the_schedule(self):
         create_object(Exit, key="out", location=self.home, destination=self.public)
         create_object(Exit, key="in", location=self.public, destination=self.home)
@@ -243,6 +251,9 @@ class ResidentSyncTests(EvenniaTest):
         settle_npc_schedules(25200, 61200)
         self.assertIs(host.location, self.home)
 
+    @covers_requirement(
+        "npc-residents::resident-construction-is-persistent-and-chat-capable"
+    )
     def test_resync_reuses_the_resident_and_preserves_edits(self):
         profile = _profile("t_resident_profile", greeting="t-greeting")
         resident = _resident("t_resident_a", "t_resident_profile", home="t_home")
@@ -267,6 +278,9 @@ class ResidentSyncTests(EvenniaTest):
             1,
         )
 
+    @covers_requirement(
+        "npc-residents::residents-participate-in-source-inventory-and-roster-integrity"
+    )
     def test_two_live_npcs_claiming_one_identity_reject_before_any_write(self):
         create_object(LLMNPC, key="t-one").attributes.add(RESIDENT_ATTRIBUTE, "t_resident_a")
         create_object(LLMNPC, key="t-two").attributes.add(RESIDENT_ATTRIBUTE, "t_resident_a")
@@ -349,6 +363,9 @@ class ResidentSyncTests(EvenniaTest):
         with self.assertRaises(ServiceHostIntegrityError):
             _find_service_host("t_shared_profile")
 
+    @covers_requirement(
+        "npc-residents::residents-converse-without-hosting-a-service"
+    )
     def test_a_locked_topic_discloses_only_its_label_and_refusal(self):
         profile = _profile("t_resident_profile", greeting=None)
         resident = _resident(
