@@ -21,7 +21,7 @@
 | 資料域 | 欄位 | 內容 |
 |---|---|---|
 | 身份 | `key`、`display_name`、`age`、`apparent_age`、`race`、`subrace`、`sex` | registry 鍵、顯示名、實際與外表年齡、種族亞種、性別 |
-| 配點 | `allocations`、`emphasis` | 七軸原始配點與一句話配點說明 |
+| 配點 | `allocations`、`emphasis` | 七軸配點（各軸不超過其點數上限）與一句話配點說明 |
 | 技能 | `active_skills`、`passive_skills`、`skill_proficiency`、`affinity_elements` | 主動／被動技能鍵、宣告式練習 XP、開局親附屬性 |
 | 物品與裝備 | `starting_items`、`starting_equipment` | 開局攜帶清單，以及其中開局就穿上的子集 |
 | 人格 | `persona` | import-card 形狀的七鍵人格（見 §3 Step 2） |
@@ -39,11 +39,11 @@
 
 | 路徑 | 數值宣告 | 驗證 | 文件 |
 |---|---|---|---|
-| 模板（本文） | `allocations`：七軸各 0～軸跨度，總和必須恰好等於該 race＋subrace 設定檔的預算 | lore CI 測試 `world/lore/tests/test_player_presets.py` 釘住每張卡的總和與跨度；啟動時 `_validate_allocations()` 再驗一次 | 本指南 |
+| 模板（本文） | `allocations`：七軸各 0～該軸點數上限（可能小於 lore 跨度），總和必須恰好等於該 race＋subrace 設定檔的預算 | lore CI 測試 `world/lore/tests/test_player_presets.py` 釘住每張卡的總和與點數上限；啟動時 `_validate_allocations()` 再驗一次 | 本指南 |
 | 自訂建立 | 同樣是 `allocations`，由玩家逐軸輸入 | `preflight_character_creation()` 即時驗證 | [角色建立與匯入](/gm/characters) 下半部 |
 | JSON 匯入卡 | 絕對 `stats`（直接給最終值） | `CHARACTER_SCHEMA_V1` 結構與語意驗證 | [角色建立與匯入](/gm/characters) 上半部 |
 
-模板為何宣告**配點**而匯入卡宣告**絕對數值**？配點政策由 `resolve_starting_profile(race_key, subrace_key, mode=...)` 完全從不可變 lore 推導：七軸上下界取自種族的 `vital_baseline`／`static_baseline`，亞種的 `vital_overrides` 可以覆寫邊界。`mode` 必須明講，因為兩條路徑的政策不同。**模板卡**（以及非精靈的自訂建立）走每點一單位的政策（`mode="preset"`）：各軸點數上限就是該軸跨度，預算是各軸跨度總和除以二無條件捨去（`sum(span) // 2`）。**精靈的自訂建立**走 `mode="custom"` 的專屬政策：生命、魔力、體力三軸不可配點，三個物理軸仍每點一單位，預算等於三個物理軸跨度之和（出廠值 75），`magic_power` 的點數上限等於該預算，並在套用亞種修正前由 lore 下限內插到建立上限 200。卡宣告的是「花多少預算」，啟動時 `_resolve_values()` 才把配點換算成絕對值（再乘上亞種對三個物理軸的靜態修正；`magic_power` 可配但無修正，啟動後 `guild_merit` 釘 0）。若模板直接寫絕對值，種族魔力帶一改，卡的實際價值就悄悄漂移；宣告配點讓同設定檔的每張卡付出同一個預算，價值由規則層機械性保證。匯入卡走的是另一套機制：它是內容作者與 NPC 的路徑，沒有預算算術，`disguised_stats` 的鍵必須是 `stats` 子集之類的規則是匯入路徑專屬，模板路徑無法照抄（模板宣告配點，沒有絕對 `stats` 可比）。
+模板為何宣告**配點**而匯入卡宣告**絕對數值**？配點政策由 `resolve_starting_profile(race_key, subrace_key)` 完全從不可變 lore 推導，而且只由解析後的種族決定，自訂建立與模板卡共用同一套。七軸上下界取自種族的 `vital_baseline`／`static_baseline`，亞種的 `vital_overrides` 可以覆寫邊界。**非精靈**走每點一單位：各軸點數上限就是該軸的 lore 跨度，預算是七軸跨度總和除以二無條件捨去（`sum(span) // 2`）。**精靈**（自訂建立與模板卡都一樣）走精靈政策：生命、魔力、體力三軸不可配點，三個物理軸仍每點一單位，預算是三個物理軸跨度之和（出廠值 75），`magic_power` 的點數上限等於該預算，但它的 lore 跨度是 800；點數在套用亞種修正前，由 lore 下限內插到建立上限 200。精靈的一點魔力不是一點魔力值，而是把 `(200 − 下界) × 點數 ÷ 預算` 換算成魔力值。卡宣告的是「花多少預算」，啟動時 `_resolve_values()` 才把配點換算成絕對值（再乘上亞種對三個物理軸的靜態修正；`magic_power` 可配但無修正，啟動後 `guild_merit` 釘 0）。若模板直接寫絕對值，種族魔力帶一改，卡的實際價值就悄悄漂移；宣告配點讓同設定檔的每張卡付出同一個預算，價值由規則層機械性保證。匯入卡走的是另一套機制：它是內容作者與 NPC 的路徑，沒有預算算術，`disguised_stats` 的鍵必須是 `stats` 子集之類的規則是匯入路徑專屬，模板路徑無法照抄（模板宣告配點，沒有絕對 `stats` 可比）。
 
 ### 開局位置
 
@@ -53,8 +53,8 @@
 
 ## 2. 事前決定：寫卡之前要回答的四個問題
 
-1. 種族與亞種選哪個？`race` 必須在 `RACE_REGISTRY`、`subrace` 必須在 `SUBRACE_REGISTRY` 且屬於該種族，每張模板卡都必須帶亞種（沒有「無亞種」卡）。先用 `resolve_starting_profile(race, subrace, mode="preset")` 看清這個配對的預算與各軸點數上限。卡上的 `sex` 也受 `RACE_REGISTRY[race].allowed_sexes` 限制：精靈只有 `female`，精靈卡宣告 `male` 或 `other` 會在載入期被 `_validate_preset_sex` 拒收，因此種族與性別要一起決定。
-2. 配點怎麼分？預算由設定檔決定（人類模板設定檔目前是 224），七軸各在 0～該軸點數上限內取，總和不許差一。模板卡一律使用 `mode="preset"` 的每點一單位政策；只有精靈的**自訂**建立使用內插政策，兩者不可混用。`allocations` 記的是**對該軸下限的增量，不是最終值**：啟動時最終值 = 該軸下界 + 配點，物理三軸（`atk_phys`／`agility`／`defense`）再乘上亞種的靜態修正，`magic_power` 可配但無修正（成長重設計 D-A5 已刪除種族平均取樣器，因此魔力仍完全由作者手寫決定）。作者不要把配點當成絕對值：精靈卡寫 `("magic_power", 377)`，開局實際魔力是 477。
+1. 種族與亞種選哪個？`race` 必須在 `RACE_REGISTRY`、`subrace` 必須在 `SUBRACE_REGISTRY` 且屬於該種族，每張模板卡都必須帶亞種（沒有「無亞種」卡）。先用 `resolve_starting_profile(race, subrace)` 看清這個配對的預算與各軸點數上限。卡上的 `sex` 也受 `RACE_REGISTRY[race].allowed_sexes` 限制：精靈只有 `female`，精靈卡宣告 `male` 或 `other` 會在載入期被 `_validate_preset_sex` 拒收，因此種族與性別要一起決定。
+2. 配點怎麼分？預算由設定檔決定（人類模板設定檔目前是 224），七軸各在 0～該軸點數上限內取，總和不許差一。非精靈模板卡走每點一單位政策；精靈模板卡與精靈的自訂建立共用精靈政策，魔力點數會被換算而不是直接相加。`allocations` 記的是**配點，不是最終值**：非精靈的最終值 = 該軸下界 + 配點；精靈的物理三軸（`atk_phys`／`agility`／`defense`）同樣是下界 + 配點，再乘上亞種的靜態修正，`magic_power` 則依上述比例換算且無修正（成長重設計 D-A5 已刪除種族平均取樣器，因此魔力仍完全由作者手寫決定）。作者不要把配點當成絕對值：精靈卡寫 `("magic_power", 15)`，開局實際魔力是 120。
 3. 技能組牽涉哪些血脈前置？宣告的 kit 在啟動時由 `lineage_ownership_closure()` 補齊前置鏈、再由 `seed_lineage_proficiency()` 把未滿足的前置邊播到恰好達標。作者只需宣告核心技能，前置交給閉包；要改變某條邊的練習值，才需要 `skill_proficiency`。技能若宣告必要種族能力 `can_use_divine_arts`，種族設定檔就必須提供該能力，否則載入時拒絕。
 4. 這張卡需不需要隱藏身分層與夥伴？`persona` 的 `identity` 有公開／隱秘兩層，隱秘層供 PersonaStore 渲染；`starting_companions` 的每筆指向夥伴**自己**的 registry 卡，所以夥伴得先作為一張可選卡存在（雙胞胎互宣告就是這個形）。
 
@@ -68,12 +68,18 @@
 
 ```python
 from world.rules.starting_policy import resolve_starting_profile
-profile = resolve_starting_profile("human", "human_plains", mode="preset")
+profile = resolve_starting_profile("human", "human_plains")
 print(profile.budget)        # 目前人類模板為 224
 print(profile.axes_dict())   # 七軸各自的 Lore 下界、Lore 上界、點數上限與上限對應值
+
+elf_profile = resolve_starting_profile("elf", "ciaran")
+magic = elf_profile.axes_dict()["magic_power"]
+print(elf_profile.budget)    # 75：三個物理軸跨度之和
+print(magic.point_cap)       # 75：可花的魔力點數，不是 800 的 lore 跨度
+print(magic.value_for(15))   # 120：點數換算成魔力值
 ```
 
-`allocations` 的每一項是 `("軸名", 值)` 成對，值取 0～該軸跨度，七軸必須齊全。
+`allocations` 的每一項是 `("軸名", 值)` 成對，值取 0～該軸的點數上限（`point_cap`），七軸必須齊全。
 
 ### Step 1 — 寫入 `PLAYER_PRESET_REGISTRY` 一筆
 
@@ -159,7 +165,7 @@ uv run --locked python -m tools.spec_traceability check
 | `_validate_preset_persona_lengths` | `character_creation` 匯入 | persona record 任何字串超過 600 碼點 | `exceeds the 600-character length cap` |
 | `_validate_preset_companion_bounds` | `starting_companions` 匯入 | 夥伴數超過 `PARTY_MAX_COMPANIONS`（4）、`affinity` 不在 1～`NATURAL_CAP`（99）或為 bool、合成最大擁有者名推導出的人物卡違反精簡角色卡契約（必填葉非空、單葉 ≤600、區塊 ≤2000） | `more than the party cap 4`／`outside 1..99`／`derived card violates contract` |
 
-配點預算的精確性**不在**匯入期驗證器之列：`world/lore/tests/test_player_presets.py` 在 CI 釘住每張卡總和等於預算、逐軸不超跨度，啟動時 `_validate_allocations()` 會以 `allocations must sum exactly to <預算>` 拒收壞卡。卡摘要超過 256 碼點則由 `tests/test_creation_parity_contract.py` 在 repo 契約測試層抓。
+配點預算的精確性**不在**匯入期驗證器之列：`world/lore/tests/test_player_presets.py` 在 CI 釘住每張卡總和等於預算、逐軸不超點數上限，啟動時 `_validate_allocations()` 會以 `allocations must sum exactly to <預算>` 拒收壞卡。卡摘要超過 256 碼點則由 `tests/test_creation_parity_contract.py` 在 repo 契約測試層抓。
 
 「非神性種族不得帶偽裝層」這條規則同樣適用於 JSON 匯入路徑，`world/imports/validate.py` 對 JSON 匯入卡跑同一個不變式，觸發於 `validate_batch()`／`validate_character()`，錯誤以 `RecordReport` 的拒收（rejection）回報，不拖到建構：
 
