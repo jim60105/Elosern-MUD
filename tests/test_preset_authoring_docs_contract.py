@@ -163,6 +163,9 @@ class PresetAuthoringGuideContractTests(unittest.TestCase):
         # Distinct from the omitting-sex row, which is about construction.
         self.assertNotIn("漏寫", elf_sex_rows[0])
 
+    @covers_requirement(
+        "preset-authoring-docs::the-guide-distinguishes-allocation-point-caps-from-stat-spans"
+    )
     def test_the_guide_distinguishes_point_caps_from_stat_spans(self):
         guide = GUIDE_PATH.read_text(encoding="utf-8")
         # A preset author must not read an elf's 800-wide magic lore span as
