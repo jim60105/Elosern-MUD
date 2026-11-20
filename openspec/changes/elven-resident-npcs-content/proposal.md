@@ -26,7 +26,7 @@
 
 ## Impact
 
-- 內容檔：`world/lore/npc_profiles/`（居民切片）、`world/lore/dialogue/content/`（45 表）、`world/lore/`（`RESIDENT_REGISTRY` 資料列）、`content/maps/interiors/`（45 家）、`content/map-editor-layouts/`。
+- 內容檔：`world/lore/npc_profiles/`（居民切片）、`world/lore/dialogue/content/`（45 表）、`world/lore/`（`RESIDENT_REGISTRY` 資料列）、`content/maps/interiors/`（15 個家庭屋，每村 5 個，各住母女三人）、`content/map-editor-layouts/`。
 - 登錄：`world/lore/npc_profiles/inventory.py`（45 筆 `resident`）、`docs/development/npc-editorial-review.md`（45 筆）。
 - 衍生物：`content/map-reference-context.json`（重新產生）。
 - 不碰引擎程式碼、loader、shared 註冊清單、`npc_schedules.yaml`、`places*.py`。
