@@ -20,7 +20,7 @@
 
 ### Modified Capabilities
 
-<!-- 無。 -->
+- `npc-profile-registry`: 出貨 NPC 來源名冊新增封閉的 `resident` 種類，來源完整性與啟動名冊門禁把居民納入身分、孤設定檔／孤表與單一對話擁有者檢查。
 
 ## Impact
 

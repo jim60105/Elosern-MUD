@@ -62,7 +62,7 @@ Frozen `Resident` dataclass + `RESIDENT_REGISTRY`（初始可為空，內容改�
 
 ### D3 — Generalise the residence route to home ↔ public space
 
-`resolve_residence_route(home_key, guild_key)` 現把第二端點硬編碼為共街面的公會 place。泛化（或並列一個 resolver）使其第二端點是村內**公共空間 room**（同 settlement node），回傳同一 `{home, public, frontage}` 形狀供作息覆寫器使用。居民 `home_room` 是內室 room ID，解析為 materialized `Room`；作息條目沿用既有 `move` kind 走既有結算路徑。每戶家保有通往村街道／公共 node 的真實 Exit 以利結算穿越。公共空間可被多位居民共用。
+`resolve_residence_route(home_key, guild_key)` 現把第二端點硬編碼為共街面的公會 place。泛化（或並列一個 resolver）使其第二端點是村內**公共空間 room**（同 settlement node），回傳同一 `{home, public, frontage}` 形狀供作息覆寫器使用。居民 `home_room` 是內室 room ID，解析為 materialized `Room`；作息條目沿用既有 `move` kind 走既有結算路徑。內室 schema 只允許一個外門（`exterior`），所以該門所在的 settlement node 就是居民唯一的徒步出口：`home_room` 的外門必須開在該村宣告的公共節點上，public 與 frontage 因此是同一個 grid room（內容改變負責把每戶的門廊節點對齊宣告）。每戶家保有通往村街道／公共 node 的真實 Exit 以利結算穿越。公共空間可被多位居民共用。
 
 ### D4 — Chat-only dialogue wiring
 

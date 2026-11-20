@@ -529,6 +529,84 @@ def resolve_residence_route(home_key: str, guild_key: str) -> dict:
     return rooms
 
 
+def resolve_public_route(
+    home_room_id: str, settlement_key: str, public_node: str
+) -> dict:
+    """Resolve a resident home's authored route to its village public node.
+
+    An authored permanent interior declares exactly one exterior doorway; that
+    doorway is a home's only authored exit onto the settlement, so the node it
+    opens onto must be the village's declared public-space node. The public
+    room is that doorway's grid room and is also the home's ``frontage``:
+    schedule settlement walks an NPC one direct Exit per ``move`` entry, so home
+    and public space must lie one doorway apart in exactly this way.
+
+    Returns ``{home, public, frontage}`` with ``public`` and ``frontage`` the
+    same materialized grid room. A missing or ambiguous room, a doorway onto
+    another settlement or another node, or a missing scheduled Exit either way
+    rejects with a named ``ValueError`` before any NPC write.
+    """
+    from evennia.objects.objects import DefaultExit
+    from evennia.utils.search import search_object_by_tag
+
+    from typeclasses.exits import MovementCostMixin
+    from world.maps import interiors
+
+    matches = [
+        obj for obj in search_object_by_tag(home_room_id) if isinstance(obj, Room)
+    ]
+    if len(matches) != 1:
+        raise ValueError(
+            f"resident home {home_room_id!r} resolves to {len(matches)} rooms"
+        )
+    home = matches[0]
+    exterior = interiors.exterior_for(home_room_id)
+    if exterior is None:
+        raise ValueError(
+            f"resident home {home_room_id!r} declares no exterior doorway"
+        )
+    if (exterior.settlement, exterior.node) != (settlement_key, public_node):
+        raise ValueError(
+            f"resident home {home_room_id!r} opens onto "
+            f"{exterior.settlement!r}/{exterior.node!r}, not the declared public "
+            f"node {settlement_key!r}/{public_node!r}"
+        )
+    public_rooms = list(
+        GridRoom.objects.filter_xyz(
+            xyz=settlement_node_xyz(
+                settlement_node_ref(settlement_key, public_node),
+                source=f"resident public node {settlement_key!r}/{public_node!r}",
+            )
+        )
+    )
+    if len(public_rooms) != 1:
+        raise ValueError(
+            f"resident public node {settlement_key!r}/{public_node!r} resolves "
+            f"to {len(public_rooms)} rooms"
+        )
+    public = public_rooms[0]
+
+    def _eligible_exit(source, target) -> bool:
+        if source is target:
+            return False
+        return any(
+            exit_obj.destination is target
+            and type(exit_obj).at_traverse
+            in (DefaultExit.at_traverse, MovementCostMixin.at_traverse)
+            for exit_obj in source.exits
+        )
+
+    if not _eligible_exit(home, public):
+        raise ValueError(
+            f"resident home {home_room_id!r} route lacks home->public Exit"
+        )
+    if not _eligible_exit(public, home):
+        raise ValueError(
+            f"resident home {home_room_id!r} route lacks public->home Exit"
+        )
+    return {"home": home, "public": public, "frontage": public}
+
+
 def sync_limbo() -> None:
     """Converge the starting room (Limbo) onto its zh-tw identity idempotently.
 

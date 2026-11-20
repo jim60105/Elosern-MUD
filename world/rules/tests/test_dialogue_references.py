@@ -30,6 +30,7 @@ from world.lore.items import ITEM_REGISTRY
 from world.lore.npc_profiles import NPC_PROFILE_REGISTRY
 from world.lore.player_presets import PLAYER_PRESET_REGISTRY
 from world.lore.races import RACE_REGISTRY
+from world.lore.residents import RESIDENT_REGISTRY
 from world.lore.settlements.places import PLACE_REGISTRY, place_is_hostless
 from world.lore.social_identities import SOCIAL_IDENTITY_REGISTRY
 from world.quests.catalog import QUEST_CATALOG
@@ -87,6 +88,8 @@ class StaticDialogueReferencesTests(unittest.TestCase):
                 place.host_name
             )
         for row in ADVENTURER_REGISTRY.values():
+            canonical_names.setdefault(row.profile_key, set()).add(row.name)
+        for row in RESIDENT_REGISTRY.values():
             canonical_names.setdefault(row.profile_key, set()).add(row.name)
 
         profile_table = self.references.tables["profile"]

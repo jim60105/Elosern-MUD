@@ -11,6 +11,7 @@ from __future__ import annotations
 import unittest
 
 from world.lore.dialogue import DIALOGUE_SNAPSHOT
+from world.lore.residents import RESIDENT_REGISTRY
 from world.lore.settlements.places import place_dialogue_keys
 import world.lore.settlements.places_altoria_lower as pal
 import world.lore.settlements.places_altoria_middle as pam
@@ -22,13 +23,22 @@ def _keys(rows) -> set[str]:
     return {key for place in rows for key in place_dialogue_keys(place)}
 
 
+def _resident_keys() -> set[str]:
+    """Every dialogue table an authored resident owns."""
+    return {
+        resident.dialogue_key
+        for resident in RESIDENT_REGISTRY.values()
+        if resident.dialogue_key
+    }
+
+
 class AltoriaDialogueSplitContractTests(unittest.TestCase):
     """The terrace split of Altoria dialogue tables preserves assembly order and terrace alignment."""
 
     def test_assembled_dialogue_snapshot_contains_every_bound_table(self):
         from world.lore.settlements.places import PLACE_REGISTRY
 
-        bound = _keys(PLACE_REGISTRY.values())
+        bound = _keys(PLACE_REGISTRY.values()) | _resident_keys()
         self.assertTrue(bound)
         self.assertEqual(len(DIALOGUE_SNAPSHOT), len(bound))
 
@@ -48,5 +58,5 @@ class AltoriaDialogueSplitContractTests(unittest.TestCase):
         upper_places = _keys(pau.ROWS)
         from world.lore.settlements.places import PLACE_REGISTRY
 
-        all_bound_keys = _keys(PLACE_REGISTRY.values())
+        all_bound_keys = _keys(PLACE_REGISTRY.values()) | _resident_keys()
         self.assertEqual(set(DIALOGUE_SNAPSHOT.keys()), all_bound_keys)

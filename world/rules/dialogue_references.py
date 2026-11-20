@@ -99,12 +99,13 @@ def _profile_names() -> dict[str, set[str]]:
     """Map each registered profile key to its canonical authored public names.
 
     A profile's public name is authored by the sources that materialize it, so
-    the catalog reads exactly those rows: a place's service-host name and a
-    persistent adventurer's own name. Persona cards and display names are
-    never consulted -- a profile whose name is unregistered or whose rows
-    disagree is not a resolvable companion reference.
+    the catalog reads exactly those rows: a place's service-host name, a
+    persistent adventurer's own name and a resident's authored name. Persona
+    cards and display names are never consulted -- a profile whose name is
+    unregistered or whose rows disagree is not a resolvable companion reference.
     """
     from world.lore.guild_adventurers import ADVENTURER_REGISTRY
+    from world.lore.residents import RESIDENT_REGISTRY
     from world.lore.settlements.places import PLACE_REGISTRY, place_is_hostless
 
     names: dict[str, set[str]] = {}
@@ -123,6 +124,8 @@ def _profile_names() -> dict[str, set[str]]:
             continue
         _add(place.host_profile_key, place.host_name)
     for row in ADVENTURER_REGISTRY.values():
+        _add(row.profile_key, row.name)
+    for row in RESIDENT_REGISTRY.values():
         _add(row.profile_key, row.name)
     return names
 

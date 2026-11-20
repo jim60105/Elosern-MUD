@@ -25,6 +25,7 @@ from world.lore.guild_adventurers import ADVENTURER_REGISTRY, EXAM_QUALIFICATION
 from world.lore.npc_card import NpcCard
 from world.lore.npc_profiles import NPC_PROFILE_REGISTRY
 from world.lore.player_presets import PLAYER_PRESET_REGISTRY
+from world.lore.residents import RESIDENT_REGISTRY
 from world.lore.settlements.places import PLACE_REGISTRY, place_dialogue_keys
 from world.rules.npc_roster_validation import derive_shipped_sources
 
@@ -144,15 +145,36 @@ class NpcHostCharacterizationContractTests(unittest.TestCase):
                 key, table_hosts, f"{place.host_profile_key} references {key!r}"
             )
             table_hosts[key].append(place)
+        resident_owners: dict[str, list[str]] = {}
+        for resident in RESIDENT_REGISTRY.values():
+            if not resident.dialogue_key:
+                continue
+            self.assertIn(
+                resident.dialogue_key,
+                table_hosts,
+                f"resident {resident.key} references {resident.dialogue_key!r}",
+            )
+            resident_owners.setdefault(resident.dialogue_key, []).append(resident.key)
         for table_key, hosts in table_hosts.items():
             with self.subTest(table=table_key):
-                self.assertEqual(
-                    len(hosts),
-                    1,
-                    f"table {table_key!r} must be answered by exactly one profiled host, "
-                    f"got {[h.host_profile_key for h in hosts]}",
+                owners = [h.host_profile_key for h in hosts] + resident_owners.get(
+                    table_key, []
                 )
-                self.assertIn(hosts[0].host_profile_key, NPC_PROFILE_REGISTRY)
+                self.assertEqual(
+                    len(owners),
+                    1,
+                    f"table {table_key!r} must be answered by exactly one owner, "
+                    f"got {owners}",
+                )
+                if hosts:
+                    self.assertIn(hosts[0].host_profile_key, NPC_PROFILE_REGISTRY)
+                else:
+                    resident = next(
+                        row
+                        for row in RESIDENT_REGISTRY.values()
+                        if row.dialogue_key == table_key
+                    )
+                    self.assertIn(resident.profile_key, NPC_PROFILE_REGISTRY)
 
     @covers_requirement(
         "npc-profile-registry::every-registry-derived-host-has-complete-individual-characterization"
@@ -187,16 +209,24 @@ class NpcHostCharacterizationContractTests(unittest.TestCase):
     def test_every_other_source_kind_carries_its_characterization_input(self):
         sources = derive_shipped_sources(quest_templates=QUEST_TEMPLATE_POOL)
         kinds = {kind for kind, _ in sources}
+        expected_kinds = {
+            "place_host",
+            "dialogue_table",
+            "persistent_adventurer",
+            "starting_companion",
+            "quest_template_occupant",
+            "import_example",
+            "resident",
+        }
+        if not RESIDENT_REGISTRY:
+            # The resident slices ship empty until elven-resident-npcs-content
+            # fills them, so the shipped derivation legitimately enumerates no
+            # resident yet; the inventory contract test proves the branch.
+            expected_kinds.discard("resident")
         self.assertEqual(
             kinds,
-            {
-                "place_host",
-                "dialogue_table",
-                "persistent_adventurer",
-                "starting_companion",
-                "quest_template_occupant",
-                "import_example",
-            },
+            expected_kinds,
+            "the shipped derivation does not enumerate every source kind",
         )
         for kind, key in sorted(sources):
             if kind == "starting_companion":
@@ -220,6 +250,12 @@ class NpcHostCharacterizationContractTests(unittest.TestCase):
                     persona = record["persona"]
                     self.assertIsInstance(persona, dict)
                     self.assertTrue(persona)
+            elif kind == "resident":
+                with self.subTest(source=key):
+                    resident = RESIDENT_REGISTRY[key]
+                    self.assertIn(resident.profile_key, NPC_PROFILE_REGISTRY)
+                    if resident.dialogue_key:
+                        self.assertIn(resident.dialogue_key, DIALOGUE_ROWS)
 
 
 def _example_path(stem: str):

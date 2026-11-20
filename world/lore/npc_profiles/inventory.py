@@ -14,13 +14,14 @@ from dataclasses import dataclass
 class NpcSource:
     """One shipped NPC source and the content-change slice that owns its persona.
 
-    ``kind`` is one of six closed source kinds, each keyed differently:
+    ``kind`` is one of seven closed source kinds, each keyed differently:
     ``place_host`` (keyed by the place's ``service_id``), ``dialogue_table``
     (keyed by the table's ``dialogue_key``), ``starting_companion`` (keyed
     ``<declaring preset>:<partner preset>``), ``quest_template_occupant``
     (keyed ``<template name>:<stage index>:<position in that stage's
     npc_reqs>``), and ``import_example`` (keyed by the example file's stem).
-    ``persistent_adventurer`` is keyed by authored person identity.
+    ``persistent_adventurer`` is keyed by authored person identity, and
+    ``resident`` is keyed by the authored resident key.
     ``owner`` is the owning content change's slice label.
     """
 

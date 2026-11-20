@@ -26,15 +26,16 @@ from world.rules.npc_roster_validation import (
     derive_shipped_sources,
 )
 
-# The closed source vocabulary, including persistent normal people. This is the
-# authored kind vocabulary the inventory rows may name, not an owner or count
-# list: the kinds it declares are the six relationships the roster validator
-# knows how to check.
+# The closed source vocabulary, including persistent normal people and
+# chat-only residents. This is the authored kind vocabulary the inventory rows
+# may name, not an owner or count list: the kinds it declares are the seven
+# relationships the roster validator knows how to check.
 SOURCE_KINDS = frozenset(
     {
         "place_host",
         "dialogue_table",
         "persistent_adventurer",
+        "resident",
         "starting_companion",
         "quest_template_occupant",
         "import_example",
@@ -91,6 +92,15 @@ class NpcSourceInventoryContractTests(unittest.TestCase):
             with self.subTest(kind=row.kind, key=row.key):
                 self.assertIn(row.kind, SOURCE_KINDS)
 
+    def test_resident_rows_are_derived_from_the_resident_registry(self):
+        # The live registry is empty until the content change lands; a
+        # synthetic mapping proves the derivation is wired rather than absent.
+        derived = derive_shipped_sources(
+            quest_templates=QUEST_TEMPLATE_POOL,
+            residents={"t_resident": object()},
+        )
+        self.assertIn(("resident", "t_resident"), derived)
+
 
 class ShippedProfileRegistryImmutabilityTests(unittest.TestCase):
     """The shipped, assembled profile registry is a read-only mapping.
@@ -114,6 +124,7 @@ class ShippedProfileRegistryImmutabilityTests(unittest.TestCase):
     )
     def test_every_shipped_host_and_person_profile_authors_a_bounded_age_pair(self):
         from world.lore.guild_adventurers import ADVENTURER_REGISTRY
+        from world.lore.residents import RESIDENT_REGISTRY
         from world.lore.settlements.places import PLACE_REGISTRY
 
         # The compared sets are derived from the live place and person records,
@@ -124,7 +135,8 @@ class ShippedProfileRegistryImmutabilityTests(unittest.TestCase):
             if place.host_profile_key is not None
         }
         person_profiles = {row.profile_key for row in ADVENTURER_REGISTRY.values()}
-        for profile_key in sorted(host_keys | person_profiles):
+        resident_profiles = {row.profile_key for row in RESIDENT_REGISTRY.values()}
+        for profile_key in sorted(host_keys | person_profiles | resident_profiles):
             with self.subTest(profile_key=profile_key):
                 self.assertIn(profile_key, NPC_PROFILE_REGISTRY)
                 profile = NPC_PROFILE_REGISTRY[profile_key]
@@ -132,11 +144,15 @@ class ShippedProfileRegistryImmutabilityTests(unittest.TestCase):
                 self.assertIs(type(profile.apparent_age), int)
                 self.assertTrue(0 <= profile.age <= 10000)
                 self.assertTrue(0 <= profile.apparent_age <= 10000)
-        # A normal person owns a profile of their own; a place host keeps its
-        # own identity. Neither may reuse the other's profile.
+        # A normal person and a resident each own a profile of their own; a
+        # place host keeps its own identity. None may reuse another's profile.
         self.assertFalse(person_profiles & host_keys)
+        self.assertFalse(resident_profiles & (host_keys | person_profiles))
         self.assertEqual(
-            {PROFILE_KEY_SLICES[key] for key in host_keys | person_profiles},
+            {
+                PROFILE_KEY_SLICES[key]
+                for key in host_keys | person_profiles | resident_profiles
+            },
             set(PROFILE_SLICE_LABELS),
         )
 
