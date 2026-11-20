@@ -291,9 +291,10 @@ class ItemMechanicsTests(unittest.TestCase):
         self.assertIsNone(potion.equipment_slot)
         self.assertIs(ITEM_REGISTRY["plain_sword"].equipment_slot, EquipmentSlot.WEAPON_MAIN)
         self.assertIsNone(ITEM_REGISTRY["plain_sword"].use_mechanics)
-        # Inspect-only items declare neither form.
-        self.assertIsNone(ITEM_REGISTRY["meal"].use_mechanics)
-        self.assertIsNone(ITEM_REGISTRY["meal"].equipment_slot)
+        # A definition that authors neither form declares neither.
+        inert = self._definition()
+        self.assertIsNone(inert.use_mechanics)
+        self.assertIsNone(inert.equipment_slot)
 
     def test_mutable_use_definition_rejects_malformed_members(self):
         # The effect-key field no longer exists at all (add-declarative-

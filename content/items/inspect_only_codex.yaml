@@ -10,6 +10,12 @@ items:
       icon_key: food
       rarity: common
       summary_zh: 礦工下坑必帶的黑麥硬麵包，耐嚼且扛餓。
+    use_mechanics:
+      consumable: true
+      combat_allowed: false
+      effects:
+        - stat: sp
+          amount: 8
   - key: adventurer_field_ration
     display_name_zh: 冒險者攜行口糧
     price_table_key: meal
@@ -19,6 +25,12 @@ items:
       icon_key: food
       rarity: common
       summary_zh: 公會統一配發的壓縮口糧，D 級以下的常見配給。
+    use_mechanics:
+      consumable: true
+      combat_allowed: false
+      effects:
+        - stat: sp
+          amount: 12
   - key: imperial_candied_fruit
     display_name_zh: 帝國蜜漬果乾
     price_table_key: specialty_food
@@ -28,6 +40,12 @@ items:
       icon_key: food
       rarity: common
       summary_zh: 東南港口特產的蜜漬水果乾，耐放又香甜。
+    use_mechanics:
+      consumable: true
+      combat_allowed: false
+      effects:
+        - stat: mp
+          amount: 6
   - key: beastfolk_smoked_jerky
     display_name_zh: 獸王國燻獸肉乾
     price_table_key: specialty_food
@@ -37,6 +55,14 @@ items:
       icon_key: food
       rarity: common
       summary_zh: 高地獵手以獵物燻製而成的肉乾，蛋白質豐富。
+    use_mechanics:
+      consumable: true
+      combat_allowed: false
+      effects:
+        - stat: hp
+          amount: 6
+        - stat: sp
+          amount: 14
   - key: harbor_lobster_bisque
     display_name_zh: 東南港灣龍蝦濃湯
     price_table_key: specialty_food
@@ -46,6 +72,14 @@ items:
       icon_key: food
       rarity: common
       summary_zh: 港口城市貴族餐廳的招牌濃湯，滋味濃郁。
+    use_mechanics:
+      consumable: true
+      combat_allowed: false
+      effects:
+        - stat: hp
+          amount: 18
+        - stat: sp
+          amount: 6
   - key: elven_candied_blossom
     display_name_zh: 精靈蜜漬花蕊
     price_table_key: specialty_food
@@ -55,6 +89,12 @@ items:
       icon_key: food
       rarity: rare
       summary_zh: 少量流入人類社會的精靈花蕊蜜餞，甜而不膩。
+    use_mechanics:
+      consumable: true
+      combat_allowed: false
+      effects:
+        - stat: mp
+          amount: 12
   - key: miners_bracing_broth
     display_name_zh: 王國礦工提神湯
     price_table_key: potion
