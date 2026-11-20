@@ -256,7 +256,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "06df4dc2f3d5818f6f3c94986282d59eb58a57745d595f41af96b5304bf6e2ca",
+  "fingerprint": "6a5fe3edcc2e0d92d5e35fdb5f2da3d4f9a26c43e9f50ffc0304e8e68bc0c900",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -16506,8 +16506,8 @@
     "world/lore/npc_tiers.py": "ed743d369ecb394ffe1dbcd8d9bf04d25a93b2e4d6d7f98ac7c3c54b373a219c",
     "world/lore/player_presets/__init__.py": "7640ad1e9fcdee37be50038eb956441baf7ed9f347b4ffc0f748b695c887fee0",
     "world/lore/player_presets/assembly.py": "f285d3efdca8bb76276f5a5c6696f0a3a43c775516affaa8443ab89239cc30a4",
-    "world/lore/player_presets/data_pack_cards.py": "c7931b75af6c73bfc9dcdba0b1ad86a372886dee9152e453a5840076bb9d977e",
-    "world/lore/player_presets/data_story_cards.py": "061390b1b5a89fc2a1b83cde333936534e240f8b1c53bd6213cc2f463089b8ec",
+    "world/lore/player_presets/data_pack_cards.py": "867872faeeb34e56d7e0be4d74a901f264ec05917979b3b55b021642465923cf",
+    "world/lore/player_presets/data_story_cards.py": "c46c62922925a979da8f373540e50820ca18f271a1b19e2505d436541e6435dd",
     "world/lore/player_presets/validation.py": "51bad97af51ba44c701a2c07d67180293ab4b9f8999f392f492c54a55712e0d2",
     "world/lore/player_presets/vocab.py": "40b9f00671e848829cf0430aaaa9f49190af40c9a2359494ba254ab28c270c8e",
     "world/lore/races.py": "6729ceb531b42ecdf6cef25c07b76b184f256be5217b943489f8993916a245e9",
@@ -16617,7 +16617,7 @@
     "world/rules/camping.py": "19d4c1123af23841327252981c8ab51dbf8caea56fb7b80e7ff26c5cdca0e433",
     "world/rules/caravan_arrivals.py": "e811db84b8fd6992130ba77db149839f6159ff02097fff122c4ac96861248f39",
     "world/rules/cast_settlement.py": "7dc704ec3352f374216c83ee16d5b004bc46a3dfadb2be1010070eec6c5bf06a",
-    "world/rules/character_creation.py": "5ea051ae9839a9b70dc96d650970f75001bf230b70e0aaf966d4c713228f7465",
+    "world/rules/character_creation.py": "7a0155b9f6351765b5b2c74e9a2ba2e327b7ae35e4e215bf08452443f24e82ec",
     "world/rules/church.py": "d0d197ca2b70aa2623edeecf065f4d702789bfcfde32dc59d1e8b028397e7b52",
     "world/rules/church_rulebook.py": "7373da0ee3b9311dc8dbb1c768ff54437ad180a86307ef7fc2c6d3480f679f7e",
     "world/rules/clock.py": "7068284d0c3d688965208e61a6604368d7fc7d5f715a3917322962f8eaaa49a2",
@@ -16653,7 +16653,7 @@
     "world/rules/creation_identity.py": "30eca3c4f8330d88219597ec4a0d45e3d366ec321dc115552101d47bbfd73264",
     "world/rules/creation_messages.py": "6cfb1663d6bb4038d197a0f2cd8143b0bb2cee2ac84a4936e3c3742b575db4e6",
     "world/rules/creation_portrait.py": "65ff68c569e6b54556c177a52e9d8f1eeff40aa06eb1653ad97417dcc77fd893",
-    "world/rules/creation_wizard.py": "6698fdd5cf4fd3cb36cc90ed2cb188546302b4e4f32d6a7ceb784ca08f510b91",
+    "world/rules/creation_wizard.py": "9643f62ed2e9e10bf93bf5e19343d3b5acd1f938d25c297db74a90de2579d82f",
     "world/rules/cross_lineage_unlock.py": "2d5be43005b3e54430e40fb48286367f88dc8a01b9b40d4fcd054c42f5d11d99",
     "world/rules/defeat_aftermath/__init__.py": "d21525ea09e3c34d72953eb6d9272371d94b5b76ebe37b39f7f3a0ffc09d3551",
     "world/rules/defeat_aftermath/aftermath.py": "ad09806eeef0efeaa53ae98a60b69a9f96b3e20fad3950f074b15840d9e95f7f",
@@ -16823,7 +16823,7 @@
     "world/rules/spell_conditions.py": "76f567b6f19671550b20a4c40d54721ef26ad2356eeca8be8410b1ebae63807e",
     "world/rules/start_location.py": "05b7019e8d8325da4b3a1a4855b8b156c80d7c42d1b501c787a1e34849bd34ae",
     "world/rules/starting_companions.py": "c3620c30054c787f1747bddee53c45951be8a20b176a0f700af7bd61ca340c5b",
-    "world/rules/starting_policy.py": "32af9038e3f219a9d7aa45c00de19eafe9d4ee6f628736e707295b3a005a3eb8",
+    "world/rules/starting_policy.py": "046bd77ef6e8ede60eeac144574dd048aeb70bb9f0cb665961bd35931d45dd90",
     "world/rules/state_derived_roll.py": "a2750faa8d5e9eeeddcd20a7c711e4d76be0b13a7f8dae6413f84f0c3ecfce99",
     "world/rules/state_reactions.py": "488f3d36ba86ee9c2e0694c2c5835c114926c270715d53c1a36afa3e9ed9c89d",
     "world/rules/status_display.py": "615ef85f36c071cc2e44b776f621820dbdfd780460ef40e536559c2b956ab2ea",

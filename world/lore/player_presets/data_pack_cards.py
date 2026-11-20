@@ -186,7 +186,7 @@ ROWS: dict[str, PlayerPreset] = {
         # world.rules.namegen): Sylwen + Stillwater.
         "sylwen_stillwater", "希爾溫", 180, 24, "elf", "fionnen",
         (("hp", 0), ("mp", 0), ("sp", 0), ("atk_phys", 12),
-         ("agility", 12), ("defense", 13), ("magic_power", 400)),
+         ("agility", 12), ("defense", 13), ("magic_power", 38)),
         "劍盾守護為本、元素與療癒皆為後天所學的護衛",
         # The ordinary elf baseline (align-character-template-development
         # D1): every currently implemented, identity-eligible elemental,
