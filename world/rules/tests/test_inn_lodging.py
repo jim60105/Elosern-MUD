@@ -6,6 +6,7 @@ from unittest.mock import patch
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
+from tools.spec_traceability import covers_requirement
 from typeclasses.components import Lodging
 from typeclasses.npcs import NPC
 from typeclasses.rooms import LodgingGuestRoom
@@ -34,6 +35,7 @@ from world.rules.rest_bonuses import (
 from world.rules.sleep_receipt import (
     STATE_COMPLETED,
     STATE_INTERRUPTED,
+    STATE_SLEEPING,
     full_recovery_seconds,
     read_sleep_receipt,
 )
@@ -115,6 +117,7 @@ class LodgingCheckInTests(EvenniaTest):
         join_party(npc, self.player)
         return npc
 
+    @covers_requirement("inn-lodging::check-in-books-the-whole-present-party")
     def test_quote_and_confirm_charge_present_party_and_move_it(self):
         companion = self._companion("在場同伴")
         remote = self._companion("遠端同伴")
@@ -143,6 +146,7 @@ class LodgingCheckInTests(EvenniaTest):
         self.assertIsNone(read_access(remote))
         self.assertEqual(result.room_id, int(self.player.location.pk))
 
+    @covers_requirement("inn-lodging::check-in-books-the-whole-present-party")
     def test_stale_wallet_and_blocked_guest_change_nothing(self):
         quote = lodging.quote_for(self.player, self.host)
         self.player.db.wallet = 0
@@ -160,6 +164,7 @@ class LodgingCheckInTests(EvenniaTest):
         self.assertIs(self.player.location, self.room1)
         self.assertIsNone(lodging.read_booking(self.room1))
 
+    @covers_requirement("inn-lodging::an-inn-provides-one-reusable-private-guest-room")
     def test_unauthorized_entry_and_departure_close_the_booking(self):
         companion = self._companion("同伴")
         quote = lodging.quote_for(self.player, self.host)
@@ -181,6 +186,7 @@ class LodgingCheckInTests(EvenniaTest):
         lodging.release_access_on_departure(companion)
         self.assertIsNone(lodging.read_booking(self.room1))
 
+    @covers_requirement("inn-lodging::an-inn-provides-one-reusable-private-guest-room")
     def test_repeated_stay_reuses_one_persistent_room(self):
         quote = lodging.quote_for(self.player, self.host)
         first = lodging.confirm_check_in(
@@ -194,6 +200,7 @@ class LodgingCheckInTests(EvenniaTest):
         self.assertEqual(first.room_id, second.room_id)
         self.assertIsInstance(self.player.location, LodgingGuestRoom)
 
+    @covers_requirement("inn-lodging::check-in-books-the-whole-present-party")
     def test_failure_after_debit_and_partial_move_restores_every_surface(self):
         companion = self._companion("受困同伴")
         quote = lodging.quote_for(self.player, self.host)
@@ -252,6 +259,8 @@ class PaidSleepTests(EvenniaTest):
         quote = lodging.quote_for(self.player, self.host)
         lodging.confirm_check_in(self.player, self.host, quote_id=quote.quote_id)
 
+    @covers_requirement("inn-lodging::booked-guests-can-sleep-once-at-accelerated-recovery")
+    @covers_requirement("well-rested-travel::a-completed-full-paid-sleep-grants-a-nonstacking-allowance")
     def test_recovery_target_uses_doubled_rate_and_paid_sleep_is_bound(self):
         self._check_in()
         for key in ("hp", "mp", "sp"):
@@ -273,6 +282,7 @@ class PaidSleepTests(EvenniaTest):
         self.assertEqual(read_walking_allowance(self.player), 7200)
         self.assertIsNone(read_paid_sleep(self.player))
 
+    @covers_requirement("well-rested-travel::a-completed-full-paid-sleep-grants-a-nonstacking-allowance")
     def test_allowance_never_stacks_and_replay_cannot_refill_it(self):
         self._check_in()
         for key in ("hp", "mp", "sp"):
@@ -289,6 +299,7 @@ class PaidSleepTests(EvenniaTest):
         )
         self.assertEqual(read_walking_allowance(self.player), 3600)
 
+    @covers_requirement("inn-lodging::booked-guests-can-sleep-once-at-accelerated-recovery")
     def test_paid_sleep_doubles_a_depleted_gauge_rate(self):
         self._check_in()
         gauge = self.player.traits.hp
@@ -323,6 +334,7 @@ class PaidSleepTests(EvenniaTest):
             booking["paid"][str(int(companion.pk))],
         )
 
+    @covers_requirement("inn-lodging::booked-guests-can-sleep-once-at-accelerated-recovery")
     def test_paid_sleep_actually_fills_all_four_resources_faster(self):
         self._check_in()
         for key in ("hp", "mp", "sp"):
@@ -340,6 +352,113 @@ class PaidSleepTests(EvenniaTest):
         self.assertIsNotNone(read_access(self.player))
         with self.assertRaises(SleepRefused):
             enter_sleep(self.player, mode="duration", seconds=60)
+
+    @covers_requirement("inn-lodging::interruption-does-not-duplicate-paid-sleep")
+    def test_resumable_pause_keeps_the_same_paid_sleep_across_reload(self):
+        from world.rules import time_skip as time_skip_module
+        from world.rules.clock import (
+            _EVENT_SOURCES,
+            ScheduledEvent,
+            register_event_source,
+        )
+        from world.rules.sleep_receipt import read_sleep_view_generation
+        from world.rules.time_skip import (
+            continue_owner_sleep,
+            decline_owner_sleep_dream,
+            owner_sleep_view_state,
+        )
+
+        self._check_in()
+        for key in ("hp", "mp", "sp"):
+            gauge = getattr(self.player.traits, key)
+            gauge.current = gauge.max
+        write_fatigue_state(self.player, 72000, SleepPosture.AWAKE)
+        wallet = self.player.db.wallet
+        entry = enter_sleep(self.player, mode="recovery")
+        self.assertEqual(read_paid_sleep(self.player)["sleep_id"], entry.sleep_id)
+
+        original = _EVENT_SOURCES.get("shop_hours")
+        register_event_source(
+            "shop_hours",
+            lambda start, end: [
+                ScheduledEvent("synthetic_interactive", end, {}, interactive=True)
+            ],
+            next_boundary=lambda start, end: start + 37,
+        )
+        try:
+            view = owner_sleep_view_state(self.player)
+            decline_owner_sleep_dream(
+                self.player,
+                sleep_id=entry.sleep_id,
+                revision=view["revision"],
+                generation=view["generation"],
+            )
+            paused = continue_owner_sleep(
+                self.player,
+                sleep_id=entry.sleep_id,
+                expected_generation=read_sleep_view_generation(self.player),
+            )
+            self.assertEqual(paused.continuation, "paused")
+            self.assertEqual(read_sleep_receipt(self.player).state, STATE_SLEEPING)
+            self.assertEqual(
+                read_paid_sleep(self.player)["sleep_id"], entry.sleep_id
+            )
+
+            # The durable binding survives the in-memory replay ledger being
+            # gone, the reload boundary that must not charge twice.
+            time_skip_module._RESULT_LEDGER.clear()
+            self.assertEqual(read_sleep_receipt(self.player).state, STATE_SLEEPING)
+            self.assertEqual(
+                read_paid_sleep(self.player)["sleep_id"], entry.sleep_id
+            )
+            self.assertEqual(self.player.db.wallet, wallet)
+
+            register_event_source(
+                "shop_hours", lambda start, end: [], next_boundary=None
+            )
+            resumed = continue_owner_sleep(
+                self.player,
+                sleep_id=entry.sleep_id,
+                expected_generation=read_sleep_view_generation(self.player),
+            )
+            self.assertEqual(resumed.continuation, "complete")
+            self.assertEqual(self.player.db.wallet, wallet)
+            self.assertEqual(read_sleep_receipt(self.player).state, STATE_COMPLETED)
+            self.assertIsNone(read_paid_sleep(self.player))
+        finally:
+            if original is not None:
+                _EVENT_SOURCES["shop_hours"] = original
+            else:
+                _EVENT_SOURCES.pop("shop_hours", None)
+
+    @covers_requirement("inn-lodging::interruption-does-not-duplicate-paid-sleep")
+    def test_early_wake_forfeits_only_the_wakers_paid_sleep(self):
+        from world.rules.clock import get_world_clock
+        from world.rules.time_skip import interrupt_sleep_for_contact
+
+        companion = create_object(NPC, key="同伴", location=self.room1)
+        companion.race = "human"
+        companion.apply_race_baseline()
+        join_party(companion, self.player)
+        write_fatigue_state(companion, 72000, SleepPosture.AWAKE)
+        write_fatigue_state(self.player, 72000, SleepPosture.AWAKE)
+        self._check_in()
+        wallet = self.player.db.wallet
+        outcome = enter_party_sleep(self.player, mode="duration", seconds=600)
+        self.assertIsNone(outcome.result)
+        player_sleep = read_paid_sleep(self.player)["sleep_id"]
+        companion_sleep = read_paid_sleep(companion)["sleep_id"]
+        self.assertNotEqual(player_sleep, companion_sleep)
+
+        tick = int(get_world_clock().tick)
+        interrupt_sleep_for_contact(
+            companion, tick=tick + 100, operation_id="early-wake"
+        )
+        self.assertEqual(read_sleep_receipt(companion).state, STATE_INTERRUPTED)
+        self.assertIsNone(read_paid_sleep(companion))
+        self.assertEqual(self.player.db.wallet, wallet)
+        self.assertEqual(read_sleep_receipt(self.player).state, STATE_SLEEPING)
+        self.assertEqual(read_paid_sleep(self.player)["sleep_id"], player_sleep)
 
 
 class CitySleepPolicyTests(EvenniaTest):
@@ -375,6 +494,7 @@ class CitySleepPolicyTests(EvenniaTest):
         city.start()
         self.addCleanup(city.stop)
 
+    @covers_requirement("city-sleep-policy::city-locations-govern-voluntary-sleep")
     def test_city_interior_refuses_while_village_interior_and_outdoors_stay_open(self):
         self.room1.tags.add(TEST_SHOP)
         self.assertEqual(
@@ -393,6 +513,7 @@ class CitySleepPolicyTests(EvenniaTest):
         entry = enter_sleep(self.player, mode="duration", seconds=60)
         self.assertIsNotNone(entry.receipt)
 
+    @covers_requirement("city-sleep-policy::a-city-patrol-ends-voluntary-street-naps")
     def test_patrol_ends_street_nap_and_refuses_same_day_again(self):
         place = city_sleep.SleepPlace(
             city_sleep.SleepLocation.STREET,
@@ -426,6 +547,7 @@ class CitySleepPolicyTests(EvenniaTest):
             with self.assertRaises(SleepRefused):
                 enter_sleep(self.player, mode="duration", seconds=60)
 
+    @covers_requirement("city-sleep-policy::a-city-patrol-ends-voluntary-street-naps")
     def test_patrol_does_not_wake_a_forced_sleeper(self):
         write_fatigue_state(self.player, 0, SleepPosture.FORCED)
         clock = get_world_clock()
@@ -435,6 +557,7 @@ class CitySleepPolicyTests(EvenniaTest):
             SleepPosture.FORCED,
         )
 
+    @covers_requirement("city-sleep-policy::a-city-patrol-ends-voluntary-street-naps")
     def test_another_bodys_advance_still_ends_the_nap_at_the_patrol(self):
         place = city_sleep.SleepPlace(
             city_sleep.SleepLocation.STREET,
@@ -487,6 +610,7 @@ class CitySleepPolicyTests(EvenniaTest):
             policy.patrol_phase_offset_seconds + policy.patrol_interval_seconds,
         )
 
+    @covers_requirement("city-sleep-policy::a-city-patrol-ends-voluntary-street-naps")
     def test_street_refusal_expires_on_the_next_game_day(self):
         from world.rules.rest_bonuses import (
             record_street_refusal,
@@ -497,6 +621,7 @@ class CitySleepPolicyTests(EvenniaTest):
         self.assertTrue(street_refused(self.player, "street", 0))
         self.assertFalse(street_refused(self.player, "street", 1))
 
+    @covers_requirement("city-sleep-policy::city-locations-govern-voluntary-sleep")
     def test_street_nap_shows_only_a_general_warning(self):
         place = city_sleep.SleepPlace(
             city_sleep.SleepLocation.STREET,
@@ -518,6 +643,7 @@ class TravelAllowanceTests(EvenniaTest):
         self.player.location = self.room1
         write_fatigue_state(self.player, 360000, SleepPosture.AWAKE)
 
+    @covers_requirement("well-rested-travel::foot-travel-consumes-the-allowance-exactly")
     def test_clock_settles_the_exact_piecewise_consumption(self):
         from world.rules.rest_bonuses import write_walking_allowance
 
@@ -540,6 +666,7 @@ class TravelAllowanceTests(EvenniaTest):
         )
         self.assertEqual(read_walking_allowance(self.player), 0)
 
+    @covers_requirement("well-rested-travel::foot-travel-consumes-the-allowance-exactly")
     def test_pre_destination_depletion_uses_the_allowance_boundary(self):
         from world.rules.rest_bonuses import ALLOWANCE_ATTRIBUTE
         from world.rules.travel_cost import (
@@ -572,6 +699,7 @@ class TravelAllowanceTests(EvenniaTest):
         with self.assertRaises(MovementPreflightRefused):
             refuse_pre_destination_depletion(10, [member(69)])
 
+    @covers_requirement("well-rested-travel::foot-travel-consumes-the-allowance-exactly")
     def test_prediction_advance_matches_the_piecewise_allowance(self):
         from world.rules.travel_plan import TravellerState
 
