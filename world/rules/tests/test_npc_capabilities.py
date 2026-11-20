@@ -122,6 +122,7 @@ class VocabularyContractTests(unittest.TestCase):
                     "guild_exam_reception",
                     "quest_issuer",
                     "church_host",
+                    "lodging",
                 }
             ),
         )

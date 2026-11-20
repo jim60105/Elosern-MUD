@@ -48,6 +48,7 @@
 | [`rest`](/game/command-reference?id=rest) | 等待並推進時間；可用 `practice <技能>` 宣告每整小時熟練度修煉，只有實際清醒的整小時才會結算。 |
 | [`修煉`](/game/command-reference?id=修煉) | `修煉 <技能> [= <成員>]` 為成員排入修煉；只記錄排入，下一次休息、睡眠或等待才依完整小時結算。 |
 | [`sleep`](/game/command-reference?id=sleep) | 自願入睡：預設或 `until-recovered` 恢復至生命、法力、體力與精力全滿，`until-dawn`（`睡到天亮`／`天亮`）睡到下一個黎明，也可用 `sleep <時長>` 指定時長；明確模式後加 `dream` 可在入睡時選擇進入夢境。`sleep all` 讓在場全員一起入睡，`sleep continue` 續睡目前的睡眠；`camp [<模式>] [dream]` 一次完成整隊紮營，沉睡中也可使用。 |
+| [`lodging`](/game/command-reference?id=lodging) | 向旅店老闆詢問整隊住宿：列出在場旅客與每人房價，`lodging confirm` 一次扣款、登記並把全隊帶進同一間客房；不會順便入睡或推進時間。 |
 | [`handoff`](/game/command-reference?id=handoff) | 檢視或確認沉睡身體的控制權交接：完整列出回到自己身體、每位同伴與最終的 `全員一起睡眠`；取消不推進時間。 |
 | [`dream`](/game/command-reference?id=dream) | 回應主人睡眠中的夢境問題（`dream enter`／`dream decline`），或查看願望全貌與剩餘訴說次數、決定願望的歸屬（`dream thread`）、訴說、停止訴說（`dream finalize`）、把願望收著、許下願望與醒來。 |
 | [`wait`](/game/command-reference?id=wait) | 等待直到指定時段。 |

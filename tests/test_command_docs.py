@@ -91,6 +91,12 @@ EXPECTED_COMMANDS: dict[str, dict[str, str]] = {
         ),
         "context": "一般",
     },
+    "lodging": {
+        "syntax": (
+            "lodging [<對象>]、lodging confirm [<對象>]、lodging cancel"
+        ),
+        "context": "一般（需在旅店老闆所在的旅店大廳）",
+    },
     "handoff": {
         "syntax": "handoff、handoff <編號>、handoff party、handoff cancel",
         "context": "一般（需控制的身體正在沉睡）",
