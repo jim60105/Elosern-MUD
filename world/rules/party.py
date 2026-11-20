@@ -520,6 +520,10 @@ def follow_companions(
             moved = False
         if not moved:
             left_behind.append(member)
+            continue
+        from world.rules.lodging import release_access_on_departure
+
+        release_access_on_departure(member)
     if body_arrived:
         _reobserve_quest_arrival(
             commander,

@@ -78,6 +78,7 @@ from world.rules.fatigue import (
     read_fatigue_state,
     read_optional_fatigue_state,
 )
+from world.rules.rest_bonuses import read_walking_allowance
 
 RULEBOOK_PATH = Path(__file__).parent / "rulebook" / "movement.yaml"
 
@@ -151,12 +152,24 @@ def refuse_pre_destination_depletion(seconds: int, members: Sequence[Any]) -> No
     """
     if seconds <= 0:
         return
-    rate = abs(int(get_policy().rates[FatigueActivity.FOOT_TRAVEL]))
+    policy = get_policy()
+    foot = Fraction(policy.rates[FatigueActivity.FOOT_TRAVEL])
+    rested = Fraction(policy.rates[FatigueActivity.WELL_RESTED_FOOT_TRAVEL])
     for member in members:
         state = _fatigue_state(member)
         if state is None:
             continue
-        if Fraction(state.reserve_units, rate) < seconds:
+        try:
+            allowance = read_walking_allowance(member)
+        except ValueError:  # observability: ignore R2: a malformed allowance cannot grant a discount; the ordinary rate applies
+            allowance = 0
+        walked_rested = min(int(seconds), allowance)
+        remaining = (
+            Fraction(state.reserve_units)
+            + foot * int(seconds)
+            + (rested - foot) * walked_rested
+        )
+        if remaining < 0:
             raise MovementPreflightRefused(
                 "pre_destination_depletion", DEPLETION_MESSAGE
             )
@@ -352,25 +365,66 @@ class TraversalPlan:
     members: tuple[Any, ...]
 
 
-def _predicted_state(reserve_units: int, elapsed: Fraction) -> FatigueState:
-    """The predicted state of one body after exact fractional ``elapsed``.
+def _exact_reserve(
+    reserve_units: int, allowance_seconds: int, elapsed: Fraction
+) -> Fraction:
+    """The exact reserve after ``elapsed`` foot travel with the allowance.
 
-    Foot-travel consumption is exactly linear in elapsed time, so every
-    segment start (including the start of a later terrain leg) is derived from
-    the member's initial reserve and the traversal's exact elapsed time rather
-    than from a per-segment state that flooring would drift. The stored state
-    is integral: the reserve is truncated and the residual fraction still
-    belongs to the same band, while a fully consumed reserve is the forced
-    latch.
+    Consumption is ``6*min(t, a) + 8*max(0, t-a)`` for remaining allowance
+    ``a``. Every segment start is derived from the initial reserve and the
+    traversal's exact elapsed time, so a fraction is never dropped.
     """
+    policy = get_policy()
+    foot = Fraction(policy.rates[FatigueActivity.FOOT_TRAVEL])
+    rested = Fraction(policy.rates[FatigueActivity.WELL_RESTED_FOOT_TRAVEL])
+    rested_seconds = min(elapsed, Fraction(max(0, int(allowance_seconds))))
+    return Fraction(reserve_units) + foot * elapsed + (rested - foot) * rested_seconds
 
-    rate = Fraction(get_policy().rates[FatigueActivity.FOOT_TRAVEL])
-    exact = Fraction(reserve_units) + rate * elapsed
+
+def _safe_allowance(member: Any) -> int:
+    """The member's remaining allowance; a malformed value grants no discount."""
+    try:
+        return read_walking_allowance(member)
+    except ValueError:  # observability: ignore R2: a malformed bonus grants no discount; the ordinary travel rate stays authoritative
+        return 0
+
+
+def _predicted_state(
+    reserve_units: int, allowance_seconds: int, elapsed: Fraction
+) -> FatigueState:
+    """The predicted state of one body after exact fractional ``elapsed``."""
+    exact = _exact_reserve(reserve_units, allowance_seconds, elapsed)
     if exact <= 0:
         return FatigueState(
             reserve_units=0, posture=SleepPosture.FORCED
         )
     return FatigueState(reserve_units=int(exact), posture=SleepPosture.AWAKE)
+
+
+def _boundary_offset(
+    reserve_units: int,
+    allowance_seconds: int,
+    state: FatigueState,
+    elapsed: Fraction,
+) -> tuple[Fraction, BoundaryKind] | None:
+    """Exact seconds from ``elapsed`` to this member's next fatigue boundary."""
+    boundary = next_fatigue_boundary(state, FatigueActivity.FOOT_TRAVEL)
+    if boundary is None:
+        return None
+    exact = _exact_reserve(reserve_units, allowance_seconds, elapsed)
+    remaining = exact - boundary.reserve_units
+    if remaining <= 0:
+        return Fraction(0), boundary.kind
+    policy = get_policy()
+    foot = Fraction(policy.rates[FatigueActivity.FOOT_TRAVEL])
+    rested = Fraction(policy.rates[FatigueActivity.WELL_RESTED_FOOT_TRAVEL])
+    rested_left = max(
+        Fraction(0), Fraction(max(0, int(allowance_seconds))) - elapsed
+    )
+    rested_capacity = -rested * rested_left
+    if remaining <= rested_capacity:
+        return remaining / -rested, boundary.kind
+    return rested_left + (remaining - rested_capacity) / -foot, boundary.kind
 
 
 def plan_traversal(
@@ -407,7 +461,14 @@ def plan_traversal(
     initial_reserves = tuple(
         None if state is None else state.reserve_units for state in initial_states
     )
-    rate = Fraction(get_policy().rates[FatigueActivity.FOOT_TRAVEL])
+    initial_allowances = tuple(
+        (
+            0
+            if state is None
+            else _safe_allowance(member)
+        )
+        for member, state in zip(members, initial_states)
+    )
     total_distance = Fraction(0)
     elapsed = Fraction(0)
     segments: list[TraversalSegment] = []
@@ -418,8 +479,12 @@ def plan_traversal(
         total_distance += remaining
         while remaining > 0:
             states = tuple(
-                None if reserve is None else _predicted_state(reserve, elapsed)
-                for reserve in initial_reserves
+                None
+                if reserve is None
+                else _predicted_state(reserve, allowance, elapsed)
+                for reserve, allowance in zip(
+                    initial_reserves, initial_allowances
+                )
             )
             if any(
                 state is not None and state.posture is SleepPosture.FORCED
@@ -439,21 +504,17 @@ def plan_traversal(
             # reserve (not its truncated state), so a carried fraction from an
             # earlier leg is never dropped.
             boundaries: list[tuple[Fraction, BoundaryKind]] = []
-            for reserve, state in zip(initial_reserves, states):
+            for reserve, allowance, state in zip(
+                initial_reserves, initial_allowances, states
+            ):
                 if reserve is None or state is None:
                     continue
-                boundary = next_fatigue_boundary(
-                    state, FatigueActivity.FOOT_TRAVEL
+                boundary = _boundary_offset(
+                    reserve, allowance, state, elapsed
                 )
                 if boundary is None:
                     continue
-                exact_reserve = Fraction(reserve) + rate * elapsed
-                boundaries.append(
-                    (
-                        (exact_reserve - boundary.reserve_units) / -rate,
-                        boundary.kind,
-                    )
-                )
+                boundaries.append(boundary)
             boundary_seconds = (
                 min(offset for offset, _ in boundaries) if boundaries else None
             )

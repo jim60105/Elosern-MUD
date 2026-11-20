@@ -104,3 +104,18 @@ class QuestIssuer(Component):
     issuer_key = DBField(default=None)
     service_binding = DBField(default=None)
     anchor_room_id = DBField(default=None)
+
+
+class Lodging(Component):
+    """Capability marker and service identity of one paid-lodging host.
+
+    The host offers one whole-party check-in for its authored place. Booking
+    state lives with the lodging room (never on the person), so the component
+    carries only the stable service identity and the shared availability
+    binding.
+    """
+
+    name = "lodging"
+    service_id = DBField(default=None)
+    service_binding = DBField(default=None)
+    anchor_room_id = DBField(default=None)

@@ -45,6 +45,17 @@
   section: rate
   activity: sleep
   units_per_second: 12
+# Paid lodging sleep doubles every positive recovery rate, mental reserve
+# included. Well-rested foot travel spends exactly three quarters of the
+# ordinary foot-travel cost while the allowance remains.
+- id: rate_paid_sleep
+  section: rate
+  activity: paid_sleep
+  units_per_second: 24
+- id: rate_well_rested_foot_travel
+  section: rate
+  activity: well_rested_foot_travel
+  units_per_second: -6
 
 # Exclusive awake fatigue stages. `minimum_units`/`maximum_units` are the
 # closed reserve interval the stage owns; the bands must tile 1..360000 and

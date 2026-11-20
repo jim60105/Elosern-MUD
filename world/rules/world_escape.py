@@ -556,7 +556,15 @@ def _project_retreat_state(record: Any, body: Any) -> TravellerState:
             seconds,
             completion=IntervalCompletion.INDIVISIBLE,
         ).end
-    return TravellerState.from_state(current, member_id=member_id)
+    from world.rules.rest_bonuses import read_walking_allowance
+
+    try:
+        allowance = read_walking_allowance(body)
+    except ValueError:  # observability: ignore R2: a malformed bonus grants no retreat discount
+        allowance = 0
+    return TravellerState.from_state(
+        current, member_id=member_id, allowance_seconds=allowance
+    )
 
 
 def _preferred_index(

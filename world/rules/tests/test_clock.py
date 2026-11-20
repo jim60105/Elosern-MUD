@@ -302,6 +302,7 @@ class ClockTests(unittest.TestCase):
                 "correspondence_delivery",
                 "instance_reclamation",
                 "monster_site_lifecycle",
+                "city_sleep_patrol",
                 "field_contact",
             ),
         )
@@ -984,6 +985,7 @@ class AdvanceSurfaceContractUnitTests(unittest.TestCase):
                 "correspondence_delivery",
                 "instance_reclamation",
                 "monster_site_lifecycle",
+                "city_sleep_patrol",
                 "field_contact",
             ),
         )

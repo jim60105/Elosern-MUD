@@ -44,9 +44,18 @@ def sample_activity(
     entity: Any, awake_activity: FatigueActivity = FatigueActivity.AWAKE
 ) -> FatigueActivity:
     """Return the activity a body's stored posture settles over an interval."""
+    from world.rules.rest_bonuses import paid_sleep_active
+
     state = read_optional_fatigue_state(entity)
     if state is None or state.posture is SleepPosture.AWAKE:
         return awake_activity
+    if state.posture is SleepPosture.VOLUNTARY:
+        try:
+            receipt = read_sleep_receipt(entity)
+        except SleepReceiptError:  # observability: ignore R2: an unusable receipt is ordinary sleep at worst; the authoritative continuation reports it
+            receipt = None
+        if paid_sleep_active(entity, receipt):
+            return FatigueActivity.PAID_SLEEP
     return FatigueActivity.SLEEP
 
 

@@ -461,7 +461,9 @@ def _validate_service_route(value: Any, identity: int) -> dict[str, Any]:
             raise ProtocolValidationError("a dialogue route carries only its topic_id")
         return {"kind": kind, "npc_id": npc_id, "topic_id": topic_id}
     command = value.get("command")
-    if command != "church join":
+    from world.rules.npc_services import COMMAND_ROUTE_COMMANDS
+
+    if command not in COMMAND_ROUTE_COMMANDS:
         raise ProtocolValidationError("a command route names the one supported command")
     if "section" in value or "topic_id" in value:
         raise ProtocolValidationError("a command route carries only its command")

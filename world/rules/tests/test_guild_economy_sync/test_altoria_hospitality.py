@@ -35,7 +35,7 @@ from commands.default_cmdsets import CharacterCmdSet
 from commands.skip import CmdRest, CmdSleep
 from tools.spec_traceability import covers_requirement
 from typeclasses.characters import PlayerCharacter
-from typeclasses.components import Merchant, ScriptedDialogue
+from typeclasses.components import Lodging, Merchant, ScriptedDialogue
 from typeclasses.npcs import NPC
 from typeclasses.rooms import GridRoom
 from world.rules.clock import WorldClock
@@ -45,6 +45,7 @@ from world.rules import guild_config, guild_economy
 from world.rules.guild_config import get_catalog
 from world.rules.guild_economy import sync_service_content
 from world.maps.bootstrap import sync_interiors
+from world.tests.geography_fixture import publish_shipped_map_world
 from world.skills.handler import INNATE_SKILL_ORDER
 
 from ._support import (
@@ -134,6 +135,9 @@ class AltoriaHospitalityTests(ServiceContentIsolation, EvenniaTestCase):
     converge_world_per_test = True
 
     def setUp(self):
+        # ``_support`` registers the quest catalog before its own convergence,
+        # and that registration validates against the published map world.
+        publish_shipped_map_world()
         super().setUp()
         with self.captureOnCommitCallbacks(execute=True):
             sync_service_content()
@@ -232,10 +236,9 @@ class AltoriaHospitalityTests(ServiceContentIsolation, EvenniaTestCase):
     def test_resting_sleeping_and_practising_inside_the_inn_equal_doing_it_anywhere(self):
         inn = _place_by_kind("lodging")
         practice_skill = _innate_practicable_skill()
-        # Two identical fresh characters: the inside run books the inn's
-        # interior, the outside run an ordinary street room. Each command
-        # run drives its own real WorldClock (no persistence attached), so
-        # the clock cost is read directly off the tick the run settled.
+        # The inn lobby still settles awake rest and practice exactly like
+        # anywhere else, but voluntary sleep now belongs to a booked guest
+        # room: the lobby refuses it without changing the clock or wallet.
         results = {}
         for label, location in (
             ("inside", _interior(inn)),
@@ -253,10 +256,6 @@ class AltoriaHospitalityTests(ServiceContentIsolation, EvenniaTestCase):
                 rest.caller = player
                 rest.args = f"2h practice {practice_skill}"
                 rest.func()
-                sleep = CmdSleep()
-                sleep.caller = player
-                sleep.args = ""
-                sleep.func()
             results[label] = SimpleNamespace(
                 messages=tuple(messages),
                 tick=clock.tick,
@@ -270,9 +269,23 @@ class AltoriaHospitalityTests(ServiceContentIsolation, EvenniaTestCase):
         # The booked hour actually grew something (the comparison above
         # would also pass on two identical no-ops).
         self.assertIn(practice_skill, inside.proficiency)
-        # And neither room took a coin: the wallet never moved anywhere.
+        # And neither room took a coin for rest or practice.
         self.assertEqual(inside.wallet, 5000)
         self.assertEqual(outside.wallet, 5000)
+
+        sleeper = self._player("hospitality_lobby_sleeper")
+        sleeper.location = _interior(inn)
+        messages = []
+        sleeper.msg = messages.append
+        clock = WorldClock(6 * 3600)
+        with patch("world.rules.time_skip.get_world_clock", return_value=clock):
+            command = CmdSleep()
+            command.caller = sleeper
+            command.args = ""
+            command.func()
+        self.assertEqual(clock.tick, 6 * 3600)
+        self.assertTrue(messages)
+        self.assertIsNone(sleeper.attributes.get("sleep_receipt"))
 
     @covers_requirement(
         "altoria-hospitality::a-hospitality-location-adds-no-mechanism-it-does-not-have"
@@ -346,7 +359,13 @@ class AltoriaHospitalityTests(ServiceContentIsolation, EvenniaTestCase):
             (row.db_model, row.db_key, row.db_category)
             for row in Attribute.objects.only("db_model", "db_key", "db_category")
         }
-        self.assertEqual(arrived_vocabulary, vocabulary)
+        lodging_slot = Lodging.get_component_slot()
+        new_keys = arrived_vocabulary - vocabulary
+        self.assertTrue(new_keys)
+        self.assertTrue(
+            all(key.startswith(f"{lodging_slot}::") for _, key, _ in new_keys),
+            new_keys,
+        )
         # A further resync stays idempotent (no second-sync-only state).
         with self.captureOnCommitCallbacks(execute=True):
             sync_service_content()
@@ -357,14 +376,26 @@ class AltoriaHospitalityTests(ServiceContentIsolation, EvenniaTestCase):
                 for row in Attribute.objects.only("db_model", "db_key", "db_category")
             },
         )
-        # The hospitality hosts persist no attribute key a shipped trading
-        # host does not also carry: the attendant shape adds nothing to the
-        # persisted surface.
+        # The tavern and bathhouse still add nothing to the persisted
+        # surface. The inn's one documented lodging component is the only
+        # new key set the change authors.
         trader_host_keys = {
             attribute.key
             for attribute in _host(_place_by_kind("general_store")).attributes.all()
         }
+        inn = _place_by_kind("lodging")
+        lodging_keys = {
+            attribute.key
+            for attribute in _host(inn).attributes.all()
+        } - trader_host_keys
+        self.assertTrue(lodging_keys)
+        self.assertTrue(
+            all(key.startswith(f"{lodging_slot}::") for key in lodging_keys),
+            lodging_keys,
+        )
         for place in _hospitality_places():
+            if place.kind == "lodging":
+                continue
             with self.subTest(place=place.kind):
                 self.assertLessEqual(
                     {attribute.key for attribute in _host(place).attributes.all()},
