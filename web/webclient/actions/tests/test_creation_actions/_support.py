@@ -213,9 +213,9 @@ def _open_t_creation_scope(case):
 
 
 def balanced_allocations(
-    race: str, subrace: str | None = None, *, mode: str = "custom"
+    race: str, subrace: str | None = None
 ) -> dict[str, int]:
-    profile = resolve_starting_profile(race, subrace, mode=mode)
+    profile = resolve_starting_profile(race, subrace)
     remaining = profile.budget
     result: dict[str, int] = {}
     for axis in profile.axes:

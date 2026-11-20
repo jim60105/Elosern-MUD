@@ -58,9 +58,7 @@ class PlayerPresetTests(unittest.TestCase):
         for preset in PLAYER_PRESET_REGISTRY.values():
             with self.subTest(preset=preset.key):
                 self.assertIsInstance(preset, PlayerPreset)
-                profile = resolve_starting_profile(
-                    preset.race, preset.subrace, mode="preset"
-                )
+                profile = resolve_starting_profile(preset.race, preset.subrace)
                 allocations = preset.allocation_dict()
                 self.assertEqual(sum(allocations.values()), profile.budget)
                 for axis in profile.axes:

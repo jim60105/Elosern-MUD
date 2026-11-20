@@ -53,6 +53,7 @@ from world.rules import starting_companions as starting_companions_module
 from world.rules.affinity import NATURAL_CAP
 from world.rules.character_creation import MAX_PERSONA_FIELD_LENGTH, validate_affinity_seed
 from world.rules import start_location
+from world.rules.starting_policy import resolve_starting_profile
 from world.rules.tests._combat_session_helpers import _race_key, open_synthetic_scope
 from world.tests.start_room_fixture import stub_start_room
 from world.tests.synthetic_data import (
@@ -126,6 +127,19 @@ _T_OWNER_KEY = "wren-holder"
 def _probe_preset(key: str = "t_probe", **overrides) -> PlayerPreset:
     """One file-local card derived from a kit card (scope-scoped use)."""
     return make_preset(key, **overrides)
+
+
+def _elf_allocations(race_key: str, subrace_key: str) -> tuple[tuple[str, int], ...]:
+    """Spend a scoped elf profile's exact budget across its point caps."""
+    profile = resolve_starting_profile(race_key, subrace_key)
+    remaining = profile.budget
+    allocations: dict[str, int] = {}
+    for axis in profile.axes:
+        allocations[axis.axis] = min(axis.point_cap, remaining)
+        remaining -= allocations[axis.axis]
+    if remaining:
+        raise AssertionError("starting profile budget exceeds allocatable spans")
+    return tuple(allocations.items())
 
 
 def _register_probe(test, preset: PlayerPreset) -> PlayerPreset:
@@ -405,6 +419,7 @@ class CompanionBuildTests(_BuilderCase):
                     race="elf",
                     subrace=branch.key,
                     sex="female",
+                    allocations=_elf_allocations("elf", branch.key),
                 ),
             )
             companion = build_starting_companion(
@@ -444,6 +459,7 @@ class CompanionBuildTests(_BuilderCase):
                 race=_T_OVERLAY_RACE,
                 subrace=subrace.key,
                 affinity_elements=(),
+                allocations=_elf_allocations(_T_OVERLAY_RACE, subrace.key),
             ),
         )
         self.assertEqual(card.affinity_elements, ())

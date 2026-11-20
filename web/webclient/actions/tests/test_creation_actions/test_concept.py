@@ -14,6 +14,7 @@ from web.webclient.actions.creation_actions import (
 from tools.spec_traceability import covers_requirement
 from unittest.mock import patch
 from world.rules.creation_wizard import draft_fingerprint, read_draft, save_custom_draft
+from world.rules.starting_policy import resolve_starting_profile
 import unittest
 from ._support import (
     CreationActionBase,
@@ -191,9 +192,18 @@ class CreationConceptTests(CreationActionBase):
         # No draft is written by the transient fill.
         self.assertIsNone(read_draft(self.character))
 
-        # The superseded single-budget elf proposal (every axis spendable) is
+        # The superseded single-budget elf proposal (every axis spendable up
+        # to its lore span, budget = floor of half the summed spans) is
         # refused by the shared policy, and the previous slot stays untouched.
-        old_style = balanced_allocations("elf", _T_ELF_SUBRACE.key, mode="preset")
+        profile = resolve_starting_profile("elf", _T_ELF_SUBRACE.key)
+        spans = {axis.axis: axis.maximum - axis.minimum for axis in profile.axes}
+        raw_budget = sum(spans.values()) // 2
+        old_style = {}
+        remaining = raw_budget
+        for axis in profile.axes:
+            old_style[axis.axis] = min(spans[axis.axis], remaining)
+            remaining -= old_style[axis.axis]
+        self.assertEqual(sum(old_style.values()), raw_budget)
         self.assertNotEqual(old_style, allocations)
         previous = self._slot()
         self._propose(

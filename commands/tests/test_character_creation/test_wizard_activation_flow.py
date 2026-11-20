@@ -229,9 +229,9 @@ class CharacterCreationCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         "player-stat-allocation::creation-surfaces-use-the-selected-allocation-policy"
     )
     def test_the_custom_elf_briefing_explains_the_magic_conversion(self):
-        from world.rules.starting_policy import CUSTOM_MODE, resolve_starting_profile
+        from world.rules.starting_policy import resolve_starting_profile
 
-        profile = resolve_starting_profile("elf", _ELF_BRANCH.key, mode=CUSTOM_MODE)
+        profile = resolve_starting_profile("elf", _ELF_BRANCH.key)
         magic = profile.axes_dict()["magic_power"]
         self.assertNotEqual(magic.value_at_cap - magic.minimum, magic.point_cap)
 

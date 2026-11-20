@@ -77,9 +77,9 @@ _SCOPE = synthetic_registries(
 
 
 def balanced_allocations(
-    race: str, subrace: str | None = None, *, mode: str = "custom"
+    race: str, subrace: str | None = None
 ) -> dict[str, int]:
-    profile = resolve_starting_profile(race, subrace, mode=mode)
+    profile = resolve_starting_profile(race, subrace)
     remaining = profile.budget
     result: dict[str, int] = {}
     for axis in profile.axes:
@@ -164,7 +164,7 @@ class CreationWizardTests(EvenniaTest):
         self.assertEqual(axes, set(ALLOCATABLE_AXES))
         self.assertEqual(
             elf_profile.budget,
-            resolve_starting_profile(race_key, subrace_key, mode="custom").budget,
+            resolve_starting_profile(race_key, subrace_key).budget,
         )
         self.assertIsNone(view.draft)
 

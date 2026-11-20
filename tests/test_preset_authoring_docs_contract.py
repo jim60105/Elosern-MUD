@@ -163,6 +163,24 @@ class PresetAuthoringGuideContractTests(unittest.TestCase):
         # Distinct from the omitting-sex row, which is about construction.
         self.assertNotIn("漏寫", elf_sex_rows[0])
 
+    @covers_requirement(
+        "preset-authoring-docs::the-guide-distinguishes-allocation-point-caps-from-stat-spans"
+    )
+    def test_the_guide_distinguishes_point_caps_from_stat_spans(self):
+        guide = GUIDE_PATH.read_text(encoding="utf-8")
+        # A preset author must not read an elf's 800-wide magic lore span as
+        # spendable points; the guide names the 75-point budget and cap and
+        # states that the magic points are converted.
+        self.assertIn("點數上限", guide)
+        self.assertIn("自訂建立與模板卡共用同一套", guide)
+        step0 = guide.split("### Step 0", 1)[1].split("### Step 1", 1)[0]
+        self.assertIn(
+            'resolve_starting_profile("human", "human_plains")', step0
+        )
+        self.assertIn("elf_profile.budget)    # 75", step0)
+        self.assertIn("magic.point_cap)       # 75", step0)
+        self.assertIn("magic.value_for(15))   # 120", step0)
+
 
 if __name__ == "__main__":
     unittest.main()

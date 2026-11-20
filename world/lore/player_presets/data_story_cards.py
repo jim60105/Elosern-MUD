@@ -117,15 +117,16 @@ ROWS: dict[str, PlayerPreset] = {
     ),
     "yuka_darknight": PlayerPreset(
         # Pre-departure Yuka: still living in Shadow Valley Village, the
-        # village's youngest blade prodigy, Yuna at her side. Age 16; final
-        # innate statics 88/92/90 and magic power 477. The allocation above
-        # the ciaran floors is an increment over those floors, never the
-        # final value, and the x1000 body enhancement is the skill, not the
-        # allocation. Every approved source fact is recorded in
+        # village's youngest blade prodigy, Yuna at her side. Age 16; the
+        # ciaran physical floors plus this allocation yield 88/92/90, and the
+        # shared elf policy converts the magic points to 120. The allocation
+        # is an increment over the lore floors, never the final value, and the
+        # x1000 body enhancement is the skill, not the allocation. Every
+        # approved source fact is recorded in
         # docs/lore/character-template-alignment.md.
         "yuka_darknight", "悠花", 16, 16, "elf", "ciaran",
         (("hp", 0), ("mp", 0), ("sp", 0), ("atk_phys", 18),
-         ("agility", 22), ("defense", 20), ("magic_power", 377)),
+         ("agility", 22), ("defense", 20), ("magic_power", 15)),
         "攻擊與防禦逼近精靈上限的雙刀配點",
         # Fire and dark are mastered, so their ordinary trees arrive through
         # the shared prerequisite closure and must carry NO literal XP here
@@ -242,14 +243,14 @@ ROWS: dict[str, PlayerPreset] = {
     ),
     "yuna_darknight": PlayerPreset(
         # Pre-departure Yuna: the village's acknowledged sex-magic prodigy,
-        # still in Shadow Valley Village. Age 16; final innate statics
-        # 70/70/92 and magic power 515. The allocation above the ciaran
-        # floors is an increment over those floors, never the final value.
-        # Every approved source fact is recorded in
-        # docs/lore/character-template-alignment.md.
+        # still in Shadow Valley Village. Age 16; the ciaran floors plus this
+        # allocation yield 70/70/92, and the shared elf policy converts the
+        # magic points to 171. The allocation is an increment over those
+        # floors, never the final value. Every approved source fact is
+        # recorded in docs/lore/character-template-alignment.md.
         "yuna_darknight", "悠奈", 16, 16, "elf", "ciaran",
         (("hp", 0), ("mp", 0), ("sp", 0), ("atk_phys", 0),
-         ("agility", 0), ("defense", 22), ("magic_power", 415)),
+         ("agility", 0), ("defense", 22), ("magic_power", 53)),
         "防禦特化的魔力體質配點",
         # Fire and dark stay mastery-supplied (no literal XP); the rest of
         # the ordinary baseline is authored like her twin's.
@@ -358,13 +359,14 @@ ROWS: dict[str, PlayerPreset] = {
         # walked into the human world ALONE -- not yet registered at the guild,
         # Violet not yet met, no disciple, no party name. Species is 伊歐拉斯族
         # (eolas, Phantasm Elf), age 10/apparent 10 (she CLAIMS 222; the
-        # persona prose carries the lie). Final innate statics 70/70/95 and
-        # magic power 512; the allocation above the eolas floor is an
-        # increment over that floor, never the final value. Every approved
-        # source fact is recorded in docs/lore/character-template-alignment.md.
+        # persona prose carries the lie). The eolas floors plus this allocation
+        # yield 70/70/95, and the shared elf policy converts the magic points
+        # to 167; the allocation is an increment over that floor, never the
+        # final value. Every approved source fact is recorded in
+        # docs/lore/character-template-alignment.md.
         "elosia_shadowmoon", "伊洛希雅", 10, 10, "elf", "eolas",
         (("hp", 0), ("mp", 0), ("sp", 0), ("atk_phys", 0),
-         ("agility", 0), ("defense", 25), ("magic_power", 412)),
+         ("agility", 0), ("defense", 25), ("magic_power", 50)),
         "防禦滿值、魔力極高的魔導師配點",
         # Wind and light are mastered, so their ordinary trees come from the
         # shared closure with no literal XP; the other ordinary roots are

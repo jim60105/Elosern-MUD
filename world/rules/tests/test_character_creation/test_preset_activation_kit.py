@@ -142,7 +142,7 @@ class CharacterActivationTests(EvenniaTest):
             CharacterCreationRequest(mode="preset", preset_key=card.key),
         )
         floor = resolve_starting_profile(
-            card.race, card.subrace, mode="preset"
+            card.race, card.subrace
         ).axes_dict()["magic_power"].minimum
         self.assertEqual(result.magic_power, floor + dict(card.allocations)["magic_power"])
         self.assertEqual(self.character.race, card.race)

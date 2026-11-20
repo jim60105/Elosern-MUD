@@ -92,7 +92,7 @@ def _npc_persona_fixture(character, account=None) -> None:
                 SHIPPED_BASE_SUBRACE,
             )
             profile = resolve_starting_profile(
-                SHIPPED_BASE_RACE, SHIPPED_BASE_SUBRACE, mode="custom"
+                SHIPPED_BASE_RACE, SHIPPED_BASE_SUBRACE
             )
             rem = profile.budget
             allocs = {}

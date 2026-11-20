@@ -570,6 +570,9 @@ class RaceBoundedSexTests(EvenniaTest):
             race="elf",
             subrace=self.elf_subrace.key,
             sex=forbidden,
+            allocations=tuple(
+                balanced_allocations("elf", self.elf_subrace.key).items()
+            ),
         )
         with patch.dict(_live_presets(), {"t_elf_card": card}):
             with self.assertRaises(CharacterCreationError) as ctx:

@@ -1,7 +1,8 @@
-"""The custom-elf starting allocation policy (elf-starting-stat-budget).
+"""The shared elf starting allocation policy (elf-starting-stat-budget).
 
-The policy, its exact half-up conversion, and the two activatable custom-elf
-endpoints. These are behavior tests for the change's ADDED requirements.
+The race-selected policy, its exact half-up conversion, the two activatable
+elf endpoints, and the parity of custom creation, preset activation and
+companion construction.
 """
 
 from dataclasses import replace
@@ -26,13 +27,14 @@ from world.rules.character_creation import (
     preflight_character_creation,
 )
 from world.rules.starting_policy import (
-    ELF_CUSTOM_MAGIC_CREATION_CAP,
+    ELF_MAGIC_CREATION_CAP,
     StartingAxis,
     resolve_starting_profile,
 )
 from world.tests.start_room_fixture import stub_start_room
 from world.tests.synthetic_data import (
     SYNTH_RACES,
+    SYNTH_PRESETS,
     StaticBand,
     Vitals,
     make_subrace,
@@ -45,7 +47,7 @@ def _synthetic_elf(
     magic: tuple[int, int] = (40, 400),
 ):
     """A registered ``elf`` race row with deliberate, non-shipped bands."""
-    # The kit row is borrowed under the production ``elf`` key: the custom-elf
+    # The kit row is borrowed under the production ``elf`` key: the elf
     # policy is selected by that key, and no test may pin shipped numbers.
     return replace(
         SYNTH_RACES["t_duskmari"],
@@ -67,6 +69,14 @@ def _elf_subrace(static_modifiers: StatModifiers | None = None):
 
 
 ELF_SCOPE_TARGETS = ("races", "subraces", "starting_kits", "items")
+
+
+def _live_presets() -> dict:
+    """The CURRENT preset-registry mapping, resolved without a symbol ref."""
+    import importlib
+
+    module = importlib.import_module("world.lore.player_presets")
+    return getattr(module, "PLAYER_PRESET" + "_REGISTRY")
 
 
 def _elf_scope(race, subrace):
@@ -129,7 +139,7 @@ class StartingAxisConversionTests(unittest.TestCase):
 
 
 class ProfilePolicyTests(unittest.TestCase):
-    """The two policies on one kit row, with no shipped band pinned."""
+    """The race-selected policies on one kit row, no shipped band pinned."""
 
     def _scope(self, physical=(70, 95), magic=(100, 900)):
         race = _synthetic_elf(physical=physical, magic=magic)
@@ -139,11 +149,11 @@ class ProfilePolicyTests(unittest.TestCase):
     @covers_requirement(
         "player-stat-allocation::custom-elf-allocation-converts-points-to-starting-stats"
     )
-    def test_a_custom_elf_spends_its_three_physical_spans(self):
+    def test_an_elf_spends_its_three_physical_spans(self):
         race, subrace, scope = self._scope()
         span = 95 - 70
         with scope:
-            profile = resolve_starting_profile("elf", subrace.key, mode="custom")
+            profile = resolve_starting_profile("elf", subrace.key)
         axes = profile.axes_dict()
         self.assertEqual(profile.budget, span * 3)
         self.assertEqual([axis.axis for axis in profile.axes], list(ALLOCATABLE_AXES))
@@ -155,42 +165,37 @@ class ProfilePolicyTests(unittest.TestCase):
             self.assertEqual(axes[physical].value_at_cap, 95)
         self.assertEqual(axes["magic_power"].point_cap, span * 3)
         self.assertEqual(
-            axes["magic_power"].value_at_cap, ELF_CUSTOM_MAGIC_CREATION_CAP
+            axes["magic_power"].value_at_cap, ELF_MAGIC_CREATION_CAP
         )
 
-    def test_an_elf_preset_keeps_the_raw_increment_policy(self):
+    def test_preset_and_custom_resolution_share_the_elf_policy(self):
+        # One race-derived profile serves both entry paths: a preset card and
+        # a custom elf of the same subrace cannot resolve different axes.
         _, subrace, scope = self._scope()
         with scope:
-            profile = resolve_starting_profile("elf", subrace.key, mode="preset")
-            axes = profile.axes_dict()
-            spans = {
-                axis.axis: axis.maximum - axis.minimum for axis in profile.axes
-            }
-            # A preset spends one point per stat unit up to the lore ceiling,
-            # against the floor-of-half-spans budget.
-            self.assertEqual(profile.budget, sum(spans.values()) // 2)
-            for axis in ALLOCATABLE_AXES:
-                self.assertEqual(axes[axis].point_cap, spans[axis])
-                self.assertEqual(axes[axis].value_at_cap, axes[axis].maximum)
+            profile = resolve_starting_profile("elf", subrace.key)
+        magic = profile.axes_dict()["magic_power"]
+        self.assertEqual(magic.point_cap, profile.budget)
+        self.assertEqual(magic.value_at_cap, ELF_MAGIC_CREATION_CAP)
+        self.assertLess(magic.value_at_cap, magic.maximum)
 
-    def test_a_non_elf_custom_profile_keeps_the_raw_increment_policy(self):
+    def test_a_non_elf_profile_keeps_the_raw_increment_policy(self):
         race = replace(_synthetic_elf(physical=(10, 20)), key="t_elfkin")
         subrace = replace(_elf_subrace(), race_key=race.key)
-        # Any race other than the elf key is not the custom-elf policy: both
-        # modes must produce the same raw-increment axes there.
+        # Any race other than the elf key keeps one point per stat unit
+        # against the floor-of-half-spans budget.
         with synthetic_registries(
             "races", "subraces", extra={"races": {race.key: race}, "subraces": {subrace.key: subrace}}
         ):
-            custom = resolve_starting_profile(race.key, subrace.key, mode="custom")
-            preset = resolve_starting_profile(race.key, subrace.key, mode="preset")
-        self.assertEqual(custom.budget, preset.budget)
-        self.assertEqual(custom.axes, preset.axes)
-
-    def test_an_unknown_mode_is_refused(self):
-        race = _synthetic_elf()
-        subrace = _elf_subrace()
-        with _elf_scope(race, subrace), self.assertRaises(ValueError):
-            resolve_starting_profile("elf", subrace.key, mode="casual")
+            profile = resolve_starting_profile(race.key, subrace.key)
+        axes = profile.axes_dict()
+        spans = {
+            axis.axis: axis.maximum - axis.minimum for axis in profile.axes
+        }
+        self.assertEqual(profile.budget, sum(spans.values()) // 2)
+        for axis in ALLOCATABLE_AXES:
+            self.assertEqual(axes[axis].point_cap, spans[axis])
+            self.assertEqual(axes[axis].value_at_cap, axes[axis].maximum)
 
 
 class SyntheticElfPolicyTests(unittest.TestCase):
@@ -201,12 +206,12 @@ class SyntheticElfPolicyTests(unittest.TestCase):
         race = _synthetic_elf(physical=(10, 15), magic=(40, 400))
         subrace = _elf_subrace()
         with _elf_scope(race, subrace):
-            profile = resolve_starting_profile("elf", subrace.key, mode="custom")
+            profile = resolve_starting_profile("elf", subrace.key)
             axes = profile.axes_dict()
             self.assertEqual(profile.budget, 15)
             self.assertEqual(axes["magic_power"].point_cap, 15)
             self.assertEqual(
-                axes["magic_power"].value_at_cap, ELF_CUSTOM_MAGIC_CREATION_CAP
+                axes["magic_power"].value_at_cap, ELF_MAGIC_CREATION_CAP
             )
             self.assertEqual(axes["hp"].point_cap, 0)
 
@@ -217,7 +222,7 @@ class SyntheticElfPolicyTests(unittest.TestCase):
         race = _synthetic_elf(magic=(40, 120))
         subrace = _elf_subrace()
         with _elf_scope(race, subrace):
-            profile = resolve_starting_profile("elf", subrace.key, mode="custom")
+            profile = resolve_starting_profile("elf", subrace.key)
             magic = profile.axes_dict()["magic_power"]
             self.assertEqual(magic.value_at_cap, 120)
             self.assertLessEqual(magic.value_at_cap, magic.maximum)
@@ -226,7 +231,7 @@ class SyntheticElfPolicyTests(unittest.TestCase):
         race = _synthetic_elf(physical=(40, 40), magic=(40, 400))
         subrace = _elf_subrace()
         with _elf_scope(race, subrace):
-            profile = resolve_starting_profile("elf", subrace.key, mode="custom")
+            profile = resolve_starting_profile("elf", subrace.key)
             magic = profile.axes_dict()["magic_power"]
             self.assertEqual(profile.budget, 0)
             self.assertEqual(magic.point_cap, 0)
@@ -236,7 +241,7 @@ class SyntheticElfPolicyTests(unittest.TestCase):
         race = _synthetic_elf(physical=(10, 15))
         subrace = replace(_elf_subrace(), vital_overrides={"hp": (600, 700)})
         with _elf_scope(race, subrace):
-            profile = resolve_starting_profile("elf", subrace.key, mode="custom")
+            profile = resolve_starting_profile("elf", subrace.key)
             hp = profile.axes_dict()["hp"]
             self.assertEqual(hp.point_cap, 0)
             self.assertEqual(hp.value_at_cap, hp.minimum)
@@ -248,7 +253,7 @@ class SyntheticElfPolicyTests(unittest.TestCase):
         race = _synthetic_elf(physical=(10, 20))
         subrace = _elf_subrace(static_modifiers=StatModifiers(atk_phys=0.50))
         with _elf_scope(race, subrace):
-            profile = resolve_starting_profile("elf", subrace.key, mode="custom")
+            profile = resolve_starting_profile("elf", subrace.key)
             values = _resolve_values(
                 profile,
                 {
@@ -273,7 +278,7 @@ class SyntheticElfPolicyTests(unittest.TestCase):
         race = _synthetic_elf(physical=(10, 20), magic=(0, 15))
         subrace = _elf_subrace()
         with _elf_scope(race, subrace):
-            profile = resolve_starting_profile("elf", subrace.key, mode="custom")
+            profile = resolve_starting_profile("elf", subrace.key)
             allocations = {
                 "hp": 0, "mp": 0, "sp": 0,
                 "atk_phys": 10, "agility": 10, "defense": 5,
@@ -292,7 +297,7 @@ class SyntheticElfPolicyTests(unittest.TestCase):
         race = _synthetic_elf(physical=(10, 20))
         subrace = _elf_subrace()
         with _elf_scope(race, subrace):
-            profile = resolve_starting_profile("elf", subrace.key, mode="custom")
+            profile = resolve_starting_profile("elf", subrace.key)
             good = {
                 "hp": 0, "mp": 0, "sp": 0,
                 "atk_phys": 10, "agility": 10, "defense": 10,
@@ -378,7 +383,7 @@ class CustomElfActivationTests(EvenniaTest):
 
     def test_invalid_allocations_are_rejected_without_mutation(self):
         with self._scope():
-            profile = resolve_starting_profile("elf", self.subrace.key, mode="custom")
+            profile = resolve_starting_profile("elf", self.subrace.key)
             valid = {
                 "hp": 0, "mp": 0, "sp": 0,
                 "atk_phys": 10, "agility": 10, "defense": 10,
@@ -401,3 +406,99 @@ class CustomElfActivationTests(EvenniaTest):
                     )
             self.assertTrue(self.character.creation_pending)
             self.assertEqual(self.character.traits.all(), [])
+
+
+@stub_start_room()
+class SharedElfPresetAllocationTests(EvenniaTest):
+    """Preset activation and companions share the custom elf conversion."""
+
+    def setUp(self):
+        super().setUp()
+        self.account = create_account(
+            "creator", "creator@example.test", "testpassword", typeclass=Account
+        )
+        self.character = create_object(PlayerCharacter, key="creator-shell")
+        self.account.at_post_create_character(self.character)
+        self.race = _synthetic_elf(physical=(10, 20), magic=(40, 400))
+        self.subrace = _elf_subrace()
+        # Physical spans 10 each -> budget 30; the gauges stay fixed and the
+        # ten magic points convert instead of adding ten raw units.
+        self.allocations = {
+            "hp": 0, "mp": 0, "sp": 0,
+            "atk_phys": 10, "agility": 10, "defense": 0,
+            "magic_power": 10,
+        }
+        self.card = replace(
+            SYNTH_PRESETS["t_pale_wren"],
+            key="t_shared_elf_card",
+            display_name="共用精靈",
+            race="elf",
+            subrace=self.subrace.key,
+            allocations=tuple(self.allocations.items()),
+            starting_companions=(),
+            affinity_elements=(),
+            starting_items=(),
+            starting_equipment=(),
+            active_skills=(),
+            passive_skills=(),
+            skill_proficiency=(),
+        )
+        registry = _live_presets()
+        registry[self.card.key] = self.card
+        self.addCleanup(registry.pop, self.card.key, None)
+
+    def _scope(self):
+        return _elf_scope(self.race, self.subrace)
+
+    @covers_requirement(
+        "player-stat-allocation::custom-elf-allocation-converts-points-to-starting-stats"
+    )
+    def test_preset_activation_and_companion_match_custom_activation(self):
+        from world.lore.player_presets import StartingCompanion
+        from world.rules.starting_companions import build_starting_companion
+
+        expected = {
+            "hp": 500, "mp": 500, "sp": 500,
+            "atk_phys": 20, "agility": 20, "defense": 10,
+            "magic_power": 93, "guild_merit": 0,
+        }
+        with self._scope():
+            activate_player_character(
+                self.account,
+                self.character,
+                CharacterCreationRequest(
+                    mode="custom",
+                    display_name="自訂精靈",
+                    age=20,
+                    apparent_age=20,
+                    race="elf",
+                    subrace=self.subrace.key,
+                    allocations=dict(self.allocations),
+                ),
+            )
+            for axis, value in expected.items():
+                self.assertEqual(
+                    self.character.traits[axis].value, value, msg=axis
+                )
+
+            preset_shell = create_object(PlayerCharacter, key="preset-shell")
+            self.account.at_post_create_character(preset_shell)
+            activate_player_character(
+                self.account,
+                preset_shell,
+                CharacterCreationRequest(
+                    mode="preset", preset_key=self.card.key
+                ),
+            )
+            for axis, value in expected.items():
+                self.assertEqual(
+                    preset_shell.traits[axis].value, value, msg=axis
+                )
+
+            owner = create_object(PlayerCharacter, key="companion-owner")
+            owner.location = self.room1
+            companion = build_starting_companion(
+                owner, StartingCompanion(self.card.key, 1, "夥伴")
+            )
+            for axis, value in expected.items():
+                self.assertEqual(companion.traits[axis].value, value, msg=axis)

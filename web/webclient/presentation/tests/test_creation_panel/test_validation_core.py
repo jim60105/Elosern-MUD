@@ -400,7 +400,7 @@ class CreationPanelValidationTests(unittest.TestCase):
         payload = validate_creation(_valid_payload())
         for profile in payload["custom"]["profiles"]:
             resolved = resolve_starting_profile(
-                profile["race"], profile["subrace"], mode="custom"
+                profile["race"], profile["subrace"]
             )
             self.assertEqual(profile["budget"], resolved.budget)
             for axis in profile["axes"]:

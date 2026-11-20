@@ -145,9 +145,9 @@ def await_result(d):
 
 def _in_band_allocations(race_key: str, subrace_key: str) -> dict[str, int]:
     """Spend a profile's full budget with every allocation inside its cap."""
-    from world.rules.starting_policy import CUSTOM_MODE, resolve_starting_profile
+    from world.rules.starting_policy import resolve_starting_profile
 
-    profile = resolve_starting_profile(race_key, subrace_key, mode=CUSTOM_MODE)
+    profile = resolve_starting_profile(race_key, subrace_key)
     remaining = profile.budget
     allocations: dict[str, int] = {}
     for axis in profile.axes:
@@ -237,11 +237,11 @@ class CharacterCreationPromptTests(unittest.TestCase):
                 f"{race_key}（{description}，親附上限：{bound}）", catalog
             )
         policy_block, _, remainder = catalog.partition("\n種族：")
-        from world.rules.starting_policy import CUSTOM_MODE, resolve_starting_profile
+        from world.rules.starting_policy import resolve_starting_profile
 
         for subrace_key, subrace in _subraces().items():
             profile = resolve_starting_profile(
-                subrace.race_key, subrace_key, mode=CUSTOM_MODE
+                subrace.race_key, subrace_key
             )
             caps = ",".join(
                 str(profile.axes_dict()[axis].point_cap) for axis in ALLOCATABLE_AXES
@@ -446,10 +446,10 @@ class CharacterCreationProposalTests(unittest.TestCase):
         client = FakeLLMClient()
         # One past the widest live point cap: no axis may exceed the selected
         # profile's cap, whichever row the default race resolves to.
-        from world.rules.starting_policy import CUSTOM_MODE, resolve_starting_profile
+        from world.rules.starting_policy import resolve_starting_profile
 
         policy = resolve_starting_profile(
-            _default_race(), _default_subrace(), mode=CUSTOM_MODE
+            _default_race(), _default_subrace()
         ).axes_dict()
         widest_axis = max(ALLOCATABLE_AXES, key=lambda axis: policy[axis].point_cap)
         over_band = {axis: 0 for axis in ALLOCATABLE_AXES}
@@ -468,10 +468,10 @@ class CharacterCreationProposalTests(unittest.TestCase):
         client = FakeLLMClient()
         # The exact in-band spending with one extra unit on an axis that still
         # has cap room: the totals stop matching without tripping a cap.
-        from world.rules.starting_policy import CUSTOM_MODE, resolve_starting_profile
+        from world.rules.starting_policy import resolve_starting_profile
 
         policy = resolve_starting_profile(
-            _default_race(), _default_subrace(), mode=CUSTOM_MODE
+            _default_race(), _default_subrace()
         ).axes_dict()
         skewed = _in_band_allocations(_default_race(), _default_subrace())
         spare_axis = next(
@@ -656,7 +656,7 @@ class AllocationParityTests(unittest.TestCase):
     @covers_requirement("generative-character-concept::proposals-are-validated-deterministically-against-the-registries")
     def test_caps_and_budget_match_the_deterministic_preflight_for_every_profile(self):
         from world.ai.character_creation import _validate_allocations
-        from world.rules.starting_policy import CUSTOM_MODE, resolve_starting_profile
+        from world.rules.starting_policy import resolve_starting_profile
 
         for race_key in _races():
             subrace_keys = [
@@ -666,7 +666,7 @@ class AllocationParityTests(unittest.TestCase):
             for subrace_key in subrace_keys:
                 with self.subTest(race=race_key, subrace=subrace_key):
                     profile = resolve_starting_profile(
-                        race_key, subrace_key, mode=CUSTOM_MODE
+                        race_key, subrace_key
                     )
                     allocations = _in_band_allocations(race_key, subrace_key)
                     self.assertEqual(

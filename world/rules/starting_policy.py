@@ -4,14 +4,15 @@ One deterministic resolver turns immutable lore bands into the exact
 allocation policy a player sees: the lore bounds of every axis, the number of
 points its cap admits, the pre-modifier value that cap yields, and the exact
 point budget. The deterministic creation preflight, the draft wizard, the
-creation panel presenter, the text wizard and the generative proposal validator
-all read this module, so no surface can carry its own copy of the arithmetic.
+creation panel presenter, the text wizard, the generative proposal validator,
+preset activation and companion construction all read this module, so no
+surface can carry its own copy of the arithmetic.
 
-Two modes exist and are always requested explicitly (``mode="custom"`` or
-``mode="preset"``): preset cards keep the raw increment-per-point policy,
-non-elf custom creation does too, and a custom elf spends points against a
-budget derived from its three physical spans while magic power interpolates up
-to the creation cap *before* the subrace modifiers apply.
+The policy is selected by the resolved race alone: a non-elf profile spends
+one point per stat unit against the floor-of-half-spans budget, while an elf
+spends points against a budget derived from its three physical spans and
+interpolates magic power up to the creation cap *before* the subrace modifiers
+apply. Custom creation and preset cards therefore share one policy.
 
 The module is deliberately dependency-narrow: the immutable lore registries and
 the pure identity seam only, no database, no Evennia import, and no module-level
@@ -36,15 +37,12 @@ GAUGE_AXES = ("hp", "mp", "sp")
 PHYSICAL_AXES = ("atk_phys", "agility", "defense")
 ALLOCATABLE_AXES = GAUGE_AXES + PHYSICAL_AXES + ("magic_power",)
 
-CUSTOM_MODE = "custom"
-PRESET_MODE = "preset"
-CREATION_MODES = (CUSTOM_MODE, PRESET_MODE)
 ELF_RACE_KEY = "elf"
 
-#: The creation-time ceiling a custom elf's magic power can reach. It is a
+#: The creation-time ceiling an elf's magic power can reach. It is a
 #: starting-value limit only: the shipped lore ceiling (900) still bounds every
 #: authored and grown value, and no combat rule changes.
-ELF_CUSTOM_MAGIC_CREATION_CAP = 200
+ELF_MAGIC_CREATION_CAP = 200
 
 
 def _half_up(numerator: int, denominator: int) -> int:
@@ -105,7 +103,7 @@ def _axis_for(
 def _raw_increment_axes(
     bounds: dict[str, tuple[int, int]]
 ) -> tuple[StartingAxis, ...]:
-    """Every axis spends one point per stat unit (preset and non-elf custom)."""
+    """Every axis spends one point per stat unit (every non-elf profile)."""
     return tuple(
         _axis_for(
             axis,
@@ -117,10 +115,10 @@ def _raw_increment_axes(
     )
 
 
-def _elf_custom_axes(
+def _elf_axes(
     bounds: dict[str, tuple[int, int]]
 ) -> tuple[StartingAxis, ...]:
-    """The custom elf policy: physical builds spend, magic interpolates.
+    """The elf policy: physical builds spend, magic interpolates.
 
     The gauges are fixed for an elf (their lore floor is the only value), the
     three physical axes keep the raw increment, and magic power interpolates
@@ -149,7 +147,7 @@ def _elf_custom_axes(
         else:
             lower, upper = bounds[axis]
             value_at_cap = lower if budget == 0 else max(
-                lower, min(ELF_CUSTOM_MAGIC_CREATION_CAP, upper)
+                lower, min(ELF_MAGIC_CREATION_CAP, upper)
             )
             axes.append(
                 _axis_for(
@@ -160,20 +158,17 @@ def _elf_custom_axes(
 
 
 def resolve_starting_profile(
-    race_key: str, subrace_key: str | None = None, *, mode: str
+    race_key: str, subrace_key: str | None = None
 ) -> StartingProfile:
     """Resolve one allocation policy entirely from immutable lore.
 
-    ``mode`` is required so every caller states which policy it applies: a
-    preset card or a non-elf custom build spends raw increments against the
-    floor-of-half-spans budget, while a custom elf spends a budget equal to its
-    three physical spans and converts magic points to magic power.
+    The selected race decides the policy: a non-elf profile spends raw
+    increments against the floor-of-half-spans budget, while an elf spends a
+    budget equal to its three physical spans and converts magic points to
+    magic power. Callers do not choose a policy; custom creation, preset
+    activation and companion construction all resolve the same race-derived
+    profile.
     """
-    if mode not in CREATION_MODES:
-        raise ValueError(
-            "starting profile mode must be 'custom' or 'preset', got "
-            f"{mode!r}"
-        )
     race_key, subrace_key = resolve_race_and_subrace(race_key, subrace_key)
     race = RACE_REGISTRY[race_key]
     subrace = SUBRACE_REGISTRY[subrace_key] if subrace_key else None
@@ -188,8 +183,8 @@ def resolve_starting_profile(
         bounds.update(subrace.vital_overrides)
     modifiers = subrace.static_modifiers if subrace else StatModifiers()
 
-    if mode == CUSTOM_MODE and race_key == ELF_RACE_KEY:
-        axes = _elf_custom_axes(bounds)
+    if race_key == ELF_RACE_KEY:
+        axes = _elf_axes(bounds)
         budget = sum(bounds[axis][1] - bounds[axis][0] for axis in PHYSICAL_AXES)
     else:
         axes = _raw_increment_axes(bounds)
