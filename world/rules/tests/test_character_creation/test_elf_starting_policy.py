@@ -114,7 +114,7 @@ class StartingAxisConversionTests(unittest.TestCase):
 
     def test_interpolation_hits_both_endpoints(self):
         axis = StartingAxis(
-            axis="magic_power", minimum=100, maximum=900, point_cap=75, value_at_cap=200
+            axis="magic_power", minimum=100, maximum=200, point_cap=75, value_at_cap=200
         )
         self.assertEqual(axis.value_for(0), 100)
         self.assertEqual(axis.value_for(75), 200)
@@ -130,7 +130,7 @@ class StartingAxisConversionTests(unittest.TestCase):
 
     def test_interpolation_never_leaves_the_published_band(self):
         axis = StartingAxis(
-            axis="magic_power", minimum=100, maximum=900, point_cap=75, value_at_cap=200
+            axis="magic_power", minimum=100, maximum=200, point_cap=75, value_at_cap=200
         )
         values = [axis.value_for(points) for points in range(76)]
         self.assertEqual(values, sorted(values))
@@ -141,7 +141,7 @@ class StartingAxisConversionTests(unittest.TestCase):
 class ProfilePolicyTests(unittest.TestCase):
     """The race-selected policies on one kit row, no shipped band pinned."""
 
-    def _scope(self, physical=(70, 95), magic=(100, 900)):
+    def _scope(self, physical=(70, 95), magic=(100, 200)):
         race = _synthetic_elf(physical=physical, magic=magic)
         subrace = _elf_subrace()
         return race, subrace, _elf_scope(race, subrace)
@@ -177,7 +177,7 @@ class ProfilePolicyTests(unittest.TestCase):
         magic = profile.axes_dict()["magic_power"]
         self.assertEqual(magic.point_cap, profile.budget)
         self.assertEqual(magic.value_at_cap, ELF_MAGIC_CREATION_CAP)
-        self.assertLess(magic.value_at_cap, magic.maximum)
+        self.assertEqual(magic.value_at_cap, magic.maximum)
 
     def test_a_non_elf_profile_keeps_the_raw_increment_policy(self):
         race = replace(_synthetic_elf(physical=(10, 20)), key="t_elfkin")

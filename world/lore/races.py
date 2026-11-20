@@ -134,7 +134,7 @@ RACE_REGISTRY: dict[str, RaceProfile] = {
         vital_baseline=Vitals(
             hp=(10000, 10000), mp=(10000, 10000), sp=(10000, 10000)
         ),
-        static_baseline=_static_band(70, 95, 100, 900),
+        static_baseline=_static_band(70, 95, 100, 200),
         learning_multiplier=10.0,
         can_use_divine_arts=True,
         description="壽命數百年的精靈族，魔力深厚、體質超凡，與森林和魔法的關係密不可分。",
@@ -183,11 +183,11 @@ STATIC_TIER_REGISTRY: dict[str, StaticTier] = {
     ),
     "elf_common": StaticTier(
         "elf_common", "elf", "一般精靈", 1, (70, 95), None,
-        "The physical band of a typical elf.", (100, 500),
+        "The physical band of a typical elf.", (100, 200),
     ),
     "elf_prodigy": StaticTier(
         "elf_prodigy", "elf", "精靈中的異數", 2, (95, None), None,
-        "An exceptional elf with no documented hard ceiling.", (500, 900),
+        "An exceptional elf with no documented physical hard ceiling.", (100, 200),
     ),
 }
 

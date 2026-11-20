@@ -256,7 +256,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "11ddd9743cdf4c1697cdbb308d40a94fc9182e33f991e9f1aa6dcdd0b0cf8f13",
+  "fingerprint": "3a54ee4ccf010c51908d54e3d45c12174197de5784f55d09ae70e60e4633f9a3",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -16510,7 +16510,7 @@
     "world/lore/player_presets/data_story_cards.py": "c46c62922925a979da8f373540e50820ca18f271a1b19e2505d436541e6435dd",
     "world/lore/player_presets/validation.py": "51bad97af51ba44c701a2c07d67180293ab4b9f8999f392f492c54a55712e0d2",
     "world/lore/player_presets/vocab.py": "40b9f00671e848829cf0430aaaa9f49190af40c9a2359494ba254ab28c270c8e",
-    "world/lore/races.py": "6729ceb531b42ecdf6cef25c07b76b184f256be5217b943489f8993916a245e9",
+    "world/lore/races.py": "584b6ce120104d096dee34c5f165a201dd61f326b32bdf8dd019e400e481bfa7",
     "world/lore/registry_index.py": "f4902ac3797d720c33e95529a6d41ba8b4f6ca640a43f67e24cd683bbfa9cad8",
     "world/lore/registry_refs.py": "26bf919f94ae5cd7a451570d734c5d13bd2080137f55a111a26c4554d29646b8",
     "world/lore/rites/__init__.py": "167fddd4cd27b054638ab3ecb6def50bd16bdf5a85e7b4bb2850cbeca714cb65",
@@ -16823,7 +16823,7 @@
     "world/rules/spell_conditions.py": "76f567b6f19671550b20a4c40d54721ef26ad2356eeca8be8410b1ebae63807e",
     "world/rules/start_location.py": "05b7019e8d8325da4b3a1a4855b8b156c80d7c42d1b501c787a1e34849bd34ae",
     "world/rules/starting_companions.py": "c3620c30054c787f1747bddee53c45951be8a20b176a0f700af7bd61ca340c5b",
-    "world/rules/starting_policy.py": "d1156288bfcf1ff4ce30e881ba452eb75b9032320062ff438d8c184818e4962a",
+    "world/rules/starting_policy.py": "940915c1de977d6f1ae578c9e00e215c1c870bd587ed4b43152e74ff0a10c736",
     "world/rules/state_derived_roll.py": "a2750faa8d5e9eeeddcd20a7c711e4d76be0b13a7f8dae6413f84f0c3ecfce99",
     "world/rules/state_reactions.py": "488f3d36ba86ee9c2e0694c2c5835c114926c270715d53c1a36afa3e9ed9c89d",
     "world/rules/status_display.py": "615ef85f36c071cc2e44b776f621820dbdfd780460ef40e536559c2b956ab2ea",

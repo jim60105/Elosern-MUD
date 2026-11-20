@@ -39,9 +39,9 @@ ALLOCATABLE_AXES = GAUGE_AXES + PHYSICAL_AXES + ("magic_power",)
 
 ELF_RACE_KEY = "elf"
 
-#: The creation-time ceiling an elf's magic power can reach. It is a
-#: starting-value limit only: the shipped lore ceiling (900) still bounds every
-#: authored and grown value, and no combat rule changes.
+#: The elf magic-power ceiling. It is the same number as the race band's
+#: ceiling: creation interpolates up to it and every authored value is bounded
+#: by it. The band, not this constant, is the single source of the number.
 ELF_MAGIC_CREATION_CAP = 200
 
 

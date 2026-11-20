@@ -298,25 +298,32 @@ class RaceProfile:
 > **Amended 2026-08-30 (change `magic-power-static-rename`, growth redesign D1/D2).** The
 > `magic_cap` field is deleted. `StaticBand` is four-dimensional: `magic_power` joins
 > `atk_phys`/`agility`/`defense` as the magic school's combat stat with a species-wide
-> floor-to-ceiling band (human 5-90, beastfolk 1-30, elf 100-900) and no progression semantics.
+> floor-to-ceiling band (human 5-90, beastfolk 1-30, elf 100-200) and no progression semantics.
 > `StaticTier` carries its own `magic_band` (validated against the owning race band at registry
 > load), which replaces the deleted race-level `starting_magic_level` for tier-built NPCs.
+>
+> **Amended 2026-11-20 (change `elf-starting-stat-budget`).** The elf ceiling is 200, the same
+> number as the creation cap: the race band and both elf tier magic bands are `(100, 200)`, and
+> imports above 200 are rejected. The 2026-08-30 text above carried the superseded 900 ceiling.
 
 **Vital pools and static stats scale by different factors, and neither may be derived from the
-other.** Pools scale ~100× from human to elf (120-150 → 10000); static combat stats scale ~10×
-(human elite 8 → elf 88), matching `world_info.md`'s "身體素質為人類精銳戰士的 10 倍". Magic level
-likewise scales 10× (cap 90 → 900). Reference points taken from the sample cards:
+other.** Pools scale ~100× from human to elf (120-150 → 10000); the three physical static stats
+scale ~10× (human elite 8 → elf 88), matching `world_info.md`'s "身體素質為人類精銳戰士的 10 倍".
+The elf magic ceiling is 200, not ten times the human ceiling. Reference points taken from the
+sample cards:
 
 | | human elite | human non-combatant | elf | ratio |
 |---|---|---|---|---|
 | `atk_phys` / `agility` / `defense` | 8 / 9 / 7 | 5 / 6 / 6 | 88 / 92 / 90 | ~10× |
-| `magic_power` band ceiling | 90 | 90 | 900 | 10× |
+| `magic_power` band ceiling | 90 | 90 | 200 | ~2.2× |
 | `hp` | 120 | 150 | 10000 | ~100× |
 
 
-The asymmetry is deliberate: elves are absurdly durable but "only" ten times as damaging, which is
-why `hp` is an input to `effective_power()` — a stat-only ratio would not flag an elf-versus-human
-fight as overwhelming even though the human cannot win.
+The asymmetry is deliberate: elves are absurdly durable and ten times as damaging with a blade,
+while their raw magic ceiling is only about twice a human's; skill multipliers and proficiency
+carry the rest of the magical gap. That is why `hp` is an input to `effective_power()` — a
+stat-only ratio would not flag an elf-versus-human fight as overwhelming even though the human
+cannot win.
 
 **Skill multipliers are a third, independent layer** applied on top of base stats at resolution
 time: ×10 (統御術 partial effect), ×100 (身體強化), ×1000 (身體超強化). They are never baked into

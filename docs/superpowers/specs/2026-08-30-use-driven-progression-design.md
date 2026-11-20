@@ -123,7 +123,10 @@ class StaticBand:
 |---|---|---|---|
 | human | (1, 22) | (5, 90) | 1.0 |
 | beastfolk | (4, 34) | (1, 30) | 1.0 |
-| elf | (70, 95) | (100, 900) | 10.0 |
+| elf | (70, 95) | (100, 200) | 10.0 |
+
+> **Amended 2026-11-20 (change `elf-starting-stat-budget`).** 精靈 `magic_power` 上限改為 200，
+> 與創角上限一致；此表的精靈帶已更新，其餘種族不變。
 
 `STATIC_TIER_REGISTRY` 各列照現有三維的做法為每維補上更窄的 tier 帶，tier 帶必須
 是種族帶的子集合，載入時檢查。舊的數值 lore 錨點以 tier 提示形式存活，例如
