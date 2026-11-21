@@ -22,7 +22,7 @@ topics:
         text: 尤斯汀‧柯德溫朝窗外看了一眼，拿起粉筆，把牆上的名冊對過一遍。
       - kind: speech
         speaker: host
-        text: 「對。天亮到正午是東門最忙的時候。書記趕在城門開大之前，一隊一隊核對貨單，錯一筆，出關就要重跑一趟。」
+        text: 「對啊。天亮到正午是東門最忙的時候。書記趕在城門開大之前，一隊一隊核對貨單，錯一筆，出關就要重跑一趟。」
       - kind: speech
         speaker: host
         text: 「公所管的是登記和排序。誰先走、誰後走，我這邊排開，免得官道上擠成一團，誰也動不了。」
@@ -31,7 +31,7 @@ topics:
         text: 「那這些商隊缺人手的時候，公所會幫忙找人嗎？」
       - kind: speech
         speaker: host
-        text: 「不會。公所中立，不替商隊招護衛，也不替任何一批貨作保。你要查本季出發的字號，牆邊粉筆寫得明白。」
+        text: 「不會啦。公所中立，不替商隊招護衛，也不替任何一批貨作保。你要查本季出發的字號，牆邊粉筆寫得明白。」
   fallback:
     scene_id: altoria_merchant_hall.topic_01_fallback_scene
     revision: r5

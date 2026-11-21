@@ -81,7 +81,7 @@ topics:
         text: 「聖袍也算禮服？」
       - kind: speech
         speaker: host
-        text: 「算。穿在誰身上，就是給誰看。教會要的就是這個意思，我照著裁，一針都不多添。」
+        text: 「算啊。穿在誰身上，就是給誰看。教會要的就是這個意思，我照著裁，一針都不多添。」
   fallback:
     scene_id: altoria_tailor.topic_03_fallback_scene
     revision: r4

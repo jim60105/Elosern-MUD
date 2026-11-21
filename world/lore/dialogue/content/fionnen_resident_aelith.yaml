@@ -18,7 +18,7 @@ topics:
       text: 一隻蜂落在她手腕上，她也不趕，只由著牠爬。
     - kind: speech
       speaker: host
-      text: 「蜂不騙人。你待牠好，牠就把甜留給你。我嘴笨，跟蜂相處比跟人相處省事，牠們不會問我話。」
+      text: 「蜂不騙人，你待牠好，牠就把甜留給你。我嘴笨，跟蜂相處比跟人相處省事，牠們不會問我話。」
 - topic_id: fionnen_resident_aelith.topic_02
   keyword: 蜜
   label: 蜜
@@ -108,4 +108,4 @@ topics:
       text: 她眼底浮起一片蜜色，聲音軟得化不開。
     - kind: speech
       speaker: host
-      text: 「蜜會勾人。你嚐過我這口蜜，往後走遠了，舌尖還會記得。」
+      text: 「蜜會勾人喔。你嚐過我這口蜜，往後走遠了，舌尖還會記得。」

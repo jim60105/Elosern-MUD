@@ -72,7 +72,7 @@ topics:
       text: 她掬起一捧水，低頭照了照自己的臉。
     - kind: speech
       speaker: host
-      text: 「水會照人。你湊近點，也能從水裡瞧見自己。」
+      text: 「水會照人，你湊近點，也能從水裡瞧見自己。」
 - topic_id: eolas_resident_aranith.topic_05
   keyword: 私語
   label: 私語

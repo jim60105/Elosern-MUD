@@ -47,7 +47,7 @@ topics:
       text: 「這屋裡還住了誰？」
     - kind: speech
       speaker: host
-      text: 「兩個女兒。大的芬林餵蛛，林子裡每窩蛛的脾氣她都摸得透；小的布倫內爾運絲，把絲捆好背回谷底。」
+      text: 「兩個女兒，大的芬林餵蛛，林子裡每窩蛛的脾氣她都摸得透；小的布倫內爾運絲，把絲捆好背回谷底。」
     - kind: narration
       text: 她朝林子的方向抬了抬下巴，聲音放得又低了些。
     - kind: speech
@@ -65,7 +65,7 @@ topics:
       text: 「『沙多瓦勒』這個姓，是什麼意思？」
     - kind: speech
       speaker: host
-      text: 「就是影谷。幽月谷的月亮一升上來，谷壁的影子順著溪水疊成一道，這家就住在那一帶。」
+      text: 「就是影谷，幽月谷的月亮一升上來，谷壁的影子順著溪水疊成一道，這家就住在那一帶。」
     - kind: narration
       text: 她伸手比了比谷壁的方向，指尖在半空停了一下。
     - kind: speech

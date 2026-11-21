@@ -28,7 +28,7 @@ topics:
         text: 「順著身子走？所以比起手臂使力，更看重從腳到腰的協調？」
       - kind: speech
         speaker: host
-        text: 「算你懂。別喊我導師，我不教人。基亞蘭的孩子先認刀柄，再認刀鋒。想真懂差別，就拿把木刀進場走幾百遍，身體比耳朵記得快。」
+        text: 「算你懂啦。別喊我導師，我不教人。基亞蘭的孩子先認刀柄，再認刀鋒。想真懂差別，就拿把木刀進場走幾百遍，身體比耳朵記得快。」
   fallback:
     scene_id: ciaran_teliel_home.topic_01_scene
     revision: r4
