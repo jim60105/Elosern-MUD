@@ -6,14 +6,14 @@ topics:
   label: 線
   fallback:
     scene_id: ciaran_resident_yrenwen.topic_01_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「這麼多線，你真的分得清？」
     - kind: speech
       speaker: host
-      text: 「分得清。深一線、淺一線，閉著眼摸也知道。」
+      text: 「分得清啊，深一線、淺一線，閉著眼摸也知道。」
     - kind: speech
       speaker: host
       text: 「我生在染房，眼睛先學會的是顏色。線一亂，我心裡就跟著亂。」
@@ -69,14 +69,14 @@ topics:
   label: 名字
   fallback:
     scene_id: ciaran_resident_yrenwen.topic_04_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「特魯松，是那排挺直的松樹？」
     - kind: speech
       speaker: host
-      text: 「真松。坡上的松都長得直，風再大也不彎。」
+      text: 「那排就是真松，坡上的松都長得直，風再大也不彎。」
     - kind: speech
       speaker: host
       text: 「我家的人也直。只有我溫吞，常被姊笑。」

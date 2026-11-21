@@ -6,14 +6,14 @@ topics:
   label: 槌衣
   fallback:
     scene_id: ciaran_resident_coriel.topic_01_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「這池衣裳，你一天要槌多少件？」
     - kind: speech
       speaker: host
-      text: 「數不清。早上洗到天黑，手沒停過。」
+      text: 「從天亮洗到天黑，手沒停過，數也數不清。」
     - kind: speech
       speaker: host
       text: 「下槌要實，也要勻。衣裳浸透了，先把泥水槌出來，再換清水漂。偷懶少槌兩下，領口就留一圈灰。」
@@ -72,14 +72,14 @@ topics:
   label: 名字
   fallback:
     scene_id: ciaran_resident_coriel.topic_04_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「拉文伍德，是林子裡那些鴉嗎？」
     - kind: speech
       speaker: host
-      text: 「鴉林。天黑牠們繞著樹叫，翅膀一張一合。」
+      text: 「拉文伍德說的鴉林，就是林子裡那些鴉。天黑牠們繞著樹叫，翅膀一張一合。」
     - kind: speech
       speaker: host
       text: 「我槌累了，就坐在池邊聽一會。那聲音不中聽，可是踏實。」

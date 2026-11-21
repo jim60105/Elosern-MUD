@@ -69,14 +69,14 @@ topics:
   label: 谷裡
   fallback:
     scene_id: eolas_resident_taellin.topic_04_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「谷裡的晚上，也這麼安靜嗎？」
     - kind: speech
       speaker: host
-      text: 「才不。夜裡才熱鬧。泉邊人聲、水聲，還有聽不出誰跟誰的喘氣，全攪在一塊。」
+      text: 「才不呢，夜裡才熱鬧，泉邊人聲、水聲，還有聽不出誰跟誰的喘氣，全攪在一塊。」
     - kind: speech
       speaker: host
       text: 「有的人摟完就下水，泡著泡著又講起明天要做的活。」
@@ -122,14 +122,14 @@ topics:
       text: 「這是我自己留著的小事，不隨便講。等你在池邊跟我坐熟了，我再說。」
   fallback:
     scene_id: eolas_resident_taellin.topic_06_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「你有沒有只屬於自己的小習慣？」
     - kind: speech
       speaker: host
-      text: 「有。剛洗完，身上還燙，我就裹著半濕的布站在池邊，讓夜風吹乾。」
+      text: 「剛洗完，身上還燙，我就裹著半濕的布站在池邊，讓夜風吹乾。」
     - kind: narration
       text: 她說得起勁，嘴角的窩都笑出來。
     - kind: speech

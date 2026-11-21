@@ -69,14 +69,14 @@ topics:
   label: 名字
   fallback:
     scene_id: ciaran_resident_faellin.topic_04_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「杜斯克瓦爾克爾，是踏著黃昏走的意思嗎？」
     - kind: speech
       speaker: host
-      text: 「踏昏。黃昏我收刀最晚，影子拖得老長，一路拖過整個練刀場。」
+      text: 「踏昏說的是黃昏。我收刀最晚，影子拖得老長，一路拖過整個練刀場。」
     - kind: speech
       speaker: host
       text: 「這姓配我，配得正好嘛。」

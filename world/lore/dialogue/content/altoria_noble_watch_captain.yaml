@@ -27,7 +27,7 @@ topics:
         text: 「石板路誰都能走。各府門房有各府的規矩，拜帖往哪裡遞，他們自己核。你請自便。」
   fallback:
     scene_id: altoria_noble_watch.topic_01_scene
-    revision: r4
+    revision: r5
     lines:
     - kind: speech
       speaker: actor
@@ -36,7 +36,7 @@ topics:
       text: 他把登記板擱回桌上，朝門外空蕩的街面抬了抬下巴。
     - kind: speech
       speaker: host
-      text: 「不用。貴族區對所有人開放。衛所按時巡街、查驗防火水槽，不盤問行人的來歷。」
+      text: 「貴族區對所有人開放，不必通報。衛所按時巡街、查驗防火水槽，不盤問行人的來歷。」
     - kind: speech
       speaker: host
       text: 「各家府門深鎖，那是各府自己的規矩。街道本身誰都能走。請自便。」
@@ -66,7 +66,7 @@ topics:
   label: 衛所
   fallback:
     scene_id: altoria_noble_watch.topic_03_scene
-    revision: r4
+    revision: r5
     lines:
     - kind: speech
       speaker: actor
@@ -75,7 +75,7 @@ topics:
       text: 他把巡查名冊往桌前一推，用羽毛筆在紙邊點了點。
     - kind: speech
       speaker: host
-      text: 「三件。按時巡街、查驗各處防火水槽，還有登記各戶夜裡報上來的燈火和門戶。」
+      text: 「按時巡街、查驗各處防火水槽，還有登記各戶夜裡報上來的燈火和門戶，就這三件。」
     - kind: speech
       speaker: host
       text: 「下城門和主幹道的防務，歸南門衛兵隊長托瓦德‧鄧堡統籌。換班的時候，我和他對一對兩邊的治安消息。」
@@ -84,7 +84,7 @@ topics:
       text: 「那這片高地上的事，問你就對了？」
     - kind: speech
       speaker: host
-      text: 「問吧。我知道的都講，不知道的就說不知道。訪客問路，我也只能指，不能帶。」
+      text: 「你問吧，我知道的都講，不知道的就說不知道。訪客問路，我也只能指，不能帶。」
 - topic_id: altoria_noble_watch.topic_04
   keyword: 委託
   label: 委託

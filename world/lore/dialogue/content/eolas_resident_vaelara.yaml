@@ -27,14 +27,14 @@ topics:
   label: 溪邊
   fallback:
     scene_id: eolas_resident_vaelara.topic_02_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「溪邊白天都這麼多人嗎？」
     - kind: speech
       speaker: host
-      text: 「白天多。挑水的人、洗衣的人，都擠在這一段。日頭偏西就散了，剩幾個貪涼的脫乾淨往水裡躺。」
+      text: 「白天人多。挑水的人、洗衣的人，都擠在這一段。日頭偏西就散了，剩幾個貪涼的脫乾淨往水裡躺。」
     - kind: speech
       speaker: host
       text: 「我也不例外。水托著身子，比床還舒服。」
@@ -69,14 +69,14 @@ topics:
   label: 名字
   fallback:
     scene_id: eolas_resident_vaelara.topic_04_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「你們家的姓，是清水的意思吧？」
     - kind: speech
       speaker: host
-      text: 「清水。水清得見底，石子數得出來。」
+      text: 「我們家的姓說的是清水。水清得見底，石子數得出來。」
     - kind: narration
       text: 她說著，真把腳踩進溪裡，腳趾在石頭上動了動。
     - kind: speech
@@ -101,14 +101,14 @@ topics:
       text: 「我話多，可心裡那口井，只給走得近的人舀。你再來幾趟。」
   fallback:
     scene_id: eolas_resident_vaelara.topic_05_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「你有沒有哪天，特別想被人抱住？」
     - kind: speech
       speaker: host
-      text: 「有。溪水漲到腰那天，我就想有個人從後面攬住我，兩個人一起在水裡晃。」
+      text: 「溪水漲到腰那天，我就想有個人從後面攬住我，兩個人一起在水裡晃。」
     - kind: narration
       text: 她臉頰紅了，笑起來卻一點也不躲。
     - kind: speech

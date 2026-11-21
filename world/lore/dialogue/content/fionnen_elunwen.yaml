@@ -6,7 +6,7 @@ topics:
   label: 箭術
   fallback:
     scene_id: fionnen_elunwen_home.topic_01_scene
-    revision: r4
+    revision: r5
     lines:
     - kind: speech
       speaker: actor
@@ -15,7 +15,7 @@ topics:
       text: 她把弓靠回靶架，走到你側面，低頭看你的腳，再往上看你的腰。
     - kind: speech
       speaker: host
-      text: 「站。腳踩穩，胯別歪，肩膀放平。勁從腳底上來，一路到肩。姿勢散了，力就漏掉。」
+      text: 「頭一件學的是站。腳踩穩，胯別歪，肩膀放平。勁從腳底上來，一路到肩。姿勢散了，力就漏掉。」
     - kind: speech
       speaker: host
       text: 「拉滿別憋氣，吐到一半再放。那一下會抖，從腰竄上胸口。你壓不住，讓它走完就好。」
@@ -24,7 +24,7 @@ topics:
       text: 「所以要練到身子自己記得？」
     - kind: speech
       speaker: host
-      text: 「對。我拉過太多回，腳一踩進土裡，腰跟肩自己就找對位置。你練到閉著眼也放得開手，就行。」
+      text: 「對，我拉過太多回，腳一踩進土裡，腰跟肩自己就找對位置。你練到閉著眼也放得開手，就行。」
 - topic_id: fionnen_elunwen_home.topic_02
   keyword: 靶道
   label: 靶道
@@ -54,7 +54,7 @@ topics:
   label: 光魔法
   fallback:
     scene_id: fionnen_elunwen_home.topic_03_scene
-    revision: r4
+    revision: r5
     lines:
     - kind: speech
       speaker: actor
@@ -72,13 +72,13 @@ topics:
       text: 「兩樣一起練，不會互相妨礙嗎？」
     - kind: speech
       speaker: host
-      text: 「不會。眼睛盯著靶，呼吸跟手裡的光一起定下來。」
+      text: 「兩樣不會互相妨礙。眼睛盯著靶，呼吸跟手裡的光一起定下來。」
 - topic_id: fionnen_elunwen_home.topic_04
   keyword: 比試
   label: 比試
   fallback:
     scene_id: fionnen_elunwen_home.topic_04_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
@@ -87,7 +87,7 @@ topics:
       text: 她把弓靠回靶架，搖了搖頭，沒接話。
     - kind: speech
       speaker: host
-      text: 「不比。這條道上，每個人只管自己的準頭。」
+      text: 「這種事我不比。這條道上，每個人只管自己的準頭。」
     - kind: speech
       speaker: host
       text: 「你要比，就拿今天跟昨天比。今天手比昨天穩，就是你贏。」

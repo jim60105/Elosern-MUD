@@ -30,7 +30,7 @@ topics:
   label: 藥露
   fallback:
     scene_id: eolas_nirnel_home.topic_02_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
@@ -48,7 +48,7 @@ topics:
       text: 「喝多了會出事嗎？」
     - kind: speech
       speaker: host
-      text: 「會。藥要照身子的狀況配，不是拿來當水喝。你哪天覺得不對，就先回來找我。」
+      text: 「喝多了當然會出事。藥要照身子的狀況配，不是拿來當水喝。你哪天覺得不對，就先回來找我。」
 - topic_id: eolas_nirnel_home.topic_03
   keyword: 魔力
   label: 魔力
@@ -75,7 +75,7 @@ topics:
   label: 收回
   fallback:
     scene_id: eolas_nirnel_home.topic_04_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
@@ -91,4 +91,4 @@ topics:
       text: 「外頭買來的藥水，也不能拿來換嗎？」
     - kind: speech
       speaker: host
-      text: 「不能。你留著自己用，或帶回山外。谷裡的藥只認谷裡採的草喔。」
+      text: 「外頭買來的藥水不能換。你留著自己用，或帶回山外，谷裡的藥只認谷裡採的草喔。」

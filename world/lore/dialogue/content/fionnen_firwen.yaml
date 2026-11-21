@@ -84,7 +84,7 @@ topics:
   disclosure: pure_chain
   fallback:
     scene_id: fionnen_firwen_home.topic_04_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
@@ -102,4 +102,4 @@ topics:
       text: 「所以林間光庭是那時候留下來的？」
     - kind: speech
       speaker: host
-      text: 「是。孩子，你眼下坐的地方，從前連一隻鳥都飛不進來。」
+      text: 「樹冠那時候就讓開了。孩子，你眼下坐的地方，從前連一隻鳥都飛不進來。」

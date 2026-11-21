@@ -29,7 +29,7 @@ topics:
   label: 差事
   fallback:
     scene_id: altoria_guardhouse.topic_02_scene
-    revision: r4
+    revision: r5
     lines:
     - kind: speech
       speaker: actor
@@ -38,7 +38,7 @@ topics:
       text: 托瓦德按住腰間佩劍的銅柄，火光映到他左眉那道舊傷上，眼神沒有鬆。
     - kind: speech
       speaker: host
-      text: 「沒有。衛兵隊守城門、管街面秩序，駐所的職責就到這裡。委託一概不發，以後也一樣。這不是推託，分內分外要先弄清楚。」
+      text: 「衛兵隊守城門、管街面秩序，駐所的職責就到這裡，一概不發委託，以後也一樣。這不是推託，分內分外要先弄清楚。」
     - kind: speech
       speaker: host
       text: 「要接差事，往北走到中央廣場，往東拐進公會前。大廳那面看板釘著各級委託，你看上哪張，去櫃檯找辦事員登記。他們核過，才算數。」

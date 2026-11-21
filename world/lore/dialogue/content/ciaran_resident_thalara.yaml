@@ -27,14 +27,14 @@ topics:
   label: 藥
   fallback:
     scene_id: ciaran_resident_thalara.topic_02_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「你們熬藥有什麼講究？」
     - kind: speech
       speaker: host
-      text: 「火候。大一分，藥性散掉；小一分，味道出不來。」
+      text: 「最講究的是火候，大一分藥性散掉，小一分味道出不來。」
     - kind: speech
       speaker: host
       text: 「我守著壺，聞氣味從苦轉香，就知道成了。急也沒有用，藥不聽人。」
@@ -48,7 +48,7 @@ topics:
   label: 家人
   fallback:
     scene_id: ciaran_resident_thalara.topic_03_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
@@ -60,7 +60,7 @@ topics:
       text: 她往屋後那片草影望了一眼，語氣很平。
     - kind: speech
       speaker: host
-      text: 「我管種。三個人湊齊的時候，園子裡都是人影。」
+      text: 「我管種，三個人湊齊的時候，園子裡都是人影。」
     - kind: speech
       speaker: host
       text: 「她們兩個都比我會說話。你要找誰，喊一聲，人就在草叢裡。」
@@ -69,14 +69,14 @@ topics:
   label: 名字
   fallback:
     scene_id: ciaran_resident_thalara.topic_04_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「索爾恩伍德這個姓，是什麼意思？」
     - kind: speech
       speaker: host
-      text: 「棘木。園子外圍那一圈帶刺的老木，是這家的界線。」
+      text: 「索爾恩伍德就是棘木，園子外圍那一圈帶刺的老木，是這家的界線。」
     - kind: narration
       text: 她抬手往園外那排黑成一片的枝影指了指。
     - kind: speech
@@ -101,14 +101,14 @@ topics:
       text: 「有些話像藥，火候不到就端出來，只會燙人。你再多來幾趟。」
   fallback:
     scene_id: ciaran_resident_thalara.topic_05_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「你自己最常喝哪一味？」
     - kind: speech
       speaker: host
-      text: 「催情草。夜裡一個人的時候，煎一碗喝了，熱從肚子裡往外走，指尖都發燙。」
+      text: 「我最常煎催情草。夜裡一個人的時候，煎一碗喝了，熱從肚子裡往外走，指尖都發燙。」
     - kind: speech
       speaker: host
       text: 「然後我把衣裳褪了，靠在草堆邊，讓那股熱自己走完。」

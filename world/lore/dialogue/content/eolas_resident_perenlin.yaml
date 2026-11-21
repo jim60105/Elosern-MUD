@@ -90,14 +90,14 @@ topics:
   label: 季節
   fallback:
     scene_id: eolas_resident_perenlin.topic_05_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「這池子到了冬天，水不會冷掉嗎？」
     - kind: speech
       speaker: host
-      text: 「不會。泉從岩縫裡出來，天一冷反而更燙，白氣整座谷都看得見。」
+      text: 「這池子不會冷。泉從岩縫裡出來，天一冷反而更燙，白氣整座谷都看得見。」
     - kind: speech
       speaker: host
       text: 「天冷時，人都往最裡頭那口擠。肩膀碰肩膀，誰也不嫌誰。」

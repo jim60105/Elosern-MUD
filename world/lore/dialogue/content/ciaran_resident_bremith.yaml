@@ -84,14 +84,14 @@ topics:
   label: 名字
   fallback:
     scene_id: ciaran_resident_bremith.topic_04_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「杜斯克瓦爾克爾，是踏昏的意思嗎？」
     - kind: speech
       speaker: host
-      text: 「踏昏。黃昏收刀，人影拖在場上，人踩著自個兒的影子回家。這家就認了這個姓。」
+      text: 「踏昏說的是黃昏收刀。人影拖在場上，人踩著自個兒的影子回家，這家就認了這個姓。」
     - kind: narration
       text: 她抬腳往地上跺了跺，乾泥浮起一小片灰，落了滿鞋面。
     - kind: speech
@@ -116,14 +116,14 @@ topics:
       text: 「我話說得直，可交心的事，只跟接得住我刀的人說。你先練，練到我不必留手，再來問。」
   fallback:
     scene_id: ciaran_resident_bremith.topic_05_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「練刀這麼狠，你也有軟下來的時候嗎？」
     - kind: speech
       speaker: host
-      text: 「有。練到力竭，整個人泡進溪池，那時我最軟，像一團化開的泥。」
+      text: 「有啊，練到力竭，整個人泡進溪池。那時我最軟，像一團化開的泥。」
     - kind: speech
       speaker: host
       text: 「水涼，涼到骨頭裡。我靠著池邊，手指頭都懶得抬。」

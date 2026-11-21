@@ -6,14 +6,14 @@ topics:
   label: 聽風
   fallback:
     scene_id: fionnen_resident_ondeth.topic_01_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「風有什麼好聽的？我聽到的都一樣。」
     - kind: speech
       speaker: host
-      text: 「不一樣。葉子翻面是一種聲音，鳥被驚起是另一種。風把林子裡的事一樣一樣送過來。」
+      text: 「風聲每一樣都不一樣。葉子翻面是一種聲音，鳥被驚起是另一種。風把林子裡的事一樣一樣送過來。」
     - kind: narration
       text: 她側過耳朵，停了一下，林子那頭還沒有動靜。
     - kind: speech
@@ -27,14 +27,14 @@ topics:
   label: 動靜
   fallback:
     scene_id: fionnen_resident_ondeth.topic_02_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「林子裡有什麼動靜，你都能先知道？」
     - kind: speech
       speaker: host
-      text: 「大多能。獸踩斷枯枝、鳥突然不叫、溪水聲音變悶，都是有東西經過。」
+      text: 「大多能先知道。獸踩斷枯枝、鳥突然不叫、溪水聲音變悶，都是有東西經過。」
     - kind: speech
       speaker: host
       text: 「夜裡林子也不安靜。有人笑、有人喘，順著風都聽得見。我聽見了就翻身，不去打擾。」
@@ -69,14 +69,14 @@ topics:
   label: 名字
   fallback:
     scene_id: fionnen_resident_ondeth.topic_04_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「蒙斯哈德，是月影的意思？」
     - kind: speech
       speaker: host
-      text: 「月影。夜裡月影挪過草葉，沒有聲音。我聽不見，只能看著它動。」
+      text: 「蒙斯哈德說的是月影。夜裡月影挪過草葉，沒有聲音，我聽不見，只能看著它動。」
     - kind: narration
       text: 她低頭看腳邊，那裡的樹影正被風推著晃。
     - kind: speech
@@ -101,14 +101,14 @@ topics:
       text: 「風裡的話，我只講給一起靜下來的人聽。你現在還沒靜。」
   fallback:
     scene_id: fionnen_resident_ondeth.topic_05_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「一個人聽了一整天的風，晚上你最想聽什麼？」
     - kind: speech
       speaker: host
-      text: 「心跳。夜半無風的時候，林子靜得嚇人，自己的心跳反而最大聲。」
+      text: 「我最想聽心跳。夜半無風的時候，林子靜得嚇人，自己的心跳反而最大聲。」
     - kind: speech
       speaker: host
       text: 「有個人躺在我旁邊，呼吸貼著我的耳朵。我不必聽風，就知道她在。」

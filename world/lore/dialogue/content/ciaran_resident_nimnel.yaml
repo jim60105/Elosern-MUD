@@ -75,14 +75,14 @@ topics:
   label: 名字
   fallback:
     scene_id: ciaran_resident_nimnel.topic_04_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「溫特爾松，這個姓是冬松的意思嗎？」
     - kind: speech
       speaker: host
-      text: 「冬松。村外那排松，冬天風一過就響起來，像有人在裡頭哼歌。」
+      text: 「冬松，說的就是村外那排松。冬天風一過就響起來，像有人在裡頭哼歌。」
     - kind: narration
       text: 她把嘴一抿，壓低聲音學了一段風聲，膝上的孩子笑得往後仰。
     - kind: speech

@@ -6,14 +6,14 @@ topics:
   label: 爬樹
   fallback:
     scene_id: fionnen_resident_lornnel.topic_01_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「你上瞭望枝，怎麼都不必看路？」
     - kind: speech
       speaker: host
-      text: 「看了。只是看得比別人快。哪根枝能踩、哪根踩了會空，腳底記得比腦子清楚。」
+      text: 「路我當然看，只是看得比別人快。哪根枝能踩、哪根踩了會空，腳底記得比腦子清楚。」
     - kind: narration
       text: 她抬手拍了拍身旁那根粗枝，樹皮上的苔被拍落一層。
     - kind: speech
@@ -27,14 +27,14 @@ topics:
   label: 高處
   fallback:
     scene_id: fionnen_resident_lornnel.topic_02_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「站這麼高，風一吹，你不怕掉下來？」
     - kind: speech
       speaker: host
-      text: 「怕過。第一次站上最頂那根，腿抖得厲害。後來發現，樹不會突然斷，怕的是自己先鬆手。」
+      text: 「怕過啊。第一次站上最頂那根，腿抖得厲害。後來發現，樹不會突然斷，怕的是自己先鬆手。」
     - kind: speech
       speaker: host
       text: 「高處看得遠。雲從哪邊來、獵隊走到哪個坡，我一眼就報下去。村裡靠這個決定今天出不出獵。」
@@ -69,14 +69,14 @@ topics:
   label: 名字
   fallback:
     scene_id: fionnen_resident_lornnel.topic_04_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「蒙斯哈德，是月影的意思？」
     - kind: speech
       speaker: host
-      text: 「月影。夜裡的影子落在樹冠上，一塊一塊，風一吹就換位置。」
+      text: 「蒙斯哈德說的就是月影。夜裡的影子落在樹冠上，一塊一塊，風一吹就換位置。」
     - kind: speech
       speaker: host
       text: 「我夜裡也上樹。影子在腳邊移，我踩著亮的地方往上，暗的地方留給手。」
@@ -101,14 +101,14 @@ topics:
       text: 「那種話得等我從樹上下來，跟你並肩坐過一回再說。現在講，太輕了。」
   fallback:
     scene_id: fionnen_resident_lornnel.topic_05_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「你在最高的地方，最想跟誰一起看？」
     - kind: speech
       speaker: host
-      text: 「日落。整片林子從綠變成金，再變成灰，最後只剩樹梢還亮著。」
+      text: 「我最想一起看日落。整片林子從綠變成金，再變成灰，最後只剩樹梢還亮著。」
     - kind: speech
       speaker: host
       text: 「有個人跟我並排坐，腳懸在外頭。她不抓樹枝，抓我的手腕。風大，我們誰也不講話。」

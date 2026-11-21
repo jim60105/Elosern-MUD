@@ -57,7 +57,7 @@ topics:
   label: 白衣
   fallback:
     scene_id: eolas_naelara_home.topic_03_scene
-    revision: r4
+    revision: r5
     lines:
     - kind: speech
       speaker: actor
@@ -75,13 +75,13 @@ topics:
       text: 「外頭來的人，頭一回見了總要嚇一跳吧？」
     - kind: speech
       speaker: host
-      text: 「會。山外的人把自己裹得密不透風，見了這副光景，臉先紅的是他們。住久了還會回頭看，夜裡有人留在我這織機邊，天亮才回自己的岩屋。」
+      text: 「會嚇一跳啊。山外的人把自己裹得密不透風，見了這副光景，臉先紅的是他們。住久了還會回頭看，夜裡有人留在我這織機邊，天亮才回自己的岩屋。」
 - topic_id: eolas_naelara_home.topic_04
   keyword: 收回
   label: 收回
   fallback:
     scene_id: eolas_naelara_home.topic_04_scene
-    revision: r4
+    revision: r5
     lines:
     - kind: speech
       speaker: actor
@@ -97,4 +97,4 @@ topics:
       text: 「外頭帶來的布料，真的一件都不行？」
     - kind: speech
       speaker: host
-      text: 「不行。你留著自己用，或帶回山外處理。谷裡的絲只認谷裡的手。」
+      text: 「外頭帶來的布料一件都不行。你留著自己用，或帶回山外處理，谷裡的絲只認谷裡的手。」

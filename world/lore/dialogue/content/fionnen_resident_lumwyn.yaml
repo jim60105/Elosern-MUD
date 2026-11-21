@@ -6,14 +6,14 @@ topics:
   label: 刻花
   fallback:
     scene_id: fionnen_resident_lumwyn.topic_01_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「這些木器上的花，都是你一個人刻的？」
     - kind: speech
       speaker: host
-      text: 「多半是。順著木紋走，刀才不會咬住。刻壞一處，整塊料就廢了，所以我下刀前先看很久。」
+      text: 「多半出自我的刀。順著木紋走，刀才不會咬住。刻壞一處，整塊料就廢了，所以我下刀前先看很久。」
     - kind: narration
       text: 她吹開木屑，剛成形的花瓣露出來，邊緣還帶著細毛。
     - kind: speech
@@ -27,7 +27,7 @@ topics:
   label: 手藝
   fallback:
     scene_id: fionnen_resident_lumwyn.topic_02_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
@@ -42,7 +42,7 @@ topics:
       text: 她把刻刀在指間轉了半圈，刀尖停在木頭上。
     - kind: speech
       speaker: host
-      text: 「急不來。坐一整天，可能只成一朵。可那朵留下來，就是留下來了。」
+      text: 「這刀法急不來。坐一整天，可能只成一朵。可那朵留下來，就是留下來了。」
 - topic_id: fionnen_resident_lumwyn.topic_03
   keyword: 家人
   label: 家人
@@ -69,14 +69,14 @@ topics:
   label: 名字
   fallback:
     scene_id: fionnen_resident_lumwyn.topic_04_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「哈克菲特赫爾，是鷹羽的意思嗎？」
     - kind: speech
       speaker: host
-      text: 「鷹羽。獵鷹換羽的時候，羽毛會落在空地上。掃起來一堆，風一吹就跑。」
+      text: 「哈克菲特赫爾說的是鷹羽。獵鷹換羽的時候，羽毛會落在空地上，掃起來一堆，風一吹就跑。」
     - kind: narration
       text: 她從木料堆邊拈起一根羽毛，湊到眼前。
     - kind: speech
@@ -101,14 +101,14 @@ topics:
       text: 「我心裡的事刻得很深。要挖給人看，得先確定那個人坐得住。」
   fallback:
     scene_id: fionnen_resident_lumwyn.topic_05_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「你一個人刻一整天，會不會想要有人陪？」
     - kind: speech
       speaker: host
-      text: 「想。可有人的時候，我反而刻不好。得是不說話的那種陪。」
+      text: 「想啊，可有人的時候，我反而刻不好。得是不說話的那種陪。」
     - kind: speech
       speaker: host
       text: 「她坐在對面，看我把一朵花刻完。不催，也不問還有多久。最後一刀落下，她伸手把我手腕上的木屑拂掉。」

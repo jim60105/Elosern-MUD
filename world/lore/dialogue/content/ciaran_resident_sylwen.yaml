@@ -6,14 +6,14 @@ topics:
   label: 熬藥
   fallback:
     scene_id: ciaran_resident_sylwen.topic_01_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「熬藥的時候，你怎麼知道火候剛好？」
     - kind: speech
       speaker: host
-      text: 「看蒸氣。白煙轉清，苦味裡頭透出甜，那就是好了。」
+      text: 「我盯著蒸氣看。白煙轉清，苦味裡頭透出甜，那就是好了。」
     - kind: speech
       speaker: host
       text: 「火不能大。大一分，藥性就散，整鍋只剩苦水。」
@@ -48,14 +48,14 @@ topics:
   label: 家人
   fallback:
     scene_id: ciaran_resident_sylwen.topic_03_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「這園子裡就你們三個人？」
     - kind: speech
       speaker: host
-      text: 「三個。娘種草，姊夜裡採，我熬。天還沒亮我就生火，水一開，姊剛好進門。」
+      text: 「園子裡就我們三個。娘種草，姊夜裡採，我熬。天還沒亮我就生火，水一開，姊剛好進門。」
     - kind: narration
       text: 她往門口看了一眼，又看了看灶上的水。
     - kind: speech
@@ -69,14 +69,14 @@ topics:
   label: 名字
   fallback:
     scene_id: ciaran_resident_sylwen.topic_04_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「索爾恩伍德，就是那圈帶刺的老木？」
     - kind: speech
       speaker: host
-      text: 「是棘木。它圈著園子，擋野獸，也擋亂踩進來的人。」
+      text: 「就是那圈棘木，圈著園子，擋野獸，也擋亂踩進來的人。」
     - kind: narration
       text: 她抿了一口湯，含在嘴裡才嚥。
     - kind: speech

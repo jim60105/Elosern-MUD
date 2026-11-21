@@ -27,14 +27,14 @@ topics:
   label: 記憶
   fallback:
     scene_id: ciaran_resident_naernel.topic_02_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「記這麼多事，不會累嗎？」
     - kind: speech
       speaker: host
-      text: 「不累。記得起來，才知道自己從哪裡來。」
+      text: 「記這些不會累。記得起來，才知道自己從哪裡來。」
     - kind: speech
       speaker: host
       text: 「谷裡人活得久，忘了，就白走這一趟。」
@@ -69,14 +69,14 @@ topics:
   label: 名字
   fallback:
     scene_id: ciaran_resident_naernel.topic_04_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「溫特爾松，是冬天松林裡的風聲？」
     - kind: speech
       speaker: host
-      text: 「冬松。風穿過松林，像一句拖得很長的歌。」
+      text: 「冬松說的正是那個。風穿過松林，像一句拖得很長的歌。」
     - kind: speech
       speaker: host
       text: 「我家就住在歌聲最清的那棵樹下。」

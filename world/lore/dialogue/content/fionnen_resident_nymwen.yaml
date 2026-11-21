@@ -27,14 +27,14 @@ topics:
   label: 做弓
   fallback:
     scene_id: fionnen_resident_nymwen.topic_02_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「村裡的弓，大半都是你做的？」
     - kind: speech
       speaker: host
-      text: 「大半是。選料、削弓臂、上弦，一道一道來。木紋要順，逆著走，拉幾次就裂。」
+      text: 「村裡的弓大半經我的手。選料、削弓臂、上弦，一道一道來。木紋要順，逆著走，拉幾次就裂。」
     - kind: speech
       speaker: host
       text: 「弓做得好不好，拉開就知道。順手的弓，放出去聲音脆，手也不震。」
@@ -69,14 +69,14 @@ topics:
   label: 名字
   fallback:
     scene_id: fionnen_resident_nymwen.topic_04_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「哈克菲特赫爾，是鷹羽的意思？」
     - kind: speech
       speaker: host
-      text: 「鷹羽。獵鷹換羽的時候，羽毛落在空地上，掃起來一堆。」
+      text: 「哈克菲特赫爾說的是鷹羽。獵鷹換羽的時候，羽毛落在空地上，掃起來一堆。」
     - kind: narration
       text: 她彎腰撿起一片刨花，在指間捻了捻。
     - kind: speech
@@ -101,7 +101,7 @@ topics:
       text: 「我說話不繞，可有些事不隨便攤開。你先把手上的活做完，再來問。」
   fallback:
     scene_id: fionnen_resident_nymwen.topic_05_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
@@ -111,7 +111,7 @@ topics:
       text: 「跳進林溪洗一洗。木屑黏在脖子上，癢得很，非得泡透才行。」
     - kind: speech
       speaker: host
-      text: 「水涼。我靠在石頭上不想動，有人從岸上伸手，把我拉起來。」
+      text: 「我想找涼水。我靠在石頭上不想動，有人從岸上伸手，把我拉起來。」
     - kind: speech
       speaker: host
       text: 「她拿乾布從頭擦到腳，擦得我站不穩。做了一天的活，那時才覺得骨頭鬆開。」

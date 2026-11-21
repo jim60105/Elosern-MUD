@@ -27,14 +27,14 @@ topics:
   label: 收成
   fallback:
     scene_id: fionnen_resident_relllin.topic_02_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「收成的時候，你們忙得過來嗎？」
     - kind: speech
       speaker: host
-      text: 「忙。三個人一起上，採的採、裝的裝。中午就在圃邊吃，吃完接著做。」
+      text: 「忙得過來，三個人一起上，採的採、裝的裝。中午就在圃邊吃，吃完接著做。」
     - kind: speech
       speaker: host
       text: 「收完那晚煮一大鍋，端去共食棚。村裡誰來都可以盛一碗，沒有人空手回去。」
@@ -69,14 +69,14 @@ topics:
   label: 名字
   fallback:
     scene_id: fionnen_resident_relllin.topic_04_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「孫希斯佩爾，是日光在低聲說話的意思？」
     - kind: speech
       speaker: host
-      text: 「是。日頭穿過樹冠，光斑落在菜圃上，風一吹就動。這家說是光在講話，就取了這個姓。」
+      text: 「是這個意思。日頭穿過樹冠，光斑落在菜圃上，風一吹就動，這家說是光在講話，就取了這個姓。」
     - kind: narration
       text: 她攤開手，接住一片漏下來的陽光。
     - kind: speech

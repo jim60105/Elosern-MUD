@@ -69,14 +69,14 @@ topics:
   label: 名字
   fallback:
     scene_id: eolas_resident_quennel.topic_04_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「『維爾維特莉夫』這個姓，是誰取的？」
     - kind: speech
       speaker: host
-      text: 「絨葉。岩屋坡那幾棵老樹，葉背有一層細絨，風一翻，整片坡泛白，跟下雪一樣。」
+      text: 「維爾維特莉夫說的是絨葉。岩屋坡那幾棵老樹，葉背有一層細絨，風一翻，整片坡泛白，跟下雪一樣。」
     - kind: narration
       text: 她瞇起眼，拇指在梭子邊上蹭了蹭，沒再說話。
     - kind: speech

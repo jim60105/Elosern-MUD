@@ -30,7 +30,7 @@ topics:
   label: 戰衣
   fallback:
     scene_id: ciaran_vethiel_home.topic_02_scene
-    revision: r5
+    revision: r6
     lines:
     - kind: speech
       speaker: actor
@@ -39,7 +39,7 @@ topics:
       text: 她把那襲黑衣從架上取下來，雙手一展平鋪，掌心順著腰線的縫路滑過去。
     - kind: speech
       speaker: host
-      text: 「合適。通體墨黑，線條貼著筋骨走，人一伏進樹影裡就看不見。腰胯和關節我都留了空，跑跳翻躍不會被料子扯住。」
+      text: 「穿去林地狩獵正合適。通體墨黑，線條貼著筋骨走，人一伏進樹影裡就看不見。腰胯和關節我都留了空，跑跳翻躍不會被料子扯住。」
     - kind: speech
       speaker: host
       text: 「它遮得不多，圖的就是身子動得開。一出汗，布就溼貼在大腿和腰窩上，那滋味，穿過的人沒一個捨得脫下。」

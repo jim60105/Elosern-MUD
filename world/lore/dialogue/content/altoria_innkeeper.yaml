@@ -30,7 +30,7 @@ topics:
   label: 過夜
   fallback:
     scene_id: altoria_lodging.topic_02_scene
-    revision: r4
+    revision: r5
     lines:
     - kind: speech
       speaker: actor
@@ -48,7 +48,7 @@ topics:
       text: 「聽你這麼說，睡飽再上路，這個道理就通了。」
     - kind: speech
       speaker: host
-      text: 「通就好。我別的本事沒有，勸人睡覺倒是很會。」
+      text: 「想通了就好。我別的本事沒有，勸人睡覺倒是很會。」
 - topic_id: altoria_lodging.topic_03
   keyword: 修煉
   label: 修煉

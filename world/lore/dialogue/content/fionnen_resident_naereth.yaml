@@ -48,14 +48,14 @@ topics:
   label: 家人
   fallback:
     scene_id: fionnen_resident_naereth.topic_03_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「你們家三個人，你最黏誰？」
     - kind: speech
       speaker: host
-      text: 「姊姊。她削箭的時候我坐在旁邊，什麼都不做，就看她的手。」
+      text: 「我最黏姊姊。她削箭的時候我坐在旁邊，什麼都不做，就看她的手。」
     - kind: speech
       speaker: host
       text: 「她不趕我，也不嫌我吵。我跑累了靠過去，她會把肩膀讓出來。」
@@ -69,14 +69,14 @@ topics:
   label: 名字
   fallback:
     scene_id: fionnen_resident_naereth.topic_04_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「戈爾德莉夫，是金葉的意思？」
     - kind: speech
       speaker: host
-      text: 「金葉。秋天靶道旁邊的地上鋪滿葉子，跑過去會響，一踩就碎。」
+      text: 「戈爾德莉夫說的是金葉。秋天靶道旁邊的地上鋪滿葉子，跑過去會響，一踩就碎。」
     - kind: narration
       text: 她抬起腳，做了個踩葉子的動作，腳尖在地上轉了半圈。
     - kind: speech

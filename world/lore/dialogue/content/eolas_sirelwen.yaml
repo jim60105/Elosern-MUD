@@ -28,7 +28,7 @@ topics:
   label: 短杖
   fallback:
     scene_id: eolas_sirelwen_home.topic_02_scene
-    revision: r4
+    revision: r5
     lines:
     - kind: speech
       speaker: actor
@@ -47,13 +47,13 @@ topics:
       text: 「所以剛開始學的人拿它，是為了少燒壞自己的手？」
     - kind: speech
       speaker: host
-      text: 「對。手燒壞了要養很久，杖燒壞了嘛，再削一支就有。」
+      text: 「對啊，手燒壞了要養很久，杖燒壞了嘛，再削一支就有。」
 - topic_id: eolas_sirelwen_home.topic_03
   keyword: 元素
   label: 元素
   fallback:
     scene_id: eolas_sirelwen_home.topic_03_scene
-    revision: r4
+    revision: r5
     lines:
     - kind: speech
       speaker: actor
@@ -74,7 +74,7 @@ topics:
       text: 「所以你們說親近，只是每一種都練得起來，練起來一樣要付代價？」
     - kind: speech
       speaker: host
-      text: 「對。親近是說門都開著，代價要自己付。我這些疤，就是付過的部分。」
+      text: 「對啊，親近是說門都開著，代價要自己付。我這些疤，就是付過的部分。」
 - topic_id: eolas_sirelwen_home.topic_04
   keyword: 收回
   label: 收回

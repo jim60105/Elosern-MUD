@@ -24,14 +24,14 @@ topics:
   label: 手藝
   fallback:
     scene_id: fionnen_resident_cyrwen.topic_02_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「你這手藝，是跟誰學的？」
     - kind: speech
       speaker: host
-      text: 「跟我娘。她拉弓，我造箭，一張一弛，剛好補上。做了這麼多年，閉著眼也削得直。」
+      text: 「我跟娘學手藝。她拉弓，我造箭，一張一弛，剛好補上。做了這麼多年，閉著眼也削得直。」
     - kind: speech
       speaker: host
       text: 「手藝這種東西急不來。你靜得下心，它才肯教你。我話少，坐在這兒削一天也不悶，木頭不催我。」
@@ -40,14 +40,14 @@ topics:
   label: 家人
   fallback:
     scene_id: fionnen_resident_cyrwen.topic_03_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「你家裡，誰射得最好？」
     - kind: speech
       speaker: host
-      text: 「我娘。妹妹跑得快，撿箭送箭，閒不住。我夾在中間，只管把箭做好，讓她們射個痛快。」
+      text: 「我娘射得最好。妹妹跑得快，撿箭送箭，閒不住；我夾在中間，只管把箭做好，讓她們射個痛快。」
     - kind: narration
       text: 她笑了笑，手上的刀沒停。
     - kind: speech
@@ -58,14 +58,14 @@ topics:
   label: 名字
   fallback:
     scene_id: fionnen_resident_cyrwen.topic_04_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「戈爾德莉夫，就是秋日的金葉？」
     - kind: speech
       speaker: host
-      text: 「金葉。秋天滿林金黃，葉子落在靶道上，我掃箭的時候常撿到。」
+      text: 「戈爾德莉夫指的是金葉。秋天滿林金黃，葉子落在靶道上，我掃箭的時候常撿到。」
     - kind: narration
       text: 她從腳邊拈起一片枯葉，夾進木料堆裡。
     - kind: speech

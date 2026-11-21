@@ -24,14 +24,14 @@ topics:
   label: 吊橋
   fallback:
     scene_id: fionnen_resident_elunlin.topic_02_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「樹冠吊橋，都是你們在補？」
     - kind: speech
       speaker: host
-      text: 「是。風大的日子繩橋會晃，我常上去看，哪兒磨了、哪兒鬆了，一眼就瞧見。補好了，人走著才踏實。」
+      text: 「繩橋歸我們補。風大的日子繩橋會晃，我常上去看，哪兒磨了、哪兒鬆了，一眼就瞧見。補好了，人走著才踏實。」
     - kind: speech
       speaker: host
       text: 「橋連著一戶一戶。我補的不只是繩子，也是谷裡的往來。這麼說好像很了不起，其實就是爬上去綁幾個結。」
@@ -58,14 +58,14 @@ topics:
   label: 名字
   fallback:
     scene_id: fionnen_resident_elunlin.topic_04_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「哈克菲特赫爾，是天上落下的鷹羽？」
     - kind: speech
       speaker: host
-      text: 「鷹羽。換羽的時候落在空地上，我常撿來別在腰間。風一吹，羽絨就蓬開。」
+      text: 「哈克菲特赫爾說的是鷹羽。換羽的時候落在空地上，我常撿來別在腰間，風一吹，羽絨就蓬開。」
     - kind: narration
       text: 她的手往腰間一按，像那兒真別著一根。
     - kind: speech

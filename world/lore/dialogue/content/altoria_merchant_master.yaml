@@ -34,7 +34,7 @@ topics:
         text: 「不會。公所中立，不替商隊招護衛，也不替任何一批貨作保。你要查本季出發的字號，牆邊粉筆寫得明白。」
   fallback:
     scene_id: altoria_merchant_hall.topic_01_fallback_scene
-    revision: r4
+    revision: r5
     lines:
     - kind: speech
       speaker: actor
@@ -49,7 +49,7 @@ topics:
       text: 「如果有旅人想跟著商隊一起走，公所代為安排嗎？」
     - kind: speech
       speaker: host
-      text: 「不安排。搭車、隨行、私下的護衛約定，都是商隊和人之間的事，公所一概不沾。這點我先講明白，免得你白等。」
+      text: 「這種事公所不安排。搭車、隨行、私下的護衛約定，都是商隊和人之間的事，公所一概不沾。我先講明白，免得你白等。」
 - topic_id: altoria_merchant_hall.topic_02
   keyword: 貿易路線
   label: 貿易路線
@@ -103,7 +103,7 @@ topics:
   label: 會務
   fallback:
     scene_id: altoria_merchant_hall.topic_04_scene
-    revision: r4
+    revision: r5
     lines:
     - kind: speech
       speaker: actor
@@ -112,10 +112,10 @@ topics:
       text: 他撫過胸前的商會徽章，指著窗下長桌上那疊帳簿。
     - kind: speech
       speaker: host
-      text: 「三件。協調各行會的利益、評議關稅章程，還有季末清算各家的帳。商號要入會，得備齊保薦人的文書，到我面前當面談。」
+      text: 「協調各行會的利益、評議關稅章程，還有季末清算各家的帳，公所管的就是這三件。商號要入會，得備齊保薦人的文書，到我面前當面談。」
     - kind: speech
       speaker: actor
       text: 「評議定下來的關稅細則，外來的行商也能看嗎？」
     - kind: speech
       speaker: host
-      text: 「能。條文就攤在窗下那張長桌上，怎麼寫就怎麼算。你要抄一份帶走，我也不攔，只是別把順序抄錯，稅率差一級，價錢差很多。」
+      text: 「條文就攤在窗下那張長桌上，外來的行商一樣能看，怎麼寫就怎麼算。你要抄一份帶走，我也不攔，只是別把順序抄錯，稅率差一級，價錢差很多。」

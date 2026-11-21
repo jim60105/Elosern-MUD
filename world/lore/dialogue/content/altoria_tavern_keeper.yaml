@@ -109,7 +109,7 @@ topics:
   label: 歇腳
   fallback:
     scene_id: altoria_tavern.topic_04_scene
-    revision: r4
+    revision: r5
     lines:
     - kind: speech
       speaker: actor
@@ -127,4 +127,4 @@ topics:
       text: 「那我把這杯喝完再過去，還來得及嗎？」
     - kind: speech
       speaker: host
-      text: 「來得及。喝太快，白糟蹋酒，也糟蹋睡覺的心情。」
+      text: 「不急，來得及。喝太快，白糟蹋酒，也糟蹋睡覺的心情。」

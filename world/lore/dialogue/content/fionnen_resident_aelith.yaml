@@ -6,14 +6,14 @@ topics:
   label: 蜂
   fallback:
     scene_id: fionnen_resident_aelith.topic_01_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「這園子裡的蜂，都認得你？」
     - kind: speech
       speaker: host
-      text: 「認氣味。我動作放輕，不嚇牠們，牠們也懶得理我。上一雙手把這群蜂交給我，忙的時候牠們繞著我飛，翅膀擦過耳邊。」
+      text: 「牠們認氣味。我動作放輕，不嚇牠們，牠們也懶得理我。上一雙手把這群蜂交給我，忙的時候牠們繞著我飛，翅膀擦過耳邊。」
     - kind: narration
       text: 一隻蜂落在她手腕上，她也不趕，只由著牠爬。
     - kind: speech
@@ -24,7 +24,7 @@ topics:
   label: 蜜
   fallback:
     scene_id: fionnen_resident_aelith.topic_02_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
@@ -40,20 +40,20 @@ topics:
       text: 「一勺蜜就能定人？」
     - kind: speech
       speaker: host
-      text: 「我試過。心裡亂的時候，我坐下來舔木勺，舔完就笑自己，哪有那麼嚴重。甜味有時候就是哄人的東西，哄自己也算。」
+      text: 「我自己試過。心裡亂的時候，我坐下來舔木勺，舔完就笑自己，哪有那麼嚴重。甜味有時候就是哄人的東西，哄自己也算。」
 - topic_id: fionnen_resident_aelith.topic_03
   keyword: 家人
   label: 家人
   fallback:
     scene_id: fionnen_resident_aelith.topic_03_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「花蕊蜜園，就你們三個在忙？」
     - kind: speech
       speaker: host
-      text: 「是。女兒一個熬蜜漬花蕊，一個採蜜，我管蜂。三個人成天沾著花粉，連睡覺都帶著甜味。」
+      text: 「就我們三個。女兒一個熬蜜漬花蕊，一個採蜜，我管蜂。三個人成天沾著花粉，連睡覺都帶著甜味。」
     - kind: narration
       text: 她撣了撣肩上的花粉，笑得柔軟。
     - kind: speech
@@ -64,14 +64,14 @@ topics:
   label: 名字
   fallback:
     scene_id: fionnen_resident_aelith.topic_04_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「希爾維爾布魯克，是銀溪的意思？」
     - kind: speech
       speaker: host
-      text: 「銀溪。夜裡月光落在林溪上，水面泛銀光，從花圃邊流過去。這家守著這片花跟這條水，就取了這個名。」
+      text: 「希爾維爾布魯克說的是銀溪。夜裡月光落在林溪上，水面泛銀光，從花圃邊流過去，這家守著這片花跟這條水，就取了這個名。」
     - kind: narration
       text: 她朝不遠處那條泛光的小溪望去。
     - kind: speech

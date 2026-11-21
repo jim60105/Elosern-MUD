@@ -30,7 +30,7 @@ topics:
   label: 恆振晶
   fallback:
     scene_id: fionnen_corith_home.topic_02_scene
-    revision: r5
+    revision: r6
     lines:
     - kind: speech
       speaker: actor
@@ -39,7 +39,7 @@ topics:
       text: 她把晶石從頸繩上解下來，擱在掌心，指尖順著石面上那道看不清的細紋走了一圈。
     - kind: speech
       speaker: host
-      text: 「恆振晶。裡頭刻著一層很細的振動，我調的是它的拍子。調快了扎人，調慢了就散成一團，等於白戴。」
+      text: 「你問的是恆振晶。裡頭刻著一層很細的振動，我調的是它的拍子。調快了扎人，調慢了就散成一團，等於白戴。」
     - kind: speech
       speaker: host
       text: 「調順了就貼身戴。它卡在那個地方，一整天不停地震。走路的時候震得最兇，我腿根發軟，只能夾著腿走。」
@@ -60,7 +60,7 @@ topics:
   label: 魔藤
   fallback:
     scene_id: fionnen_corith_home.topic_03_scene
-    revision: r5
+    revision: r6
     lines:
     - kind: speech
       speaker: actor
@@ -84,7 +84,7 @@ topics:
       text: 「養這種東西，費不費事？」
     - kind: speech
       speaker: host
-      text: 「不費事。土別讓它乾透，光別斷，天冷了搬進屋。村裡一半人家的窗台都擺著一盆，全是我這幾盆分出去的枝。」
+      text: 「不費什麼事，土別讓它乾透，光別斷，天冷了搬進屋。村裡一半人家的窗台都擺著一盆，全是我這幾盆分出去的枝。」
 - topic_id: fionnen_corith_home.topic_04
   keyword: 收回
   label: 收回

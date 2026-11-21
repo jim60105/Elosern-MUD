@@ -24,14 +24,14 @@ topics:
   label: 洗衣
   fallback:
     scene_id: ciaran_resident_rellwen.topic_02_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「你一天要洗多少衣裳？」
     - kind: speech
       speaker: host
-      text: 「數不清。誰把一籃往池邊一放，我槌完晾好，再讓人來領。名字我都記得住。」
+      text: 「每天洗到數不清，誰把一籃往池邊一放，我槌完晾好，再讓人來領。名字我都記得住。」
     - kind: speech
       speaker: host
       text: 「洗東西最不悶，水聲一直在講話。人蹲在旁邊等衣裳，就會開始聊，聊到最後什麼都講了。」
@@ -66,14 +66,14 @@ topics:
   label: 名字
   fallback:
     scene_id: ciaran_resident_rellwen.topic_04_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「拉文伍德，是鴉林的意思吧？」
     - kind: speech
       speaker: host
-      text: 「鴉林。天黑前那群鴉會在林子上頭繞，翅膀拍得很響。」
+      text: 「就是鴉林。天黑前那群鴉會在林子上頭繞，翅膀拍得很響。」
     - kind: narration
       text: 她側過頭，像真的在聽那陣聲音。
     - kind: speech

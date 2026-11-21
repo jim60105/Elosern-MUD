@@ -6,14 +6,14 @@ topics:
   label: 香草
   fallback:
     scene_id: eolas_resident_ondwyn.topic_01_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「石階菜畦那幾樣香草，聞起來都不一樣嗎？」
     - kind: speech
       speaker: host
-      text: 「不一樣。有的清涼，有的發苦，有的聞著甜，放進嘴裡卻辣舌頭。」
+      text: 「每一樣都不一樣，有的清涼，有的發苦，有的聞著甜，放進嘴裡卻辣舌頭。」
     - kind: narration
       text: 她撕下一小片葉子，在指腹搓開，抬手遞到你鼻前。
     - kind: speech
@@ -27,14 +27,14 @@ topics:
   label: 採集
   fallback:
     scene_id: eolas_resident_ondwyn.topic_02_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「採草要挑時辰嗎？還是看見就摘？」
     - kind: speech
       speaker: host
-      text: 「要挑。晨露還沒散，草頭最飽；日頭過正午，葉子就垂。我天剛亮上山，揀嫩的掐，不連根拔。」
+      text: 「要挑時辰。晨露還沒散，草頭最飽；日頭過正午，葉子就垂。我天剛亮上山，揀嫩的掐，不連根拔。」
     - kind: speech
       speaker: host
       text: 「採回來倒掛在樑下，讓風從葉縫穿過去。乾透了才收，收晚了會悶壞。」
@@ -69,14 +69,14 @@ topics:
   label: 名字
   fallback:
     scene_id: eolas_resident_ondwyn.topic_04_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「『格林拉德』是這片坡的名字嗎？」
     - kind: speech
       speaker: host
-      text: 「綠穀。春天一到，坡上的青從上頭往下鋪，遠看整條坡都在流。」
+      text: 「格林拉德說的是綠穀。春天一到，坡上的青從上頭往下鋪，遠看整條坡都在流。」
     - kind: narration
       text: 她閉了閉眼，鼻尖抽動，跟著風向偏了偏頭。
     - kind: speech
@@ -101,14 +101,14 @@ topics:
       text: 「草的事我肯講，我的事得先把你當成自己人。你再來幾回，等我把你認熟了。」
   fallback:
     scene_id: eolas_resident_ondwyn.topic_05_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「採回來的香草，你最中意哪一株？」
     - kind: speech
       speaker: host
-      text: 「都中意。真要挑，我會抓幾把丟進鍋裡煮，等熱氣起來，脫了衣裳坐進去。」
+      text: 「每一株我都中意。真要挑，我會抓幾把丟進鍋裡煮，等熱氣起來，脫了衣裳坐進去。」
     - kind: narration
       text: 她眼底亮了一下，隨即又低下去看手裡的草。
     - kind: speech

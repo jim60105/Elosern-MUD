@@ -57,7 +57,7 @@ topics:
   label: 乾糧
   fallback:
     scene_id: altoria_eatery.topic_03_scene
-    revision: r4
+    revision: r5
     lines:
     - kind: speech
       speaker: actor
@@ -75,7 +75,7 @@ topics:
       text: 「那你看我這趟進山，還有什麼是我沒想到、你卻常看人漏掉的？」
     - kind: speech
       speaker: host
-      text: 「鹽巴。用小布袋分裝一小包塞進背包，再帶上能生火的火絨。人餓一兩天還撐得住，沒鹽吃上三天，腿先軟。」
+      text: 「要帶鹽巴，用小布袋分裝一小包塞進背包，再帶上能生火的火絨。人餓一兩天還撐得住，沒鹽吃上三天，腿先軟。」
     - kind: speech
       speaker: host
       text: 「講吃的我話多，你別嫌我嘮叨。出了這道門，鍋子就幫不上你了。」
@@ -84,7 +84,7 @@ topics:
   label: 收購
   fallback:
     scene_id: altoria_eatery.topic_04_scene
-    revision: r4
+    revision: r5
     lines:
     - kind: speech
       speaker: actor
@@ -93,7 +93,7 @@ topics:
       text: 西格瑪收起笑，前臂搭在檯面上，眼神嚴肅起來。
     - kind: speech
       speaker: host
-      text: 「收。新鮮的獸肉、野味、能下鍋的山菜，都放上檯面過磅，我照公道價付足銀錢，當面點清。」
+      text: 「新鮮的獸肉、野味、能下鍋的山菜我都收，放上檯面過磅，我照公道價付足銀錢，當面點清。」
     - kind: speech
       speaker: host
       text: 「醜話說前頭，破口爛肉、隔夜發臭的貨，我原樣退回，誰來講情都不收。吃進客人肚子裡的東西，馬虎不得。」

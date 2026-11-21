@@ -74,7 +74,7 @@ topics:
   disclosure: pure_chain
   fallback:
     scene_id: eolas_saelnel_home.topic_04_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
@@ -92,4 +92,4 @@ topics:
       text: 「聽起來，那時候的谷裡也很熱鬧。」
     - kind: speech
       speaker: host
-      text: 「熱鬧。孩子，你現在踩的這片谷底空地，比你想的還要舊，也比你想的更懂得快活。」
+      text: 「那時候可熱鬧了。孩子，你現在踩的這片谷底空地，比你想的還要舊，也比你想的更懂得快活。」

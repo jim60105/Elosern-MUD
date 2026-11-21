@@ -24,14 +24,14 @@ topics:
   label: 擔水
   fallback:
     scene_id: eolas_resident_iolowen.topic_02_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「這擔子壓不壞肩嗎？」
     - kind: speech
       speaker: host
-      text: 「壓不壞。擔了半輩子，兩條胳膊早就習慣了。水軟，力氣得自己練，練久了身子才實在。」
+      text: 「壓不壞，擔了半輩子，兩條胳膊早就習慣了。水軟，力氣得自己練，練久了身子才實在。」
     - kind: speech
       speaker: host
       text: 「谷裡人不嬌氣。累了就往泉裡一躺，讓水把身子頂著。你哪天挑不動了，去泡一泡，比什麼都解乏。」
@@ -58,14 +58,14 @@ topics:
   label: 名字
   fallback:
     scene_id: eolas_resident_iolowen.topic_04_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「『克莉爾瓦特爾』，是清水的意思？」
     - kind: speech
       speaker: host
-      text: 「清水。溪源那水，清得能數石子。這家守著它，也就拿它做了姓。」
+      text: 「克莉爾瓦特爾說的是清水。溪源那水，清得能數石子，這家守著它，也就拿它做了姓。」
     - kind: narration
       text: 她捧了一捧水，任它從指縫漏回桶裡。
     - kind: speech

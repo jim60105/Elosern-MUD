@@ -6,14 +6,14 @@ topics:
   label: 引水
   fallback:
     scene_id: eolas_resident_aranith.topic_01_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「這水槽是你修的？」
     - kind: speech
       speaker: host
-      text: 「是我看。哪段淤了、哪段漏了，我一摸就曉。槽老了，得常補，不然水一散，谷裡的菜畦就渴。」
+      text: 「這水槽歸我看管。哪段淤了、哪段漏了，我一摸就曉。槽老了，得常補，不然水一散，谷裡的菜畦就渴。」
     - kind: narration
       text: 她拾起一片落葉，順手丟進身側的石縫。
     - kind: speech
@@ -42,14 +42,14 @@ topics:
   label: 家人
   fallback:
     scene_id: eolas_resident_aranith.topic_03_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「你家裡人都住在這兒？」
     - kind: speech
       speaker: host
-      text: 「是。娘約洛溫擔水，妹妹維拉拉洗衣。我管槽。一家人全泡在水裡，連說話都帶水汽。」
+      text: 「我們一家都住這兒。娘約洛溫擔水，妹妹維拉拉洗衣，我管槽。一家人全泡在水裡，連說話都帶水汽。」
     - kind: narration
       text: 她笑了笑，露出腕上一道被曬出的分界。
     - kind: speech
@@ -60,14 +60,14 @@ topics:
   label: 名字
   fallback:
     scene_id: eolas_resident_aranith.topic_04_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「『克莉爾瓦特爾』這姓呢？」
     - kind: speech
       speaker: host
-      text: 「清水。這家守水，谷裡的水都打溪源過。清得見底，就把這兩個字放進了姓。」
+      text: 「這姓說的是清水。這家守水，谷裡的水都打溪源過，清得見底，就把這兩個字放進了姓。」
     - kind: narration
       text: 她掬起一捧水，低頭照了照自己的臉。
     - kind: speech
@@ -89,14 +89,14 @@ topics:
       text: 「這種話得先信得過人才講。你讓我再相處一陣，過些時候再說。」
   fallback:
     scene_id: eolas_resident_aranith.topic_05_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「你整天守著水，會不會也想要人陪？」
     - kind: speech
       speaker: host
-      text: 「想。最想的是只把腳浸在水裡，頭枕著誰的膝，讓那人的手貼著我額頭。水從腳底涼上來，人從耳畔暖下去。」
+      text: 「我最想要的是只把腳浸在水裡，頭枕著誰的膝，讓那人的手貼著我額頭。水從腳底涼上來，人從耳畔暖下去。」
     - kind: narration
       text: 她終於停下手裡的活，直起身看向你。
     - kind: speech

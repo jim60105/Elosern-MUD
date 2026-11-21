@@ -72,14 +72,14 @@ topics:
   label: 名字
   fallback:
     scene_id: ciaran_resident_eryniel.topic_04_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「索爾恩伍德，是那圈帶刺的樹？」
     - kind: speech
       speaker: host
-      text: 「是。棘木圍著園子，入夜更黑。」
+      text: 「是棘木，圍著園子的那一圈。入夜更黑。」
     - kind: speech
       speaker: host
       text: 「我摸黑也能順著刺走回家，手比眼睛可靠。」
@@ -104,7 +104,7 @@ topics:
       text: 「你問得太快了。夜裡的事，我向來不隨便開口。」
   fallback:
     scene_id: ciaran_resident_eryniel.topic_05_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
@@ -114,7 +114,7 @@ topics:
       text: 「想要一個也不怕黑的人，摸進草叢裡來。」
     - kind: speech
       speaker: host
-      text: 「不點燈。只憑手和氣味，把我認出來。」
+      text: 「我想要有人不點燈，只憑手和氣味，就把我認出來。」
     - kind: narration
       text: 她仰起臉，月光落在她鎖骨上，衣襟鬆著，也不去拉。
     - kind: speech

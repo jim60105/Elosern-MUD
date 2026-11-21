@@ -6,14 +6,14 @@ topics:
   label: 射箭
   fallback:
     scene_id: fionnen_resident_alarnel.topic_01_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「射箭最要緊的是什麼？我拉了幾回，箭老是偏。」
     - kind: speech
       speaker: host
-      text: 「站穩。腳底先釘住，再管手。」
+      text: 「要站穩，腳底先釘住，再管手。」
     - kind: speech
       speaker: host
       text: 「心定，眼睛只留靶心那一點。你越想射中，手就越抖。我教人先學把氣吐長，箭自然就出去。」
@@ -64,14 +64,14 @@ topics:
   label: 名字
   fallback:
     scene_id: fionnen_resident_alarnel.topic_04_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「戈爾德莉夫，是金葉的意思？」
     - kind: speech
       speaker: host
-      text: 「金葉。秋天林子一片金，風一過，葉子往下掉。這家住在光庭邊，看得最清楚。」
+      text: 「戈爾德莉夫說的是金葉。秋天林子一片金，風一過，葉子往下掉，這家住在光庭邊，看得最清楚。」
     - kind: narration
       text: 她伸手接住一片打旋落下的葉子。
     - kind: speech

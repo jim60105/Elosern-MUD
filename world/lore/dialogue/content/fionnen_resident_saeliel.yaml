@@ -6,14 +6,14 @@ topics:
   label: 採蜜
   fallback:
     scene_id: fionnen_resident_saeliel.topic_01_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「你採蜜不怕被蜇嗎？我站這麼遠都覺得蜂在瞪我。」
     - kind: speech
       speaker: host
-      text: 「不怕。手放輕，別擋住巢門，牠們就自己忙去。」
+      text: 「不怕啊。手放輕，別擋住巢門，牠們就自己忙去。」
     - kind: speech
       speaker: host
       text: 「真被蜇一下也沒什麼。腫一塊，過兩天就消。我反而覺得那天的蜜特別甜。」
@@ -27,14 +27,14 @@ topics:
   label: 花
   fallback:
     scene_id: fionnen_resident_saeliel.topic_02_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「這片花圃，你認得幾種花？」
     - kind: speech
       speaker: host
-      text: 「都認得。哪朵幾時開、哪朵蜜多，我閉著眼也摸得出來。」
+      text: 「都認得，哪朵幾時開、哪朵蜜多，我閉著眼也摸得出來。」
     - kind: speech
       speaker: host
       text: 「春天的花蜜清，夏天的花蜜厚。同樣是蜜，顏色和味道都不一樣。」
@@ -42,20 +42,20 @@ topics:
       text: 她彎腰湊近一朵花，鼻尖幾乎碰到花瓣。
     - kind: speech
       speaker: host
-      text: 「你聞。風從那邊吹過來，整片園子都是甜味。」
+      text: 「你聞聞看，風從那邊吹過來，整片園子都是甜味。」
 - topic_id: fionnen_resident_saeliel.topic_03
   keyword: 家人
   label: 家人
   fallback:
     scene_id: fionnen_resident_saeliel.topic_03_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「你們家三個人都喜歡這座蜜園嗎？」
     - kind: speech
       speaker: host
-      text: 「喜歡。娘看蜂，姊姊熬蜜，我採。三個人一回家，滿屋子都是甜味。」
+      text: 「我們三個都喜歡。娘看蜂，姊姊熬蜜，我採，三個人一回家，滿屋子都是甜味。」
     - kind: speech
       speaker: host
       text: 「姊姊總嫌我吵。可我要是安靜一天，她又要問我是不是病了。」
@@ -69,14 +69,14 @@ topics:
   label: 名字
   fallback:
     scene_id: fionnen_resident_saeliel.topic_04_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「希爾維爾布魯克，是月光下的銀溪？」
     - kind: speech
       speaker: host
-      text: 「銀溪。夜裡月亮照在溪上，整條水亮得像有人灑了東西下去。」
+      text: 「希爾維爾布魯克說的是銀溪。夜裡月亮照在溪上，整條水亮得像有人灑了東西下去。」
     - kind: narration
       text: 她踮起腳，朝溪水的方向張望。
     - kind: speech

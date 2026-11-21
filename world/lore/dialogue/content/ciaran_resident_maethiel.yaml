@@ -6,14 +6,14 @@ topics:
   label: 疊布
   fallback:
     scene_id: ciaran_resident_maethiel.topic_01_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「疊布也有講究嗎？」
     - kind: speech
       speaker: host
-      text: 「有。對角要齊，折痕要正，疊出來才挺。」
+      text: 「有講究，對角要齊，折痕要正，疊出來才挺。」
     - kind: speech
       speaker: host
       text: 「一件衣裳洗得再乾淨，疊得亂，也白費了。」
@@ -46,14 +46,14 @@ topics:
   label: 家人
   fallback:
     scene_id: ciaran_resident_maethiel.topic_03_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「你家裡人都聽你安排嗎？」
     - kind: speech
       speaker: host
-      text: 「也不是。娘瑞爾溫管洗，姊姊科瑞爾槌衣，我疊。」
+      text: 「也不是我一個人安排。娘瑞爾溫管洗，姊姊科瑞爾槌衣，我疊。」
     - kind: speech
       speaker: host
       text: 「姊姊力氣大，常把疊好的布碰亂。我嘴上唸她兩句，還是重新疊過。」
@@ -67,14 +67,14 @@ topics:
   label: 名字
   fallback:
     scene_id: ciaran_resident_maethiel.topic_04_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「拉文伍德，是夜裡那幾隻鴉？」
     - kind: speech
       speaker: host
-      text: 「鴉林。天黑牠們叫得準時，比誰都守時。」
+      text: 「拉文伍德說的就是鴉林。天黑牠們叫得準時，比誰都守時。」
     - kind: speech
       speaker: host
       text: 「我按時按慣了，跟牠們倒合得來。」

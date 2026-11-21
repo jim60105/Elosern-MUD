@@ -35,7 +35,7 @@ topics:
   label: 材料
   fallback:
     scene_id: altoria_general_store.topic_02_scene
-    revision: r4
+    revision: r5
     lines:
     - kind: speech
       speaker: actor
@@ -44,7 +44,7 @@ topics:
       text: 他用指節敲了敲擦得發亮的小黃銅秤盤，敲完就抬眼望向門口。
     - kind: speech
       speaker: host
-      text: 「收。哥布林耳朵、史萊姆黏液、地龍鱗片、巨魔尖牙，全收。一整袋也行，一枚也行，擱上秤我照實報，銅幣當你的面點清楚。」
+      text: 「哥布林耳朵、史萊姆黏液、地龍鱗片、巨魔尖牙，我全收。一整袋也行，一枚也行，擱上秤我照實報，銅幣當你的面點清楚。」
     - kind: speech
       speaker: actor
       text: 「那你自己架上那些貴的材料，又是從哪來的？」
@@ -61,7 +61,7 @@ topics:
   label: 行頭
   fallback:
     scene_id: altoria_general_store.topic_03_scene
-    revision: r4
+    revision: r5
     lines:
     - kind: speech
       speaker: actor
@@ -79,13 +79,13 @@ topics:
       text: 「這樣就夠了？還是我再多帶點什麼？」
     - kind: speech
       speaker: host
-      text: 「夠了。多帶是給自己添重量。出門前把行囊再翻一遍，少帶一樣，都比多背十斤好。」
+      text: 「這樣就夠了，多帶是給自己添重量。出門前把行囊再翻一遍，少帶一樣，都比多背十斤好。」
 - topic_id: altoria_general_store.topic_04
   keyword: 飾品藥水
   label: 飾品藥水
   fallback:
     scene_id: altoria_general_store.topic_04_scene
-    revision: r4
+    revision: r5
     lines:
     - kind: speech
       speaker: actor
@@ -94,7 +94,7 @@ topics:
       text: 他搖了搖頭，把剛寫好的單據翻到下一頁，答得很乾脆。
     - kind: speech
       speaker: host
-      text: 「沒有。飾品去隔壁的首飾坊找艾蓮娜，她那雙手做的東西我服氣。藥水沿市場街往東，東市鍊金坊的希碧拉，配方實在。」
+      text: 「護身首飾和療傷藥水，我這裡不賣。飾品去隔壁的首飾坊找艾蓮娜，她那雙手做的東西我服氣；藥水沿市場街往東，東市鍊金坊的希碧拉，配方實在。」
     - kind: speech
       speaker: actor
       text: 「受洗聖水呢？那個總該有吧？」

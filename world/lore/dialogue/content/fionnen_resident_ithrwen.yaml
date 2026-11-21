@@ -27,14 +27,14 @@ topics:
   label: 看渠
   fallback:
     scene_id: fionnen_resident_ithrwen.topic_02_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「渠堵住的時候，你一個人清得完嗎？」
     - kind: speech
       speaker: host
-      text: 「清得完。堵的多半是落葉和細枝，我拿長柄的耙子從上游往下刮，刮到水聲順了才停。」
+      text: 「一個人清得完。堵的多半是落葉和細枝，我拿長柄的耙子從上游往下刮，刮到水聲順了才停。」
     - kind: speech
       speaker: host
       text: 「要是石頭被水沖鬆，就得搬回來，用腳踩實。渠壁一歪，水就往別處跑，菜圃那頭就乾了。」
@@ -48,14 +48,14 @@ topics:
   label: 家人
   fallback:
     scene_id: fionnen_resident_ithrwen.topic_03_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「你們家三個人，平常都待在圃裡？」
     - kind: speech
       speaker: host
-      text: 「差不多。娘種，我澆，妹妹採。誰先忙完就去幫另一個。」
+      text: 「差不多都待在圃裡。娘種，我澆，妹妹採，誰先忙完就去幫另一個。」
     - kind: speech
       speaker: host
       text: 「我話少，跟土相處比跟人久。妹妹米拉拉不一樣，她一邊摘菜一邊唱歌，整片圃子都聽得見。」
@@ -69,14 +69,14 @@ topics:
   label: 名字
   fallback:
     scene_id: fionnen_resident_ithrwen.topic_04_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「孫希斯佩爾，是日光在低聲說話的意思嗎？」
     - kind: speech
       speaker: host
-      text: 「是。午後的日頭穿過樹冠，光斑落在菜葉上，一動一動。我娘說那是光在講話，就取了這個姓。」
+      text: 「是這個意思。午後的日頭穿過樹冠，光斑落在菜葉上，一動一動，我娘說那是光在講話，就取了這個姓。」
     - kind: narration
       text: 她抬手擋了一下落在眼前的光，指縫間漏出幾條亮線。
     - kind: speech

@@ -58,14 +58,14 @@ topics:
   label: 名字
   fallback:
     scene_id: eolas_resident_fenlin.topic_04_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「你們家為什麼叫沙多瓦勒？」
     - kind: speech
       speaker: host
-      text: 「影谷。月亮一上來，谷底就橫著好幾道影。我跟娘說，那影子像一張沒織完的網，風一吹就在動。」
+      text: 「沙多瓦勒說的是影谷。月亮一上來，谷底就橫著好幾道影。我跟娘說，那影子像一張沒織完的網，風一吹就在動。」
     - kind: narration
       text: 她朝谷壁望了一眼，視線在石壁上停了停。
     - kind: speech
@@ -103,14 +103,14 @@ topics:
       text: 「我平日什麼都肯講，這一題卻要留給熟的人。你先陪我多站幾回林子，等我認得你的腳步聲再說。」
   fallback:
     scene_id: eolas_resident_fenlin.topic_06_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「你有沒有想過，不做這些了，去做點別的？」
     - kind: speech
       speaker: host
-      text: 「沒想過。只有一樣，我想哪天把衣服全脫了，一個人躺進最燙的泉裡，讓水的勁頭把我最裡頭也燙透。」
+      text: 「我沒想過換別的事做。只有一樣，我想哪天把衣服全脫了，一個人躺進最燙的泉裡，讓水的勁頭把我最裡頭也燙透。」
     - kind: narration
       text: 聲音壓得很低，尾音幾乎散在風裡。
     - kind: speech

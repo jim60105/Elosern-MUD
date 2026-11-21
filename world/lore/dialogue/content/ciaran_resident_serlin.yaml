@@ -69,14 +69,14 @@ topics:
   label: 名字
   fallback:
     scene_id: ciaran_resident_serlin.topic_04_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「杜斯克瓦爾克爾，是踏著黃昏回來的意思？」
     - kind: speech
       speaker: host
-      text: 「踏昏。黃昏的時候，我在屋裡磨刀，聽得見娘和姊的腳步從場上回來。」
+      text: 「踏昏說的是黃昏。那時候我在屋裡磨刀，聽得見娘和姊的腳步從場上回來。」
     - kind: narration
       text: 她停下手，頭偏著，聽屋外的腳步。
     - kind: speech

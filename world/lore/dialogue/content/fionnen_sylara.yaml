@@ -57,7 +57,7 @@ topics:
   label: 光魔法
   fallback:
     scene_id: fionnen_sylara_home.topic_03_scene
-    revision: r4
+    revision: r5
     lines:
     - kind: speech
       speaker: actor
@@ -75,7 +75,7 @@ topics:
       text: 「那你自己受的傷，也用光治嗎？」
     - kind: speech
       speaker: host
-      text: 「用不上。給枝子劃一下，睡一覺就癒了。我練這門手藝是為了別人，山外的客人跟林裡的野物，不會自己長回去。」
+      text: 「我自己用不上。給枝子劃一下，睡一覺就癒了。我練這門手藝是為了別人，山外的客人跟林裡的野物，不會自己長回去。」
 - topic_id: fionnen_sylara_home.topic_04
   keyword: 收回
   label: 收回

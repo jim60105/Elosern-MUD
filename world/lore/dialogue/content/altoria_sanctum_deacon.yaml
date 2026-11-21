@@ -6,7 +6,7 @@ topics:
   label: 賣什麼
   fallback:
     scene_id: altoria_sanctum.topic_01_scene
-    revision: r4
+    revision: r5
     lines:
     - kind: speech
       speaker: actor
@@ -15,7 +15,7 @@ topics:
       text: 她把手裡的炭筆擱到帳簿旁，朝身後排得整齊的木架偏了偏頭。
     - kind: speech
       speaker: host
-      text: 「分兩邊。一邊戴在身上過日子，一邊拿來一次用完。戴的那邊有花蒂銀夾、暖蜜魔導珠、尖銳觸感之飾、恆溫魔法卵，還有貼身藏著的恆振晶。每一樣都是讓人整天靜不下來的小東西。」
+      text: 「櫃上的東西分兩邊，一邊戴在身上過日子，一邊拿來一次用完。戴的那邊有花蒂銀夾、暖蜜魔導珠、尖銳觸感之飾、恆溫魔法卵，還有貼身藏著的恆振晶。每一樣都是讓人整天靜不下來的小東西。」
     - kind: speech
       speaker: actor
       text: 「那一次用的呢？」
@@ -60,7 +60,7 @@ topics:
   label: 禮器
   fallback:
     scene_id: altoria_sanctum.topic_03_scene
-    revision: r4
+    revision: r5
     lines:
     - kind: speech
       speaker: actor
@@ -78,13 +78,13 @@ topics:
       text: 「用過的也收？」
     - kind: speech
       speaker: host
-      text: 「收。只要沒摔裂砸爛，拿回櫃上，我照價折現給你。好東西洗一洗還能用，丟了可惜。」
+      text: 「用過的也收，只要沒摔裂砸爛，拿回櫃上，我照價折現給你。好東西洗一洗還能用，丟了可惜。」
 - topic_id: altoria_sanctum.topic_04
   keyword: 聖所事務
   label: 聖所事務
   fallback:
     scene_id: altoria_sanctum.topic_04_scene
-    revision: r4
+    revision: r5
     lines:
     - kind: speech
       speaker: actor
@@ -102,7 +102,7 @@ topics:
       text: 「那要祝禱，或要買東西，也走同一條走廊嗎？」
     - kind: speech
       speaker: host
-      text: 「不用。祝禱回大殿找艾莉安娜主祭，買東西留在我這櫃檯。一棟屋子，三個櫃檯，各管各的事。」
+      text: 「祝禱回大殿找艾莉安娜主祭，買東西留在我這櫃檯，不用走同一條走廊。一棟屋子，三個櫃檯，各管各的事。」
     - kind: speech
       speaker: host
       text: 「頭一次來的客人常問這個。問清楚再進去，比進去才問好。」

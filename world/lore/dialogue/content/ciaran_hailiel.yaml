@@ -33,7 +33,7 @@ topics:
         text: 「天生這兩個字，外頭的人自己編。刀打出來就是給人使。砧邊那對剛收工，你想掂分量就自己去拿，腰站穩了，再論刀合不合手。」
   fallback:
     scene_id: ciaran_hailiel_home.topic_01_scene
-    revision: r5
+    revision: r6
     lines:
     - kind: speech
       speaker: actor
@@ -51,7 +51,7 @@ topics:
       text: 「原來成色全捏在手上。我能先握一握，試一下重心嗎？」
     - kind: speech
       speaker: host
-      text: 「拿。先別急著揮，掂一掂重心在不在腕前。你的手我瞄過了，握得實，我就放心讓你碰它。」
+      text: 「拿去吧，先別急著揮。掂一掂重心在不在腕前，你的手我瞄過了，握得實，我就放心讓你碰它。」
 - topic_id: ciaran_hailiel_home.topic_02
   keyword: 影刀
   label: 影刀
@@ -81,7 +81,7 @@ topics:
   label: 鐵料
   fallback:
     scene_id: ciaran_hailiel_home.topic_03_scene
-    revision: r5
+    revision: r6
     lines:
     - kind: speech
       speaker: actor
@@ -90,7 +90,7 @@ topics:
       text: 她搖了搖頭，目光落在牆角那幾袋烏黑的砂粒上。
     - kind: speech
       speaker: host
-      text: 「不收。外頭來的鐵，性子我摸不準。我打刀用的鐵砂，全是我自己拿鐵鏟去谷底溪灘淘回來。」
+      text: 「外頭來的鐵，性子我摸不準，不收。我打刀用的鐵砂，全是我自己拿鐵鏟去谷底溪灘淘回來。」
     - kind: speech
       speaker: host
       text: 「這片山谷養出來的砂，我摸了好些年，它進爐的火候我閉著眼都記得。外來的料混進去，一整槽鋼就報廢。」

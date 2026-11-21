@@ -42,14 +42,14 @@ topics:
   label: 家人
   fallback:
     scene_id: eolas_resident_alarith.topic_03_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「你娘和你妹妹也天天來？」
     - kind: speech
       speaker: host
-      text: 「來。娘布瑞米爾管種，妹妹翁德溫認得每株草，我翻土。三個人一塊下田，一塊收工。」
+      text: 「她們也天天來。娘布瑞米爾管種，妹妹翁德溫認得每株草，我翻土。三個人一塊下田，一塊收工。」
     - kind: narration
       text: 她朝菜畦另一頭抬了抬下巴，那兒有個蹲著的身影。
     - kind: speech
@@ -89,14 +89,14 @@ topics:
       text: 「這類事我講不順。你讓我再處一陣，等我把你當自己人了，再開口。」
   fallback:
     scene_id: eolas_resident_alarith.topic_05_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「你這麼能幹，也想要人照顧嗎？」
     - kind: speech
       speaker: host
-      text: 「想。收工那夜，我最想有個人替我擦背，把僵住的肩揉開，從肩頭一路按到背心。力氣全交出去，由人擺布，那才叫痛快。」
+      text: 「收工那夜，我最想有個人替我擦背，把僵住的肩揉開，從肩頭一路按到背心。力氣全交出去，由人擺布，那才叫痛快。」
     - kind: narration
       text: 她垂下眼，搓了搓指節上的厚繭。
     - kind: speech

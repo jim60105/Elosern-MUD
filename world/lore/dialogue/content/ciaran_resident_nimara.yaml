@@ -6,7 +6,7 @@ topics:
   label: 染布
   fallback:
     scene_id: ciaran_resident_nimara.topic_01_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
@@ -16,7 +16,7 @@ topics:
       text: 「溪邊的染草熬出來。浸一道，晾一道，再浸。藍才吃得進布裡。」
     - kind: speech
       speaker: host
-      text: 「急不得。一急，色就浮在表面，洗兩次就掉了。」
+      text: 「這種活急不得，一急色就浮在表面，洗兩次就掉了。」
     - kind: narration
       text: 她把布抖開，一縷靛藍順著布紋滑下去，滴在她腳邊的石板上。
     - kind: speech
@@ -48,14 +48,14 @@ topics:
   label: 家人
   fallback:
     scene_id: ciaran_resident_nimara.topic_03_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「織房坡這一攤，都是你們三個人顧？」
     - kind: speech
       speaker: host
-      text: 「是。我染，大女兒瑞拉拉織，小女兒伊倫溫分線。」
+      text: 「是我們三個。我染，大女兒瑞拉拉織，小女兒伊倫溫分線。」
     - kind: speech
       speaker: host
       text: 「三個人從早泡到晚，手上、胳膊上都是洗不掉的藍。」
@@ -69,14 +69,14 @@ topics:
   label: 名字
   fallback:
     scene_id: ciaran_resident_nimara.topic_04_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「特魯松，是什麼意思？」
     - kind: speech
       speaker: host
-      text: 「真松。坡上那排松長得直，不歪。」
+      text: 「特魯松就是真松，坡上那排松長得直，不歪。」
     - kind: speech
       speaker: host
       text: 「我家做布也求個直。紋路、染色，都不許走樣。」

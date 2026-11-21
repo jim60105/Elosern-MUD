@@ -6,14 +6,14 @@ topics:
   label: 線
   fallback:
     scene_id: eolas_resident_caeleth.topic_01_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「這麼多線，你都分得清？」
     - kind: speech
       speaker: host
-      text: 「分得清。手指一撚，哪個滑、哪個澀，心裡就有數。線比人乾脆，它不會騙你。」
+      text: 「分得清啊，手指一撚，哪個滑、哪個澀，心裡就有數。線比人乾脆，它不會騙你。」
     - kind: narration
       text: 她把一綹灰藍的線舉到窗邊，讓光照透。
     - kind: speech
@@ -40,14 +40,14 @@ topics:
   label: 家人
   fallback:
     scene_id: eolas_resident_caeleth.topic_03_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「你姊姊剪布，你分線，日子不悶嗎？」
     - kind: speech
       speaker: host
-      text: 「不悶。娘和姊姊都在屋裡，織機、剪子、繞線，聲音擠成一團。我不用說話，也有人懂我。」
+      text: 「一點也不悶。娘和姊姊都在屋裡，織機、剪子、繞線，聲音擠成一團。我不用說話，也有人懂我。」
     - kind: narration
       text: 她垂下眼，耳根子紅了一點。
     - kind: speech
@@ -58,14 +58,14 @@ topics:
   label: 名字
   fallback:
     scene_id: eolas_resident_caeleth.topic_04_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「『維爾維特莉夫』，是怎麼取來的？」
     - kind: speech
       speaker: host
-      text: 「絨葉。岩屋坡老樹的葉背有一層絨，日頭一打，像蒙了霧。這家的姓，就是那層絨。」
+      text: 「維爾維特莉夫說的是絨葉。岩屋坡老樹的葉背有一層絨，日頭一打，像蒙了霧，這家的姓，就是那層絨。」
     - kind: narration
       text: 她拈起一片枯葉，用指甲在葉背刮了刮。
     - kind: speech

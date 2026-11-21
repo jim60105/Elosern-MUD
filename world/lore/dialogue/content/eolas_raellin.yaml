@@ -55,14 +55,14 @@ topics:
   label: 共食
   fallback:
     scene_id: eolas_raellin_home.topic_03_scene
-    revision: r4
+    revision: r5
     lines:
     - kind: speech
       speaker: actor
       text: 「村子裡的人平日都在哪裡吃飯？」
     - kind: speech
       speaker: host
-      text: 「共食棚。谷底空地旁邊那間棚子，傍晚誰先到誰升火，做好的擺上長桌，坐下來就吃。」
+      text: 「大夥都在谷底空地旁那間共食棚吃飯。傍晚誰先到誰升火，做好的擺上長桌，坐下來就吃。」
     - kind: speech
       speaker: host
       text: 「在那裡吃不用留銅幣。村裡沒有誰欠誰，多做一份就多吃一份。」

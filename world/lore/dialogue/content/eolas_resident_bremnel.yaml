@@ -60,14 +60,14 @@ topics:
   label: 名字
   fallback:
     scene_id: eolas_resident_bremnel.topic_04_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「沙多瓦勒，是影谷的意思？」
     - kind: speech
       speaker: host
-      text: 「對。影谷。月亮一來，谷壁的影子蓋到我家門前，一條整齊得很。我娘就認了這個姓。」
+      text: 「對，就是影谷。月亮一來，谷壁的影子蓋到我家門前，一條整齊得很，我娘就認了這個姓。」
     - kind: narration
       text: 她抬手往谷壁那頭指了指，影子正好爬到腳邊。
     - kind: speech

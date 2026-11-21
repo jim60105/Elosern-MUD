@@ -60,14 +60,14 @@ topics:
   label: 名字
   fallback:
     scene_id: eolas_resident_bremiel.topic_04_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「『格林拉德』，是綠地的意思？」
     - kind: speech
       speaker: host
-      text: 「綠穀。春來整片菜畦泛青，像水流過山谷。這家就認了這個姓。」
+      text: 「格林拉德說的是綠穀。春來整片菜畦泛青，像水流過山谷，這家就認了這個姓。」
     - kind: narration
       text: 她語氣鬆了，帶著一點得意，下巴朝菜畦抬了抬。
     - kind: speech

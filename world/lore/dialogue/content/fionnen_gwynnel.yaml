@@ -33,7 +33,7 @@ topics:
   label: 長弓
   fallback:
     scene_id: fionnen_gwynnel_home.topic_02_scene
-    revision: r5
+    revision: r6
     lines:
     - kind: speech
       speaker: actor
@@ -42,7 +42,7 @@ topics:
       text: 她把長弓往身前一立，一手扶弓身，另一手沿著弦槽抹過去。
     - kind: speech
       speaker: host
-      text: 「弓身長。拉滿了箭走得遠，也壓得住。代價是力氣。腕子要硬，肩背腰腿都得使上勁，只靠手臂拉不到底。」
+      text: 「差在弓身長。拉滿了箭走得遠，也壓得住，代價是力氣。腕子要硬，肩背腰腿都得使上勁，只靠手臂拉不到底。」
     - kind: speech
       speaker: host
       text: 「拉到滿，胸口整個打開，弦順著下巴那道筋走。你喘，弓梢不動；你穩，它一路直到底。那口氣憋在哪，弓都曉得。」

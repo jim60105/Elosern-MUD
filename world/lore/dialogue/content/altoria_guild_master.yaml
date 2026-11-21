@@ -37,7 +37,7 @@ topics:
   label: 任務
   fallback:
     scene_id: guild_staff.topic_02_scene
-    revision: r5
+    revision: r6
     lines:
     - kind: speech
       speaker: actor
@@ -55,7 +55,7 @@ topics:
       text: 「要是走到半路才發現太難，辦不下去，交回來會受罰嗎？」
     - kind: speech
       speaker: host
-      text: 「不會。把單據完好交回櫃檯，我另外派人接手。寧可回頭換張簡單的差事，也別在荒野硬撐。」
+      text: 「交回來不會罰你。把單據完好交回櫃檯，我另外派人接手。寧可回頭換張簡單的差事，也別在荒野硬撐。」
     - kind: speech
       speaker: host
       text: 「我年輕時護送商隊，看過不肯回頭的人沒能回來。面子換不回命，這句話我說了二十年，還是要說。」
@@ -88,7 +88,7 @@ topics:
         text: 「憑名冊上的紀錄，各分會的櫃檯都查得到你接過什麼、辦完什麼。換一座城，不必從頭證明自己。這種事，我向來記得住。」
   fallback:
     scene_id: guild_staff.topic_03_scene
-    revision: r4
+    revision: r5
     lines:
     - kind: speech
       speaker: actor
@@ -103,7 +103,7 @@ topics:
       text: 「那貴族或官員送來的委託，公會也照樣收嗎？」
     - kind: speech
       speaker: host
-      text: 「照樣收。領地貴族出手重，農家湊出來的幾枚銅幣輕，送到櫃檯前面一樣排隊。怎麼登載看名冊上的紀錄，不看送委託的人是誰。」
+      text: 「貴族送來的委託照樣收。領地貴族出手重，農家湊出來的幾枚銅幣輕，送到櫃檯前面一樣排隊。怎麼登載看名冊上的紀錄，不看送委託的人是誰。」
     - kind: speech
       speaker: host
       text: 「我坐在這張櫃檯後面十五年，收過的委託裡有貴族的印，也有不識字的人畫的押。規矩只有一套，我才坐得穩。」

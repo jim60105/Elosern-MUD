@@ -27,14 +27,14 @@ topics:
   label: 谷裡
   fallback:
     scene_id: eolas_resident_yrenlin.topic_02_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「谷裡的人都跟你一樣，話這麼少嗎？」
     - kind: speech
       speaker: host
-      text: 「不。就我話少。娘和姊姊都愛講，講到池水都涼了還不收。」
+      text: 「谷裡的人不像我這樣。就我話少，娘和姊姊都愛講，講到池水都涼了還不收。」
     - kind: speech
       speaker: host
       text: 「晚上人來池邊，把白天的事都倒進水裡。我在旁邊聽，不插嘴。」
@@ -90,14 +90,14 @@ topics:
   label: 名字
   fallback:
     scene_id: eolas_resident_yrenlin.topic_05_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「『溫德松』這名字，你自己喜歡嗎？」
     - kind: speech
       speaker: host
-      text: 「喜歡。風穿過松林，整片會哼。這家守著水，也分得到那點聲音。」
+      text: 「我喜歡這名字。風穿過松林，整片會哼。這家守著水，也分得到那點聲音。」
     - kind: narration
       text: 她閉上眼，頭往後靠著石壁。
     - kind: speech

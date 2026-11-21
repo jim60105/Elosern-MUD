@@ -27,14 +27,14 @@ topics:
   label: 剪裁
   fallback:
     scene_id: eolas_resident_niriel.topic_02_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「你下刀之前，真的一點都不怕剪歪？」
     - kind: speech
       speaker: host
-      text: 「怕。一匹布就這麼寬，剪壞了接不回去。所以我把布鋪平，先拿炭線畫好。線歪了還能擦，刀一下去就沒了。」
+      text: 「怕啊。一匹布就這麼寬，剪壞了接不回去。所以我把布鋪平，先拿炭線畫好。線歪了還能擦，刀一下去就沒了。」
     - kind: narration
       text: 她指尖沿著桌沿的布邊劃過去，停在線尾。
     - kind: speech
@@ -69,14 +69,14 @@ topics:
   label: 名字
   fallback:
     scene_id: eolas_resident_niriel.topic_04_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「『維爾維特莉夫』這姓，是葉子的意思吧？」
     - kind: speech
       speaker: host
-      text: 「絨葉。老樹的葉背有一層細絨，風一翻，整片坡泛白，跟落了霜一樣。」
+      text: 「維爾維特莉夫說的是絨葉。老樹的葉背有一層細絨，風一翻，整片坡泛白，跟落了霜一樣。」
     - kind: narration
       text: 她從窗邊拈起一片葉子，翻過面，遞到你眼前。
     - kind: speech
@@ -101,14 +101,14 @@ topics:
       text: 「量身子可以，心裡的話不行。我話接得快，可有些話得先認了人，才說得出口。你再來幾回吧。」
   fallback:
     scene_id: eolas_resident_niriel.topic_05_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「做了這麼久的衣裳，你最喜歡哪一步？」
     - kind: speech
       speaker: host
-      text: 「量人。手貼著熱的身子往下走，隔著掌心能摸到一個人的呼吸。那點熱順著手爬上來，我自己先軟了半截。」
+      text: 「我最喜歡量人。手貼著熱的身子往下走，隔著掌心能摸到一個人的呼吸。那點熱順著手爬上來，我自己先軟了半截。」
     - kind: narration
       text: 她咬了咬下唇，眼睛彎起來，剪子在手裡轉了半圈。
     - kind: speech

@@ -24,14 +24,14 @@ topics:
   label: 白衣
   fallback:
     scene_id: eolas_resident_liathiel.topic_02_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「村人身上那件白衣，都是用這絲織的？」
     - kind: speech
       speaker: host
-      text: 「是。織得薄，薄得透光，是怕勾到蛛網，也是谷裡人不愛把身子藏起來。你穿了就曉得，風貼著皮走，涼得像水。」
+      text: 「用的都是這絲。織得薄，薄得透光，是怕勾到蛛網，也是谷裡人不愛把身子藏起來。你穿了就曉得，風貼著皮走，涼得像水。」
     - kind: speech
       speaker: host
       text: 「誰想要一件衣裳，拿銅幣換就成。這谷不設鋪子，誰手裡有，就分給誰。」
@@ -76,14 +76,14 @@ topics:
   label: 收絲
   fallback:
     scene_id: eolas_resident_liathiel.topic_05_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「收絲最要緊的是什麼？」
     - kind: speech
       speaker: host
-      text: 「腳步。蛛怕震，你在那邊一跺地，整片網都要白費一季。收絲的人腳要像貓踩在水上。」
+      text: 「最要緊的是腳步。蛛怕震，你在那邊一跺地，整片網都要白費一季。收絲的人腳要像貓踩在水上。」
     - kind: speech
       speaker: host
       text: 「所以谷裡的人在林邊都赤腳。涼是涼，皮糙些也不打緊。」
@@ -103,14 +103,14 @@ topics:
       text: 「這種貼心的話，我只跟交過心的人講。你再多來幾回，等我知道你是誰了，再說。」
   fallback:
     scene_id: eolas_resident_liathiel.topic_06_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「你有沒有只屬於自己的喜好？」
     - kind: speech
       speaker: host
-      text: 「有。收完的絲還鮮的時候，貼在皮膚上最滑，像有一條涼水順著腰往下流。我常把那根最勻的留給自己，夜裡貼著肩膀睡。」
+      text: 「收完的絲還鮮的時候，貼在皮膚上最滑，像有一條涼水順著腰往下流。我常把那根最勻的留給自己，夜裡貼著肩膀睡。」
     - kind: narration
       text: 她眼底柔和下來，指腹又捻了捻那根絲。
     - kind: speech

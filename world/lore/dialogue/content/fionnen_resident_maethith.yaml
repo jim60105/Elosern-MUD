@@ -27,14 +27,14 @@ topics:
   label: 花蕊
   fallback:
     scene_id: fionnen_resident_maethith.topic_02_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「這些花瓣，都是從你們家那片花圃來的？」
     - kind: speech
       speaker: host
-      text: 「是。娘看蜂，妹妹搖蜜，我醃花。天亮前採的花，露水還在，香氣最足。」
+      text: 「都從那片花圃來。娘看蜂，妹妹搖蜜，我醃花。天亮前採的花，露水還在，香氣最足。」
     - kind: speech
       speaker: host
       text: 「一罐封好，要花掉一整天的工夫。冬天拿出來，配著熱茶吃，甜味會回來。」
@@ -48,14 +48,14 @@ topics:
   label: 家人
   fallback:
     scene_id: fionnen_resident_maethith.topic_03_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「你們家三個人，誰最常待在蜜園裡？」
     - kind: speech
       speaker: host
-      text: 「娘。她天一亮就去看蜂，蜂也認得她的味道。妹妹待不住，採完蜜就往靶道跑。」
+      text: 「最常待在那兒的是我娘。她天一亮就去看蜂，蜂也認得她的味道。妹妹待不住，採完蜜就往靶道跑。」
     - kind: narration
       text: 她搖了搖頭，語氣裡帶著笑。
     - kind: speech
@@ -69,14 +69,14 @@ topics:
   label: 名字
   fallback:
     scene_id: fionnen_resident_maethith.topic_04_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「希爾維爾布魯克，是月光下的銀溪？」
     - kind: speech
       speaker: host
-      text: 「銀溪。夜裡月亮照在溪面上，亮得能看見水底的石頭。」
+      text: 「希爾維爾布魯克說的是銀溪。夜裡月亮照在溪面上，亮得能看見水底的石頭。」
     - kind: narration
       text: 她轉頭看向窗外，溪谷的方向只露出一線樹影。
     - kind: speech

@@ -58,14 +58,14 @@ topics:
   label: 名字
   fallback:
     scene_id: fionnen_resident_berenara.topic_04_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「蒙斯哈德，是月影的意思？」
     - kind: speech
       speaker: host
-      text: 「月影。夜裡月亮把影子投進林間，一塊明一塊暗。這家住在光庭邊，那影就在門前晃。」
+      text: 「蒙斯哈德說的是月影。夜裡月亮把影子投進林間，一塊明一塊暗，這家住在光庭邊，那影就在門前晃。」
     - kind: narration
       text: 她指著腳下那片斑駁的月光。
     - kind: speech

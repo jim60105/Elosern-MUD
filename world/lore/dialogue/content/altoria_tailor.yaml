@@ -108,7 +108,7 @@ topics:
   label: 收購
   fallback:
     scene_id: altoria_tailor.topic_04_scene
-    revision: r4
+    revision: r5
     lines:
     - kind: speech
       speaker: actor
@@ -117,7 +117,7 @@ topics:
       text: 她側身讓開走道，指了指屋角一個擦洗乾淨的大藤箱。
     - kind: speech
       speaker: host
-      text: 「收。只要是我這間店賣出的衣甲，沒破成布條，帶回來擱進藤箱就行。」
+      text: 「只要是我這間店賣出的衣甲，沒破成布條，帶回來擱進藤箱就行，我收。」
     - kind: speech
       speaker: host
       text: 「沾了泥水汗漬，先在溪邊洗乾淨再拿來。髒的擱進去，整箱都沾味，我可不收。」

@@ -66,14 +66,14 @@ topics:
   label: 名字
   fallback:
     scene_id: ciaran_resident_rellara.topic_04_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「特魯松，是那排筆直的松樹嗎？」
     - kind: speech
       speaker: host
-      text: 「真松。坡上那排，長得直，風大也不歪。」
+      text: 「那排就是真松，坡上長得直，風大也不歪。」
     - kind: narration
       text: 她抬手比了比機上繃緊的經線，一條一條，沒有哪條鬆。
     - kind: speech

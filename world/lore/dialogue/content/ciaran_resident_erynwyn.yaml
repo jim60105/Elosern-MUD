@@ -27,14 +27,14 @@ topics:
   label: 谷裡
   fallback:
     scene_id: ciaran_resident_erynwyn.topic_02_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「這谷裡，最老的故事是哪一樁？」
     - kind: speech
       speaker: host
-      text: 「多了。溪水哪一年斷過，誰家的刀折在哪座山，哪對情人在村北古樹下待到天亮。」
+      text: 「要講的故事多了，溪水哪一年斷過，誰家的刀折在哪座山，哪對情人在村北古樹下待到天亮。」
     - kind: speech
       speaker: host
       text: 「我揀著講，一晚也講不完。」
@@ -69,14 +69,14 @@ topics:
   label: 名字
   fallback:
     scene_id: ciaran_resident_erynwyn.topic_04_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「溫特爾松，是冬天松林裡的聲音嗎？」
     - kind: speech
       speaker: host
-      text: 「冬松。入冬山風穿過松林，響得像有人在唱。」
+      text: 「冬松，說的就是那個聲音。入冬山風穿過松林，響得像有人在唱。」
     - kind: speech
       speaker: host
       text: 「這家就住在古樹下，聽得最清楚。」
