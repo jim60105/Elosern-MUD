@@ -1,76 +1,105 @@
 schema_version: 1
-greeting: 布瑞米斯把刀往腰間一別，紅眸掃過來：「學刀，還是看我練？」
+greeting: 布瑞米斯把刀往腰間一別，紅眸掃過來，從你的肩頭看到手掌，看得很快。她把下巴的汗一抹，才開口：「學刀，還是看我練？站遠了看不清，站近了要接刀。」
 topics:
 - topic_id: ciaran_resident_bremith.topic_01
   keyword: 練刀
   label: 練刀
   fallback:
     scene_id: ciaran_resident_bremith.topic_01_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「練刀場上，一天都練些什麼？」
+      text: 「天還沒亮你就上場，一練就是一整天。同樣那幾下，你不會膩嗎？」
     - kind: speech
       speaker: host
-      text: 「劈、撩、格，再從頭。我天不亮上場，空揮三百下，汗把地都打濕。刀靠練，不是靠想。」
+      text: 「膩啊。怎麼不膩。」
+    - kind: speech
+      speaker: host
+      text: 「可是刀這東西，三天不碰，它就忘了你手的輕重。我上場先空揮三百下，汗先濕了腳下的土，人才醒。」
     - kind: narration
-      text: 她手腕一翻，刀在掌心轉了半圈，穩穩停住。
+      text: 她抬手抹了把下巴，汗順著指縫滑落，滴在夯實的泥地上，砸出一小圈深色。
     - kind: speech
       speaker: host
-      text: 「身子跟刀一樣，得日日磨。」
+      text: 「劈、撩、格，再從頭。旁人看著無聊，我在裡頭自己數。數到第幾下開始手痠，第幾下又鬆了，心裡都有本帳。」
+    - kind: speech
+      speaker: host
+      text: 「身子跟刀一樣，一天不磨，它就鈍。你停下來的那一天，手先知道。」
 - topic_id: ciaran_resident_bremith.topic_02
   keyword: 刀法
   label: 刀法
   fallback:
     scene_id: ciaran_resident_bremith.topic_02_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「你們的刀法，跟別處有什麼不同？」
+      text: 「你們的刀，跟我在外頭看到的不是同一種東西。差在哪裡？」
     - kind: speech
       speaker: host
-      text: 「這裡的刀貼著身子走，近身、纏鬥，不講花俏。一招出去，要嘛劈中，要嘛換命。谷裡人狠，刀也狠。」
+      text: 「差在距離。外頭的人愛把架勢拉開，刀走大圈，講究好看，也留得住退路。」
     - kind: speech
       speaker: host
-      text: 「練到極處，刀跟自個兒多出來的一條胳膊一樣。上場、上床，都靠這股狠勁。你懂刀，就懂谷裡的性子。」
+      text: 「這裡沒那種地方退。場上就這麼大，人一擠，你的刀就被人貼進來。」
+    - kind: speech
+      speaker: host
+      text: 「所以谷裡的刀貼著身子走，近身、纏鬥，一刀出去，要嘛劈中，要嘛換命。」
+    - kind: narration
+      text: 她手腕一翻，刀在掌心轉了半圈，停下。場邊有人收刀，鐵碰鐵，響了一聲。
+    - kind: speech
+      speaker: host
+      text: 「練到後來，刀像多出來的一條胳膊。我睡前把它擱在枕邊，醒來先摸它，摸順了才想起自個兒的臉。」
+    - kind: speech
+      speaker: host
+      text: 「谷裡人性子狠，刀也狠。你看懂這把刀，大概就懂我們怎麼過日子。」
 - topic_id: ciaran_resident_bremith.topic_03
   keyword: 家人
   label: 家人
   fallback:
     scene_id: ciaran_resident_bremith.topic_03_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「你家裡人都練刀？」
+      text: 「你家裡的人，也都練刀嗎？」
     - kind: speech
       speaker: host
-      text: 「大女兒菲林學劈，刀舞得最好看；小女兒塞爾林不碰刀，只磨刀，一柄鈍刃到她手裡就發亮。我教、她看、她磨，一家人都在刀上。」
+      text: 「菲林練劈，塞爾林磨刀。一個揮刀，一個不讓刀鈍。」
+    - kind: speech
+      speaker: host
+      text: 「菲林那把刀舞起來最好看，我教她的時候就知道，這孩子的手比我穩。」
+    - kind: speech
+      speaker: host
+      text: 「塞爾林不碰刀。她只磨，一柄鈍刃到她手裡，過一陣子就發亮。她還嫌我開刃的角度不對，我也隨她嫌。」
     - kind: narration
-      text: 她朝場邊那道安靜的人影抬了抬下巴。
+      text: 她朝場邊一道安靜的人影抬了抬下巴，眼裡那點硬氣鬆了一下。
     - kind: speech
       speaker: host
-      text: 「娘仨都狠。你想要件稱手的兵刃，找小的磨；想學，找我。」
+      text: 「我教，菲林看著學，塞爾林在旁邊磨她的刀。一家三口繞著同一件事轉，誰也沒覺得哪裡奇怪。」
+    - kind: speech
+      speaker: host
+      text: 「誰的刀鈍了，去找小的磨。想學怎麼使，來找我。她們兩個都比我難講話，先找我省事。」
 - topic_id: ciaran_resident_bremith.topic_04
   keyword: 名字
   label: 名字
   fallback:
     scene_id: ciaran_resident_bremith.topic_04_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「杜斯克瓦爾克爾，是踏昏的意思？」
+      text: 「杜斯克瓦爾克爾，是踏昏的意思嗎？」
     - kind: speech
       speaker: host
-      text: 「踏昏。黃昏收刀，人影拖在場上，一步一踏。這家就認了這個姓。」
+      text: 「踏昏。黃昏收刀，人影拖在場上，人踩著自個兒的影子回家。這家就認了這個姓。」
     - kind: narration
-      text: 她跺了跺腳，地上浮起一小片灰。
+      text: 她抬腳往地上跺了跺，乾泥浮起一小片灰，落了滿鞋面。
     - kind: speech
       speaker: host
-      text: 「練完刀，踏著暮色回家，那步子最實。你來久了，也能踏出這份勁。」
+      text: 「名字這種東西，取的時候誰也沒多想。用久了，踩著那條影子回家，倒覺得踏實。」
+    - kind: speech
+      speaker: host
+      text: 「練完刀，踏著暮色回家，那步子最實。你在谷裡住久了，也會走出這種步子。」
 - topic_id: ciaran_resident_bremith.topic_05
   keyword: 私語
   label: 私語
@@ -80,23 +109,29 @@ topics:
   unavailable: locked
   refusal:
     scene_id: ciaran_resident_bremith.topic_05_refusal
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: host
-      text: 「我這人直，可交心的事，只跟接得住我刀的人說。」
+      text: 「我話說得直，可交心的事，只跟接得住我刀的人說。你先練，練到我不必留手，再來問。」
   fallback:
     scene_id: ciaran_resident_bremith.topic_05_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「練刀這麼狠，你也有軟下來的時候？」
+      text: 「練刀這麼狠，你也有軟下來的時候嗎？」
     - kind: speech
       speaker: host
-      text: 「有。練到力竭，泡進溪池，那時我最軟，像一團化開的泥。有個人貼過來，從後面環住我，讓我在她懷裡散成一片。那比贏十場還痛快。」
+      text: 「有。練到力竭，整個人泡進溪池，那時我最軟，像一團化開的泥。」
+    - kind: speech
+      speaker: host
+      text: 「水涼，涼到骨頭裡。我靠著池邊，手指頭都懶得抬。」
     - kind: narration
-      text: 她難得地放柔了語氣。
+      text: 她難得放柔了語氣，眼睛望向場外那條通往溪邊的小路。
     - kind: speech
       speaker: host
-      text: 「狠到頭，才知道軟多麼解乏。你練過就懂。」
+      text: 「然後有人從後面環住我，把我整個人收進懷裡。我就那樣散開，散得一點力氣都不剩。」
+    - kind: speech
+      speaker: host
+      text: 「贏十場也沒那樣解乏。練得越狠，越知道鬆開有多要緊。」

@@ -1,44 +1,44 @@
 schema_version: 1
-greeting: 菲爾溫‧埃文斯塔爾坐在平台邊，身上只披一件敞著的長披風，裡頭什麼也沒穿，她也不急著攏上。她望了望樹梢間的光，才回過頭，朝屋裡那塊鋪板抬了抬下巴，「孩子，坐那兒。光一會兒就移過去，正好暖著你的背。」
+greeting: 菲爾溫‧埃文斯塔爾坐在平台邊，身上只披一件敞著的長披風，裡頭什麼也沒穿，她也不急著攏上。她望了望樹梢間的光，才回過頭，朝屋裡那塊鋪板抬了抬下巴：「孩子，坐那兒。光一會兒就移過去，正好暖著你的背。」
 topics:
 - topic_id: fionnen_firwen_home.topic_01
   keyword: 森林
   label: 森林
   fallback:
     scene_id: fionnen_firwen_home.topic_01_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
       text: 「這村子是怎麼在樹上過日子的？」
     - kind: speech
       speaker: host
-      text: 「樹下住人，樹上也住人，兩層靠吊橋和繩梯上下。溪水從高處流下來，族人在溪邊汲水，在林間菜圃種菜，在花蕊蜜園養蜂。」
+      text: 「樹下住人，樹上也住人。兩層之間靠吊橋和繩梯上下。溪水從高處流下來，族人在溪邊汲水，在林間菜圃種菜，在花蕊蜜園養蜂。」
     - kind: speech
       speaker: host
-      text: 「洗身的去處是林泉浴場，上頭的溪水匯成一池，水還溫著。族人脫了衣裳下去，洗身、洗衣、說話，誰也不躲誰。身子不管是年少還是上了年歲，泡在熱水裡都好看，沒什麼好裹著。」
+      text: 「洗身的地方是林泉浴場。上頭的溪水匯成一池，水還溫著。脫了衣裳下去，洗身、洗衣、說話，誰也不躲誰。身子泡在熱水裡都好看，不必裹著。」
     - kind: speech
       speaker: actor
       text: 「外頭來的客人走到池邊，不曉得該怎麼辦嗎？」
     - kind: speech
       speaker: host
-      text: 「不知道就坐在石頭上瞧。你愛脫就脫，愛披就披，沒人催；你要下水，裡頭的人會挪個位子給你。」
+      text: 「不知道就坐在石頭上瞧。你愛脫就脫，愛披就披，沒人催。要下水，裡頭的人會挪個位子給你。」
     - kind: speech
       speaker: host
-      text: 「夜裡也這樣。誰跟誰睡，跟白天誰在誰家吃晚飯一樣敞著。村裡大半的人，我都疼愛過一段日子，從來不必躲著誰。」
+      text: 「夜裡也一樣。誰跟誰睡，跟白天誰在誰家吃晚飯一樣，都擺在明面上。村裡大半的人，我都疼愛過一段日子，從來不必躲誰。」
 - topic_id: fionnen_firwen_home.topic_02
   keyword: 光庭
   label: 光庭
   fallback:
     scene_id: fionnen_firwen_home.topic_02_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
       text: 「林間光庭是什麼樣的地方？」
     - kind: speech
       speaker: host
-      text: 「樹冠在那兒讓開一片天，光整個落在地上。村裡有事要說，就在那片光裡聚攏。」
+      text: 「樹冠在那兒讓開一片天，光整個落到地上。村裡有事要說，就在那片光裡聚。」
     - kind: speech
       speaker: host
       text: 「活計在那裡分派，消息也在那裡換。孩子追著光斑跑，跑累了就攤在光裡睡。」
@@ -50,13 +50,13 @@ topics:
       text: 「很少有要緊的事。多半是誰家屋頂該補、哪畦菜該收，說幾句就散了。」
     - kind: speech
       speaker: host
-      text: 「黃昏時候，幾對年青的牽著手，從光裡往林子深處去。這些也都不用誰點頭。你要找人，傍晚上去，那時人最多。」
+      text: 「黃昏時候，幾對年輕人牽著手，從光裡往林子深處去。這些不用誰點頭。你要找人，傍晚上去，那時人最多。」
 - topic_id: fionnen_firwen_home.topic_03
   keyword: 外人
   label: 外人
   fallback:
     scene_id: fionnen_firwen_home.topic_03_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
@@ -66,16 +66,16 @@ topics:
       text: 「不緊著看，也不格外招呼。你走進來，就當你走進來了。」
     - kind: speech
       speaker: host
-      text: 「葉隱小徑就那一道口子，枝葉垂著，從外頭瞧只是一片林子。沒人刻意藏它，只是沒人想到要指給外人看。」
+      text: 「葉隱小徑就那一道口子，枝葉垂著，從外頭看只是一片林子。沒人刻意藏，只是也沒人想到要指給外人看。」
     - kind: speech
       speaker: actor
       text: 「所以外頭的人多半找不著這裡？」
     - kind: speech
       speaker: host
-      text: 「找不著的多。尋得到路的人，多半順著風向或水聲摸進來，像你這樣。」
+      text: 「很少有人找得到路。多半是順著風向或水聲摸進來，像你這樣。」
     - kind: speech
       speaker: host
-      text: 「外頭的人瞧見我們打赤膊，頭一回多半先愣住，眼睛不知往哪兒擱，又捨不得真不瞧。日子久了，才鬆下來。」
+      text: 「外頭的人瞧見我們打赤膊，頭一回多半先愣住，眼睛不知往哪兒擺，又捨不得真的不看。日子久了，才鬆下來。」
 - topic_id: fionnen_firwen_home.topic_04
   keyword: 往事
   label: 往事
@@ -84,19 +84,19 @@ topics:
   disclosure: pure_chain
   fallback:
     scene_id: fionnen_firwen_home.topic_04_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
-      text: 「你方才說樹下樹上都住人，那樹冠還沒讓開之前，村子是什麼樣？」
+      text: 「你方才說樹下樹上都住人。那樹冠還沒讓開之前，村子是什麼樣？」
     - kind: speech
       speaker: host
-      text: 「那時整片樹冠密實地合在一起，白天也暗得像傍晚。族人都在樹根邊過活，抬頭看不見天。」
+      text: 「那時候整片樹冠密實地合著，白天也暗得像傍晚。族人都在樹根邊過活，抬頭看不見天。」
     - kind: narration
       text: 她抬手往平台外一指，光從葉隙漏下來，在她手背上停了一會。
     - kind: speech
       speaker: host
-      text: 「有一年風大，最老那棵樹折了一根粗枝，裂開的口子後來怎麼也長不回去。光從那口子照進來，大家才曉得樹上也能住人。」
+      text: 「有一年風大，最老那棵樹折了一根粗枝。裂開的口子後來怎麼也長不回去。光從那裡照進來，大家才曉得樹上也能住人。」
     - kind: speech
       speaker: actor
       text: 「所以林間光庭是那時候留下來的？」

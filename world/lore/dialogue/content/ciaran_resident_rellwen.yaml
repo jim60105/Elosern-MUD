@@ -1,76 +1,84 @@
 schema_version: 1
-greeting: 瑞爾溫從池邊直起身，抹了把臉上的水，朝你笑：「是來洗身，還是洗衣裳？」
+greeting: 瑞爾溫從池邊直起身，水從肩頭一路淌到腳跟。她抹了把臉，笑得很大聲：「來洗身還是洗衣裳？脫了再講，站著看多彆扭。」
 topics:
 - topic_id: ciaran_resident_rellwen.topic_01
   keyword: 溪池
   label: 溪池
   fallback:
     scene_id: ciaran_resident_rellwen.topic_01_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「溪池浴場，是全村一起用嗎？」
+      text: 「這座池子，全村人都在用？」
     - kind: speech
       speaker: host
-      text: 「是。洗身、洗衣、泡水，都在這。上游洗菜，下游洗衣，想泡就脫了衣裳往暖池裡一躺。沒人分什麼你我。」
+      text: 「用啊。上頭洗菜，下頭洗衣，中間最暖那池留給泡身子。誰先來誰佔，沒有人在管。」
     - kind: narration
-      text: 她往水裡撩了一把，水花濺得老高。
+      text: 她彎腰撩了一把水，水花濺到石頭上，留下一片深色。
     - kind: speech
       speaker: host
-      text: 「這兒沒牆也沒簾，皮和皮見了都平常。你泡一回，就知道谷裡人為什麼不害臊。」
+      text: 「這裡沒有牆，也沒有簾。皮肉看慣了，就不算什麼。你泡過一回就懂，害臊是從外頭帶進來的東西。」
 - topic_id: ciaran_resident_rellwen.topic_02
   keyword: 洗衣
   label: 洗衣
   fallback:
     scene_id: ciaran_resident_rellwen.topic_02_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
       text: 「你一天要洗多少衣裳？」
     - kind: speech
       speaker: host
-      text: 「數不清。誰把髒衣裳往池邊一放，我槌了、搓了，晾乾再還回去。累是累，可有水聲陪著，也不悶。」
+      text: 「數不清。誰把一籃往池邊一放，我槌完晾好，再讓人來領。名字我都記得住。」
     - kind: speech
       speaker: host
-      text: 「人把心事也帶到池邊來。我一邊洗，一邊聽，谷裡的事，比誰都清楚。」
+      text: 「洗東西最不悶，水聲一直在講話。人蹲在旁邊等衣裳，就會開始聊，聊到最後什麼都講了。」
+    - kind: narration
+      text: 她把一件濕衣裳甩開，啪地貼上石面。
+    - kind: speech
+      speaker: host
+      text: 「所以谷裡的事，我比誰都清楚。你可別在池邊講不想讓人知道的話喔。」
 - topic_id: ciaran_resident_rellwen.topic_03
   keyword: 家人
   label: 家人
   fallback:
     scene_id: ciaran_resident_rellwen.topic_03_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「你家裡人都來這兒忙？」
+      text: 「你家兩個女兒，也跟著你在池邊忙？」
     - kind: speech
       speaker: host
-      text: 「大女兒科瑞爾力氣大，槌衣；小女兒邁特希爾心細，疊布。我管洗。仨人一天到晚泡在水裡。」
+      text: 「大的科瑞爾力氣大，槌衣的石板到她手裡特別響。小的邁特希爾心細，折布折得比我整齊。」
     - kind: narration
-      text: 她朝池邊那兩個身影努了努嘴。
+      text: 她朝下游抬了抬下巴，那頭有兩個濕透的身影在笑。
     - kind: speech
       speaker: host
-      text: 「一家人濕淋淋地回家，身上都是水的涼氣。你要找人，池邊一喊就應。」
+      text: 「三個人一身水回家，路上滴出一條線。你要找誰，池邊喊一聲就有。」
+    - kind: speech
+      speaker: host
+      text: 「我們家講話大聲，別被嚇到。嗓門大不等於在吵架喔。」
 - topic_id: ciaran_resident_rellwen.topic_04
   keyword: 名字
   label: 名字
   fallback:
     scene_id: ciaran_resident_rellwen.topic_04_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「拉文伍德，是鴉林的意思？」
+      text: 「拉文伍德，是鴉林的意思吧？」
     - kind: speech
       speaker: host
-      text: 「鴉林。入夜鴉在林子上空盤，翅膀拍得啪啪響。我家靠著這片池子，夜裡聽得最清。」
+      text: 「鴉林。天黑前那群鴉會在林子上頭繞，翅膀拍得很響。」
     - kind: narration
-      text: 她側耳，像在聽那陣翅聲。
+      text: 她側過頭，像真的在聽那陣聲音。
     - kind: speech
       speaker: host
-      text: 「鴉是夜的信差。你夜裡來，我指給你看那幾隻。」
+      text: 「我家就在池邊，夜裡聽得最清楚。你要看，晚上來，我指給你看牠們往哪棵樹落。」
 - topic_id: ciaran_resident_rellwen.topic_05
   keyword: 私語
   label: 私語
@@ -80,23 +88,26 @@ topics:
   unavailable: locked
   refusal:
     scene_id: ciaran_resident_rellwen.topic_05_refusal
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: host
-      text: 「我話多，可也不是誰都交底。你多來泡幾回，再說。」
+      text: 「我什麼都講，就這件事得看人。你先多來泡幾回，把身上的外頭味洗掉，我再考慮。」
   fallback:
     scene_id: ciaran_resident_rellwen.topic_05_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「你最自在的時刻，是什麼樣？」
+      text: 「你一個人的時候，最放鬆是什麼時候？」
     - kind: speech
       speaker: host
-      text: 「是收工後，我獨自泡進最暖那池，水沒過胸口。有個人在對岸看我，看得我渾身發燙，我才招手叫她下來。水一動，身子就貼上了，分不清是誰的熱。」
+      text: 「收工以後，我一個人泡進最暖那池，水到胸口。泡到骨頭都鬆了，才甘願上岸。」
+    - kind: speech
+      speaker: host
+      text: 「有時候對岸站著一個人看我。我不趕她，等我泡夠了，才朝她招手。水一動，兩個人就貼上了，誰的熱都分不清。」
     - kind: narration
-      text: 她聲音沉下去，眼裡卻亮著。
+      text: 她說這些話時聲音低下來，眼睛卻很亮。
     - kind: speech
       speaker: host
-      text: 「水最懂怎麼讓人軟。你泡過，就離不開了。」
+      text: 「水最懂怎麼讓人軟。你泡過，就離不開這池子了。」

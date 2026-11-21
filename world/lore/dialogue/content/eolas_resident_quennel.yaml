@@ -1,76 +1,90 @@
 schema_version: 1
-greeting: 奎內爾的織機停了下來，她抬眼望向你：「來問布，還是問織法？」
+greeting: 奎內爾停下織機，梭子還捏在手裡。「來問布，還是問織法？先說好，我講起來話長。」
 topics:
 - topic_id: eolas_resident_quennel.topic_01
   keyword: 織布
   label: 織布
   fallback:
     scene_id: eolas_resident_quennel.topic_01_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「這谷裡的布，怎麼織得又輕又結實？」
+      text: 「谷裡的布，怎麼織得又輕又結實？」
     - kind: speech
       speaker: host
-      text: 「經線拉得勻，緯線壓得實。手要穩，眼要毒，一個線頭都不能冒。織壞了就拆，拆到自己服氣為止。」
+      text: 「經線拉勻，緯線壓實。手要穩，眼睛要盯著每一根線，冒出一個線頭就得拆。」
     - kind: narration
-      text: 她拍了拍那架老織機，木框的包漿在燈下發亮。
+      text: 她拍了拍織機的木框，那上頭被手磨得發亮。
     - kind: speech
       speaker: host
-      text: 「這衣裳貼著身子，輕得沒有分量。你摸一摸料子，比聽我說十句都真。」
+      text: 「拆到我自己點頭，才肯往下織。布騙不了人，哪裡鬆，一眼就看出來。」
+    - kind: speech
+      speaker: host
+      text: 「你上手摸這匹。貼在臉上也不扎，比聽我講十句都明白。」
 - topic_id: eolas_resident_quennel.topic_02
   keyword: 染色
   label: 染色
   fallback:
     scene_id: eolas_resident_quennel.topic_02_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「谷裡也有帶顏色的布？」
+      text: 「谷裡的布，就只有白色嗎？」
     - kind: speech
       speaker: host
-      text: 「不多。白衣是谷裡的底，想添點顏色，就去找泰莉斯討她燒瓷剩下的色料，染出幾匹淡布。」
+      text: 「白衣是底。想添點顏色，我去找泰莉斯討她燒瓷剩下的色料，能染出幾匹顏色淺的布。」
     - kind: speech
       speaker: host
-      text: 「這裡的人不靠衣裳辨人。脫了都一樣，靠說話和身子認。你要嫌太素，就穿那件白底，也耐看。」
+      text: 「染缸小，一次只夠一匹。顏色深一點淺一點，我都記在本子上。」
+    - kind: narration
+      text: 她從織機旁抽出一小塊染過布頭，攤在光下。
+    - kind: speech
+      speaker: host
+      text: 「這裡的人不靠衣裳認人。脫了都一樣，靠講話和身子認。」
 - topic_id: eolas_resident_quennel.topic_03
   keyword: 家人
   label: 家人
   fallback:
     scene_id: eolas_resident_quennel.topic_03_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
       text: 「這架織機，是你們家傳下來的？」
     - kind: speech
       speaker: host
-      text: 「村裡最老的一架，到我手裡還在用。大的妮瑞爾管剪裁，小的凱勒斯管分線，母女仨圍著它轉。」
+      text: 「村裡最老的一架，到我手裡還在響。妮瑞爾接我的布去裁，凱勒斯管分線，三個人繞著它轉。」
     - kind: narration
-      text: 她說起女兒，手裡的緯梭多帶了一分勁。
+      text: 她說起女兒，手裡的梭子多使了一分勁。
     - kind: speech
       speaker: host
-      text: 「夜裡誰倦了誰先歇，一間屋三張鋪。一家人，沒那麼多講究。」
+      text: 「夜裡誰累了誰先躺，一間屋三張鋪。一家人，不必講究那些。」
+    - kind: speech
+      speaker: host
+      text: 「線亂了喊一聲，三雙手就過來。這架機器認得我們三個人的聲音。」
 - topic_id: eolas_resident_quennel.topic_04
   keyword: 名字
   label: 名字
   fallback:
     scene_id: eolas_resident_quennel.topic_04_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「『維爾維特莉夫』，是怎麼來的？」
+      text: 「『維爾維特莉夫』這個姓，是誰取的？」
     - kind: speech
       speaker: host
-      text: 「絨葉。岩屋坡的老樹葉子背後有層細絨，風一過，白茫茫一片，像下雪。這家就取了這景。」
+      text: 「絨葉。岩屋坡那幾棵老樹，葉背有一層細絨，風一翻，整片坡泛白，跟下雪一樣。」
     - kind: narration
-      text: 她瞇起眼，像在回味那陣絨。
+      text: 她瞇起眼，拇指在梭子邊上蹭了蹭，沒再說話。
     - kind: speech
       speaker: host
-      text: 「谷裡人取名，都取眼跟前的事物。你聽多了，就曉得哪家住在哪片坡上。」
+      text: 「取名的時候，眼前看見什麼，就取什麼。谷裡人的姓，多半就是這樣取。」
+    - kind: speech
+      speaker: host
+      text: 「你聽多了就曉得，哪個姓住在哪片坡。」
 - topic_id: eolas_resident_quennel.topic_05
   keyword: 私語
   label: 私語
@@ -80,23 +94,26 @@ topics:
   unavailable: locked
   refusal:
     scene_id: eolas_resident_quennel.topic_05_refusal
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: host
-      text: 「有的話只織給自家人。你來多坐幾回，再聊。」
+      text: 「有些話我織在布裡，不掛在嘴上。你多來坐幾回，等梭子認得你了，再說。」
   fallback:
     scene_id: eolas_resident_quennel.topic_05_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「織了這麼多年布，你最享受的是哪一樣？」
+      text: 「織了這麼多年布，你最享受哪一刻？」
     - kind: speech
       speaker: host
-      text: 「織完一匹，把布抖開，貼著臉蹭過去。那一下，整天的酸都化在布上。有時我裹著它，就著窗光站很久，自己跟自己待一會。」
+      text: 「織完一匹，把布抖開，貼著臉蹭過去。那一整天的痠，全留在布面上。」
     - kind: narration
-      text: 她垂下眼，指尖在布面上劃了劃。
+      text: 她垂下眼，指尖沿著布邊劃過去。
     - kind: speech
       speaker: host
-      text: 「歡愉不一定要誰。有時一塊好布，比一個情人還貼心。」
+      text: 「有時候我裹著它坐在窗邊，什麼也不做，就聽外頭風穿過屋角。」
+    - kind: speech
+      speaker: host
+      text: 「歡喜不一定得靠誰。一塊好布貼著，比有的人還貼心。」

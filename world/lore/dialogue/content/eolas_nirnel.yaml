@@ -1,40 +1,40 @@
 schema_version: 1
-greeting: 屋裡一座小爐正溫著藥露，妮爾內爾‧德米多把採回來的一籃香草放到桌上，抬眼把來人從頭看到腳，像在讀他累到哪兒了。爐火烘得石室發暖，她把衣襟往外鬆了鬆，頸下一片皮膚和鎖骨一起露在暖光裡，她也沒急著攏回去。「坐。今天熬好的是幽月香草藥露，架上封好的都在。你是身上累，還是魔力空了？先說明白，我才好替你挑。」
+greeting: 屋裡的小爐正溫著藥露，妮爾內爾‧德米多把採回來的一籃香草放上桌，抬眼把你的樣子看過一遍，看到眼底就停了下來。爐火烘得屋裡發暖，她把衣襟往外鬆了鬆，頸下一片皮膚露在暖光裡，也沒急著攏回去。「坐。今天熬好的是幽月香草藥露，架上封好的都在。你是身子累，還是魔力空了？先講明白，我才好替你挑。」
 topics:
 - topic_id: eolas_nirnel_home.topic_01
   keyword: 香草
   label: 香草
   fallback:
     scene_id: eolas_nirnel_home.topic_01_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
-      text: 「石階菜畦上的香草都是你在顧的嗎？你怎麼知道哪一畦該採了？」
+      text: 「石階菜畦上的香草都是你在顧的？你怎麼知道哪一畦該採了？」
     - kind: narration
-      text: 她捻起籃裡的一片葉子，在指間壓碎，湊到鼻前聞了聞。
+      text: 她捻起籃裡一片葉子，在指間壓碎，湊到鼻前聞了聞。
     - kind: speech
       speaker: host
-      text: 「香草認時辰。天剛亮葉子還帶著夜裡的涼，採下來的氣味最乾淨。我走一趟菜畦，只採當天要用的那一點。」
+      text: 「香草認時辰。天剛亮葉子還帶著夜裡的涼，那時候採下來，氣味最乾淨。我走一趟菜畦，只採當天要用的分量。」
     - kind: speech
       speaker: host
-      text: 「畦裡也種催情的草。那幾株湊在一起聞，比什麼都濃，族裡的人把它們混進浴水，往後做愛做得更盡興。氣味到了，身子先軟。」
+      text: 「畦裡也種催情的草。那幾株湊在一起聞，比什麼都濃，族裡的人把它們混進浴水，做愛做得更盡興。氣味到了，身子自己就軟。」
     - kind: speech
       speaker: actor
       text: 「採回來的香草，接下來怎麼處理？」
     - kind: speech
       speaker: host
-      text: 「攤在通風的地方陰乾，不曬太陽。石階上那一整排，我綁成一束一束，都是今年收下來的草，要熬藥時再取喔。」
+      text: 「攤在通風的地方陰乾，別曬太陽。石階上那一整排，我綁成一束一束，全是今年剛收的草，要熬藥時再取喔。」
 - topic_id: eolas_nirnel_home.topic_02
   keyword: 藥露
   label: 藥露
   fallback:
     scene_id: eolas_nirnel_home.topic_02_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
-      text: 「幽月香草藥露是拿什麼熬的？喝下去之後，人會覺得哪裡不一樣？」
+      text: 「幽月香草藥露是拿什麼熬的？喝下去，人會覺得哪裡不一樣？」
     - kind: speech
       speaker: host
       text: 「菜畦上的香草，加上溪源打上來的水，小火熬到湯色轉深就封起來。它補的是體力，走路走到腿發軟，喝下就撐得住。」
@@ -54,14 +54,14 @@ topics:
   label: 魔力
   fallback:
     scene_id: eolas_nirnel_home.topic_03_scene
-    revision: r4
+    revision: r5
     lines:
     - kind: speech
       speaker: actor
       text: 「架上的魔力藥水和強效治療藥水，分別在什麼時候用？」
     - kind: speech
       speaker: host
-      text: 「魔力藥水補的是施法之後空掉的魔力，法術試到頭昏，喝下讓力氣回來。強效治療藥水留給真的破了皮肉的人，滲得深的那種傷，普通藥水壓不住。」
+      text: 「魔力藥水補的是施法之後空掉的魔力，法術試到頭昏，喝一下讓力氣回來。強效治療藥水留給真的破了皮肉的人，滲得深的那種傷，普通藥水壓不住。」
     - kind: narration
       text: 她把兩個瓶子並排放在桌上，一個泛藍，一個顏色深些。
     - kind: speech
@@ -69,13 +69,13 @@ topics:
       text: 「也有人來問性愛的事。做愛做久了，肚子餓、腿發軟，這些都是身子在喊累。身子先撐得住，才談得上盡興；等到耗空了才想起我，就晚了。」
     - kind: speech
       speaker: host
-      text: 「我自己也常犯急。那回燙了手，隔了這麼多年，點火時還是會先吸一口氣喔。」
+      text: 「我自己也常犯急。有一回燙了手，隔了這麼多年，點火時還是會先吸一口氣喔。」
 - topic_id: eolas_nirnel_home.topic_04
   keyword: 收回
   label: 收回
   fallback:
     scene_id: eolas_nirnel_home.topic_04_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor

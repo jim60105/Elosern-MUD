@@ -1,27 +1,27 @@
 schema_version: 1
-greeting: 村北古樹下的石屋裡，懸滿了四處蒐羅來的物件。瓦爾溫‧斯蒂爾瓦特爾正把一疊壓實的藍染料塊擺上木架，聽見門口動靜便回頭，眼睛一亮：「哎，有客人來了！你是打哪兒來的呀？路上瞧見什麼新鮮事了？快進來坐，我這屋裡掛著的每件東西都有來歷，想聽哪一段我都說給你聽。」
+greeting: 村北古樹下的石屋裡，牆上、樑下掛滿了四處蒐羅來的物件。瓦爾溫‧斯蒂爾瓦特爾正把一疊壓實的藍染料塊擺上木架，聽見門口的動靜就回頭，眼睛一亮：「哎，有客人！你是打哪兒來的？路上瞧見什麼新鮮事了？快進來坐，我這屋裡掛著的每件東西都有來歷，想聽哪一段，我都說給你聽。」
 topics:
 - topic_id: ciaran_valwyn_home.topic_01
   keyword: 蒐羅
   label: 蒐羅
   fallback:
     scene_id: ciaran_valwyn_home.topic_01_scene
-    revision: r4
+    revision: r5
     lines:
     - kind: speech
       speaker: actor
-      text: 牆上掛著這麼多羽毛、種子、貝殼，都是你一路蒐回來的嗎？
+      text: 「牆上掛著這麼多羽毛、種子、貝殼。這些都是你一路蒐回來的嗎？」
     - kind: narration
-      text: 她踮起腳，指著樑下那根斑駁的青色大羽毛，語氣裡滿是得意。
+      text: 她指著樑下那根斑駁的青色大羽毛，語氣裡滿是得意。
     - kind: speech
       speaker: host
-      text: 「是啊！山徑上拾來、深潭邊換來、溪水沖上岸，全都在這兒。你看那根青翎，三百年前一隻大鳥躲雷雨落進谷底，褪下了這根青翎。那天雨下得可急了……哎呀，我又扯遠了。這些物件都繫著小木牌，記著各自的來歷，我留著作紀念，不換給外人喔。」
+      text: 「是啊！山徑上撿回來、深潭邊跟人換來、溪水沖上岸，全在這兒。你看那根青翎，有一年一隻大鳥躲雷雨落進谷底，褪下了這根。那天雨下得可急了……哎，我又扯遠了。這些物件都繫著小木牌，記著各自的來歷，我留著當紀念，不換給外人喔。」
     - kind: speech
       speaker: host
-      text: 「架子那頭那疊暗影谷藍染，是我親手用溪畔下游的染草壓成。罈裡裝的是溪裡淘的暗影谷晶砂，那些隨人取用啦。」
+      text: 「架子那頭那疊暗影谷藍染，我自己用溪畔下游的染草壓成一塊一塊。罈裡裝的是溪裡淘出來的暗影谷晶砂，那些隨人取用啦。」
     - kind: speech
       speaker: actor
-      text: 每件小東西都記著年份和地點，整理起來費不少心神吧？
+      text: 「每件小東西都記著年份和地點，整理起來費不少心神吧？」
     - kind: speech
       speaker: host
       text: 「一點也不費事，記下它們從哪兒來，是最快活的事啦！屋裡能看的物件多得很，你看中哪樣儘管問，我全都記得。」
@@ -30,11 +30,11 @@ topics:
   label: 藍染
   fallback:
     scene_id: ciaran_valwyn_home.topic_02_scene
-    revision: r4
+    revision: r5
     lines:
     - kind: speech
       speaker: actor
-      text: 架子下那幾塊壓得方正的深藍料子，也是你蒐回來的嗎？
+      text: 「架子下那幾塊壓得方正的深藍料子，也是你蒐回來的嗎？」
     - kind: narration
       text: 她彎腰搬起一塊染料，指腹抹過斷面，指尖染上一層藍。
     - kind: speech
@@ -45,7 +45,7 @@ topics:
       text: 「織房坡上晾的布，藍色全從這兒來。下過溪水的手，要好幾天才褪得掉呢。」
     - kind: speech
       speaker: actor
-      text: 原來村裡布匹的藍都從這兒來。那蛛絲呢？我聽說精靈的蛛絲也在這一帶。
+      text: 「原來村裡布匹的藍都從這兒來。那蛛絲呢？我聽說精靈的蛛絲也在這一帶。」
     - kind: speech
       speaker: host
       text: 「蛛絲是幽月谷村的東西啦。蛛絲林邊的奈拉拉‧弗羅斯特威洛織得最好，兩村的人偶爾互相走動。她織的白衣我見過，薄得透光。」
@@ -60,58 +60,58 @@ topics:
       stage_key: familiar
     scene:
       scene_id: ciaran_valwyn_home.topic_03_familiar
-      revision: r3
+      revision: r4
       lines:
       - kind: speech
         speaker: actor
-        text: 你耳邊那對月牙耳環，彎弧精巧，上頭是不是也藏著一段故事？
+        text: 「你耳邊那對月牙耳環，彎弧精巧。上頭是不是也藏著一段故事？」
       - kind: narration
         text: 她側過臉，指尖碰了碰耳垂，眼裡帶著認出熟客的笑意。
       - kind: speech
         speaker: host
-        text: 「哎，是你呀！這對月牙耳環你之前見過吧。是銀葉坡格威娜拉的手藝，我用撿來的貝殼跟她換來，戴了好多年，可不能解下來給你喔。」
+        text: 「哎，是你呀！這對月牙耳環你之前見過吧。是銀葉坡格威娜拉的手藝，我用撿來的貝殼跟她換來。戴了好多年，可不能解下來給你喔。」
       - kind: speech
         speaker: actor
-        text: 既然是你珍藏多年的心愛飾物，我自然不強求。想找這般精緻的巧物，該去哪兒？
+        text: 「既然是你珍藏多年的心愛飾物，我自然不強求。想找這般精緻的巧物，該去哪兒？」
       - kind: speech
         speaker: host
         text: 「你要是真心喜歡這副樣式，沿著路去銀葉坡找格威娜拉。她窗邊掛著好幾對剛做妥的綴飾，去那兒挑，準能挑中你喜歡的樣式。」
   fallback:
     scene_id: ciaran_valwyn_home.topic_03_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
-      text: 你耳邊那對月牙耳環，彎弧精巧，上頭是不是也藏著一段故事？
+      text: 「你耳邊那對月牙耳環，彎弧精巧。上頭是不是也藏著一段故事？」
     - kind: narration
-      text: 她側過臉，指尖碰了碰耳上的銀飾，帶著笑迎上客人的視線。
+      text: 她側過臉，指尖碰了碰耳上的銀飾，笑著迎上你的視線。
     - kind: speech
       speaker: host
-      text: 「這對月牙耳環好看吧？是銀葉坡格威娜拉的手藝。我拿撿來的小貝殼跟她換來戴，已經許多年啦。上面記著好多年的事，我可不能解下來換給你喔。」
+      text: 「這對月牙耳環好看吧？是銀葉坡格威娜拉的手藝。我拿撿來的小貝殼跟她換來戴，已經好些年了。上面記著好些事，我可不能解下來換給你喔。」
     - kind: speech
       speaker: actor
-      text: 既然是你珍藏多年的心愛飾物，我自然不強求。想找這般精緻的巧物，該去哪兒？
+      text: 「既然是你珍藏多年的心愛飾物，我自然不強求。想找這般精緻的巧物，該去哪兒？」
     - kind: speech
       speaker: host
-      text: 「沿著石徑往銀葉坡走，格威娜拉就住那兒。她做的首飾在村裡最出名，去她窗邊挑一副喜歡的樣式帶上路，不會叫你白跑。」
+      text: 「沿著石徑往銀葉坡走，格威娜拉就住那兒。她做的首飾在村裡最出名，去她窗邊挑一副喜歡的帶上路，不會叫你白跑。」
 - topic_id: ciaran_valwyn_home.topic_04
   keyword: 以物易物
   label: 以物易物
   fallback:
     scene_id: ciaran_valwyn_home.topic_04_scene
-    revision: r4
+    revision: r5
     lines:
     - kind: speech
       speaker: actor
-      text: 聽說你最愛跟往來的旅人以物易物，平常都拿什麼交換？
+      text: 「聽說你最愛跟往來的旅人以物易物。平常都拿什麼交換？」
     - kind: narration
       text: 她雙手托著下巴，眼睛裡滿是好奇。
     - kind: speech
       speaker: host
-      text: 「我最愛跟人換東西了！不過比起銅幣，我更愛聽各地的奇聞軼事。你講一段山裡荒野的見聞，我就講一段這屋裡某件老物件的來歷，這才是划算的交換呀。」
+      text: 「我最愛跟人換東西了！不過比起銅幣，我更愛聽各地的奇聞軼事。你講一段山裡荒野的見聞，我就講一段這屋裡某件老物件的來歷，這才划算呀。」
     - kind: speech
       speaker: actor
-      text: 要是先前跟你換走的暗影谷藍染或暗影谷晶砂沒用完，能帶回來嗎？
+      text: 「要是先前跟你換走的暗影谷藍染或暗影谷晶砂沒用完，能帶回來嗎？」
     - kind: speech
       speaker: host
-      text: 「染塊沒受潮、晶砂還裝在原來的罐裡，原樣拿回來，我替你收下，按收購的規矩算回銅幣補貼盤纏。好料子回了這間屋子，遲早還派得上新用場呢。」
+      text: 「染塊沒受潮、晶砂還裝在原來的罐裡，原樣拿回來，我替你收下，按收購的規矩算回銅幣，補貼你的盤纏。好料子回了這間屋子，遲早還派得上新用場呢。」

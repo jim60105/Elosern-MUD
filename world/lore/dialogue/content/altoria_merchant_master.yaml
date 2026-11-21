@@ -1,5 +1,5 @@
 schema_version: 1
-greeting: 商會公所的尤斯汀‧柯德溫會長從稅率長桌後起身，向來客鄭重欠身：「歡迎來到商會公所。閣下想了解東市商隊、貿易路線或公所會務，本人樂意說明。只有一點先講明，公所不發放護衛委託，也不替商隊招募人手。」
+greeting: 商會公所的尤斯汀‧柯德溫從稅率長桌後起身，朝來客欠了欠身：「歡迎來到商會公所。東市商隊、貿易路線、公所會務，想問哪一樣我都答。先把話講明，公所不發護衛委託，也不替商隊招人。」
 topics:
 - topic_id: altoria_merchant_hall.topic_01
   keyword: 商隊
@@ -13,97 +13,109 @@ topics:
       end_daypart: noon
     scene:
       scene_id: altoria_merchant_hall.topic_01_dawn_scene
-      revision: r3
+      revision: r4
       lines:
       - kind: speech
         speaker: actor
-        text: 「尤斯汀會長，這大清早公所門外車馬不停，商隊正忙著清點貨物、準備啟程嗎？」
+        text: 「會長，這大清早門口車馬一輛接一輛，商隊都在忙著裝貨出城嗎？」
       - kind: narration
-        text: 尤斯汀‧柯德溫的目光掠過窗外晨曦下的貨運馬車，拿起粉筆，核對牆上的商隊名冊。
+        text: 尤斯汀‧柯德溫朝窗外看了一眼，拿起粉筆，把牆上的名冊對過一遍。
       - kind: speech
         speaker: host
-        text: 「正是。黎明到正午，是東門商隊出城最忙的時辰，書記趕在城門大開前，一隊一隊核對貨單。公所掌的是登記與協調，替各商號排開行程，免得官道上擠成一團。」
+        text: 「對。天亮到正午是東門最忙的時候。書記趕在城門開大之前，一隊一隊核對貨單，錯一筆，出關就要重跑一趟。」
       - kind: speech
         speaker: host
-        text: 「只是公所歷來中立，既不替商隊招募同行護衛，也不為任何一批貨作保。閣下若想查本季出發的商隊字號，牆邊粉筆寫的名牌都在上頭。」
+        text: 「公所管的是登記和排序。誰先走、誰後走，我這邊排開，免得官道上擠成一團，誰也動不了。」
+      - kind: speech
+        speaker: actor
+        text: 「那這些商隊缺人手的時候，公所會幫忙找人嗎？」
+      - kind: speech
+        speaker: host
+        text: 「不會。公所中立，不替商隊招護衛，也不替任何一批貨作保。你要查本季出發的字號，牆邊粉筆寫得明白。」
   fallback:
     scene_id: altoria_merchant_hall.topic_01_fallback_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
-      text: 「尤斯汀會長，想請教本季進出王都的商隊怎麼運作，公所平時如何調度？」
+      text: 「會長，本季進出王都的商隊是怎麼調度的？公所平常都做些什麼？」
     - kind: narration
-      text: 尤斯汀‧柯德溫拿起粉筆，指向牆上地圖旁成排的商號名錄。
+      text: 他拿起粉筆，在名錄上頭敲了兩下，粉灰落了一桌。
     - kind: speech
       speaker: host
-      text: 「本季進出王都的各支商隊，書記都以粉筆記在地圖側旁。公所掌的是行程登錄、關稅評議與行會協調，維持貨運的秩序。」
+      text: 「書記把每一隊記在地圖旁邊，進城、出城、走哪條道，都有帳。公所管登錄、關稅評議，還有行會之間的協調。」
     - kind: speech
       speaker: actor
-      text: 「那若是有旅人、護衛想隨商隊同行，公所能代為安排嗎？」
+      text: 「如果有旅人想跟著商隊一起走，公所代為安排嗎？」
     - kind: speech
       speaker: host
-      text: 「不能。公所不安排旁人搭車同行，也不替任何行商擔保私運的貨。商隊與護衛之間的私下約定，一概與公所無涉，這點得先向閣下講明。」
+      text: 「不安排。搭車、隨行、私下的護衛約定，都是商隊和人之間的事，公所一概不沾。這點我先講明白，免得你白等。」
 - topic_id: altoria_merchant_hall.topic_02
   keyword: 貿易路線
   label: 貿易路線
   fallback:
     scene_id: altoria_merchant_hall.topic_02_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
-      text: 「王都對外的貿易路線是怎麼分的？大宗貨物多半從哪座城門出入？」
+      text: 「王都對外的貿易路線是怎麼分的？大宗貨物多半走哪座門？」
     - kind: narration
-      text: 尤斯汀‧柯德溫走到懸掛的羊皮路線圖前，指尖沿著主幹商道劃過去。
+      text: 他走到牆上的羊皮路線圖前，指尖沿著主幹商道劃過去。
     - kind: speech
       speaker: host
-      text: 「大宗貨物多半出東門，沿官道往東。東市原是傍著舊城牆長起來的貨棧街，各國的穀物、玻璃都在這裡集散，外國硬幣也由東門流進來；工匠巷鍛出來的鐵器走市場街，鍊金坊熬藥用的原料，多半從東門進城。」
+      text: 「大宗走東門，沿官道往東。東市本來就是靠著舊城牆長起來的貨棧街，各國的穀物和玻璃都在那裡集散，外國錢幣也從東門流進來。」
+    - kind: speech
+      speaker: host
+      text: 「工匠巷的鐵器走市場街進城，鍊金坊熬藥用的原料，大多也從東門進來。一條道養活半座城，這話不誇張。」
     - kind: speech
       speaker: actor
-      text: 「東門外官道沿線的治安與岔路，公所能給些指引嗎？」
+      text: 「東門外那條官道的治安和岔路，公所能給點指引嗎？」
     - kind: speech
       speaker: host
-      text: 「公所只管關稅核算，還有商道通不通暢，不掌沿線防務。閣下若問城外哨所與路況，駐守城門的聖潔王都衛兵隊，比本人清楚得多。」
+      text: 「公所只管關稅和商道通不通，不管沿線防務。城外哨所和路況，你去問駐守城門的衛兵隊，他們比我清楚。」
 - topic_id: altoria_merchant_hall.topic_03
   keyword: 委託
   label: 委託
   fallback:
     scene_id: altoria_merchant_hall.topic_03_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
-      text: 「都說東市商隊常遭魔獸侵擾，公所可有張貼護衛商隊、運貨的差事？」
+      text: 「都說東市商隊常被魔獸纏上，公所有沒有護衛或運貨的差事可以接？」
     - kind: narration
-      text: 尤斯汀‧柯德溫神情肅然，雙手交疊壓在皮面帳冊上。
+      text: 他把雙手交疊壓在皮面帳冊上，神情正了一點。
     - kind: speech
       speaker: host
-      text: 「公所牆上沒有告示板，門邊也沒有僱傭名冊。商隊走荒野，確實需要得力護衛，可商會至今沒有正式的護衛委託規章。本人不能讓閣下去接一件權責不清、毫無著落的差事。」
+      text: 「牆上沒有告示板，門邊也沒有僱傭名冊。商隊走荒野確實需要人手，可商會到現在沒有正式的護衛委託規章，我不能讓你去接一件權責不清的活。」
     - kind: speech
       speaker: actor
-      text: 「那想靠武藝賺酬勞，接護送或討伐的活兒，該往哪兒去？」
+      text: 「那想靠武藝賺酬勞，該往哪裡去？」
     - kind: speech
       speaker: host
-      text: 「請移步到公會前的冒險者公會大廳。那裡立有合格的任務公告板，討伐、採集、押運，每樣都有法度保障。要找活計，那兒才是正途。」
+      text: 「中央廣場東側的冒險者公會。大廳的告示板每天換新，討伐、採集、押運，每一樣都有規矩，出了事也有人管。」
+    - kind: speech
+      speaker: host
+      text: 「話說回來，商隊私下僱人，我攔不住，也不會替誰背書。你要走正路，就走公會那一條。」
 - topic_id: altoria_merchant_hall.topic_04
   keyword: 會務
   label: 會務
   fallback:
     scene_id: altoria_merchant_hall.topic_04_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
-      text: 「商會公所在王都具體掌管哪些政務？行會之間的糾紛，也由公所裁決嗎？」
+      text: 「公所在王都到底管哪些事？行會之間吵起來，也是你們裁決嗎？」
     - kind: narration
-      text: 尤斯汀‧柯德溫撫過胸前的商會徽章，指著窗下長桌上那疊帳簿。
+      text: 他撫過胸前的商會徽章，指著窗下長桌上那疊帳簿。
     - kind: speech
       speaker: host
-      text: 「公所掌三項要務，協調各行會的利益、評議關稅章程，還有季末清算各家帳目。商號要申請入會，得備齊保薦人的文書，當面商議。」
+      text: 「三件。協調各行會的利益、評議關稅章程，還有季末清算各家的帳。商號要入會，得備齊保薦人的文書，到我面前當面談。」
     - kind: speech
       speaker: actor
-      text: 「評議定案的關稅細則與章程，外來的行商也能查閱嗎？」
+      text: 「評議定下來的關稅細則，外來的行商也能看嗎？」
     - kind: speech
       speaker: host
-      text: 「稅率條文都擺在窗下長桌上，白紙黑字。閣下需要，自可翻閱，當場手抄一份帶回也無妨。」
+      text: 「能。條文就攤在窗下那張長桌上，怎麼寫就怎麼算。你要抄一份帶走，我也不攔，只是別把順序抄錯，稅率差一級，價錢差很多。」

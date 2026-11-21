@@ -1,76 +1,90 @@
 schema_version: 1
-greeting: 瑞林直起腰，拍拍手上的泥：「是問菜，還是問我這身泥？」
+greeting: 瑞林赤腳站在土裡，彎腰把一株歪掉的菜苗扶正，才直起身：「問菜就問。我手上這點泥，等會再洗。」
 topics:
 - topic_id: fionnen_resident_relllin.topic_01
   keyword: 菜圃
   label: 菜圃
   fallback:
     scene_id: fionnen_resident_relllin.topic_01_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「林間菜圃，都種些什麼？」
+      text: 「林間菜圃這麼大一片，都是你一個人開出來的？」
     - kind: speech
       speaker: host
-      text: 「蔬菜成排種到樹根邊，果樹雜在其間。收成不多，夠村裡吃，多的曬乾留到冬天。這片隙地，養了整座村。」
+      text: 「一畦一畦開出來。巨樹之間的隙地，石頭多，土薄，先撿石再填土，才種得起來。」
+    - kind: speech
+      speaker: host
+      text: 「菜成排種到樹根邊，果樹雜在中間。收成不算多，夠村裡吃，多的曬乾留到冬天。」
     - kind: narration
-      text: 她摘下一片菜葉，就著露水看了看。
+      text: 她彎腰摘下一片菜葉，掐掉邊上被蟲咬過的地方。
     - kind: speech
       speaker: host
-      text: 「土好，菜就肯長。人也是，扎得深，才站得穩。」
+      text: 「這片地養了整座村。土好，菜就肯長。人也一樣，腳踩得實，才站得穩。」
 - topic_id: fionnen_resident_relllin.topic_02
   keyword: 收成
   label: 收成
   fallback:
     scene_id: fionnen_resident_relllin.topic_02_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「收成的時候，忙得過來嗎？」
+      text: 「收成的時候，你們忙得過來嗎？」
     - kind: speech
       speaker: host
-      text: 「忙，可也樂。一家人齊上陣，彎腰採、澆水、分裝的人，笑聲滿圃。累了一季，就等這一茬。」
+      text: 「忙。三個人一起上，採的採、裝的裝。中午就在圃邊吃，吃完接著做。」
     - kind: speech
       speaker: host
-      text: 「收完煮一大鍋，全村來分。那種踏實，比躺在誰懷裡還沉。」
+      text: 「收完那晚煮一大鍋，端去共食棚。村裡誰來都可以盛一碗，沒有人空手回去。」
+    - kind: narration
+      text: 她把手上的泥在衣襬上抹了兩下，抹不乾淨也不在意。
+    - kind: speech
+      speaker: host
+      text: 「累了一季，就等這一口。那種踏實，比什麼都重。」
 - topic_id: fionnen_resident_relllin.topic_03
   keyword: 家人
   label: 家人
   fallback:
     scene_id: fionnen_resident_relllin.topic_03_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「你家裡人都下圃？」
+      text: 「你家裡人都下圃嗎？」
     - kind: speech
       speaker: host
-      text: 「大女兒伊斯爾溫澆水看渠，小女兒米拉拉採菜。我管種。仨人一長排蹲在畦裡，話不多，就聽鋤頭響。」
+      text: 「大女兒伊斯爾溫澆水看渠，小女兒米拉拉採菜。我管種。」
+    - kind: speech
+      speaker: host
+      text: 「三個人蹲在一排畦裡，話不多，就聽鋤頭碰到石頭的聲音。」
     - kind: narration
-      text: 她朝菜圃另一頭的身影揮了揮手。
+      text: 她朝菜圃另一頭揮了揮手，那裡有人直起腰來回應。
     - kind: speech
       speaker: host
-      text: 「一家人靠這片地過活。你餓了，來摘兩把，不礙事。」
+      text: 「一家人靠這片地過活。你餓了，來摘兩把，不必客氣。」
 - topic_id: fionnen_resident_relllin.topic_04
   keyword: 名字
   label: 名字
   fallback:
     scene_id: fionnen_resident_relllin.topic_04_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「孫希斯佩爾，是日語的意思？」
+      text: 「孫希斯佩爾，是日光在低聲說話的意思？」
     - kind: speech
       speaker: host
-      text: 「日語。日頭穿過樹冠，光斑灑在菜圃上，像在低聲說話。這家守著這片光，就取了它。」
+      text: 「是。日頭穿過樹冠，光斑落在菜圃上，風一吹就動。這家說是光在講話，就取了這個姓。」
     - kind: narration
       text: 她攤開手，接住一片漏下來的陽光。
     - kind: speech
       speaker: host
-      text: 「菜要光，人要暖。你往後晌午來，這圃子最亮堂。」
+      text: 「我沒聽過光講話。可正午的時候，圃子最亮，菜也長得最快，這倒不假。」
+    - kind: speech
+      speaker: host
+      text: 「你要看，往後晌午來。那時整片菜圃都亮。」
 - topic_id: fionnen_resident_relllin.topic_05
   keyword: 私語
   label: 私語
@@ -80,23 +94,26 @@ topics:
   unavailable: locked
   refusal:
     scene_id: fionnen_resident_relllin.topic_05_refusal
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: host
-      text: 「土裡的話，只跟一起流過汗的人說。」
+      text: 「土裡的事我講得再多也不嫌，心裡的事得看人。你還沒跟我一起流過汗。」
   fallback:
     scene_id: fionnen_resident_relllin.topic_05_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「你最踏實的時刻，是什麼樣？」
+      text: 「忙完一整季，你最想有人陪你做什麼？」
     - kind: speech
       speaker: host
-      text: 「是收完最後一畦，夕陽把人曬得懶洋洋，有個人遞來一瓢水，再順手替我抹掉眉角的汗。我靠在她肩上，兩個人一起看這片綠，誰也不說話。」
+      text: 「收完最後一畦，坐在圃邊看太陽下去。那時整個人都空了，什麼都不想動。」
+    - kind: speech
+      speaker: host
+      text: 「有人遞一瓢水來，順手把我眉角的汗抹掉。我靠在她肩上，兩個人看那片綠，誰也不講話。」
     - kind: narration
-      text: 她瞇起眼，像正沐在那時的夕照裡。
+      text: 她瞇起眼，像還坐在那時的夕照裡。
     - kind: speech
       speaker: host
-      text: 「日子靠種，也靠人陪。你懂了土，就懂我。」
+      text: 「日子靠種，也靠人陪。土再肥，一個人守著也會荒。」

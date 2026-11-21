@@ -1,76 +1,88 @@
 schema_version: 1
-greeting: 邁特希爾正把一摞布疊得方整，抬起頭：「你稍等，我把這摞疊完。」
+greeting: 邁特希爾把一摞布疊到一半，抬眼看你。「你先坐一下。我把這摞疊完，不然角會翹。」
 topics:
 - topic_id: ciaran_resident_maethiel.topic_01
   keyword: 疊布
   label: 疊布
   fallback:
     scene_id: ciaran_resident_maethiel.topic_01_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「疊布也有講究？」
+      text: 「疊布也有講究嗎？」
     - kind: speech
       speaker: host
-      text: 「有。對角要齊，折痕要正，疊出來才挺括。一件衣裳洗得再淨，疊得亂，也糟蹋了。」
+      text: 「有。對角要齊，折痕要正，疊出來才挺。」
+    - kind: speech
+      speaker: host
+      text: 「一件衣裳洗得再乾淨，疊得亂，也白費了。」
     - kind: narration
-      text: 她十指翻飛，一摞布在她手下變得服帖。
+      text: 她十指翻飛，布面在她手下服帖，連邊角都壓得筆直。
     - kind: speech
       speaker: host
-      text: 「布也講個體面。人也是，衣裳理順了，心也跟著齊。」
+      text: 「布要體面，人也是。衣裳理順了，心也跟著整齊。」
 - topic_id: ciaran_resident_maethiel.topic_02
   keyword: 整潔
   label: 整潔
   fallback:
     scene_id: ciaran_resident_maethiel.topic_02_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「你為什麼這麼愛整潔？」
+      text: 「你為什麼這麼在意整齊？」
     - kind: speech
       speaker: host
-      text: 「亂了我就慌。東西歸了位，我才坐得住。娘和姊姊洗衣槌衣，末了都交給我，我疊得齊，一家人才舒坦。」
+      text: 「亂了我就坐不住。東西歸位，我才安心。」
     - kind: speech
       speaker: host
-      text: 「谷裡人隨性，就我愛收拾。可誰的衣服破了、髒了，也頭一個來尋我。」
+      text: 「娘和姊姊洗衣槌衣，最後都交到我手上。我疊得齊，一家人才過得舒服。」
+    - kind: speech
+      speaker: host
+      text: 「谷裡人隨性，就我愛收拾。可是誰的衣服破了、髒了，頭一個還是來找我。」
 - topic_id: ciaran_resident_maethiel.topic_03
   keyword: 家人
   label: 家人
   fallback:
     scene_id: ciaran_resident_maethiel.topic_03_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「你家裡人，都聽你安排？」
+      text: 「你家裡人都聽你安排嗎？」
     - kind: speech
       speaker: host
-      text: 「也不。娘瑞爾溫管洗，姊姊科瑞爾槌衣，我疊。姊姊力氣大，常把疊好的布碰亂，我就重新疊過，嘴上唸她兩句。」
+      text: 「也不是。娘瑞爾溫管洗，姊姊科瑞爾槌衣，我疊。」
+    - kind: speech
+      speaker: host
+      text: 「姊姊力氣大，常把疊好的布碰亂。我嘴上唸她兩句，還是重新疊過。」
     - kind: narration
-      text: 她搖搖頭，語氣裡盡是無奈的寵。
+      text: 她搖了搖頭，嘴角卻帶著笑，像早就習慣了。
     - kind: speech
       speaker: host
-      text: 「一家人，就這點小摩擦。夜裡都累了，誰也不記仇。」
+      text: 「一家人就這點小摩擦。夜裡都累了，誰也不記仇。」
 - topic_id: ciaran_resident_maethiel.topic_04
   keyword: 名字
   label: 名字
   fallback:
     scene_id: ciaran_resident_maethiel.topic_04_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「拉文伍德，是那幾隻夜裡的鴉？」
+      text: 「拉文伍德，是夜裡那幾隻鴉？」
     - kind: speech
       speaker: host
-      text: 「鴉林。天黑牠們叫得準時，比誰都守時。我這人愛整點，跟牠們倒合得來。」
+      text: 「鴉林。天黑牠們叫得準時，比誰都守時。」
+    - kind: speech
+      speaker: host
+      text: 「我按時按慣了，跟牠們倒合得來。」
     - kind: narration
-      text: 她側耳，像在等那聲鴉鳴。
+      text: 她側耳聽了一下，外頭還沒有鴉叫。
     - kind: speech
       speaker: host
-      text: 「這名字聽久了，就覺著親。你往後夜裡來，也認得那幾聲。」
+      text: 「名字聽久了就親。你往後夜裡來，也會認得那幾聲。」
 - topic_id: ciaran_resident_maethiel.topic_05
   keyword: 私語
   label: 私語
@@ -80,23 +92,26 @@ topics:
   unavailable: locked
   refusal:
     scene_id: ciaran_resident_maethiel.topic_05_refusal
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: host
-      text: 「我的心事，得等我把你當家人一般收拾妥帖，才肯放。」
+      text: 「我的心事，得等我先把你放在妥當的位置上。你別急。」
   fallback:
     scene_id: ciaran_resident_maethiel.topic_05_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「你最想有人陪的時刻，是什麼樣？」
+      text: 「你最想有人陪的時候，是什麼樣子？」
     - kind: speech
       speaker: host
-      text: 「是把一屋子布都疊完、燈也捻暗，忽然不想睡了。想有個人從背後環住我，讓我靠著，什麼都別收拾，就那樣歪在一處，貼到天亮。」
+      text: 「把一屋子布都疊完，燈也捻暗了，忽然不想睡。」
+    - kind: speech
+      speaker: host
+      text: 「想有個人從背後環住我，讓我靠著。什麼都別收拾，就那樣歪在一處，貼到天亮。」
     - kind: narration
-      text: 她低頭撫平腿上最後一道折痕，聲音輕得像怕驚了夜。
+      text: 她低頭把腿上最後一道折痕撫平，聲音放得很輕。
     - kind: speech
       speaker: host
-      text: 「我收拾了一整天，就盼著那一下，被誰抱個散亂。」
+      text: 「我收拾了一整天，就盼著那一下，被誰抱得散開。」

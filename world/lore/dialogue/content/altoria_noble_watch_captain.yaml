@@ -1,5 +1,5 @@
 schema_version: 1
-greeting: 貴族區衛所的古利安‧鷹守隊長擱下羽毛筆，從登記簿上抬起頭，推了推鼻樑上的細框眼鏡：「訪客，貴族區不設關卡，石板路誰都能走，進出無須登記名銜。本衛所管的是巡街、防火，還有各戶報上來的問題。有事想問，儘管開口。」
+greeting: 貴族區衛所裡，古利安‧鷹守擱下羽毛筆，從登記簿上抬起頭，推了推鼻樑上的細框眼鏡：「訪客，貴族區不設關卡，石板路誰都能走，進出不用報名銜。我這裡管巡街、防火，還有各戶報上來的問題。有話就問。」
 topics:
 - topic_id: altoria_noble_watch.topic_01
   keyword: 貴族區
@@ -12,94 +12,97 @@ topics:
       identity_key: noble
     scene:
       scene_id: altoria_noble_watch.topic_01_noble_scene
-      revision: r3
+      revision: r4
       lines:
       - kind: speech
         speaker: actor
-        text: 「我聽聞貴族區戒備森嚴，進門之前，是否需要衛所先驗明身分、登記名銜？」
+        text: 「我聽說貴族區戒備森嚴，進門之前，是不是要先去衛所驗身分、登記名銜？」
       - kind: narration
-        text: 古利安‧鷹守起身，把披風的褶子撫平，語氣比平日更恭謹了些。
+        text: 他起身把披風的褶子撫平，語氣比平常更客氣半分。
       - kind: speech
         speaker: host
-        text: 「閣下多慮了。本衛所巡的是街面，從不過問各家名銜，也不在路上攔人查驗。」
+        text: 「不用。衛所巡的是街面，不問各家名銜，也不在路上攔人查驗。」
       - kind: speech
         speaker: host
-        text: 「石板路誰都能走。各府門房自有規矩，拜帖該往哪遞，他們自己核驗。請自便。」
+        text: 「石板路誰都能走。各府門房有各府的規矩，拜帖往哪裡遞，他們自己核。你請自便。」
   fallback:
     scene_id: altoria_noble_watch.topic_01_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
-      text: 「這條街比別處安靜得多。像我這樣的生人進出貴族區，當真不用通報身分？」
+      text: 「這條街比別處安靜。像我這樣的生面孔進出貴族區，真的不用通報一聲？」
     - kind: narration
-      text: 古利安‧鷹守把登記板擱回桌上，朝門外空曠的街面抬了抬下巴。
+      text: 他把登記板擱回桌上，朝門外空蕩的街面抬了抬下巴。
     - kind: speech
       speaker: host
-      text: 「不用。貴族區對所有人開放，本衛所按時巡街、查驗防火水槽，不盤問行人的來歷。」
+      text: 「不用。貴族區對所有人開放。衛所按時巡街、查驗防火水槽，不盤問行人的來歷。」
     - kind: speech
       speaker: host
-      text: 「各家府門深鎖，那是各府自己的規矩。街道本身，誰都能自由行走。請自便。」
+      text: 「各家府門深鎖，那是各府自己的規矩。街道本身誰都能走。請自便。」
 - topic_id: altoria_noble_watch.topic_02
   keyword: 謁見
   label: 謁見
   fallback:
     scene_id: altoria_noble_watch.topic_02_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
-      text: 「若是想覲見王室，或向宮廷遞一份陳情，是在衛所這裡呈遞公文嗎？」
+      text: 「如果想見王室，或向宮廷遞一份陳情，是在衛所這裡送公文嗎？」
     - kind: narration
-      text: 古利安‧鷹守推了推眼鏡，嘴角浮起一點苦笑，像是被問慣了。
+      text: 他推了推眼鏡，嘴角浮起一點苦笑，像是被問慣了。
     - kind: speech
       speaker: host
-      text: 「本衛所不替王宮收送信函，眼下也沒有任何謁見的安排。」
+      text: 「衛所不收信，也不安排謁見。這裡沒有一件跟王宮有關的事。」
     - kind: speech
       speaker: host
-      text: 「順著門前這條大道一直走到底，就是王宮前庭。宮門敞著，想參觀的人自己進去。」
+      text: 「順著門前這條大道走到底，就是王宮前庭。宮門開著，想參觀的人自己走進去。」
     - kind: speech
       speaker: host
-      text: 「裡頭寬敞得很，靜得連衛兵換哨的腳步聲都聽得清楚，平日沒幾個人走動。」
+      text: 「裡頭空得很。安靜到衛兵換哨的腳步聲都聽得見，平日沒幾個人走動。你要看就看，別指望有人出來接你。」
 - topic_id: altoria_noble_watch.topic_03
   keyword: 衛所
   label: 衛所
   fallback:
     scene_id: altoria_noble_watch.topic_03_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
-      text: 「衛所平日都辦些什麼差事？我見街上時常有人巡邏。」
+      text: 「衛所平常辦哪些差事？我看街上一直有人巡邏。」
     - kind: narration
-      text: 古利安‧鷹守把巡查名冊朝桌前一推，用羽毛筆在紙邊點了點。
+      text: 他把巡查名冊往桌前一推，用羽毛筆在紙邊點了點。
     - kind: speech
       speaker: host
-      text: 「本衛所管三件事，按時巡街、查驗各處防火水槽，再登記各戶夜裡報上來的燈火與門戶狀況。」
+      text: 「三件。按時巡街、查驗各處防火水槽，還有登記各戶夜裡報上來的燈火和門戶。」
     - kind: speech
       speaker: host
-      text: 「下城門與主幹道的防務，由南門衛兵隊長托瓦德‧鄧堡統籌。換班時，我會和他對一對兩區的治安消息。」
+      text: 「下城門和主幹道的防務，歸南門衛兵隊長托瓦德‧鄧堡統籌。換班的時候，我和他對一對兩邊的治安消息。」
+    - kind: speech
+      speaker: actor
+      text: 「那這片高地上的事，問你就對了？」
     - kind: speech
       speaker: host
-      text: 「這片高地上的大小事，訪客儘管問，我如實相告。」
+      text: 「問吧。我知道的都講，不知道的就說不知道。訪客問路，我也只能指，不能帶。」
 - topic_id: altoria_noble_watch.topic_04
   keyword: 委託
   label: 委託
   fallback:
     scene_id: altoria_noble_watch.topic_04_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
-      text: 「衛所牆上沒見懸賞告示。想接清理魔獸、護衛府邸這類差事，該往哪裡去？」
+      text: 「衛所牆上沒看到懸賞告示。想接清理魔獸、護衛府邸這類差事，該去哪兒找？」
     - kind: narration
-      text: 古利安‧鷹守合上登記簿，掃了一眼潔淨無物的白石牆，搖了搖頭。
+      text: 他合上登記簿，掃了一眼潔淨的白石牆，搖了搖頭。
     - kind: speech
       speaker: host
-      text: 「本衛所不貼懸賞，也不對外發布討伐或護衛的委託。」
+      text: 「衛所不貼懸賞，也不對外發討伐或護衛的委託。一件都沒有。」
     - kind: speech
       speaker: host
-      text: 「想接差事，去中央廣場東側的冒險者公會。大廳的告示板每日都換新委託。」
+      text: 「要接差事，去中央廣場東側的冒險者公會。大廳的告示板每天換新。」
     - kind: speech
       speaker: host
-      text: 「若哪家府邸的管事私下找人幫忙，那是府裡自己的私事，本衛所不介入。」
+      text: 「若哪家府邸的管事私下找人幫忙，那是府裡的私事，衛所不介入。出了岔子，也別來找我。」

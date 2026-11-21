@@ -1,76 +1,90 @@
 schema_version: 1
-greeting: 希爾溫正把一碗剛熬好的湯放涼，抬起頭：「你嚐嚐，還是先問事？」
+greeting: 希爾溫把藥碗放在窗邊散熱，抬起頭，聲音放得很輕：「先喝一口，還是先問事？燙，我替你吹過了。」
 topics:
 - topic_id: ciaran_resident_sylwen.topic_01
   keyword: 熬藥
   label: 熬藥
   fallback:
     scene_id: ciaran_resident_sylwen.topic_01_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「熬藥時，你怎麼知道火候到了？」
+      text: 「熬藥的時候，你怎麼知道火候剛好？」
     - kind: speech
       speaker: host
-      text: 「看氣。氣由白轉清，苦味裡透出香，就成了。我守著壺，寸步不離，像守一個要醒的人。」
+      text: 「看蒸氣。白煙轉清，苦味裡頭透出甜，那就是好了。」
+    - kind: speech
+      speaker: host
+      text: 「火不能大。大一分，藥性就散，整鍋只剩苦水。」
     - kind: narration
-      text: 她舀起一勺，湊近嘴邊吹了吹。
+      text: 她舀起半勺，湊到唇邊碰了一下，又放回去。
     - kind: speech
       speaker: host
-      text: 「藥性最怕急。火一急，它就破了。你喝一碗我熬的湯，就懂這份慢。」
+      text: 「我守著這壺，像守一個睡得不安穩的人。走開一步都不放心。」
 - topic_id: ciaran_resident_sylwen.topic_02
   keyword: 香草
   label: 香草
   fallback:
     scene_id: ciaran_resident_sylwen.topic_02_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「你這屋裡，是什麼香？」
+      text: 「你這屋裡的香，是什麼味道？」
     - kind: speech
       speaker: host
-      text: 「幾味安神的草，加上姊姊夜裡採回的那種。混在一塊，聞久了就犯睏。」
+      text: 「幾味安神的草，還有我姊夜裡採回來的那種。混在一起，聞久了眼皮會重。」
     - kind: speech
       speaker: host
-      text: 「谷裡有人夜裡睡不著，就來討一小把，點在榻邊。也有拿它助興，睡前煎一碗，身子放鬆，好說話。」
+      text: 「睡不著的人來討一小把，點在榻邊。也有人煎一碗，睡前喝了，身子鬆，話也比較好講。」
+    - kind: narration
+      text: 她把一束乾草翻過來，讓你看葉背的顏色。
+    - kind: speech
+      speaker: host
+      text: 「香味這東西很怪，你以為是聞到，其實是身體先鬆了。」
 - topic_id: ciaran_resident_sylwen.topic_03
   keyword: 家人
   label: 家人
   fallback:
     scene_id: ciaran_resident_sylwen.topic_03_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「這園子裡，就你們仨忙活？」
+      text: 「這園子裡就你們三個人？」
     - kind: speech
       speaker: host
-      text: 「就仨。娘種草，姊姊夜採，我熬。天不亮我生火，鍋裡的水開了，姊姊正好踏進門。」
+      text: 「三個。娘種草，姊夜裡採，我熬。天還沒亮我就生火，水一開，姊剛好進門。」
     - kind: narration
-      text: 她朝門外望了望，像是在等那個身影。
+      text: 她往門口看了一眼，又看了看灶上的水。
     - kind: speech
       speaker: host
-      text: 「一家人話不多，可誰都不孤。夜裡我熬藥，姊姊在園子裡，娘在屋角配。各忙各活，心在一處。」
+      text: 「我們話不多，可是誰都不孤單。各人做各人的事，心在同一個屋簷下。」
+    - kind: speech
+      speaker: host
+      text: 「你哪天累了就來坐，不用講話。湯好了我自然會遞給你。」
 - topic_id: ciaran_resident_sylwen.topic_04
   keyword: 名字
   label: 名字
   fallback:
     scene_id: ciaran_resident_sylwen.topic_04_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
       text: 「索爾恩伍德，就是那圈帶刺的老木？」
     - kind: speech
       speaker: host
-      text: 「是。棘木圈著園子，開春會結小紅果，帶苦味。它擋獸，也擋那些亂踩進來的人。」
+      text: 「是棘木。它圈著園子，擋野獸，也擋亂踩進來的人。」
     - kind: narration
-      text: 她抿了一口湯，慢慢嚥下。
+      text: 她抿了一口湯，含在嘴裡才嚥。
     - kind: speech
       speaker: host
-      text: 「我喜歡這姓。它讓我想起，再軟的草，也要一圈硬刺護著。」
+      text: 「我喜歡這個姓。再軟的草，也要有一圈刺護著，才長得起來。」
+    - kind: speech
+      speaker: host
+      text: 「你走的時候小心那圈木，刺很細，勾到衣服不好拔。」
 - topic_id: ciaran_resident_sylwen.topic_05
   keyword: 私語
   label: 私語
@@ -80,23 +94,26 @@ topics:
   unavailable: locked
   refusal:
     scene_id: ciaran_resident_sylwen.topic_05_refusal
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: host
-      text: 「我的心事，得等你喝慣了我這鍋湯，才肯端出來。」
+      text: 「這鍋湯還沒熬到你的份。等我把你看熟了，再端出來。」
   fallback:
     scene_id: ciaran_resident_sylwen.topic_05_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「你熬了這麼多藥，最想給誰喝？」
+      text: 「你熬過這麼多藥，最想給誰喝？」
     - kind: speech
       speaker: host
-      text: 「給一個我中意的人。煎一碗最烈的催情草，看那人的臉一點點紅起來，呼吸變沉。然後我餵她一口，自己也吞半碗，兩個人一齊燒。」
+      text: 「給一個我看上的人。煎一碗最烈的催情草，看她臉一點一點紅起來，呼吸變沉。」
+    - kind: speech
+      speaker: host
+      text: 「然後我餵她一口，自己也喝半碗。兩個人一起燒，誰也別想先退。」
     - kind: narration
-      text: 她說得柔，眼裡的溫度卻燙人。
+      text: 她說得很輕，眼神卻沒有閃開。
     - kind: speech
       speaker: host
-      text: 「藥能點火，也能暖人。等你哪天身子涼了，來找我，我替你溫一壺。」
+      text: 「藥能點火，也能暖人。你哪天身子發涼，來找我，我替你溫一壺。」

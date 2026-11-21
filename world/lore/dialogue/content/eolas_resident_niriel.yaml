@@ -1,76 +1,90 @@
 schema_version: 1
-greeting: 妮瑞爾把剪子往布上一放，轉過身來笑問：「是來量身子，還是來說說話？」
+greeting: 妮瑞爾把剪子往桌上一擱，布角還捏在手裡。「來啦。要量身子，還是先坐著聊兩句？我這手剛停，正好歇口氣。」
 topics:
 - topic_id: eolas_resident_niriel.topic_01
   keyword: 量衣
   label: 量衣
   fallback:
     scene_id: eolas_resident_niriel.topic_01_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「這谷裡做衣裳，都要量身嗎？」
+      text: 「這谷裡做衣裳，都要量身嗎？拿根尺量一量不就好了？」
     - kind: speech
       speaker: host
-      text: 「要。量身子是門手藝，手貼著你的肩、你的腰走一圈，就把尺寸記下了。尷不尷，我一下摸得出來。」
+      text: 「尺量不出高低，我的手才摸得出來。手貼著你的肩走一圈，哪邊高、哪邊塌，心裡就有數。」
     - kind: narration
-      text: 她張開一隻手掌，在空氣裡比了比。
+      text: 她把剪子挪到桌角，掌心朝上，沿著空氣裡一道看不見的肩線比過去。
     - kind: speech
       speaker: host
-      text: 「谷裡人不慌這個，站直了，把衣裳解了才量得準。你哪天真要做，就給我量。」
+      text: 「有人一站上來，肩就縮著。我手掌往下一壓，他自己先笑出來。尷不尷，我一下就知道。」
+    - kind: speech
+      speaker: host
+      text: 「谷裡人不忌諱這個，站直了讓我量，量完該做什麼就做什麼。你要做衣裳，我也替你量。」
 - topic_id: eolas_resident_niriel.topic_02
   keyword: 剪裁
   label: 剪裁
   fallback:
     scene_id: eolas_resident_niriel.topic_02_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「一刀下去剪壞了，怎麼補？」
+      text: 「你下刀之前，真的一點都不怕剪歪？」
     - kind: speech
       speaker: host
-      text: 「補不回頭。所以下刀前先畫線，眼焐到發燙都不動手。剪是好剪，手一歪，一整匹就白糟蹋。」
+      text: 「怕。一匹布就這麼寬，剪壞了接不回去。所以我把布鋪平，先拿炭線畫好。線歪了還能擦，刀一下去就沒了。」
+    - kind: narration
+      text: 她指尖沿著桌沿的布邊劃過去，停在線尾。
     - kind: speech
       speaker: host
-      text: 「跟做事一個理，急不得。我這把剪子跟了多年，熟到我閉著眼都剪不歪。」
+      text: 「剪的時候別停。手一猶豫，剪尖就咬住布，邊口跟著翻毛。」
+    - kind: speech
+      speaker: host
+      text: 「我這把剪子用了很久，握把磨出指印。換一把，手要重新認路。」
 - topic_id: eolas_resident_niriel.topic_03
   keyword: 家人
   label: 家人
   fallback:
     scene_id: eolas_resident_niriel.topic_03_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「你家裡頭，誰管哪一樣？」
+      text: 「你家三個人擠一間屋，活怎麼分？」
     - kind: speech
       speaker: host
-      text: 「娘織布，我剪裁，妹妹凱勒斯分線。織機一響，母女仨就各占了半間屋。妹妹那雙手，分線比誰都利索。」
+      text: 「娘顧織機，梭子一來一回，白布就從她手底下長出來。我接她的布，畫線、下剪。妹妹凱勒斯管分線，線軸在她手裡排成一排。」
     - kind: narration
-      text: 她往裡屋努了努嘴，梭聲正從那兒傳來。
+      text: 她往裡屋偏了偏頭，梭聲從門縫裡漏出來。
     - kind: speech
       speaker: host
-      text: 「一家人吵歸吵，鬧歸鬧，到夜裡各自鋪開睡，嘴上也不饒人。你要打聽誰的底細，先陪我把這匹布裁完。」
+      text: 「三個人擠一間屋，誰也不讓誰。可線一斷，喊一聲就有人遞上來。」
+    - kind: speech
+      speaker: host
+      text: 「你要打聽誰家的底細，先幫我把這匹裁完。手上有活，話才不亂。」
 - topic_id: eolas_resident_niriel.topic_04
   keyword: 名字
   label: 名字
   fallback:
     scene_id: eolas_resident_niriel.topic_04_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「『維爾維特莉夫』這姓，是葉子的意思？」
+      text: 「『維爾維特莉夫』這姓，是葉子的意思吧？」
     - kind: speech
       speaker: host
-      text: 「絨葉。老樹葉背那層細絨，風一過滿坡白。娘說，做衣裳的人都細，跟那絨一樣。」
+      text: 「絨葉。老樹的葉背有一層細絨，風一翻，整片坡泛白，跟落了霜一樣。」
     - kind: narration
-      text: 她拈起一片從窗縫飄入的葉子，翻了個面給你看。
+      text: 她從窗邊拈起一片葉子，翻過面，遞到你眼前。
     - kind: speech
       speaker: host
-      text: 「名跟地方拴著。你要是常來，這巷子、這坡，日子一久就都是熟面孔了。」
+      text: 「娘說做衣裳的人要細，跟那層絨一樣，摸不出來，少了它又不行。」
+    - kind: speech
+      speaker: host
+      text: 「這姓就拴在這片坡上。你在谷裡住久，哪條坡長什麼樹，走兩回就熟。」
 - topic_id: eolas_resident_niriel.topic_05
   keyword: 私語
   label: 私語
@@ -80,23 +94,26 @@ topics:
   unavailable: locked
   refusal:
     scene_id: eolas_resident_niriel.topic_05_refusal
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: host
-      text: 「量身子都行，可有些話要我認了你，才肯講。」
+      text: 「量身子可以，心裡的話不行。我話接得快，可有些話得先認了人，才說得出口。你再來幾回吧。」
   fallback:
     scene_id: eolas_resident_niriel.topic_05_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「你最享受做衣裳的哪一步？」
+      text: 「做了這麼久的衣裳，你最喜歡哪一步？」
     - kind: speech
       speaker: host
-      text: 「是量人。手貼著熱的身子，順著曲線往下走，那點熱隔著掌心跳，像描一道活的線。量著量著，我自己先軟了。」
+      text: 「量人。手貼著熱的身子往下走，隔著掌心能摸到一個人的呼吸。那點熱順著手爬上來，我自己先軟了半截。」
     - kind: narration
-      text: 她咬了咬下唇，眼裡浮著笑意。
+      text: 她咬了咬下唇，眼睛彎起來，剪子在手裡轉了半圈。
     - kind: speech
       speaker: host
-      text: 「這門手藝最妙的地方，是能先摸到人。你哪天讓我量一回，就曉得了。」
+      text: 「所以我看人，先看肩。肩一鬆，人就肯讓我靠近。」
+    - kind: speech
+      speaker: host
+      text: 「你哪天讓我量一回，就曉得我為什麼愛這一步。」

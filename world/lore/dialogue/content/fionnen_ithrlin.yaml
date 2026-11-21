@@ -6,11 +6,11 @@ topics:
   label: 獵衣
   fallback:
     scene_id: fionnen_ithrlin_home.topic_01_scene
-    revision: r4
+    revision: r5
     lines:
     - kind: speech
       speaker: actor
-      text: 「箱上那件摺好的衣裳，料子看著很輕，是獵衣吧？」
+      text: 「箱上那件摺好的衣裳，料子看著很輕。是獵衣吧？」
     - kind: narration
       text: 她把獵衣從箱上取下來，抖開，讓布面在窗光裡透亮。
     - kind: speech
@@ -18,61 +18,61 @@ topics:
       text: 「森林葉織獵衣。線裡絞了林子裡耐扯的草，織得疏，跑起來不綁身子。」
     - kind: speech
       speaker: host
-      text: 「巨木間的枝椏低，衣裳太厚會勾住。這件貼著身子走，跑熱了汗一浸，布就裹在皮膚上，手一抬就過去了。」
+      text: 「巨木間的枝椏低，衣裳太厚會勾住。這件貼著身子走。跑熱了汗一浸，布就裹在皮膚上，手一抬就過去了。」
     - kind: speech
       speaker: actor
       text: 「穿這麼薄，林子裡的風不冷嗎？」
     - kind: speech
       speaker: host
-      text: 「跑起來就暖。汗滲進線裡，布貼著皮膚，涼風一吹正好。停下來覺得冷，再披一件外衣，獵隊都這麼穿。」
+      text: 「跑起來就暖。汗滲進線裡，布貼著皮膚，涼風一吹正好。停下來覺得冷，再披一件外衣。獵隊都這麼穿。」
     - kind: speech
       speaker: host
-      text: 「你摸一下腋下那一段，我留了活動的餘地，拉弓、攀枝都不扯。我自己進林子也穿它，汗出透了，布貼著腰、貼著腿，像第二層皮。」
+      text: 「你摸一下腋下那一段，我留了活動的餘地，拉弓、攀枝都不扯。我自己進林子也穿它。汗出透了，布貼著腰、貼著腿，像第二層皮。」
 - topic_id: fionnen_ithrlin_home.topic_02
   keyword: 輕紗
   label: 輕紗
   fallback:
     scene_id: fionnen_ithrlin_home.topic_02_scene
-    revision: r4
+    revision: r5
     lines:
     - kind: speech
       speaker: actor
-      text: 「你身上這件紗，薄得幾乎瞧不見，也是自己織的？」
+      text: 「你身上這件紗，薄得幾乎看不見。也是自己織的？」
     - kind: narration
-      text: 伊斯爾林‧斯塔爾威維爾拈起一角紗，讓它從指間滑下去，落回身上。
+      text: 她拈起一角紗，鬆手，讓它滑回去，貼在身上。
     - kind: speech
       speaker: host
-      text: 「精靈森林輕紗。線趁天剛亮、露水還沒乾的時候收，這個時節才有。」
+      text: 「精靈森林輕紗。線趁天剛亮、露水還沒乾的時候收，只有那個時節有。」
     - kind: speech
       speaker: host
-      text: 「露水凝成的線細，捻起來費工，可穿上身幾乎沒有重量。天一熱，前胸後背都濕透，它黏在乳上、黏在大腿，風一來貼著皮膚走，涼得人一激靈。」
+      text: 「露水凝成的線細，捻起來費工，穿在身上卻幾乎沒有重量。天一熱，前胸後背都濕透，它黏在乳上、黏在大腿，風一來貼著皮膚走，涼得人一激靈。」
     - kind: speech
       speaker: actor
-      text: 「這種露水線一年就一陣子吧？過了季節就織不出來了？」
+      text: 「這種露水線一年就那一陣子吧？過了季節就織不出來了？」
     - kind: speech
       speaker: host
-      text: 「過了就沒有那樣的線，一季織不了多少，織完再等下一回露水。」
+      text: 「過了就沒有那樣的線。一季織不了多少，織完再等下一個露水。」
     - kind: speech
       speaker: host
-      text: 「想試就伸手。隔著紗摸我，摸過你就曉得它好在哪；你別光站著瞧，我可會把你拉過來喔。」
+      text: 「想試就伸手。隔著紗摸我，摸過你就曉得它好在哪。你別光站著看，我可會把你拉過來喔。」
 - topic_id: fionnen_ithrlin_home.topic_03
   keyword: 白衣
   label: 白衣
   fallback:
     scene_id: fionnen_ithrlin_home.topic_03_scene
-    revision: r4
+    revision: r5
     lines:
     - kind: speech
       speaker: actor
-      text: 「架子最上頭那件白色衣裳，跟別的衣裳放在一起，是特別日子才穿的嗎？」
+      text: 「架子最上頭那件白衣裳，跟別的放在一起。是特別日子才穿的嗎？」
     - kind: narration
-      text: 她把白衣取下來，往自己身前比了比，紗下的身形透得清楚。
+      text: 她把白衣取下來，往自己身前一比，紗下的身形透得清楚。
     - kind: speech
       speaker: host
-      text: 「平常也穿。這件精靈傳統服飾村裡誰都穿，織得薄，皮膚透得到風，也瞧得見人。」
+      text: 「平常也穿。這件精靈傳統服飾村裡誰都穿。織得薄，風穿得過去，人也瞧得見。」
     - kind: speech
       speaker: host
-      text: 「身子有哪兒要遮？我們不這麼想。屋裡屋外一個樣，熱了就解衣裳，汗也不擦；想要了就把人拉上榻，跟吃飯一樣平常。」
+      text: 「身子有哪兒要遮？我們不這麼想。屋裡屋外一個樣。熱了就解衣裳，汗也不擦；想要了就把人拉上榻，跟吃飯一樣平常。」
     - kind: speech
       speaker: host
       text: 「外頭來的人起先不敢看，眼睛往旁邊躲。待久了就曉得，這兒沒人會笑他。」
@@ -81,13 +81,13 @@ topics:
       text: 「穿成這樣，圖的是自己舒服？」
     - kind: speech
       speaker: host
-      text: 「圖自己舒服，也圖別人瞧。我喜歡被看，有人盯著，我就迎著他的眼睛，看他能撐到哪。你這雙眼睛，就別躲了。」
+      text: 「圖自己舒服，也圖給人看。我喜歡被看。有人盯著，我就迎著他的眼睛，看他能撐到哪。你這雙眼睛，就別躲了。」
 - topic_id: fionnen_ithrlin_home.topic_04
   keyword: 收回
   label: 收回
   fallback:
     scene_id: fionnen_ithrlin_home.topic_04_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
@@ -97,7 +97,7 @@ topics:
       text: 「我織的衣裳，帶回來。線我挑開，洗淨了還能再用。」
     - kind: speech
       speaker: host
-      text: 「成色好的我算銅幣給你，破得厲害的我也收，線拆下來當經線。」
+      text: 「成色好的我算銅幣給你。破得厲害的我也收，線拆下來當經線。」
     - kind: speech
       speaker: actor
       text: 「外頭買來的衣裳呢？料子要是不錯，你也拆嗎？」

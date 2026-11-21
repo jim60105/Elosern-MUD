@@ -1,33 +1,36 @@
 schema_version: 1
-greeting: 門簾一掀，滾燙的肉香先撲到你臉上。西格瑪‧庫柏從大鐵鍋後頭直起腰，拿腰間的擦手布抹了抹掌心，朝灶邊的長凳揚了揚下巴：「外頭風大，先坐。鍋裡剛滾開，熱湯配剛出爐的黑麥麵包，一碗管飽。想帶乾糧出城，櫃檯上的單子寫得明白，看中哪樣招呼一聲。要是你從外頭拎了新鮮野味回來，也放上檯面，我瞧一眼再開價。」
+greeting: 門簾一掀，滾燙的肉香先撲到你臉上。西格瑪‧庫柏從大鐵鍋後頭直起腰，拿腰間的擦手布抹了抹掌心，朝灶邊的長凳揚了揚下巴：「外頭風大，先坐。鍋裡剛滾開，熱湯配剛出爐的黑麥麵包，一碗管飽。想帶乾糧出城，櫃檯上的單子寫得明白，看中哪樣招呼一聲。你從外頭拎了新鮮野味回來，也放上檯面，我瞧一眼再開價。先說一句，吃飯了沒？」
 topics:
 - topic_id: altoria_eatery.topic_01
   keyword: 餐點
   label: 餐點
   fallback:
     scene_id: altoria_eatery.topic_01_scene
-    revision: r4
+    revision: r5
     lines:
     - kind: speech
       speaker: actor
       text: 「老闆，我肚子正餓，爐子上現在有什麼熱的能先吃點？」
     - kind: narration
-      text: 西格瑪掀開鍋蓋，一大股白煙便裹著肉香騰起來。他拿木湯杓往鍋裡攪了兩下，又湊近聞了聞。
+      text: 西格瑪掀開鍋蓋，一大股白煙裹著肉香騰起來。他拿木湯杓往鍋裡攪了兩下，又湊近聞了聞。
     - kind: speech
       speaker: host
-      text: 「燉肉濃湯，配兩片剛出爐的黑麥麵包。湯用清晨剛進的肉熬了一上午，骨頭都熬酥了，一碗下去，從喉嚨一路暖到胃底。」
+      text: 「鍋裡熬的是濃湯，配兩片剛出爐的黑麥麵包。湯用清晨剛進的肉熬了一上午，骨頭都熬酥了，一碗下去，從喉嚨一路暖到胃底。」
     - kind: speech
       speaker: actor
       text: 「那要帶在路上吃，哪樣最能放？」
     - kind: speech
       speaker: host
-      text: 「出城的乾糧在櫃檯後頭那排油紙包裡。王國黑麥硬麵包烤得乾透，放半個月不壞；要更頂餓，還有冒險者攜行口糧。吃飽了才有力氣拔劍，別空著肚子出城門。」
+      text: 「出城的乾糧在櫃檯後頭那排油紙包裡。王國黑麥硬麵包烤得乾透，放半個月不壞；要更頂餓，還有冒險者攜行口糧。」
+    - kind: speech
+      speaker: host
+      text: 「吃飽了才有力氣拔劍，別空著肚子出城門。我看人進門先問吃飯沒，問了二十多年，改不掉啦。」
 - topic_id: altoria_eatery.topic_02
   keyword: 招牌
   label: 招牌
   fallback:
     scene_id: altoria_eatery.topic_02_scene
-    revision: r4
+    revision: r5
     lines:
     - kind: speech
       speaker: actor
@@ -36,19 +39,25 @@ topics:
       text: 西格瑪拿湯杓柄往灶邊那口厚底銅鍋一敲，眼角笑出幾道深紋。
     - kind: speech
       speaker: host
-      text: 「別的我不敢誇，東南港灣龍蝦濃湯，整條南大道就我這鍋熬得出那股鮮。二十年前一個東南港灣的老船工手把手教我，火候、湯底、香料的分量，我一樣沒改過。」
+      text: 「別的我不敢誇，東南港灣龍蝦濃湯，整條南大道就我這鍋熬得出那股鮮。」
+    - kind: speech
+      speaker: host
+      text: 「二十年前一個東南港灣的老船工手把手教我，火候、湯底、香料的分量，我一樣沒改過。」
     - kind: speech
       speaker: actor
       text: 「那甜的也有？我看單子上寫著什麼精靈做的稀罕東西。」
     - kind: speech
       speaker: host
-      text: 「精靈蜜漬花蕊。商隊從翠綠森林帶出來，量少得很，一進南大道就給人搶空，進價又高，架上有貨才賣得出。想換個甜口，帝國蜜漬果乾每天都擺著，耐放，酸甜不膩。」
+      text: 「精靈蜜漬花蕊。商隊從翠綠森林帶出來，量少得很，一進南大道就給人搶空，進價又高，架上有貨才賣得出。」
+    - kind: speech
+      speaker: host
+      text: 「想換個甜口，帝國蜜漬果乾每天都擺著，耐放，酸甜不膩。我自己偏愛那一味，配茶剛好。」
 - topic_id: altoria_eatery.topic_03
   keyword: 乾糧
   label: 乾糧
   fallback:
     scene_id: altoria_eatery.topic_03_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
@@ -63,13 +72,19 @@ topics:
       text: 「聽我一句，別指望進了林子現打野味。真下起連日大雨，連根乾柴都找不著，那時候包裡多兩包口糧，能救命。」
     - kind: speech
       speaker: actor
-      text: 「你長年看人出城，這提醒，比我瞎琢磨管用多了。」
+      text: 「那你看我這趟進山，還有什麼是我沒想到、你卻常看人漏掉的？」
+    - kind: speech
+      speaker: host
+      text: 「鹽巴。用小布袋分裝一小包塞進背包，再帶上能生火的火絨。人餓一兩天還撐得住，沒鹽吃上三天，腿先軟。」
+    - kind: speech
+      speaker: host
+      text: 「講吃的我話多，你別嫌我嘮叨。出了這道門，鍋子就幫不上你了。」
 - topic_id: altoria_eatery.topic_04
   keyword: 收購
   label: 收購
   fallback:
     scene_id: altoria_eatery.topic_04_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
@@ -88,3 +103,6 @@ topics:
     - kind: speech
       speaker: host
       text: 「現宰的最好，血還沒凝，我一眼就認得。真不方便收拾，也別隔夜，天一熱就變味，那樣的東西我照樣退。」
+    - kind: speech
+      speaker: host
+      text: 「我收貨不看你的臉，只看肉。話不好聽，可這樣對下一個坐下來吃飯的人公平。」

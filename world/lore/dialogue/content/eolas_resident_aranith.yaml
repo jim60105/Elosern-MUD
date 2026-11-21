@@ -1,12 +1,12 @@
 schema_version: 1
-greeting: 阿拉妮斯正蹲在引水槽邊，抬起頭：「有話說，邊走邊講，我手裡這水不能停。」
+greeting: 阿拉妮斯蹲在引水槽邊，手裡那捧水照樣往槽裡送，頭也沒抬。「有話就說，邊走邊講，我這水不能停。」她抬眼掃了你一下，又低回去看水面。
 topics:
 - topic_id: eolas_resident_aranith.topic_01
   keyword: 引水
   label: 引水
   fallback:
     scene_id: eolas_resident_aranith.topic_01_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
@@ -24,23 +24,25 @@ topics:
   label: 溪源
   fallback:
     scene_id: eolas_resident_aranith.topic_02_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
       text: 「溪源熱鬧嗎？」
     - kind: speech
       speaker: host
-      text: 「清早最熱鬧。擔水、洗菜、飲牲口的人，都擠在那一小片。水聲大，人嗓也大。到了正午，就剩我和幾個補槽的人。」
+      text: 「清早最熱鬧。擔水、洗菜、飲牲口的人，全擠在那一小片。水聲大，人嗓也大。到了正午，就剩我和幾個補槽的人。」
+    - kind: narration
+      text: 她把手在衣襬上擦了擦，往溪源的方向抬了抬下巴。
     - kind: speech
       speaker: host
-      text: 「也有不為取水、只想湊個熱鬧的人。谷裡人不怕擠，皮貼著皮也不在乎。你嫌吵，就挑個沒人的早晨去。」
+      text: 「也有不為取水、只想湊熱鬧的人。谷裡的人不怕擠，皮貼著皮也不在乎。你嫌吵，就挑個沒人的早晨去。」
 - topic_id: eolas_resident_aranith.topic_03
   keyword: 家人
   label: 家人
   fallback:
     scene_id: eolas_resident_aranith.topic_03_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
@@ -52,13 +54,13 @@ topics:
       text: 她笑了笑，露出腕上一道被曬出的分界。
     - kind: speech
       speaker: host
-      text: 「夜裡誰也不早睡。灶火、水聲、鼾聲混一起，親得很。」
+      text: 「夜裡誰也不早睡。灶火、水聲、鼾聲混在一起，親得很。」
 - topic_id: eolas_resident_aranith.topic_04
   keyword: 名字
   label: 名字
   fallback:
     scene_id: eolas_resident_aranith.topic_04_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
@@ -80,14 +82,14 @@ topics:
   unavailable: locked
   refusal:
     scene_id: eolas_resident_aranith.topic_05_refusal
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: host
-      text: 「我得先信了你，才把心裡那點事倒出來。再處處看。」
+      text: 「這種話得先信得過人才講。你讓我再相處一陣，過些時候再說。」
   fallback:
     scene_id: eolas_resident_aranith.topic_05_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
@@ -99,4 +101,4 @@ topics:
       text: 她終於停下手裡的活，直起身看向你。
     - kind: speech
       speaker: host
-      text: 「我這人悶，可就這一樣，悶到太久了。你要是懂水，就懂我。」
+      text: 「我向來悶，可就這一樣，悶到太久了。你要是懂水，就懂我。」

@@ -1,16 +1,16 @@
 schema_version: 1
-greeting: 藥草園旁的石屋裡，熬藥的苦香混著一點回甘的草木味。妮瑞斯‧米斯特瓦勒把藥爐風口關小，回頭把你從頭到腳掃了一遍：「傷口在哪，我一眼就看得出來。沒見血，好。這爐剛熬透，暗影谷解毒草露、強效治療藥水跟魔力藥水都裝進罐了。要帶幾罐上路防身，就跟我直說。」
+greeting: 藥草園旁的石屋裡，熬藥的苦香混著一點回甘的草木味。妮瑞斯‧米斯特瓦勒把藥爐風口關小，回頭把你從頭到腳掃了一遍：「傷口在哪裡？我一眼就看得出來。沒見血，好。這爐剛熬透，暗影谷解毒草露、強效治療藥水跟魔力藥水都裝進罐了。要帶幾罐上路防身，就跟我直說。」
 topics:
 - topic_id: ciaran_nireth_home.topic_01
   keyword: 調藥
   label: 調藥
   fallback:
     scene_id: ciaran_nireth_home.topic_01_scene
-    revision: r5
+    revision: r6
     lines:
     - kind: speech
       speaker: actor
-      text: 屋裡這些陶罐和火爐，就是你平日熬藥的地方嗎？
+      text: 「屋裡這些陶罐和火爐，就是你平日熬藥的地方嗎？」
     - kind: narration
       text: 她拿布巾按了按額角的汗，目光掃過爐台上排得齊整的藥瓶。
     - kind: speech
@@ -18,31 +18,31 @@ topics:
       text: 「我每天清晨在門前園子裡現摘藥草，摘回來照族裡長輩傳下的法子，小火慢煨一整天。精靈天生不染瘟病，筋骨也結實，可魔力枯竭不分族裔，誰碰上都凶險。」
     - kind: speech
       speaker: actor
-      text: 你這兒常備的藥，主要應付哪幾種情形？
+      text: 「你這兒常備的藥，主要應付哪幾種情形？」
     - kind: speech
       speaker: host
-      text: 「就這三樣。暗影谷解毒草露解誤食跟蟲蛇咬傷的毒；強效治療藥水止血、接骨、續筋；魔力藥水把耗空的魔力補回來。藥效我說到哪，就做到哪，絕不吹。」
+      text: 「就這三樣。暗影谷解毒草露解誤食跟蟲蛇咬傷的毒，強效治療藥水止血、接骨、續筋，魔力藥水把耗空的魔力補回來。藥效我說到哪，就做到哪，絕不吹。」
 - topic_id: ciaran_nireth_home.topic_02
   keyword: 重傷
   label: 重傷
   fallback:
     scene_id: ciaran_nireth_home.topic_02_scene
-    revision: r4
+    revision: r5
     lines:
     - kind: speech
       speaker: actor
-      text: 要是碰上魔獸撕咬或兵刃重創，該用哪一罐應急？
+      text: 「要是碰上魔獸撕咬或兵刃重創，該用哪一罐應急？」
     - kind: narration
-      text: 她從木架上取下一瓶繫著紅繩的陶罐，神情鄭重。
+      text: 她從木架上取下一瓶繫著紅繩的陶罐，神情認真。
     - kind: speech
       speaker: host
-      text: 「紅繩這罐是強效治療藥水。傷到臟腑、斷了筋骨，仰頭喝一整罐，藥力才穩住生機。我見過腸子流出來還自己縫回去的族人，這罐專為那種傷熬。」
+      text: 「紅繩這罐是強效治療藥水。傷到臟腑、斷了筋骨，仰頭喝一整罐，藥力才穩得住。我見過腸子流出來還自己縫回去的族人，這罐就是為那種傷熬出來。」
     - kind: speech
       speaker: host
-      text: 「尋常擦傷破皮，井水洗過、敷點草灰就癒合，別拿好藥糟蹋。」
+      text: 「尋常擦傷破皮，井水洗過、敷點草灰就會好，別拿好藥糟蹋。」
     - kind: speech
       speaker: actor
-      text: 要出外歷練，能跟你換幾罐帶在身邊防個萬一嗎？
+      text: 「要出外歷練，能跟你換幾罐帶在身邊以防萬一嗎？」
     - kind: speech
       speaker: host
       text: 「帶去防身自然行，照定好的價留下銅幣就是。收進腰包內層，臨到要命關頭才拿出來喝，平常別貪省事胡亂灌。」
@@ -51,19 +51,19 @@ topics:
   label: 魔力
   fallback:
     scene_id: ciaran_nireth_home.topic_03_scene
-    revision: r4
+    revision: r5
     lines:
     - kind: speech
       speaker: actor
-      text: 施法過度、魔力耗空的時候，喝你熬的藥水真能緩過來嗎？
+      text: 「施法過度、魔力耗空的時候，喝你熬的藥水真能緩過來嗎？」
     - kind: narration
-      text: 她指了指另一側繫著藍繩的小釉罐，語氣篤定。
+      text: 她指了指另一側繫著藍繩的小釉罐，語氣肯定。
     - kind: speech
       speaker: host
-      text: 「藍繩這罐是魔力藥水。施法的人感到精神乏了、體內魔力見底，拔開木塞喝下去，乾涸的魔力就回得過來。精靈平日法力耗得凶，也靠它補回來。」
+      text: 「藍繩這罐是魔力藥水。施法的人精神乏了、體內魔力見底，拔開木塞喝下去，乾涸的魔力就回得來。精靈平日法力耗得凶，也靠它補。」
     - kind: speech
       speaker: actor
-      text: 這種虛乏和太累，你一眼怎麼瞧得出來？
+      text: 「這種虛乏和太累，你一眼怎麼瞧得出來？」
     - kind: speech
       speaker: host
       text: 「臉色發白、步子虛浮，夜裡沒睡夠的樣子，我都瞧得出來。有的族人貪歡，纏到天亮才肯歇，隔天軟著腿來找我討藥。我一聞她身上的氣味，就知道她前一晚跟誰滾過了。」
@@ -75,22 +75,22 @@ topics:
   label: 藥草
   fallback:
     scene_id: ciaran_nireth_home.topic_04_scene
-    revision: r4
+    revision: r5
     lines:
     - kind: speech
       speaker: actor
-      text: 有旅人從外地採來奇花異草，能拿來賣給你入藥嗎？
+      text: 「有旅人從外地採來奇花異草，能拿來賣給你入藥嗎？」
     - kind: narration
       text: 她擺了擺沾著草汁的手掌，語氣很堅決。
     - kind: speech
       speaker: host
-      text: 「外頭送來的生草我一概不收。草離了根幾日，藥性就開始散；曬乾時再沾上風塵雜氣，吃下肚反會害人。我熬藥的草全在自家園子裡種，每一株的根葉來歷我都清楚。」
+      text: 「外頭送來的生草我一概不收。草離了根幾日，藥性就開始散，曬乾時再沾上風塵雜氣，吃下肚反而害人。我熬藥的草全在自家園子裡種，每一株的根葉來歷我都清楚。」
     - kind: speech
       speaker: host
       text: 「園裡那畦解毒草，搗過浸成暗影谷解毒草露。被毒蟲咬到、誤食毒蕈，喝下去就能把毒壓住。」
     - kind: speech
       speaker: actor
-      text: 要是換去的藥始終沒用上，能完好帶回來還你嗎？
+      text: 「要是換去的藥始終沒用上，能完好帶回來還你嗎？」
     - kind: speech
       speaker: host
       text: 「只要瓶塞的蠟封完好，原封不動帶回來，我照數收回，銅幣按規矩折算退你。好藥得留給真正遭難的人，擱在箱底發霉可不成。」

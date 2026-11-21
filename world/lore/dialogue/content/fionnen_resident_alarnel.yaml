@@ -1,76 +1,82 @@
 schema_version: 1
-greeting: 阿拉爾內爾把弓弦一撥，抬眼望你：「是來射箭，還是問路？」
+greeting: 阿拉爾內爾把弓弦一撥，弦聲乾淨。她抬眼望你。「站遠一點，弦會回彈。」她朝靶道抬了抬下巴。「是來射箭，還是問路？我話不多，可教人射箭還算有耐性。」
 topics:
 - topic_id: fionnen_resident_alarnel.topic_01
   keyword: 射箭
   label: 射箭
   fallback:
     scene_id: fionnen_resident_alarnel.topic_01_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「射箭最要緊的是什麼？」
+      text: 「射箭最要緊的是什麼？我拉了幾回，箭老是偏。」
     - kind: speech
       speaker: host
-      text: 「站穩，心定，眼只盯著靶心那一點。手一抖，箭就偏。我教人，先教他們把呼吸沉下去。」
+      text: 「站穩。腳底先釘住，再管手。」
+    - kind: speech
+      speaker: host
+      text: 「心定，眼睛只留靶心那一點。你越想射中，手就越抖。我教人先學把氣吐長，箭自然就出去。」
     - kind: narration
-      text: 她搭箭、引弦，一氣呵成，箭釘在靶心輕輕一顫。
+      text: 她搭箭、引弦，一氣呵成，箭釘進靶心，尾羽還在抖。
     - kind: speech
       speaker: host
-      text: 「射箭和做愛一個理，急了就空，定住才中。」
+      text: 「射箭跟做愛一個理，急了就空，定住才中。有話我直說，你別介意。」
 - topic_id: fionnen_resident_alarnel.topic_02
   keyword: 弓
   label: 弓
   fallback:
     scene_id: fionnen_resident_alarnel.topic_02_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
       text: 「谷裡的弓，都用什麼做？」
     - kind: speech
       speaker: host
-      text: 「好木料，配著絞緊的弦。一張弓做得好，拉起來順，放出去脆。獵隊出獵，都挑趁手的帶。」
+      text: 「好木料，配絞緊的弦。木頭看紋路，紋路順了才動刀；弦要拉得均。做得好，拉起來順，放出去脆。獵隊出獵，都挑趁手的帶。」
     - kind: speech
       speaker: host
-      text: 「弓跟人處久了，認主人的手。你哪天也有一張，就會懂這份貼。」
+      text: 「弓跟人處久了，認主人的手。你哪天也有一張，握久了就懂。我這張用了很久，別人借去，拉兩下就說不對勁。」
 - topic_id: fionnen_resident_alarnel.topic_03
   keyword: 家人
   label: 家人
   fallback:
     scene_id: fionnen_resident_alarnel.topic_03_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
       text: 「你家裡人都射箭？」
     - kind: speech
       speaker: host
-      text: 「大女兒基爾溫做箭，小女兒奈瑞斯撿箭、送箭。我拉弓，她倆跟在我身後。一家人都在靶道上。」
+      text: 「女兒一個做箭，一個撿箭、送箭。我拉弓，她倆跟在我身後。」
     - kind: narration
       text: 她望向靶道盡頭那個跑動的身影。
     - kind: speech
       speaker: host
-      text: 「谷裡的孩子也來學，熱鬧。你要靜，就等散了再來。」
+      text: 「一家人都在靶道上。吃飯的時候她們嫌我講話少，我也沒什麼好講，箭射出去，中不中自己看得見。」
+    - kind: speech
+      speaker: host
+      text: 「谷裡的孩子也來學，熱鬧。你要圖清靜，等散了再來，那時靶道只剩風。」
 - topic_id: fionnen_resident_alarnel.topic_04
   keyword: 名字
   label: 名字
   fallback:
     scene_id: fionnen_resident_alarnel.topic_04_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
       text: 「戈爾德莉夫，是金葉的意思？」
     - kind: speech
       speaker: host
-      text: 「金葉。秋來林子一片金，風一過，葉子簌簌往下落。這家住在光庭邊，看得最清。」
+      text: 「金葉。秋天林子一片金，風一過，葉子往下掉。這家住在光庭邊，看得最清楚。」
     - kind: narration
       text: 她伸手接住一片打旋落下的葉子。
     - kind: speech
       speaker: host
-      text: 「名是住處送的一份禮。你常來，也分得到這片金。」
+      text: 「名字是住處給的禮物。你秋天來，走過光庭那圈，腳下踩的都是這家的顏料。」
 - topic_id: fionnen_resident_alarnel.topic_05
   keyword: 私語
   label: 私語
@@ -80,23 +86,23 @@ topics:
   unavailable: locked
   refusal:
     scene_id: fionnen_resident_alarnel.topic_05_refusal
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: host
-      text: 「箭以外的心事，只對交得過心的人講。你多來拉幾回弓。」
+      text: 「射箭以外的事，我沒幾句話。你多來靶道幾回，射得穩了，我再說。」
   fallback:
     scene_id: fionnen_resident_alarnel.topic_05_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
       text: 「你最享受哪一箭？」
     - kind: speech
       speaker: host
-      text: 「是黃昏收弓，最後一箭脫手，我整個人也跟著放空。有個人在靶道邊等我，把我拉進林子，抵在樹上，讓我喘得比射箭還急。」
+      text: 「黃昏收弓，最後一箭脫手，整個人跟著空下來。有個人在靶道邊等我，把我拉進林子，抵在樹上，讓我喘得比射箭還急。」
     - kind: narration
-      text: 她聲音低下去，目光卻銳利如弦。
+      text: 她聲音低下去，眼睛卻亮著。
     - kind: speech
       speaker: host
-      text: 「弓弦繃久了，也盼著被誰鬆開。你懂這張弓，就懂我。」
+      text: 「弓弦繃久了，也盼著有人鬆開。你懂這張弓，就懂我。」

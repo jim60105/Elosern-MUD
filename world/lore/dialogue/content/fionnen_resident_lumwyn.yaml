@@ -1,76 +1,90 @@
 schema_version: 1
-greeting: 倫溫放下刻刀，吹去木粉，抬起頭：「有事嗎？我正刻到緊要處。」
+greeting: 倫溫沒抬頭，刻刀在木頭上走完一小段才停：「等我收這刀。你說，我聽得見。」
 topics:
 - topic_id: fionnen_resident_lumwyn.topic_01
   keyword: 刻花
   label: 刻花
   fallback:
     scene_id: fionnen_resident_lumwyn.topic_01_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「木器上的花，都是你刻的？」
+      text: 「這些木器上的花，都是你一個人刻的？」
     - kind: speech
       speaker: host
-      text: 「多半是。一鑿一鑿，順著木紋走。刻壞一處，整塊就廢了。這活考眼，也考心。」
+      text: 「多半是。順著木紋走，刀才不會咬住。刻壞一處，整塊料就廢了，所以我下刀前先看很久。」
     - kind: narration
-      text: 她指尖沿著剛刻出的紋路，輕輕撫過去。
+      text: 她吹開木屑，剛成形的花瓣露出來，邊緣還帶著細毛。
     - kind: speech
       speaker: host
-      text: 「花長在木頭裡，我把它們放出來。你湊近看，紋路裡有魂。」
+      text: 「花本來就在木頭裡。我只是把多出來的地方削掉。」
+    - kind: speech
+      speaker: host
+      text: 「你摸這裡。花瓣的邊要薄，底下要留肉，不然一碰就斷。」
 - topic_id: fionnen_resident_lumwyn.topic_02
   keyword: 手藝
   label: 手藝
   fallback:
     scene_id: fionnen_resident_lumwyn.topic_02_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「你刻花的手藝，跟誰學的？」
+      text: 「刻花的刀法，是你娘教的嗎？」
     - kind: speech
       speaker: host
-      text: 「跟我娘。她做弓，我刻花，一張一弛。刻著刻著，就刻出自己的脾性。」
+      text: 「娘教我握刀。她做弓，握刀和握刨子的道理差不多。刻花是我自己摸索出來。」
     - kind: speech
       speaker: host
-      text: 「手藝像熬糖，急不得。你一坐一整天，才熬得出那點精細。」
+      text: 「一開始刻壞一堆木片，娘沒罵，只把壞的拿去當柴燒。燒完了，我再刻下一塊。」
+    - kind: narration
+      text: 她把刻刀在指間轉了半圈，刀尖停在木頭上。
+    - kind: speech
+      speaker: host
+      text: 「急不來。坐一整天，可能只成一朵。可那朵留下來，就是留下來了。」
 - topic_id: fionnen_resident_lumwyn.topic_03
   keyword: 家人
   label: 家人
   fallback:
     scene_id: fionnen_resident_lumwyn.topic_03_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「你家裡，就你性子最靜？」
+      text: 「你們家三個人，就你坐得住？」
     - kind: speech
       speaker: host
-      text: 「是。娘寧溫揮錘，妹妹埃倫林滿場跑。就我坐得住，一鑿一鑿。一家人裡，我是那個收尾的人。」
+      text: 「娘揮錘，妹妹滿場跑。我坐在這裡，一鑿一鑿，坐到天黑也沒覺得久。」
     - kind: narration
-      text: 她笑了笑，笑紋極淺。
+      text: 她低頭笑了一下，笑紋很淺。
     - kind: speech
       speaker: host
-      text: 「妹妹總把我刻好的花拿去串花環。隨她，我刻就是了。」
+      text: 「妹妹埃倫林會把我刻好的花拿去串。她串得亂，我也不管。花刻出來本來就要給人用。」
+    - kind: speech
+      speaker: host
+      text: 「我們家的人講話都直。只有我話少，她們也習慣了。」
 - topic_id: fionnen_resident_lumwyn.topic_04
   keyword: 名字
   label: 名字
   fallback:
     scene_id: fionnen_resident_lumwyn.topic_04_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「哈克菲特赫爾，是那幾根鷹羽？」
+      text: 「哈克菲特赫爾，是鷹羽的意思嗎？」
     - kind: speech
       speaker: host
-      text: 「鷹羽。換羽時落在木料上，我刻花刻累了，就撿一根，看它的紋。」
+      text: 「鷹羽。獵鷹換羽的時候，羽毛會落在空地上。掃起來一堆，風一吹就跑。」
     - kind: narration
-      text: 她從木料堆上拈起一片羽，湊到眼前。
+      text: 她從木料堆邊拈起一根羽毛，湊到眼前。
     - kind: speech
       speaker: host
-      text: 「羽毛的紋路，跟木紋一樣。你靜下心，就分得出。」
+      text: 「羽毛的紋路和木紋一樣，都是一條一條順著長。只是羽毛輕，木頭沉。」
+    - kind: speech
+      speaker: host
+      text: 「我留了幾根在架上。刻累的時候看一眼，手就會穩下來。」
 - topic_id: fionnen_resident_lumwyn.topic_05
   keyword: 私語
   label: 私語
@@ -80,23 +94,26 @@ topics:
   unavailable: locked
   refusal:
     scene_id: fionnen_resident_lumwyn.topic_05_refusal
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: host
-      text: 「刻進木頭的心事，只給看得懂紋路的人。」
+      text: 「我心裡的事刻得很深。要挖給人看，得先確定那個人坐得住。」
   fallback:
     scene_id: fionnen_resident_lumwyn.topic_05_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「你最想要的陪伴，是什麼樣？」
+      text: 「你一個人刻一整天，會不會想要有人陪？」
     - kind: speech
       speaker: host
-      text: 「是有個人，坐在我對面，看我刻完一朵花。她不催，也不說話，就那麼陪著。等最後一鑿落下，她用指尖順著我腕上的木屑，一路摸到我的手心。」
+      text: 「想。可有人的時候，我反而刻不好。得是不說話的那種陪。」
+    - kind: speech
+      speaker: host
+      text: 「她坐在對面，看我把一朵花刻完。不催，也不問還有多久。最後一刀落下，她伸手把我手腕上的木屑拂掉。」
     - kind: narration
-      text: 她聲音輕下去，像怕驚了那朵花。
+      text: 她的聲音低下去，指尖停在半空。
     - kind: speech
       speaker: host
-      text: 「精細的活，要配一個安靜的人。你懂這份靜，就懂我。」
+      text: 「那一下比什麼都近。我這雙手整天握刀，只有那時手裡什麼都沒握。」

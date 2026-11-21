@@ -1,76 +1,90 @@
 schema_version: 1
-greeting: 埃林溫在火塘邊拍拍身旁的空位：「坐下，喝口熱水，想聽哪一段？」
+greeting: 埃林溫在火塘邊拍了拍身旁的空位，壺嘴正冒白氣。「坐啊，水剛開。想聽哪一段？」
 topics:
 - topic_id: ciaran_resident_erynwyn.topic_01
   keyword: 故事
   label: 故事
   fallback:
     scene_id: ciaran_resident_erynwyn.topic_01_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「你都給村裡的孩子講些什麼故事？」
+      text: 「你都跟村裡的孩子講些什麼？」
     - kind: speech
       speaker: host
-      text: 「講谷的來歷、月下的刀影，還有那些年深月久的舊情。孩子愛聽鬼怪，大人愛聽誰跟誰成了一對。我肚子裡都有。」
+      text: 「谷的來歷、月下的刀影、還有那些壓了很多年的舊情。」
+    - kind: speech
+      speaker: host
+      text: 「孩子愛聽鬼怪，大人愛聽誰跟誰好上了。我肚子裡都有。」
     - kind: narration
-      text: 她往火塘裡添了根柴，火光一跳，映得她臉膛暖融融。
+      text: 她往火裡添了根柴，火苗一跳，映得她臉上一層暖光。
     - kind: speech
       speaker: host
-      text: 「故事不避諱身子，床上床下都講。你多坐一會，我給你起個頭。」
+      text: 「故事不避諱身子。床上、樹下，我都講。你坐久一點，我給你起個頭。」
 - topic_id: ciaran_resident_erynwyn.topic_02
   keyword: 谷裡
   label: 谷裡
   fallback:
     scene_id: ciaran_resident_erynwyn.topic_02_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「這谷裡，有什麼老故事？」
+      text: 「這谷裡，最老的故事是哪一樁？」
     - kind: speech
       speaker: host
-      text: 「多了去。溪水哪年斷過，誰家的刀在哪座山折了，哪對情人在村北古樹下私會到天明。我揀著講，一宿也講不完。」
+      text: 「多了。溪水哪一年斷過，誰家的刀折在哪座山，哪對情人在村北古樹下待到天亮。」
     - kind: speech
       speaker: host
-      text: 「谷裡不興瞞著。誰跟誰好了，第二天就傳到火塘邊，成了新的故事。」
+      text: 「我揀著講，一晚也講不完。」
+    - kind: narration
+      text: 她用火鉗撥了撥炭，火星飛起來，又落回去。
+    - kind: speech
+      speaker: host
+      text: 「谷裡不興瞞。誰跟誰好了，隔天就傳到火塘邊，成了新的故事。」
 - topic_id: ciaran_resident_erynwyn.topic_03
   keyword: 家人
   label: 家人
   fallback:
     scene_id: ciaran_resident_erynwyn.topic_03_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「你的故事，都有人幫你記著嗎？」
+      text: 「你講的這些，有人幫你記著嗎？」
     - kind: speech
       speaker: host
-      text: 「大女兒奈爾內爾記性比我還強，誰說岔了她一句點破；小女兒寧內爾管孩子，把故事又講給下一茬。三代人，一個傳一個。」
+      text: 「大女兒奈爾內爾記性比我還牢。誰說岔一句，她當場點破。」
+    - kind: speech
+      speaker: host
+      text: 「小女兒寧內爾管孩子，把故事再講給下一批。」
     - kind: narration
-      text: 她朝屋角使個眼色，那裡坐著個捧書卷的身影。
+      text: 她朝屋角抬了抬下巴，那裡有人捧著書卷坐著。
     - kind: speech
       speaker: host
-      text: 「一家人就靠嘴和記性過活。你哪段想聽，問大姊；想熱鬧，找小妹。」
+      text: 「一家人就靠一張嘴和一副記性。你想聽細節，問大女兒。想聽熱鬧的段子，找小女兒。」
 - topic_id: ciaran_resident_erynwyn.topic_04
   keyword: 名字
   label: 名字
   fallback:
     scene_id: ciaran_resident_erynwyn.topic_04_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「溫特爾松，是冬日的歌聲？」
+      text: 「溫特爾松，是冬天松林裡的聲音嗎？」
     - kind: speech
       speaker: host
-      text: 「冬松。入冬山風過松林，呼呼地響，像有人在唱。這家住在古樹下，最聽得清。」
+      text: 「冬松。入冬山風穿過松林，響得像有人在唱。」
+    - kind: speech
+      speaker: host
+      text: 「這家就住在古樹下，聽得最清楚。」
     - kind: narration
-      text: 她側耳聽了一陣，屋外的風正巧掠過。
+      text: 她側耳聽了一陣，屋外的風剛好掠過屋簷。
     - kind: speech
       speaker: host
-      text: 「故事要有聲，就從這風裡來。你常來坐，也分得到一段。」
+      text: 「故事要有聲音，才活得起來。你常來坐，也分得到一段。」
 - topic_id: ciaran_resident_erynwyn.topic_05
   keyword: 私語
   label: 私語
@@ -80,23 +94,26 @@ topics:
   unavailable: locked
   refusal:
     scene_id: ciaran_resident_erynwyn.topic_05_refusal
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: host
-      text: 「有些段子，只說給自家人和交心的人聽。你多來坐。」
+      text: 「有些段子，我只留給坐得夠久的人。你再多來幾趟。」
   fallback:
     scene_id: ciaran_resident_erynwyn.topic_05_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「你自己最愛講哪一段？」
+      text: 「你自己最愛講的是哪一段？」
     - kind: speech
       speaker: host
-      text: 「是段春夜的舊事。兩個人躲進古樹的影裡，火也顧不得生，就在露水裡纏到天亮。我講到那兒，總壓低嗓子，怕壞了那夜的靜。」
+      text: 「是段春夜的舊事。兩個人躲進古樹的影子裡，火也忘了生，在露水裡纏到天亮。」
+    - kind: speech
+      speaker: host
+      text: 「我講到那裡，聲音都會壓低，怕吵壞那一夜的安靜。」
     - kind: narration
-      text: 她眼裡漾著笑，火光在她瞳仁裡晃。
+      text: 她眼裡帶著笑，火光在她瞳孔裡晃。
     - kind: speech
       speaker: host
-      text: 「好故事都帶點熱。你聽懂了，這谷的夜就都懂了。」
+      text: 「好故事都帶著一點熱。你聽懂了，這谷的夜就都懂了。」

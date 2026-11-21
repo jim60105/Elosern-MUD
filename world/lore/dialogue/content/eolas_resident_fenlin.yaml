@@ -1,46 +1,46 @@
 schema_version: 1
-greeting: 芬林從林子裡鑽出來，放輕了步子：「有話到谷裡說，別驚了蛛。」
+greeting: 芬林從林子邊探出身，見了你先把步子放輕。「有話到谷裡說，別驚了蛛。」
 topics:
 - topic_id: eolas_resident_fenlin.topic_01
   keyword: 蛛
   label: 蛛
   fallback:
     scene_id: eolas_resident_fenlin.topic_01_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
       text: 「林裡那些蛛，都是你在養？」
     - kind: speech
       speaker: host
-      text: 「養說不上，是照看。哪一窩愛吃什麼、哪一窩天冷就懶，我都記得。它們認聲，我哼著調進去，它們才不起網。」
+      text: 「養說不上，是照看。哪一窩愛吃什麼、哪一窩天一冷就懶，我都記得。它們認聲音，我哼著調進去，它們才不起網。」
     - kind: narration
       text: 她挽了挽袖子，露出小臂上幾道蛛絲拂出的細痕。
     - kind: speech
       speaker: host
-      text: 「你不先放輕步子，話到一半，整片網都震蕩了。蛛和這谷裡的人一樣，愛靜。」
+      text: 「你踩進來的時候要先放輕步子。你剛才那一下，半片網都跟著震了。蛛和這谷裡的人一樣，愛靜。」
 - topic_id: eolas_resident_fenlin.topic_02
   keyword: 養蛛
   label: 養蛛
   fallback:
     scene_id: eolas_resident_fenlin.topic_02_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
       text: 「蛛吃了什麼，才有這麼好的絲？」
     - kind: speech
       speaker: host
-      text: 「吃林子裡的露水和些小蟲。老一輩說，蛛糞養樹，樹又餵蛛，一圈一圈自己轉。」
+      text: 「吃林子裡的露水和些小蟲。老一輩說，蛛糞養樹，樹又餵蛛，自己就這麼轉著。」
     - kind: speech
       speaker: host
-      text: 「我餵的其實是耐心。一窩蛛受驚，補半個月的網都補不回那一口氣。跟哄人一個理，急了辦不好。」
+      text: 「我餵的其實是耐心。一窩蛛受了驚，半個月的網都補不回那口氣。我哄人也這樣，急起來反而把人推遠。」
 - topic_id: eolas_resident_fenlin.topic_03
   keyword: 家人
   label: 家人
   fallback:
     scene_id: eolas_resident_fenlin.topic_03_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
@@ -49,25 +49,25 @@ topics:
       speaker: host
       text: 「娘管抽絲，我管餵蛛，妹妹布倫內爾管搬運。天亮數網，天黑補網，一天就過去了。」
     - kind: narration
-      text: 她撿起一片落在肩上的蛛絲，對著光看了看。
+      text: 她撿起落在肩上的一段蛛絲，湊到眼前。
     - kind: speech
       speaker: host
-      text: 「夜裡一家人挨著睡，誰也不跟誰客氣。你要尋安靜，就來林子裡站一站。」
+      text: 「夜裡一家人挨著睡，誰也不跟誰客氣。你要尋安靜，就來林子邊站一站。」
 - topic_id: eolas_resident_fenlin.topic_04
   keyword: 名字
   label: 名字
   fallback:
     scene_id: eolas_resident_fenlin.topic_04_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
       text: 「你們家為什麼叫沙多瓦勒？」
     - kind: speech
       speaker: host
-      text: 「影谷。月照下來，谷底有整道整道的影。我跟娘說，那影子像一張沒織完的網，風一吹就在動。」
+      text: 「影谷。月亮一上來，谷底就橫著好幾道影。我跟娘說，那影子像一張沒織完的網，風一吹就在動。」
     - kind: narration
-      text: 她朝谷壁望了一眼，像在找那張看不見的網。
+      text: 她朝谷壁望了一眼，視線在石壁上停了停。
     - kind: speech
       speaker: host
       text: 「名是住處，不是名分。你記著這家的活計，比記著姓還實。」
@@ -76,7 +76,7 @@ topics:
   label: 谷裡
   fallback:
     scene_id: eolas_resident_fenlin.topic_05_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
@@ -86,7 +86,7 @@ topics:
       text: 「白天各忙一頭，輕手輕腳；入了夜才放開。泉邊、窯旁，想湊一塊就湊一塊。夜裡的事，谷裡從來不背著人。」
     - kind: speech
       speaker: host
-      text: 「你待久了就懂。這兒沒有見不得光的事。連誰和誰睡過，都像風一樣飄在街面上。」
+      text: 「你待久了就懂。這兒沒有見不得光的事。連誰和誰睡過，都像風一樣在谷裡飄著，誰也懶得藏。」
 - topic_id: eolas_resident_fenlin.topic_06
   keyword: 私語
   label: 私語
@@ -96,14 +96,14 @@ topics:
   unavailable: locked
   refusal:
     scene_id: eolas_resident_fenlin.topic_06_refusal
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: host
-      text: 「林子裡的事我都肯說，只有這一件，得等你我熟了。」
+      text: 「我平日什麼都肯講，這一題卻要留給熟的人。你先陪我多站幾回林子，等我認得你的腳步聲再說。」
   fallback:
     scene_id: eolas_resident_fenlin.topic_06_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
@@ -112,7 +112,7 @@ topics:
       speaker: host
       text: 「沒想過。只有一樣，我想哪天把衣服全脫了，一個人躺進最燙的泉裡，讓水的勁頭把我最裡頭也燙透。」
     - kind: narration
-      text: 她說得極輕，像是怕驚了誰。
+      text: 聲音壓得很低，尾音幾乎散在風裡。
     - kind: speech
       speaker: host
-      text: 「這種事，要自己嚐才曉得滋味。來日方長，不怕沒機會。」
+      text: 「這種事，要自己嚐才曉得滋味。日子還長，不怕沒機會。」

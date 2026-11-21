@@ -1,5 +1,5 @@
 schema_version: 1
-greeting: 練刀場邊的木刀在架上排成一列，泰莉爾‧菲溫德剛收完一組動作，額角帶著汗，正調勻呼吸。她赤腳站在場地邊，把你的站姿從頭到腳掃了一遍：「來看練刀？場子日夜都空著，木刀就擱在門邊。我這兒不收學生，也沒有捷徑。想練，就自己進場，先把腳站穩。」
+greeting: 練刀場邊的木刀在架上排成一列，泰莉爾‧菲溫德剛收完一組動作，額角帶著汗，正在調勻呼吸。她赤腳站在場地邊，把你的站姿從頭到腳掃了一遍：「來看練刀？場子日夜都空著，木刀擱在門邊。我這兒不收學生，也沒有捷徑。想練，就自己進場，先把腳站穩。」
 topics:
 - topic_id: ciaran_teliel_home.topic_01
   keyword: 刀術
@@ -13,37 +13,37 @@ topics:
       min_proficiency: 1
     scene:
       scene_id: ciaran_teliel_home.topic_01_swordsman_scene
-      revision: r3
+      revision: r4
       lines:
       - kind: speech
         speaker: actor
-        text: 我看過外頭不少人使劍，路數跟基亞蘭的刀法差得遠。能不能說說，你們的刀究竟講究什麼？
+        text: 「我看過外頭不少人使劍，路數跟基亞蘭的刀差得遠。能不能講一下，你們的刀到底講究什麼？」
       - kind: narration
-        text: 泰莉爾‧菲溫德的目光落在你握劍磨出的繭和沉下來的肩膀上，語氣平穩。
+        text: 她的目光落在你手掌的繭和放鬆下來的肩膀上，語氣平穩。
       - kind: speech
         speaker: host
-        text: 「你手上有繭，肩也放得下，平常握慣了兵器。不過基亞蘭的刀，跟外頭的劍是兩回事。外頭講刺擊和格擋，這兒講順勢。刀鋒出去，手腕別僵，讓它跟著腰和背脊一塊轉。身子哪一處發緊，刀就卡在哪一處。這道理我在床上也跟人講過，身子比腦子更早知道該怎麼動。」
+        text: 「你手上有繭，肩也放得下，平常握慣了兵器。基亞蘭的刀跟外頭的劍是兩回事。外頭講刺擊和格擋，這裡講順勢。刀鋒出去，手腕別僵，讓它跟著腰和背脊一起轉。身子哪一處發緊，刀就卡在哪一處。這道理我在床上也跟人講過，身子比腦子更早知道該怎麼動。」
       - kind: speech
         speaker: actor
-        text: 順著身子走？所以比起手臂使力，更看重從腳到腰的協調？
+        text: 「順著身子走？所以比起手臂使力，更看重從腳到腰的協調？」
       - kind: speech
         speaker: host
         text: 「算你懂。別喊我導師，我不教人。基亞蘭的孩子先認刀柄，再認刀鋒。想真懂差別，就拿把木刀進場走幾百遍，身體比耳朵記得快。」
   fallback:
     scene_id: ciaran_teliel_home.topic_01_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
-      text: 泰莉爾姑娘，基亞蘭的刀術有什麼獨到的地方？我看場邊練的人，揮刀的樣子跟外頭的劍士差很多。
+      text: 「我看場邊練的人，揮刀的樣子跟外頭的劍士差很多。基亞蘭的刀術有什麼不一樣的地方？」
     - kind: narration
-      text: 泰莉爾‧菲溫德的目光掃過你的身形，雙手抱在胸前，神色冷淡。
+      text: 她的目光掃過你的身形，雙手抱在胸前，神色冷淡。
     - kind: speech
       speaker: host
-      text: 「別喊我姑娘，也別喊導師，我不教人。基亞蘭的孩子先認刀柄，再認刀鋒。刀是谷裡人說話的另一種方式，用來護人的時候多過殺人。外頭的人握劍總急著分出勝負，這兒的刀卻講究呼吸和腳步的長久平穩。」
+      text: 「別喊我導師，我不教人。基亞蘭的孩子先認刀柄，再認刀鋒。刀是谷裡人說話的另一種方式，用來護人的時候多過殺人。外頭的人握劍總急著分出勝負，這兒的刀講究呼吸，還有腳步的平穩。」
     - kind: speech
       speaker: actor
-      text: 刀也是說話的方式？那要怎麼才摸得到這種感覺？
+      text: 「刀也是說話的方式？那要怎麼才摸得到這種感覺？」
     - kind: speech
       speaker: host
       text: 「看林邊樹幹上的刻痕，一代人留一片，每一刀都分明。本事只能靠自己練出來。問再多，不如進場把刀柄握熱。」
@@ -52,19 +52,19 @@ topics:
   label: 練習
   fallback:
     scene_id: ciaran_teliel_home.topic_02_scene
-    revision: r4
+    revision: r5
     lines:
     - kind: speech
       speaker: actor
-      text: 我要是想在這兒練刀，有沒有什麼規矩？平常你們怎麼帶新手？
+      text: 「我要是想在這裡練刀，有沒有什麼規矩？平常你們怎麼帶新手？」
     - kind: narration
-      text: 泰莉爾‧菲溫德朝門邊那排木刀抬了抬下巴。
+      text: 她朝門邊那排木刀抬了抬下巴。
     - kind: speech
       speaker: host
-      text: 「谷裡沒人牽著你的手，也沒有課堂。想練就自己進場。雙腳站穩，膝蓋放鬆，腰別硬頂著，讓刀跟著胯和背脊一起走。練到身子自己記住，才能算數。」
+      text: 「谷裡沒人牽著你的手，也沒有課堂。想練就自己進場。雙腳站穩，膝蓋放鬆，腰別硬頂著，讓刀跟著胯和背脊一起走。練到身子自己記住，才算數。」
     - kind: speech
       speaker: actor
-      text: 一點動作都不指點？要是姿勢走樣，練偏了怎麼辦？
+      text: 「一點動作都不指點？要是姿勢走樣，練偏了怎麼辦？」
     - kind: speech
       speaker: host
       text: 「姿勢一歪，風就頂你。你使蠻力揮空，傷的是自己的手腕和腰。我大半是在床上教會別人這個道理，身子貼著身子，誰使力、誰發緊，一點都瞞不住。刀跟身子是一回事，腰上一僵，鋒就卡住。痛過幾回，身子自己會收斂。看好前面的空地，繼續。」
@@ -73,40 +73,40 @@ topics:
   label: 練刀場
   fallback:
     scene_id: ciaran_teliel_home.topic_03_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
-      text: 這練刀場看著有些年頭了。平常都開放給誰用？
+      text: 「這練刀場看著有些年頭。平常都開放給誰用？」
     - kind: narration
-      text: 泰莉爾‧菲溫德轉身倒了杯清水喝盡，目光掃過被無數雙腳磨平的地面。
+      text: 她轉身倒了杯清水喝盡，目光掃過被無數雙腳磨平的地面。
     - kind: speech
       speaker: host
-      text: 「這片場子日夜都開著。孩子從天亮練到天黑，入了夜誰睡不著，想活動筋骨就自己來。門邊的木刀拿去就用，練完放回原處，不必跟誰報備。想要趁手的真刀，就去找場子另一頭的海莉爾。」
+      text: 「這片場子日夜都開著。孩子從天亮練到天黑，夜裡誰睡不著，想活動筋骨就自己來。門邊的木刀拿去就用，練完放回原處，不必跟誰報備。想要趁手的真刀，就去找場子另一頭的海莉爾。」
     - kind: speech
       speaker: actor
-      text: 鑄刃的海莉爾打的刀，也會拿到這片場上試嗎？
+      text: 「鑄刃的海莉爾打的刀，也會拿到這片場上試嗎？」
     - kind: speech
       speaker: host
-      text: 「她每淬好一把新刀，都先拿來讓我試握手感跟重心。好刀配好手，刀鋒偏一分，落點就瞧得出來。村裡用刀的人都在這塊地上長大。場子寬，容得下每一把認真揮出去的刀。」
+      text: 「她每淬好一把新刀，都先拿來讓我試握手感和重心。好刀配好手，刀鋒偏一分，落點就瞧得出來。村裡用刀的人都在這塊地上長大。場子寬，容得下每一把認真揮出去的刀。」
 - topic_id: ciaran_teliel_home.topic_04
   keyword: 比劃
   label: 比劃
   fallback:
     scene_id: ciaran_teliel_home.topic_04_scene
-    revision: r4
+    revision: r5
     lines:
     - kind: speech
       speaker: actor
-      text: 你在這兒守了幾百年場子，能不能拔刀跟我比劃幾下？我想見識真正的基亞蘭刀法。
+      text: 「你在這兒守了這麼久場子。能不能拔刀跟我比劃幾下？我想見識基亞蘭的刀。」
     - kind: narration
-      text: 泰莉爾‧菲溫德的眼神冷了幾分，手掌按住腰間的木刀，腳沒動。
+      text: 她的眼神冷了幾分，手掌按住腰間的木刀，腳沒動。
     - kind: speech
       speaker: host
       text: 「谷裡沒人陪外人對打，我也不陪。刀貼著刀，身子就貼著身子，我不拿這個招呼生人。村裡的孩子對練，我站在旁邊看，不伸手。你想圖個新鮮，就別碰刀。」
     - kind: speech
       speaker: actor
-      text: 是我唐突了。那要是想驗自己的刀路，又該怎麼辦？
+      text: 「是我唐突了。那要是想驗自己的刀路，又該怎麼辦？」
     - kind: speech
       speaker: host
       text: 「對著林邊的枯木練。每一刀斬得正不正，腰和肩有沒有跟上，木頭的裂口會老實告訴你。拿門邊的木刀，別動真刀。把心氣放平，進場去練。」

@@ -1,39 +1,39 @@
 schema_version: 1
-greeting: 格威內爾‧斯威夫塔羅把削刀放下，抬眼打量進來的人，目光先落在兩條手臂上。她從木釘上取下一把未上弦的弓，橫在身前：「來了。手臂伸出來我量一量，弓要合手才拉得順。」
+greeting: 格威內爾‧斯威夫塔羅把削刀放下，抬眼打量進來的人，目光先落在兩條手臂上。她從木釘上取下一把未上弦的弓，橫在身前：「來了。手臂伸出來，我量一量。弓要合手才拉得順。」
 topics:
 - topic_id: fionnen_gwynnel_home.topic_01
   keyword: 製弓
   label: 製弓
   fallback:
     scene_id: fionnen_gwynnel_home.topic_01_scene
-    revision: r4
+    revision: r5
     lines:
     - kind: speech
       speaker: actor
       text: 「樑上橫著的那幾根木頭，就是做弓的料？你怎麼挑？」
     - kind: narration
-      text: 格威內爾朝樑上一指，那截木料一頭還留著樹皮的顏色。
+      text: 她朝樑上一指。那截木料一頭還留著樹皮的顏色，切口很新。
     - kind: speech
       speaker: host
-      text: 「木作空地砍下來的枝，先看紋。紋要直，節要少，敲下去聲音沉、不發悶，才留。」
+      text: 「木作空地砍下來的枝。先看紋，紋要直，節要少。敲下去聲音沉、不發悶，才留下。」
     - kind: speech
       speaker: host
-      text: 「留下的晾在樑上，急不得。晾到木頭自己肯彎，兩頭一扳就順手，才動刀。」
+      text: 「留下的晾在樑上。急不得。晾到木頭自己肯彎，兩頭一扳就順手，才動刀。」
     - kind: speech
       speaker: actor
       text: 「晾著的這些天，你就丟著不管？」
     - kind: speech
       speaker: host
-      text: 「隔幾天翻一回面，讓風吹勻。太乾發脆，太潮彎了又彈回來，都得盯著。」
+      text: 「隔幾天翻一回面，讓風吹勻。太乾會脆，太潮彎了又彈回來。都得盯著。」
     - kind: speech
       speaker: host
-      text: 「削到末了，弓照著人的身子走。你手臂伸過來，我手一搭，肩寬臂長、勁在哪，全摸得出來，弓就照這個做。旁人做的弓，我使不順。」
+      text: 「削到最後，弓照著人的身子走。你手臂伸過來，我手一搭，肩多寬、臂多長、勁在哪，全摸得出來，弓就照這個做。」
 - topic_id: fionnen_gwynnel_home.topic_02
   keyword: 長弓
   label: 長弓
   fallback:
     scene_id: fionnen_gwynnel_home.topic_02_scene
-    revision: r4
+    revision: r5
     lines:
     - kind: speech
       speaker: actor
@@ -42,41 +42,41 @@ topics:
       text: 她把長弓往身前一立，一手扶弓身，另一手沿著弦槽抹過去。
     - kind: speech
       speaker: host
-      text: 「弓身長，拉滿了箭走得遠，也壓得住。代價是力氣。腕子要硬，肩背腰腿都得使上勁，一口氣把弦拉到下巴，光靠臂膀拉不到底。」
+      text: 「弓身長。拉滿了箭走得遠，也壓得住。代價是力氣。腕子要硬，肩背腰腿都得使上勁，只靠手臂拉不到底。」
     - kind: speech
       speaker: host
       text: 「拉到滿，胸口整個打開，弦順著下巴那道筋走。你喘，弓梢不動；你穩，它一路直到底。那口氣憋在哪，弓都曉得。」
     - kind: speech
       speaker: actor
-      text: 「練到滿弦不抖，得多久？」
+      text: 「練到滿弦不抖，得花多久？」
     - kind: speech
       speaker: host
-      text: 「弓不認人。先練到每一回拉滿都不歪，身子不散，再談準頭。手抖藏不住，指頭一搭弦，我就曉得你昨晚有沒有睡好。」
+      text: 「弓不認人。先練到每一回拉滿都不歪，身子不散，再談準頭。手抖藏不住。指頭一搭弦，我就知道你昨晚睡得好不好。」
     - kind: speech
       speaker: host
-      text: 「我摸過太多拉弓的身子。肩膀寬、背繃得緊的那種，我一眼就中意。有回夜裡跟個獵手睡，她拉出來的背，順著肩胛一路摸下去，每一條都硬。那種身子，抱得緊人也撐得開弓。」
+      text: 「我摸過太多拉弓的身子。肩膀寬、背繃得緊的那種，我一眼就中意。有回夜裡跟一個獵手睡，我順著她的肩胛一路摸下去，每一條都硬。那樣的身子抱得緊，人也撐得開弓。」
 - topic_id: fionnen_gwynnel_home.topic_03
   keyword: 弓棚
   label: 弓棚
   fallback:
     scene_id: fionnen_gwynnel_home.topic_03_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
       text: 「靶道邊那座弓棚，村裡的弓都收在裡頭？」
     - kind: speech
       speaker: host
-      text: 「弓棚的門從不關。誰的弓要換弦、要校，拎去棚裡，牆上掛著弦，自己動手。弄壞了也是自己的事。」
+      text: 「弓棚的門從不上鎖。誰的弓要換弦、要校，拎去棚裡。牆上掛著弦，自己動手。弄壞了也是自己的事。」
     - kind: speech
       speaker: host
-      text: 「村裡人取弓不過我這關。箭射壞了自己補，靶道那棵老樹幹上，歷來的箭眼一層疊一層。」
+      text: 「村裡人取弓不過我這關。箭射壞了自己補。靶道那棵老樹幹上，歷來的箭眼一層疊一層。」
     - kind: speech
       speaker: actor
       text: 「外頭來的人呢？也能進棚裡拿弓？」
     - kind: speech
       speaker: host
-      text: 「外頭的人到我這兒換。棚裡掛的弓，全出自我這雙手。你要帶走，銅幣擱我手上就是。」
+      text: 「外頭的人到我這兒換。棚裡掛的弓，全出自我這雙手。你要帶走，銅幣放我手上就行。」
     - kind: speech
       speaker: host
       text: 「棚子歸村裡，誰都能進。我只管做弓，不管那扇門。」
@@ -85,14 +85,14 @@ topics:
   label: 收回
   fallback:
     scene_id: fionnen_gwynnel_home.topic_04_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
       text: 「使舊了的弓，還能拿回來給你嗎？」
     - kind: speech
       speaker: host
-      text: 「我做的弓，沒斷的拿回來。我手一摸就曉得哪把出自我手。弦槽、弓身一看，還能用的算銅幣還你。」
+      text: 「我做的弓，沒斷的拿回來。我手一摸就曉得哪把出自我手。弦槽、弓身一看，還能使的就算銅幣還你。」
     - kind: speech
       speaker: host
       text: 「拆下來的木料還能改做別的東西，不必扔。」

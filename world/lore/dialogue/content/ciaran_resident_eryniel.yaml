@@ -1,76 +1,93 @@
 schema_version: 1
-greeting: 埃瑞妮爾從夜色裡走出來，聲音壓得低：「有話說，別點燈，驚了夜草。」
+greeting: 埃瑞妮爾從夜色裡走出來，腳步幾乎沒有聲音，手裡也沒提燈。「小聲說。別點燈，草會被驚到。」
 topics:
 - topic_id: ciaran_resident_eryniel.topic_01
   keyword: 夜草
   label: 夜草
   fallback:
     scene_id: ciaran_resident_eryniel.topic_01_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「為什麼有的草，偏要在夜裡採？」
+      text: 「有些草，為什麼非得在夜裡採？」
     - kind: speech
       speaker: host
-      text: 「天一黑它們才開口，露水一打，性子最足。白天摘回去，就是一捧沒魂的枯草。」
+      text: 「它們天黑才開口。露水一打，氣味最足。」
+    - kind: speech
+      speaker: host
+      text: 「白天摘回去，就是一捧沒用的枯葉。」
     - kind: narration
-      text: 她蹲下身，就著稀薄的月光，撥開一片草葉。
+      text: 她蹲下來，指尖撥開草葉，動作放得很輕，連葉背的絨毛都沒碰亂。
     - kind: speech
       speaker: host
-      text: 「我認它們，它們也認我。你在夜裡待久了，眼睛就開了。」
+      text: 「我認得它們，它們也認得我。你在夜裡待久了，眼睛自然會開。」
 - topic_id: ciaran_resident_eryniel.topic_02
   keyword: 夜路
   label: 夜路
   fallback:
     scene_id: ciaran_resident_eryniel.topic_02_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「一個人在夜裡上山，不怕嗎？」
+      text: 「你一個人上山，真不怕遇到什麼嗎？」
     - kind: speech
       speaker: host
-      text: 「白天人怕黑，夜裡人才看清東西。我不怕獸，也不怕鬼，就怕有人冒失地點燈，把一夜的草都驚了。」
+      text: 「怕黑的是白天的人。夜裡看東西，反而清楚。」
     - kind: speech
       speaker: host
-      text: 「谷裡的夜不只有草。有人趁黑在林子裡交纏，喘聲混著蟲鳴。我走過，聽半句，不回頭。」
+      text: 「野獸有聲音，人有腳步。我聽得出來。」
+    - kind: speech
+      speaker: host
+      text: 「真要說怕，我怕有人不長眼，一點燈就把整片草驚醒。」
+    - kind: narration
+      text: 她偏頭聽了一下林子那頭，蟲鳴正密。
+    - kind: speech
+      speaker: host
+      text: 「谷裡的夜也不只有草。有人趁黑在林裡纏在一起，喘聲混著蟲叫。我走過去，聽半句，不回頭。」
 - topic_id: ciaran_resident_eryniel.topic_03
   keyword: 家人
   label: 家人
   fallback:
     scene_id: ciaran_resident_eryniel.topic_03_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「你一個人在夜裡忙，家人不擔心？」
+      text: 「你夜裡出門，家裡人怎麼放心？」
     - kind: speech
       speaker: host
-      text: 「娘薩拉拉種草，妹妹希爾溫熬藥。她們知道我幾時回。天快亮時，我踏進門，鍋裡的水正好開。」
+      text: 「娘薩拉拉種草，妹妹希爾溫熬藥。她們知道我什麼時候回。」
+    - kind: speech
+      speaker: host
+      text: 「天快亮我進門，鍋裡的水剛好滾。」
     - kind: narration
-      text: 她語氣淡淡，眼底卻有暖意。
+      text: 她說得平淡，嘴角卻鬆了一點。
     - kind: speech
       speaker: host
-      text: 「一家人都靠夜。我採，娘配，妹妹熬。少了誰，那鍋藥都不成。」
+      text: 「一家人都靠夜裡這些草過日子。我採，娘配，妹妹熬。少一個人，那鍋藥就不對味。」
 - topic_id: ciaran_resident_eryniel.topic_04
   keyword: 名字
   label: 名字
   fallback:
     scene_id: ciaran_resident_eryniel.topic_04_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「索爾恩伍德，就是那圈棘木？」
+      text: 「索爾恩伍德，是那圈帶刺的樹？」
     - kind: speech
       speaker: host
-      text: 「是。棘木圍著園子，入夜更黑，我摸黑都能順著它的刺走回家。」
+      text: 「是。棘木圍著園子，入夜更黑。」
+    - kind: speech
+      speaker: host
+      text: 「我摸黑也能順著刺走回家，手比眼睛可靠。」
     - kind: narration
-      text: 她伸出手，指腹在虛空裡比了比那排刺。
+      text: 她伸手在空中比了比，指腹一株一株點過去。
     - kind: speech
       speaker: host
-      text: 「夜裡看不清字，摸到刺，就到家了。這姓，是給夜路的人認路的記號。」
+      text: 「夜裡看不清字。摸到刺，就到家了。這姓，是給走夜路的人留的記號。」
 - topic_id: ciaran_resident_eryniel.topic_05
   keyword: 私語
   label: 私語
@@ -80,23 +97,26 @@ topics:
   unavailable: locked
   refusal:
     scene_id: ciaran_resident_eryniel.topic_05_refusal
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: host
-      text: 「夜裡的話，只跟一起走過夜路的人說。」
+      text: 「你問得太快了。夜裡的事，我向來不隨便開口。」
   fallback:
     scene_id: ciaran_resident_eryniel.topic_05_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「你夜裡獨處，最想要的是什麼？」
+      text: 「夜裡一個人待著，你心裡最想要什麼？」
     - kind: speech
       speaker: host
-      text: 「想有個人，跟我一樣不怕黑，摸到草叢裡來。不點燈，只憑手和氣味，一寸寸認我。露水打濕了皮膚，也分不清是誰的汗。」
+      text: 「想要一個也不怕黑的人，摸進草叢裡來。」
+    - kind: speech
+      speaker: host
+      text: 「不點燈。只憑手和氣味，把我認出來。」
     - kind: narration
-      text: 她仰起臉，任月光落在她鎖骨上。
+      text: 她仰起臉，月光落在她鎖骨上，衣襟鬆著，也不去拉。
     - kind: speech
       speaker: host
-      text: 「黑裡沒有眼睛，只有身子。那才最真。」
+      text: 「露水打濕皮膚，分不清是誰的汗。黑裡沒有眼睛，只有身子。那時候最真。」

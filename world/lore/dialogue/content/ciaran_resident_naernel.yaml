@@ -1,76 +1,90 @@
 schema_version: 1
-greeting: 奈爾內爾放下手裡的書卷，抬起眼：「是來問舊事，還是新事？」
+greeting: 奈爾內爾合上手裡的書卷，抬眼看你。「問舊事，還是問新事？」
 topics:
 - topic_id: ciaran_resident_naernel.topic_01
   keyword: 舊事
   label: 舊事
   fallback:
     scene_id: ciaran_resident_naernel.topic_01_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
       text: 「這谷裡最遠的舊事，能追到哪一年？」
     - kind: speech
       speaker: host
-      text: 「遠到溪水還沒改道、古樹還只有一人高。娘記得住，我也記得。日子久了，事就沉了，可沒散。」
-    - kind: narration
-      text: 她指尖沿著書卷的邊，慢慢劃下去。
+      text: 「遠到溪水還沒改道，古樹還只有一人高的時候。」
     - kind: speech
       speaker: host
-      text: 「你想問誰、問哪樁，報個由頭，我給你理。」
+      text: 「娘記得，我也記得。事情沉下去了，可沒散。」
+    - kind: narration
+      text: 她的指尖沿著書卷邊緣劃下去，停在某一處。
+    - kind: speech
+      speaker: host
+      text: 「你想問誰、問哪一樁，給我一個由頭，我替你理。」
 - topic_id: ciaran_resident_naernel.topic_02
   keyword: 記憶
   label: 記憶
   fallback:
     scene_id: ciaran_resident_naernel.topic_02_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「記這麼多，不會累嗎？」
+      text: 「記這麼多事，不會累嗎？」
     - kind: speech
       speaker: host
-      text: 「不累。記得住，才知道自己從哪來。谷裡人壽命長，忘了，就白活了這一趟。」
+      text: 「不累。記得起來，才知道自己從哪裡來。」
     - kind: speech
       speaker: host
-      text: 「有些記性帶著甜，有些帶著刺。我都收著，一句是一句，不肯錯半個字。」
+      text: 「谷裡人活得久，忘了，就白走這一趟。」
+    - kind: narration
+      text: 她把書卷在膝上頓了一下，讓紙頁對齊。
+    - kind: speech
+      speaker: host
+      text: 「有些記憶帶甜，有些帶刺。我都收著，一句是一句，不肯錯半個字。」
 - topic_id: ciaran_resident_naernel.topic_03
   keyword: 家人
   label: 家人
   fallback:
     scene_id: ciaran_resident_naernel.topic_03_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「你家裡，都靠記性過活？」
+      text: 「你家裡都靠記性過日子？」
     - kind: speech
       speaker: host
-      text: 「娘埃林溫說故事，妹妹寧內爾哄孩子，我記脈絡。仨人一處，就是谷裡一本活生生的書。」
+      text: 「娘埃林溫說故事，妹妹寧內爾哄孩子，我記脈絡。」
+    - kind: speech
+      speaker: host
+      text: 「三個人湊在一處，就是谷裡一本活著的書。」
     - kind: narration
-      text: 她合上書卷，語氣裡有一分自持的沉。
+      text: 她垂下眼，指腹壓住書卷的邊，像怕風把紙吹亂。
     - kind: speech
       speaker: host
-      text: 「娘講，我補，妹妹傳。少了誰，這本子就缺頁。」
+      text: 「娘講，我補，妹妹傳。少一個，這本子就缺頁。」
 - topic_id: ciaran_resident_naernel.topic_04
   keyword: 名字
   label: 名字
   fallback:
     scene_id: ciaran_resident_naernel.topic_04_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「溫特爾松，是冬日松林的風聲？」
+      text: 「溫特爾松，是冬天松林裡的風聲？」
     - kind: speech
       speaker: host
-      text: 「冬松。風過松林，像一句拖長的歌。我家就住在歌聲最清的那棵樹下。」
+      text: 「冬松。風穿過松林，像一句拖得很長的歌。」
+    - kind: speech
+      speaker: host
+      text: 「我家就住在歌聲最清的那棵樹下。」
     - kind: narration
-      text: 她側過臉，像在辨認窗外那陣風。
+      text: 她側過臉，聽窗外那陣風。
     - kind: speech
       speaker: host
-      text: 「名是記號。你記住了，就找到這家。忘了，也就錯過了。」
+      text: 「名字是記號。你記住了，就找得到這家。忘了，也就錯過了。」
 - topic_id: ciaran_resident_naernel.topic_05
   keyword: 私語
   label: 私語
@@ -80,23 +94,26 @@ topics:
   unavailable: locked
   refusal:
     scene_id: ciaran_resident_naernel.topic_05_refusal
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: host
-      text: 「我記性雖好，交心的事也只說給配得上的人。」
+      text: 「我記性雖好，也不是每一頁都肯翻給人看。你換個題目。」
   fallback:
     scene_id: ciaran_resident_naernel.topic_05_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
       text: 「你最想永遠記住的是哪一段？」
     - kind: speech
       speaker: host
-      text: 「是某個夏夜，我褪盡衣裳，躺在古樹的影裡，讓露水沿著鎖骨往下淌。有個人的唇追著那道涼，一路往下。我記得住每一寸，比記任何舊事都清楚。」
+      text: 「某個夏夜。我褪了衣裳，躺在古樹的影子裡，讓露水沿著鎖骨往下淌。」
+    - kind: speech
+      speaker: host
+      text: 「有個人用嘴唇追著那道涼，一路往下。我記得每一寸，比記任何舊事都清楚。」
     - kind: narration
-      text: 她聲音極穩，眼底卻軟了。
+      text: 她聲音很穩，眼底卻軟了下來。
     - kind: speech
       speaker: host
       text: 「好的記憶都帶著體溫。你交得過心，我才肯翻給你看。」

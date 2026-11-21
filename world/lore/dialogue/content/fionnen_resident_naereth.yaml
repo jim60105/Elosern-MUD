@@ -1,76 +1,90 @@
 schema_version: 1
-greeting: 奈瑞斯跑得滿頭汗，停下腳步，笑得燦爛：「你來啦？要我帶你去靶道嗎？」
+greeting: 奈瑞斯從靶道那頭跑過來，在兩步外停下，彎著腰喘：「等我一下……好了。你找我？」
 topics:
 - topic_id: fionnen_resident_naereth.topic_01
   keyword: 跑
   label: 跑
   fallback:
     scene_id: fionnen_resident_naereth.topic_01_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「你怎麼跑得這麼快？」
+      text: 「你怎麼跑得這麼快？我還沒看清，你人就不見了。」
     - kind: speech
       speaker: host
-      text: 「撿箭練出了這雙腿。箭射出去，我得搶在箭落前追上。一天下來，比誰都跑得多。」
+      text: 「撿箭練出來。箭一射出去，我就得追，追到箭插進靶前把它接住。」
+    - kind: speech
+      speaker: host
+      text: 「一天下來，靶道來回幾十趟。腿不酸，就是喘。喘完了再跑。」
     - kind: narration
-      text: 她在原地小跳著，還沒歇過氣來。
+      text: 她在原地踏步，腳尖點著地，沒讓自己停下來。
     - kind: speech
       speaker: host
-      text: 「跑起來風貼著身子，帶著涼意，比誰的懷抱都自由。你也跑兩步，試試。」
+      text: 「娘說我天生坐不住。我坐著才難受，跑起來風貼著臉，腦子就空了。」
 - topic_id: fionnen_resident_naereth.topic_02
   keyword: 靶道
   label: 靶道
   fallback:
     scene_id: fionnen_resident_naereth.topic_02_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「靶道上，一天都熱鬧嗎？」
+      text: 「靶道白天都這麼熱鬧嗎？」
     - kind: speech
       speaker: host
-      text: 「白天熱鬧，娘拉弓，姊姊做箭，孩子也來學。我跑來跑去送箭，笑聲滿道。」
+      text: 「白天熱鬧。娘阿拉爾內爾拉弓，姊姊基爾溫削箭，村裡想學的也來。」
     - kind: speech
       speaker: host
-      text: 「到了傍晚人就少了。那時我一個人躺在靶道盡頭，看天，等風來。」
+      text: 「我跑來跑去送箭，誰喊一聲我就往哪邊去。一天到晚都在人群裡鑽。」
+    - kind: narration
+      text: 她朝靶道盡頭望了一眼，那裡的靶子排成一列。
+    - kind: speech
+      speaker: host
+      text: 「傍晚人就散了。我一個躺在靶道盡頭看天，等風來。那時候最安靜。」
 - topic_id: fionnen_resident_naereth.topic_03
   keyword: 家人
   label: 家人
   fallback:
     scene_id: fionnen_resident_naereth.topic_03_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「你家裡，你最喜歡跟誰待著？」
+      text: 「你們家三個人，你最黏誰？」
     - kind: speech
       speaker: host
-      text: 「姊姊基爾溫。她削箭，我坐她旁邊，什麼也不幹。她不趕我，我也不吵她，就那麼陪著。」
+      text: 「姊姊。她削箭的時候我坐在旁邊，什麼都不做，就看她的手。」
+    - kind: speech
+      speaker: host
+      text: 「她不趕我，也不嫌我吵。我跑累了靠過去，她會把肩膀讓出來。」
     - kind: narration
-      text: 她扯著衣角，笑得有些不好意思。
+      text: 她扯了扯衣角，笑得有點不好意思。
     - kind: speech
       speaker: host
-      text: 「娘管得嚴，姊姊卻由著我。夜裡我跑累了，她會替我擦汗。」
+      text: 「娘管我管得緊，姊姊由著我。所以我有事都先找姊姊，挨罵也先找她擋。」
 - topic_id: fionnen_resident_naereth.topic_04
   keyword: 名字
   label: 名字
   fallback:
     scene_id: fionnen_resident_naereth.topic_04_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「戈爾德莉夫，是秋天的金葉？」
+      text: 「戈爾德莉夫，是金葉的意思？」
     - kind: speech
       speaker: host
-      text: 「金葉。我跑過靶道，腳下踩著一地金黃，嘩啦嘩啦響，像在跟我說話。」
+      text: 「金葉。秋天靶道旁邊的地上鋪滿葉子，跑過去會響，一踩就碎。」
     - kind: narration
-      text: 她抬腳做出踩葉子的動作，眼裡亮晶晶。
+      text: 她抬起腳，做了個踩葉子的動作，腳尖在地上轉了半圈。
     - kind: speech
       speaker: host
-      text: 「我喜歡這名字，跑起來特別順。你跟著我跑，也分得到一陣金風。」
+      text: 「我喜歡這名字。跑起來順口，喊起來也響。」
+    - kind: speech
+      speaker: host
+      text: 「等秋天你再來，我帶你跑一遍。跑完鞋裡全是碎葉，倒出來一堆。」
 - topic_id: fionnen_resident_naereth.topic_05
   keyword: 私語
   label: 私語
@@ -80,23 +94,26 @@ topics:
   unavailable: locked
   refusal:
     scene_id: fionnen_resident_naereth.topic_05_refusal
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: host
-      text: 「我話多，可有些心事，只跟陪我跑過的人說。」
+      text: 「有些話我跑著才說得出口。你陪我跑完一圈，我再想要不要講。」
   fallback:
     scene_id: fionnen_resident_naereth.topic_05_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「你最開心的時刻，是什麼樣？」
+      text: 「跑了一整天，累到腿軟的時候，你最想要什麼？」
     - kind: speech
       speaker: host
-      text: 「是跑了一整天，累得腿發軟，有人把我接住，抱在懷裡轉圈。我笑得停不下來，汗水全蹭在她身上，她也不鬆手。」
+      text: 「有人接住我。跑到最後腿不聽使喚，整個人往前倒。」
+    - kind: speech
+      speaker: host
+      text: 「她把我抱住，還轉了一圈。我笑得停不下來，汗全蹭在她身上，她也沒鬆手。」
     - kind: narration
-      text: 她臉頰發紅，像剛跑完一場。
+      text: 她臉頰還紅著，呼吸卻已經平了。
     - kind: speech
       speaker: host
-      text: 「被抱著飛起來，比什麼都快活。你哪天也接住我，我就賴著不走了。」
+      text: 「被抱著轉的時候，比跑得最快還輕。你要試，就得先追得上我。」

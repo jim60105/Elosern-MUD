@@ -1,76 +1,90 @@
 schema_version: 1
-greeting: 邁特希斯攪著鍋裡的糖，側過頭：「你聞，花蕊快好了。想問什麼？」
+greeting: 邁特希斯把木勺擱在鍋沿，轉過身來，圍裙上沾著一層糖：「糖還差一點。你要問什麼，先坐。」
 topics:
 - topic_id: fionnen_resident_maethith.topic_01
   keyword: 蜜漬
   label: 蜜漬
   fallback:
     scene_id: fionnen_resident_maethith.topic_01_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「蜜漬花蕊，是怎麼做的？」
+      text: 「蜜漬花蕊是怎麼做的？我看鍋裡的糖漿一直很稠。」
     - kind: speech
       speaker: host
-      text: 「花瓣採下來，蜜浸足日子，再小火熬。火候差一點，花瓣就塌了；熬對了，入口先脆後甜。」
+      text: 「花瓣清晨採下來，先浸在蜜裡放足日子。等花瓣吃透了蜜，再上小火熬。」
     - kind: narration
-      text: 她攪動木勺，糖漿黏稠地掛在勺沿。
+      text: 她舀起一勺，糖漿掛在勺沿，拉出一條細線又斷掉。
     - kind: speech
       speaker: host
-      text: 「做甜食要耐心。你急，甜就跑了。坐一會，我盛一勺給你嚐。」
+      text: 「火大一點，花瓣就塌，吃起來只剩甜。火小，熬得久，咬下去才會先脆一下。」
+    - kind: speech
+      speaker: host
+      text: 「我守著這鍋，不能走開。糖這種東西，一轉眼就變臉。」
 - topic_id: fionnen_resident_maethith.topic_02
   keyword: 花蕊
   label: 花蕊
   fallback:
     scene_id: fionnen_resident_maethith.topic_02_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「這花蕊，都是你們園子裡的？」
+      text: 「這些花瓣，都是從你們家那片花圃來的？」
     - kind: speech
       speaker: host
-      text: 「是。清晨花瓣還帶著露，就採下來。妹妹賽莉爾採蜜，我醃花，娘看蜂。一家人把園子的香都收進罐裡。」
+      text: 「是。娘看蜂，妹妹搖蜜，我醃花。天亮前採的花，露水還在，香氣最足。」
     - kind: speech
       speaker: host
-      text: 「一罐子封好，就是一天的工夫。你帶一罐回去，甜能留到冬天。」
+      text: 「一罐封好，要花掉一整天的工夫。冬天拿出來，配著熱茶吃，甜味會回來。」
+    - kind: narration
+      text: 她拿起一只封好的陶罐，翻過來看底下的記號。
+    - kind: speech
+      speaker: host
+      text: 「罐底我刻了日子。哪一批先採、哪一批先熬，翻過來就知道。」
 - topic_id: fionnen_resident_maethith.topic_03
   keyword: 家人
   label: 家人
   fallback:
     scene_id: fionnen_resident_maethith.topic_03_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「你家裡，你最黏誰？」
+      text: 「你們家三個人，誰最常待在蜜園裡？」
     - kind: speech
       speaker: host
-      text: 「黏娘。她性子軟，我也慢，湊一塊正好。妹妹賽莉爾太鬧，常把我熬的糖攪出泡。」
+      text: 「娘。她天一亮就去看蜂，蜂也認得她的味道。妹妹待不住，採完蜜就往靶道跑。」
     - kind: narration
-      text: 她搖搖頭，語氣裡盡是縱容。
+      text: 她搖了搖頭，語氣裡帶著笑。
     - kind: speech
       speaker: host
-      text: 「一家人裡，就我耐得住火。夜裡糖冷透了，仨人分著吃，最香。」
+      text: 「我跟我娘比較像。她說話軟，我也不急。兩個人待在蜜漬房裡，一天下來講不到幾句。」
+    - kind: speech
+      speaker: host
+      text: 「妹妹賽莉爾一回來，整間屋子就吵起來。可她帶回來的蜜新鮮，我也少不了她。」
 - topic_id: fionnen_resident_maethith.topic_04
   keyword: 名字
   label: 名字
   fallback:
     scene_id: fionnen_resident_maethith.topic_04_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「希爾維爾布魯克，是月夜的銀溪？」
+      text: 「希爾維爾布魯克，是月光下的銀溪？」
     - kind: speech
       speaker: host
-      text: 「銀溪。月亮一來，溪水泛著銀光，像一鍋熬開的糖。這家就認了它。」
+      text: 「銀溪。夜裡月亮照在溪面上，亮得能看見水底的石頭。」
     - kind: narration
-      text: 她望向窗外，像在看那條溪。
+      text: 她轉頭看向窗外，溪谷的方向只露出一線樹影。
     - kind: speech
       speaker: host
-      text: 「這名字甜。你往後晚上來，能瞧見那一片銀。」
+      text: 「娘取這個名字的時候說，溪水不吵，卻一直在走，跟我們家過日子的方式很像。」
+    - kind: speech
+      speaker: host
+      text: 「我沒問過她是不是真的這樣想。反正叫久了，就覺得貼合。」
 - topic_id: fionnen_resident_maethith.topic_05
   keyword: 私語
   label: 私語
@@ -80,23 +94,26 @@ topics:
   unavailable: locked
   refusal:
     scene_id: fionnen_resident_maethith.topic_05_refusal
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: host
-      text: 「我的甜話，只留給肯陪我守火的人。」
+      text: 「我熬糖的時候話少，心裡的話更少。你等我願意開口，別催我。」
   fallback:
     scene_id: fionnen_resident_maethith.topic_05_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「你最想要的陪伴，是什麼樣？」
+      text: 「熬糖熬到半夜，你最想有人替你做什麼？」
     - kind: speech
       speaker: host
-      text: 「是熬糖熬到半夜，鍋裡終於收成，回頭有個人靠在門邊，就那麼等我。我把第一勺蜜漬餵進她嘴裡，看她被甜得瞇眼。那一刻，比糖還甜。」
+      text: 「坐在門邊等我。不用幫忙，也別走。鍋裡的糖一收，我就回頭。」
+    - kind: speech
+      speaker: host
+      text: 「第一勺我會先吹涼，餵給她。看她被甜得瞇起眼睛，我才覺得這一鍋熬得值得。」
     - kind: narration
-      text: 她咬著下唇，笑意從眼底漫開。
+      text: 她咬著下唇，笑意從眼角漫出來。
     - kind: speech
       speaker: host
-      text: 「有人等，熬多久都值。」
+      text: 「有人等，火再小我也不嫌久。糖涼了還能再熱，人等久了會走。」

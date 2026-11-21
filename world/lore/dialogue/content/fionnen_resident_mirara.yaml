@@ -1,76 +1,90 @@
 schema_version: 1
-greeting: 米拉拉從菜畦裡抬起頭，懷裡抱著一把嫩菜：「你來啦？我正摘菜呢。」
+greeting: 米拉拉從菜畦裡站起來，懷裡的菜差點滑出去：「哎，你來得正好！幫我看一眼，這把嫩不嫩？」
 topics:
 - topic_id: fionnen_resident_mirara.topic_01
   keyword: 採菜
   label: 採菜
   fallback:
     scene_id: fionnen_resident_mirara.topic_01_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「採菜也有時辰講究？」
+      text: 「採菜還要挑時辰？我以為葉子夠大就能摘。」
     - kind: speech
       speaker: host
-      text: 「有。趁露水沒散，菜最嫩。日頭一高，就蔫了。我清早上圃，一株一株摘，摘滿一簍才回家。」
+      text: 「大不大不重要，看它挺不挺。天剛亮，葉子還挺著，一掐就斷，那時最嫩。」
     - kind: narration
-      text: 她抖了抖懷裡的菜，露水珠子滾了一地。
+      text: 她把手裡的菜舉高，葉面上還有幾顆露水。
     - kind: speech
       speaker: host
-      text: 「菜要趁鮮。人也一樣，趕早不趕晚。你要嚐，這把最嫩。」
+      text: 「日頭一高，葉子就軟，摘下來放半天就塌。所以我寧可早起，摘滿一簍再回去。」
+    - kind: speech
+      speaker: host
+      text: 「你摸這把的梗。梗很脆，指甲一壓就出水。」
 - topic_id: fionnen_resident_mirara.topic_02
   keyword: 圃子
   label: 圃子
   fallback:
     scene_id: fionnen_resident_mirara.topic_02_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「這圃子裡，你最喜歡什麼？」
+      text: 「這片圃子裡，你最喜歡哪個角落？」
     - kind: speech
       speaker: host
-      text: 「最喜歡春天，菜苗剛破土，綠得發亮。那時候我整天泡在圃裡，拔草、看蟲，一步也捨不得走。」
+      text: 「靠樹根那幾畦。春天苗剛冒出來，整排綠得發亮，我蹲在那裡拔草，一蹲就是半天。」
     - kind: speech
       speaker: host
-      text: 「姊姊說我像株菜，曬曬太陽就長。我也愛這麼待著，跟地貼得近。」
+      text: 「娘說我像株菜，曬太陽就長。我不覺得是壞話，菜長得好也是本事。」
+    - kind: narration
+      text: 她拍了拍手上的土，往樹根那邊指了指。
+    - kind: speech
+      speaker: host
+      text: 「那幾畦的土最鬆。蚯蚓多，翻起來一條接一條，我以前還抓來放在手心上玩。」
 - topic_id: fionnen_resident_mirara.topic_03
   keyword: 家人
   label: 家人
   fallback:
     scene_id: fionnen_resident_mirara.topic_03_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「你家裡，誰最疼你？」
+      text: 「你們家，誰最常來圃裡找你？」
     - kind: speech
       speaker: host
-      text: 「姊姊伊斯爾溫。她澆水總記得留我一瓢，我曬暈了，她就把我拉到樹蔭下。我闖了禍，她替我兜著。」
+      text: 「姊姊伊斯爾溫。她澆水澆到這頭，會多留一瓢給我，叫我喝。」
+    - kind: speech
+      speaker: host
+      text: 「我曬暈過一次，蹲在畦邊起不來。她二話不說把我拖到樹蔭下，拿濕布蓋我的額頭。」
     - kind: narration
-      text: 她笑得眼睛彎成月牙。
+      text: 她笑得眼睛彎起來，手在額頭上比了一下。
     - kind: speech
       speaker: host
-      text: 「娘管得寬，姊姊管得細。一家人裡，數我最受寵。」
+      text: 「娘管得寬，姊姊管得細。我在這片圃裡，從來不用自己操心。」
 - topic_id: fionnen_resident_mirara.topic_04
   keyword: 名字
   label: 名字
   fallback:
     scene_id: fionnen_resident_mirara.topic_04_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「孫希斯佩爾，是日光的低語？」
+      text: 「孫希斯佩爾，是日光在說話的意思？」
     - kind: speech
       speaker: host
-      text: 「日語。晌午的陽光落在菜葉上，帶著暖意，像在跟我說悄悄話。這家就認了它。」
+      text: 「娘說那是日頭在跟菜講話。我聽不出字，只看得出菜往光那邊長。」
     - kind: narration
-      text: 她伸出手，接住一縷漏下來的日光。
+      text: 她伸手去接一片漏下來的光，掌心亮了一塊。
     - kind: speech
       speaker: host
-      text: 「這名字我喜歡，念起來就暖。你午後來，我帶你曬太陽。」
+      text: 「這名字念起來暖。我喜歡人家喊我米拉拉，尾音翹起來，喊著就熱鬧。」
+    - kind: speech
+      speaker: host
+      text: 「你午後再來，那時光斜，整個圃子都會亮。」
 - topic_id: fionnen_resident_mirara.topic_05
   keyword: 私語
   label: 私語
@@ -80,23 +94,26 @@ topics:
   unavailable: locked
   refusal:
     scene_id: fionnen_resident_mirara.topic_05_refusal
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: host
-      text: 「我的小秘密，只跟常陪我曬太陽的人說。」
+      text: 「我的祕密很小，只夠講給常陪我曬太陽的人聽。你先陪我坐一會嘛。」
   fallback:
     scene_id: fionnen_resident_mirara.topic_05_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「你最開心的時刻，是什麼樣？」
+      text: 「摘完菜累得半死的時候，你最想做什麼？」
     - kind: speech
       speaker: host
-      text: 「是摘滿一簍菜，蹲在圃邊喘氣，有人從身後蒙住我的眼睛，讓我猜她是誰。我笑著往後一倒，正好跌進她懷裡，兩個人一齊滾進菜畦，壓扁了一片綠。」
+      text: 「躺在畦邊不動。有人從後面蒙住我的眼睛，叫我猜她是誰。」
+    - kind: speech
+      speaker: host
+      text: 「我懶得猜，往後一倒，正好跌進她懷裡。兩個人一起滾進菜畦，壓扁一片菜。」
     - kind: narration
-      text: 她臉頰發紅，眼裡全是那天的笑。
+      text: 她臉紅起來，眼裡卻全是笑。
     - kind: speech
       speaker: host
-      text: 「開心靠種，也靠玩。你哪天跟我滾一回菜畦，就懂了。」
+      text: 「壓壞的菜，娘會念兩句。可我那時只顧著笑，什麼都聽不見。」

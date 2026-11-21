@@ -1,84 +1,108 @@
 schema_version: 1
-greeting: 櫃檯後頭，瑪爾特‧金秤埋頭對帳，炭筆在頁邊畫著只有自己看得懂的記號。他抬眼，把炭筆往耳後一別：「要出城，還是剛回王都？出城就照著價目把燈啊羅盤的挑齊；剛回來就先把貨擱上秤，我替你估個價。」
+greeting: 櫃檯後頭，瑪爾特‧金秤低頭對帳，炭筆在頁邊畫著只有他自己看得懂的記號。他抬眼，把炭筆往耳後一別：「出城，還是剛回來？要出城就講一聲要去哪兒，我照著路替你挑東西；剛回來就把貨擱上秤，我替你估個價。」
 topics:
 - topic_id: altoria_general_store.topic_01
   keyword: 賣什麼
   label: 賣什麼
   fallback:
     scene_id: altoria_general_store.topic_01_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
-      text: 「想請問一下，你這間店主要賣些什麼？出城要用的東西都有嗎？」
+      text: 「你這裡主要賣些什麼？我第一次出城，站在架子前面不知道該從哪樣看起。」
     - kind: narration
-      text: 瑪爾特‧金秤把算盤往手邊一拉，朝身後排得整齊的深色木架抬了抬下巴。
+      text: 他把算盤往手邊一拉，朝身後那排深色木架抬了抬下巴。
     - kind: speech
       speaker: host
-      text: 「出城要用的大半都在這一排。魔法燈、附魔羅盤、迷宮探照符，還有露營魔導具，攤開就是一小間擋風雨的帳篷。底層還擺著粗鐵礦和魔獸結晶，都是打鐵的料子。」
+      text: 「先從最要緊的兩樣講起。魔法燈，走進迷宮深處就靠它，不然黑得連自己的手都看不見。」
+    - kind: speech
+      speaker: host
+      text: 「附魔羅盤給你認方向。走岔了路，它不指北，只指著地表，順著它往上爬，總能出去。」
     - kind: speech
       speaker: actor
-      text: 「那價錢怎麼算？多買幾樣，能算便宜一點嗎？」
+      text: 「那符紙和帳篷那些呢？也是非帶不可嗎？」
     - kind: speech
       speaker: host
-      text: 「價錢都刻在牆上那塊價目板上，我照著收，分毫不差。殺價就省點口水吧。這把黃銅秤在東市替人過磅三十年，分量向來公道。照價目挑，買賣乾脆點。」
+      text: 「迷宮探照符撕一張，前頭一小段路就亮起來。露營魔導具攤開是一頂小帳篷，擋風擋雨，夜裡的蟲獸也進不來。通訊法螺留給跟同伴走散的時候，吹一聲，彼此聽得見。」
+    - kind: narration
+      text: 他伸手把一只羅盤轉了半圈，指針晃了兩下，停住不動。
+    - kind: speech
+      speaker: host
+      text: 「底下那層是粗鐵礦和魔獸結晶，打鐵的料。用得上的拿，用不上的別亂買，錢留著路上花。」
 - topic_id: altoria_general_store.topic_02
   keyword: 材料
   label: 材料
   fallback:
     scene_id: altoria_general_store.topic_02_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
-      text: 「聽說你這裡也收冒險者從外頭帶回來的素材？收購價怎麼算？」
+      text: 「聽說你也收冒險者帶回來的素材？什麼都收嗎？」
     - kind: narration
-      text: 瑪爾特‧金秤用指節敲了敲擦得發亮的小黃銅秤盤，像等著客人把貨擺上去。
+      text: 他用指節敲了敲擦得發亮的小黃銅秤盤，敲完就抬眼望向門口。
     - kind: speech
       speaker: host
-      text: 「收。哥布林耳朵、史萊姆黏液、巨魔尖牙、地龍鱗片，全都收。一整袋也好，一枚也好，擱上秤，我過磅就照實報價，銅幣當著你的面點清楚。」
+      text: 「收。哥布林耳朵、史萊姆黏液、地龍鱗片、巨魔尖牙，全收。一整袋也行，一枚也行，擱上秤我照實報，銅幣當你的面點清楚。」
     - kind: speech
       speaker: actor
-      text: 「那你架上也有稀罕的材料賣嗎？都是些什麼好貨？」
+      text: 「那你自己架上那些貴的材料，又是從哪來的？」
     - kind: speech
       speaker: host
-      text: 「有。最上層留著幾樣貴貨，識貨的一眼就認得。魔導晶核、龍鱗碎片，還有商隊從中央山脈那頭帶回來的精靈蛛絲。想看哪樣跟我說，我親手拿給你。」
+      text: 「商隊帶回來的貨。魔導晶核、龍鱗碎片，還有中央山脈那頭來的精靈蛛絲。這幾樣不擺外頭，識貨的問了，我才從裡頭拿。」
+    - kind: narration
+      text: 他往架頂瞟了一眼，像怕有人順手摸走。
+    - kind: speech
+      speaker: host
+      text: 「看可以，別用手指去刮。刮花了，我賣給誰？」
 - topic_id: altoria_general_store.topic_03
   keyword: 行頭
   label: 行頭
   fallback:
     scene_id: altoria_general_store.topic_03_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
-      text: 「這是我第一次出城，想準備周全一點。你會建議我帶哪些東西？」
+      text: 「我頭一回出城，想一次備齊。你會叫我帶哪些？」
     - kind: narration
-      text: 瑪爾特‧金秤放下炭筆，抬眼打量面前的生面孔，神情也認真了幾分。
+      text: 他放下炭筆，把你從頭看到腳，看得很慢。
     - kind: speech
       speaker: host
-      text: 「頭一回出城，那得聽我多說兩句。魔法燈先備好，迷宮深處黑得連手都看不清；再帶個附魔羅盤，走岔了路也找得回方向。迷宮探照符也帶幾張，撕開就能照亮前頭一小段路。」
+      text: 「頭一回啊，那就聽我說完再挑。魔法燈一盞，附魔羅盤一顆，這兩樣不帶，出了事連後悔都來不及。」
     - kind: speech
       speaker: host
-      text: 「要過夜，就把露營魔導具帶上，展開就是一小間擋風雨的帳篷，夜裡的小魔獸進不來。再帶個通訊法螺，萬一跟同伴走散，吹一聲就能彼此認出位置。出城前把行囊再查一遍，這趟才走得安心。」
+      text: 「迷宮探照符帶幾張，撕開就亮。要過夜，露營魔導具攤開就是帳篷，風雨進不來。再帶個通訊法螺，跟同伴走散了，吹一聲就能認出位置。」
+    - kind: speech
+      speaker: actor
+      text: 「這樣就夠了？還是我再多帶點什麼？」
+    - kind: speech
+      speaker: host
+      text: 「夠了。多帶是給自己添重量。出門前把行囊再翻一遍，少帶一樣，都比多背十斤好。」
 - topic_id: altoria_general_store.topic_04
   keyword: 飾品藥水
   label: 飾品藥水
   fallback:
     scene_id: altoria_general_store.topic_04_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
-      text: 「另外想問，你這裡有護身的首飾，或是療傷的藥水嗎？」
+      text: 「那護身的首飾、療傷的藥水，你這裡也有嗎？」
     - kind: narration
-      text: 瑪爾特‧金秤搖了搖頭，把剛寫好的單據翻到下一頁，答得乾脆。
+      text: 他搖了搖頭，把剛寫好的單據翻到下一頁，答得很乾脆。
     - kind: speech
       speaker: host
-      text: 「護身飾品和療傷藥水，各有專門的店。飾品去隔壁找艾蓮娜，她那間首飾坊的手藝一流；藥水沿著市場街往東走，到東市找希碧拉的鍊金坊。兩位都是我認識多年的老街坊，照我說的找，準能找到合用的東西。」
+      text: 「沒有。飾品去隔壁的首飾坊找艾蓮娜，她那雙手做的東西我服氣。藥水沿市場街往東，東市鍊金坊的希碧拉，配方實在。」
     - kind: speech
       speaker: actor
-      text: 「那我想找受洗聖水，該往哪裡走？」
+      text: 「受洗聖水呢？那個總該有吧？」
     - kind: speech
       speaker: host
-      text: 「那得上城去。沿著大道一路往上，走到大神殿，聖所的櫃檯有發放受洗聖水。到了那兒，直接問櫃檯就成。」
+      text: 「那個在上城。大道往上走到大神殿，聖所的櫃檯有賣，你到了直接問。」
+    - kind: narration
+      text: 他把單據往你面前一推，指尖在最後一行點了點。
+    - kind: speech
+      speaker: host
+      text: 「照我說的走，省得白繞一圈。我這櫃檯只賣出城要用的東西，別家的生意我不搶。」

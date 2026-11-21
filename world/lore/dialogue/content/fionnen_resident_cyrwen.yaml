@@ -1,76 +1,76 @@
 schema_version: 1
-greeting: 基爾溫正削著一支箭桿，抬起頭：「做箭的事？等我削完這支。」
+greeting: 基爾溫正削著一支箭桿，木屑落在膝上。她抬起頭，刀沒放下。「等我削完這支，差一刀就直了。」她吹掉桿上的木屑。「做箭的事？還是別的事？我一心不能二用，你先講。」
 topics:
 - topic_id: fionnen_resident_cyrwen.topic_01
   keyword: 做箭
   label: 做箭
   fallback:
     scene_id: fionnen_resident_cyrwen.topic_01_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
       text: 「一支好箭，是怎麼做出來的？」
     - kind: speech
       speaker: host
-      text: 「選直的木料，削出桿，再裝羽、磨尖。每一道都考眼力和手勁，差一點，箭出去就飄。」
+      text: 「選直的木料，削出桿，裝羽，磨尖。每一道都看眼力跟手勁。差一點，箭出去就飄，射的人還以為是自己沒瞄準。」
     - kind: narration
       text: 她舉起箭桿，湊到眼前校直，再接著削。
     - kind: speech
       speaker: host
-      text: 「谷裡的箭，多半出自我手。你射過就曉得，順不順手。」
+      text: 「谷裡的箭多半出自我這雙手。你射過就知道順不順手。我做壞的箭都拆掉重做，留著只會害人。」
 - topic_id: fionnen_resident_cyrwen.topic_02
   keyword: 手藝
   label: 手藝
   fallback:
     scene_id: fionnen_resident_cyrwen.topic_02_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
       text: 「你這手藝，是跟誰學的？」
     - kind: speech
       speaker: host
-      text: 「跟我娘。她拉弓，我造箭，一張一弛，正好補全。做了多年，閉著眼也削得直。」
+      text: 「跟我娘。她拉弓，我造箭，一張一弛，剛好補上。做了這麼多年，閉著眼也削得直。」
     - kind: speech
       speaker: host
-      text: 「手藝這東西，急不來。你靜得下心，它才肯教你。」
+      text: 「手藝這種東西急不來。你靜得下心，它才肯教你。我話少，坐在這兒削一天也不悶，木頭不催我。」
 - topic_id: fionnen_resident_cyrwen.topic_03
   keyword: 家人
   label: 家人
   fallback:
     scene_id: fionnen_resident_cyrwen.topic_03_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
       text: 「你家裡，誰射得最好？」
     - kind: speech
       speaker: host
-      text: 「我娘。小妹妹奈瑞斯跑得快，撿箭送箭，就是閒不住。我夾在中間，只管把箭做好，讓她們射個痛快。」
+      text: 「我娘。妹妹跑得快，撿箭送箭，閒不住。我夾在中間，只管把箭做好，讓她們射個痛快。」
     - kind: narration
       text: 她笑了笑，手上的刀沒停。
     - kind: speech
       speaker: host
-      text: 「一家人各有各的用。夜裡回屋，娘試箭，妹妹說笑，我在旁聽著。」
+      text: 「一家人各有各的用。夜裡回屋，娘試箭，妹妹說笑，我在旁邊聽。她們講到好笑的地方會問我，我多半沒跟上。」
 - topic_id: fionnen_resident_cyrwen.topic_04
   keyword: 名字
   label: 名字
   fallback:
     scene_id: fionnen_resident_cyrwen.topic_04_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
       text: 「戈爾德莉夫，就是秋日的金葉？」
     - kind: speech
       speaker: host
-      text: 「金葉。秋天滿林金黃，葉子落在靶道上，我掃箭時常撿到。」
+      text: 「金葉。秋天滿林金黃，葉子落在靶道上，我掃箭的時候常撿到。」
     - kind: narration
       text: 她從腳邊拈起一片枯葉，夾進木料堆裡。
     - kind: speech
       speaker: host
-      text: 「這名字暖，像秋天。你往後秋天來，靶道最漂亮。」
+      text: 「這名字暖，像秋天。你往後秋天來，靶道最好看。我不愛熱鬧，可秋天那幾天，連我都想出去走。」
 - topic_id: fionnen_resident_cyrwen.topic_05
   keyword: 私語
   label: 私語
@@ -80,23 +80,23 @@ topics:
   unavailable: locked
   refusal:
     scene_id: fionnen_resident_cyrwen.topic_05_refusal
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: host
-      text: 「削箭之外的話，得等你我熟了，我才肯多說。」
+      text: 「要講削箭以外的事，我得想很久才擠得出話。你我熟一點，我才肯多說幾句。」
   fallback:
     scene_id: fionnen_resident_cyrwen.topic_05_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「你最安靜的時刻，會想些什麼？」
+      text: 「你最安靜的時候，都在想什麼？」
     - kind: speech
       speaker: host
-      text: 「想有個人，坐在我對面，看我削一支箭，就那麼看到天黑。等我收了刀，她用指尖順著我的手腕，一路摸到掌心，像在稱我的手藝。」
+      text: 「想有個人坐在我對面，看我削一支箭，看到天黑也不催。等我收了刀，她用指尖順著我的手腕摸到掌心，停在指腹的繭上。」
     - kind: narration
-      text: 她垂眼，拇指無意識地摩挲著刀柄。
+      text: 她垂眼，拇指摩挲著刀柄。
     - kind: speech
       speaker: host
-      text: 「手藝做到極處，也盼有人懂。你懂了，就是知音。」
+      text: 「手藝做到某個地步，也盼有人懂。你懂了，我就不算白做。」

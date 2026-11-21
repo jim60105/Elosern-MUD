@@ -1,76 +1,90 @@
 schema_version: 1
-greeting: 洛爾內爾從樹上下來，拍掉手上的木屑：「有話等我站穩了說，這兒風大。」
+greeting: 洛爾內爾一手攀著枝，從上頭翻下來，膝蓋一彎就站直：「有話就講，我還要上去。」
 topics:
 - topic_id: fionnen_resident_lornnel.topic_01
   keyword: 爬樹
   label: 爬樹
   fallback:
     scene_id: fionnen_resident_lornnel.topic_01_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「你爬瞭望枝，怎麼這麼利索？」
+      text: 「你上瞭望枝，怎麼都不必看路？」
     - kind: speech
       speaker: host
-      text: 「打小爬，枝丫哪根能踩、哪根會晃，都刻在腳底。越高我越穩，平地反倒不踏實。」
+      text: 「看了。只是看得比別人快。哪根枝能踩、哪根踩了會空，腳底記得比腦子清楚。」
     - kind: narration
-      text: 她抬頭望了眼那根高枝，眼神像在估算距離。
+      text: 她抬手拍了拍身旁那根粗枝，樹皮上的苔被拍落一層。
     - kind: speech
       speaker: host
-      text: 「樹不欺人。你踩實了，它就托你；你怕了，它才晃。要不要試兩步？」
+      text: 「我爬了這麼久，摔過的枝比走過的路多。摔一次，下次就知道手要抓哪兒。」
+    - kind: speech
+      speaker: host
+      text: 「要試就從最下面那根開始。我不拉你，拉了你就學不會。」
 - topic_id: fionnen_resident_lornnel.topic_02
   keyword: 高處
   label: 高處
   fallback:
     scene_id: fionnen_resident_lornnel.topic_02_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「站那麼高，不怕摔嗎？」
+      text: 「站這麼高，風一吹，你不怕掉下來？」
     - kind: speech
       speaker: host
-      text: 「不怕。摔過，也學精了。高處看得遠，雲往哪走、獵隊到哪兒，一眼就明。谷裡人都靠這雙腿。」
+      text: 「怕過。第一次站上最頂那根，腿抖得厲害。後來發現，樹不會突然斷，怕的是自己先鬆手。」
     - kind: speech
       speaker: host
-      text: 「風吹得衣裳獵獵作響，那才叫自在。你上過一回，就捨不得下來。」
+      text: 「高處看得遠。雲從哪邊來、獵隊走到哪個坡，我一眼就報下去。村裡靠這個決定今天出不出獵。」
+    - kind: narration
+      text: 她瞇眼望向樹冠外，風把她額前的頭髮掀起來。
+    - kind: speech
+      speaker: host
+      text: 「衣裳被風扯得響，耳邊什麼都清楚。你在下面聽不見這些。」
 - topic_id: fionnen_resident_lornnel.topic_03
   keyword: 家人
   label: 家人
   fallback:
     scene_id: fionnen_resident_lornnel.topic_03_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「你家裡，都愛往高處跑？」
+      text: 「你們一家人，是不是都愛往樹上跑？」
     - kind: speech
       speaker: host
-      text: 「娘貝瑞娜拉看天，我爬樹，妹妹翁德斯聽風。仨人各占一處，把這片林看得明明白白。」
+      text: 「娘看天，我爬樹，妹妹聽風。三個人各占一個高度，各看各的一片。」
     - kind: narration
-      text: 她朝樹下那個仰著頭的身影指了指。
+      text: 她朝樹下抬了抬下巴，那裡站著一個仰頭的身影。
     - kind: speech
       speaker: host
-      text: 「妹妹在下面聽風，我上去看雲。娘在中間坐鎮。一家人，就這麼守著。」
+      text: 「我妹翁德斯話少。可她比我先知道雨要來，因為風會先變聲。」
+    - kind: speech
+      speaker: host
+      text: 「我們不常湊在一起講話。各做各的事，有事喊一聲就夠了。」
 - topic_id: fionnen_resident_lornnel.topic_04
   keyword: 名字
   label: 名字
   fallback:
     scene_id: fionnen_resident_lornnel.topic_04_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「蒙斯哈德，是夜裡的月影？」
+      text: 「蒙斯哈德，是月影的意思？」
     - kind: speech
       speaker: host
-      text: 「月影。夜裡月影投在樹冠上，一塊塊地晃。我在高處，踩著那些影往上，像踩著月亮。」
+      text: 「月影。夜裡的影子落在樹冠上，一塊一塊，風一吹就換位置。」
+    - kind: speech
+      speaker: host
+      text: 「我夜裡也上樹。影子在腳邊移，我踩著亮的地方往上，暗的地方留給手。」
     - kind: narration
-      text: 她伸手在月光裡虛虛一撈。
+      text: 她伸手在眼前晃了一下，像要把什麼撥開。
     - kind: speech
       speaker: host
-      text: 「這名字配我。你往後夜裡瞧見樹上有人，多半是我。」
+      text: 「這名字不壞。你哪天夜裡看見樹上有人，喊一聲，我會應。」
 - topic_id: fionnen_resident_lornnel.topic_05
   keyword: 私語
   label: 私語
@@ -80,23 +94,26 @@ topics:
   unavailable: locked
   refusal:
     scene_id: fionnen_resident_lornnel.topic_05_refusal
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: host
-      text: 「高處的事，只跟敢跟我爬上去的人說。」
+      text: 「那種話得等我從樹上下來，跟你並肩坐過一回再說。現在講，太輕了。」
   fallback:
     scene_id: fionnen_resident_lornnel.topic_05_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「你最想和人分享的時刻，是什麼樣？」
+      text: 「你在最高的地方，最想跟誰一起看？」
     - kind: speech
       speaker: host
-      text: 「是爬上最高的枝，看一場完整的日落。有個人跟我並排坐，腳懸在半空，誰也不說話，就讓風把頭髮吹成一團。她的肩靠著我，帶著暖意。」
+      text: 「日落。整片林子從綠變成金，再變成灰，最後只剩樹梢還亮著。」
+    - kind: speech
+      speaker: host
+      text: 「有個人跟我並排坐，腳懸在外頭。她不抓樹枝，抓我的手腕。風大，我們誰也不講話。」
     - kind: narration
-      text: 她語氣裡有一絲嚮往，眼睛望向遠方。
+      text: 她的聲音低了一點，眼睛還望著樹冠外。
     - kind: speech
       speaker: host
-      text: 「高處的安靜，要有人陪才圓滿。你哪天跟我上去，我分你一半。」
+      text: 「我在高處從來不覺得孤單。只有那種時候，會想旁邊多一個人。」

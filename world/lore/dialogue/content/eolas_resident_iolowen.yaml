@@ -1,21 +1,21 @@
 schema_version: 1
-greeting: 約洛溫把擔子在地上墩穩，直起腰：「是要水，還是問路？」
+greeting: 約洛溫把擔子在地上墩穩，直起腰，抬手抹了把額角。「是要水，還是問路？我這擔子還沒放下。」
 topics:
 - topic_id: eolas_resident_iolowen.topic_01
   keyword: 水
   label: 水
   fallback:
     scene_id: eolas_resident_iolowen.topic_01_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
       text: 「溪源的水，跟別處有什麼不同？」
     - kind: speech
       speaker: host
-      text: 「打岩縫裡滲出來，清，也甜。泡茶、洗傷、栽東西，都用它。這谷靠它活，也靠它把人湊在一處。」
+      text: 「從岩縫裡滲出來，清，也甜。泡茶、洗傷、栽東西，都用它。這谷靠它活，也靠它把人湊在一處。」
     - kind: narration
-      text: 她拎起桶，斜著給你看了看裡頭的水。
+      text: 她拎起桶，斜著在你面前晃了一下，裡頭的水跟著轉。
     - kind: speech
       speaker: host
       text: 「口渴了跟我上溪源，現舀一口，涼到心裡。比你在外頭問十個人還頂用。」
@@ -24,14 +24,14 @@ topics:
   label: 擔水
   fallback:
     scene_id: eolas_resident_iolowen.topic_02_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
       text: 「這擔子壓不壞肩嗎？」
     - kind: speech
       speaker: host
-      text: 「壓不壞。走了半生，兩條胳膊都硬了。水軟，勁靠練，身子才真。」
+      text: 「壓不壞。擔了半輩子，兩條胳膊早就習慣了。水軟，力氣得自己練，練久了身子才實在。」
     - kind: speech
       speaker: host
       text: 「谷裡人不嬌氣。累了就往泉裡一躺，讓水把身子頂著。你哪天挑不動了，去泡一泡，比什麼都解乏。」
@@ -40,7 +40,7 @@ topics:
   label: 家人
   fallback:
     scene_id: eolas_resident_iolowen.topic_03_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
@@ -52,13 +52,13 @@ topics:
       text: 她擦了擦額角，目光朝溪水的方向望去。
     - kind: speech
       speaker: host
-      text: 「這一家，離了水就散。夜裡人歸齊，灶上水開著，話也開了。」
+      text: 「這一家，離了水就散。夜裡人歸齊，灶上水開著，話也跟著開了。」
 - topic_id: eolas_resident_iolowen.topic_04
   keyword: 名字
   label: 名字
   fallback:
     scene_id: eolas_resident_iolowen.topic_04_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
@@ -70,7 +70,7 @@ topics:
       text: 她捧了一捧水，任它從指縫漏回桶裡。
     - kind: speech
       speaker: host
-      text: 「水留不住，姓也一樣。你在谷裡住，往後舀水的手，就是你自己。」
+      text: 「水留不住，姓也一樣。哪天你也在這谷裡住下，舀水的手就是你自己。」
 - topic_id: eolas_resident_iolowen.topic_05
   keyword: 私語
   label: 私語
@@ -80,23 +80,23 @@ topics:
   unavailable: locked
   refusal:
     scene_id: eolas_resident_iolowen.topic_05_refusal
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: host
-      text: 「我話實，可也得認了你這人才說。先喝水，再談心。」
+      text: 「我話實，可也得認了你這人才說。你先喝口水，我們改天再聊。」
   fallback:
     scene_id: eolas_resident_iolowen.topic_05_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
       text: 「你最想念的是哪一段日子？」
     - kind: speech
       speaker: host
-      text: 「是許久前一個大旱季，溪源都見了底。夜裡我守著那條細流，有個人無聲無息地伏在我身上，把汗滴進我頸窩。那一夜，水和我都活過來了。」
+      text: 「是好久以前一個大旱季，溪源都見了底。夜裡我守著那條細流，有個人不知道什麼時候伏到我身上，汗滴進我頸窩。那一夜，水和我都活過來了。」
     - kind: narration
-      text: 她揚起臉，像在嘗那夜留到現在的渴。
+      text: 她揚起臉，喉頭動了一下，嘴唇抿了一下。
     - kind: speech
       speaker: host
       text: 「人渴久了，才懂水的甜。你記著這句話，往後睡得踏實。」

@@ -1,76 +1,90 @@
 schema_version: 1
-greeting: 菲林收刀站定，抹了把汗，笑得眼彎：「你是來看的？那我再舞一段。」
+greeting: 菲林收刀站住，汗沿著下巴滴到土裡，笑得眼睛都彎了。「來看熱鬧的？那你站穩啦，我再舞一段。」
 topics:
 - topic_id: ciaran_resident_faellin.topic_01
   keyword: 刀舞
   label: 刀舞
   fallback:
     scene_id: ciaran_resident_faellin.topic_01_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
       text: 「你的刀舞，跟別人的刀有什麼不同？」
     - kind: speech
       speaker: host
-      text: 「別人求勝，我求好看。起手、旋身、劈落，一刀一勢都跟著身子走，像在跳一支不著地的舞。」
-    - kind: narration
-      text: 她隨手一揮，刀光在暮色裡劃出一道弧。
+      text: 「別人求贏，我求好看嘛。」
     - kind: speech
       speaker: host
-      text: 「刀是我的舞伴，貼著皮走，燙得像情人。你多看兩眼，就捨不得眨眼。」
+      text: 「起手、旋身、劈下去，每一勢都跟著身子走。跳一支腳不沾地的舞，你說是不是？」
+    - kind: narration
+      text: 她手腕一翻，刀光在暮色裡劃出一道弧，收勢時連呼吸都沒亂。
+    - kind: speech
+      speaker: host
+      text: 「刀貼著皮走，燙得像情人。你多看兩眼，就捨不得眨眼啦。」
 - topic_id: ciaran_resident_faellin.topic_02
   keyword: 比試
   label: 比試
   fallback:
     scene_id: ciaran_resident_faellin.topic_02_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
       text: 「你常跟人比試嗎？」
     - kind: speech
       speaker: host
-      text: 「常。打贏了，血也燙，笑也燙。打輸了，就纏著再來。谷裡人比試，像交纏，棋逢敵手最痛快。」
+      text: 「常啊。贏了，血燙，笑也燙。」
     - kind: speech
       speaker: host
-      text: 「打完我跟人泡進溪池，一身傷口泡得發紅。那時談什麼都真，比試的氣還沒散。」
+      text: 「輸了就纏著再來一場。谷裡人比試，像纏在一起，碰到打得過我的人，最痛快。」
+    - kind: speech
+      speaker: host
+      text: 「打完一起泡進溪池，傷口泡得發紅。那時候說什麼都真，火氣還沒散。」
+    - kind: narration
+      text: 她把刀橫在膝上，指節敲了敲刀背，聽那一聲響。
 - topic_id: ciaran_resident_faellin.topic_03
   keyword: 家人
   label: 家人
   fallback:
     scene_id: ciaran_resident_faellin.topic_03_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「你跟你娘學的刀？」
+      text: 「你的刀，是跟娘學的？」
     - kind: speech
       speaker: host
-      text: 「是。娘布瑞米斯教劈，我妹妹塞爾林磨刀。娘狠，妹妹靜，我呢，夾在中間，只管舞得痛快。」
+      text: 「是啊。娘布瑞米斯教劈，妹妹塞爾林磨刀。」
+    - kind: speech
+      speaker: host
+      text: 「娘狠，妹妹靜。我夾在中間，只管舞得痛快。」
     - kind: narration
-      text: 她笑著把刀扛上肩，語氣裡滿是自得。
+      text: 她把刀往肩上一扛，語氣裡滿是得意。
     - kind: speech
       speaker: host
-      text: 「一家人都在刀上。夜裡回了屋，身上還帶著練刀場的土，一碰就揚。」
+      text: 「一家人都繞著刀轉。晚上回屋，身上還帶著練刀場的土，一碰就揚。」
 - topic_id: ciaran_resident_faellin.topic_04
   keyword: 名字
   label: 名字
   fallback:
     scene_id: ciaran_resident_faellin.topic_04_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「杜斯克瓦爾克爾，是踏著暮色走？」
+      text: 「杜斯克瓦爾克爾，是踏著黃昏走的意思嗎？」
     - kind: speech
       speaker: host
-      text: 「踏昏。黃昏我收刀最晚，影子拖得老長，像在地上又舞了一回。這姓，正配我。」
+      text: 「踏昏。黃昏我收刀最晚，影子拖得老長，一路拖過整個練刀場。」
+    - kind: speech
+      speaker: host
+      text: 「這姓配我，配得正好嘛。」
     - kind: narration
-      text: 她抬腳踏了踏，像要踩住那道光。
+      text: 她抬腳往地上踏了踏，像要把那道看不見的影子踩住。
     - kind: speech
       speaker: host
-      text: 「練到天黑才回，是一天的盡興。你哪天看到場上只剩我一個，那影就是我。」
+      text: 「練到天黑才回家，才算盡興。哪天場上只剩一個人，那影子就是我。」
 - topic_id: ciaran_resident_faellin.topic_05
   keyword: 私語
   label: 私語
@@ -80,23 +94,26 @@ topics:
   unavailable: locked
   refusal:
     scene_id: ciaran_resident_faellin.topic_05_refusal
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: host
-      text: 「我的私房話，只跳給走進我心坎的人看。」
+      text: 「我的私房話，只跳給走進心裡的人看。你現在還站在場邊啦。」
   fallback:
     scene_id: ciaran_resident_faellin.topic_05_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「你舞得最好看的那晚，是什麼樣？」
+      text: 「你舞得最好看的那一晚，是什麼樣子？」
     - kind: speech
       speaker: host
-      text: 「是練到最後，刀都脫了手，我整個人也散開。有個人在場邊等我，把我抱進懷裡，讓我的喘和汗都落在她身上。那晚我沒拿刀，卻比哪支舞都盡興。」
+      text: 「練到最後，刀都脫了手，我整個人也散了。」
+    - kind: speech
+      speaker: host
+      text: 「場邊有人在等我，把我抱進懷裡。喘和汗都落在她身上，我連一根手指都懶得動。」
     - kind: narration
-      text: 她眼裡燒著，話卻忽然輕了下去。
+      text: 她眼裡還燒著火，聲音卻忽然低了下去。
     - kind: speech
       speaker: host
-      text: 「身子是最真的一支舞。你懂舞，就懂我。」
+      text: 「那一晚我沒拿刀，卻比哪一支舞都盡興。身子是最真的一支舞，你懂舞，就懂我。」

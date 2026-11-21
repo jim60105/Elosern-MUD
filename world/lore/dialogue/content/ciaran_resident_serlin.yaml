@@ -1,76 +1,90 @@
 schema_version: 1
-greeting: 塞爾林在磨石旁抬起頭，聲音輕：「磨刀，還是問別的？」
+greeting: 塞爾林蹲在磨石旁，等你走近才抬眼。她把刀橫到膝上，聲音很輕：「磨刀，還是問別的？」
 topics:
 - topic_id: ciaran_resident_serlin.topic_01
   keyword: 磨刀
   label: 磨刀
   fallback:
     scene_id: ciaran_resident_serlin.topic_01_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「磨刀最講究的是什麼？」
+      text: 「磨刀最要緊的是什麼？」
     - kind: speech
       speaker: host
-      text: 「力道要勻，角度要穩。手一歪，刃就花了。我磨刀不數下，只聽聲，那聲由澀轉滑，就快好了。」
+      text: 「手要穩，角度不能變。歪一下，刃就白磨了。」
+    - kind: speech
+      speaker: host
+      text: 「我不數下數。聽聲音，從粗到細，聲音滑順了就差不多。」
     - kind: narration
-      text: 她蘸了點水，繼續在磨石上推拉，一下一下。
+      text: 她舀了點水澆在磨石上，手腕帶著刀來回，沒有一點多餘的力。
     - kind: speech
       speaker: host
-      text: 「刀跟人一樣，鈍了要磨。你慢點來，磨出來的刃才薄。」
+      text: 「刀鈍了要磨，人也一樣。急不得，急了只磨掉一層。」
 - topic_id: ciaran_resident_serlin.topic_02
   keyword: 開刃
   label: 開刃
   fallback:
     scene_id: ciaran_resident_serlin.topic_02_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「你開出的刃，為什麼特別快？」
+      text: 「你開出來的刃，為什麼特別快？」
     - kind: speech
       speaker: host
-      text: 「我聽得懂鐵。指腹一抹，哪兒厚、哪兒脆，心裡有數。開刃那天，我從早坐到晚，不讓任何人近身。」
+      text: 「摸得出來。指腹滑過去，哪裡厚、哪裡脆，我都知道。」
     - kind: speech
       speaker: host
-      text: 「刀快，要穩得住才不傷己。磨刀圖個靜，跟這谷裡的夜一樣。你陪我坐一會，就明白。」
+      text: 「開刃那天我從早坐到晚，誰來都不理。手一抖，整把刀就廢了。」
+    - kind: narration
+      text: 她把刀舉到眼前，刃上有一線光。
+    - kind: speech
+      speaker: host
+      text: 「刀快不難，難在拿刀的人穩不穩。你坐一會就知道，這裡只有磨石的聲音。」
 - topic_id: ciaran_resident_serlin.topic_03
   keyword: 家人
   label: 家人
   fallback:
     scene_id: ciaran_resident_serlin.topic_03_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「你家裡人，都上練刀場？」
+      text: 「家裡人都在練刀場，你怎麼不去？」
     - kind: speech
       speaker: host
-      text: 「娘和姊姊上場，我不去。我守磨石。姊姊菲林舞刀好看，娘布瑞米斯狠。她們練，我磨，缺一樣都不成。」
+      text: 「娘和姊上場，我留在這裡。姊菲林劈得漂亮，娘布瑞米斯下手狠。」
+    - kind: speech
+      speaker: host
+      text: 「她們練完回來，刀往我手上一放，我磨。缺我這一步，前一天練的都白費。」
     - kind: narration
-      text: 她盯著手裡的刀，話裡沒有一絲不甘。
+      text: 她低頭看著膝上的刀，語氣沒有起伏。
     - kind: speech
       speaker: host
-      text: 「一家人，各守各的刀。夜裡姊姊累癱了，我把她的刀擦亮放好，就是我的話。」
+      text: 「晚上姊累得不肯動，我把她的刀擦乾淨放回架上。那是我說話的方式。」
 - topic_id: ciaran_resident_serlin.topic_04
   keyword: 名字
   label: 名字
   fallback:
     scene_id: ciaran_resident_serlin.topic_04_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「杜斯克瓦爾克爾，是踏昏的意思？」
+      text: 「杜斯克瓦爾克爾，是踏著黃昏回來的意思？」
     - kind: speech
       speaker: host
-      text: 「踏昏。我在屋裡磨刀，聽得見娘和姊姊踏著暮色回來的步子。那聲音，比刀還清楚。」
+      text: 「踏昏。黃昏的時候，我在屋裡磨刀，聽得見娘和姊的腳步從場上回來。」
     - kind: narration
-      text: 她停了手，側耳像在聽。
+      text: 她停下手，頭偏著，聽屋外的腳步。
     - kind: speech
       speaker: host
-      text: 「這姓讓我曉得，誰走了、誰回了。你常來，我閉著眼也能聽出你的步。」
+      text: 「那腳步比刀聲好認。誰走得快，誰走得累，我不用看也知道。」
+    - kind: speech
+      speaker: host
+      text: 「你來的次數多了，我也認得出你的腳步。別刻意放輕，我聽得出來。」
 - topic_id: ciaran_resident_serlin.topic_05
   keyword: 私語
   label: 私語
@@ -80,23 +94,26 @@ topics:
   unavailable: locked
   refusal:
     scene_id: ciaran_resident_serlin.topic_05_refusal
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: host
-      text: 「我的話少，不是沒有。等我把你聽熟了，再跟你說。」
+      text: 「我話少，不等於什麼都能問。等我把你的腳步聽熟了，再說。」
   fallback:
     scene_id: ciaran_resident_serlin.topic_05_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「你最安靜的時刻，會想些什麼？」
+      text: 「你最安靜的時候，心裡在想什麼？」
     - kind: speech
       speaker: host
-      text: 「想有個人，不說話，就從背後抱住我，下巴擱在我肩上，看我磨刀。兩顆心跳得比磨石還慢，一下一下，像要把這一生都磨進去。」
+      text: 「想有個人不講話，從背後抱住我，下巴靠在我肩上，看我磨刀。」
+    - kind: speech
+      speaker: host
+      text: 「兩個人的呼吸都慢下來，磨石一下一下，像把整晚都磨進去。」
     - kind: narration
-      text: 她指尖停在刀刃上，幾乎沒動。
+      text: 她的指尖停在刃口邊，沒有再往前。
     - kind: speech
       speaker: host
-      text: 「有些話，比刃還薄，一碰就破。我只留給懂我的人。」
+      text: 「有些話比刃還薄，碰一下就斷。我只留給聽得懂的人。」

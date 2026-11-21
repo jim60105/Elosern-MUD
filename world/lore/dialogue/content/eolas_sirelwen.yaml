@@ -1,12 +1,12 @@
 schema_version: 1
-greeting: 希瑞爾溫‧布瑞特瓦特爾從一塊石板前抬頭，指尖還沾著墨。她把石板往旁一擱，把被火燎過的衣襟拉開透氣，胸口一片被火烤紅的痕跡和一道舊疤一起露在風裡，她也不急著遮。「你來得正好。八種元素裡，你比較喜歡哪一種？架上的杖隨你看，要試就試，燒焦了也不用你賠。」
+greeting: 希瑞爾溫‧布瑞特瓦特爾從石板前抬頭，指尖還沾著墨。她把石板往旁一擱，拉開被火燎過的衣襟透氣，胸口那片烤紅的痕跡和舊疤一起露在風裡，她也沒去遮。「你來得正好。八種元素裡，你比較喜歡哪一種？架上的杖隨你看，要試就試，燒焦了也不用你賠。」
 topics:
 - topic_id: eolas_sirelwen_home.topic_01
   keyword: 法術
   label: 法術
   fallback:
     scene_id: eolas_sirelwen_home.topic_01_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
@@ -16,19 +16,19 @@ topics:
       text: 「元素法術。火的燒、冰的凍、雷的劈，全往那塊地上招呼。離住屋遠一點，屋子才保得住。」
     - kind: speech
       speaker: host
-      text: 「試之前我先寫下要試什麼，試完再記下實際的變化。真正有用的東西，多半在第二次失敗裡。」
+      text: 「試之前我先寫下要試什麼，試完再記下實際變成什麼樣。說出來不怕你笑，我多半是從第二次失敗裡學到東西。」
     - kind: speech
       speaker: actor
       text: 「失敗也算有用的話，你們怎麼知道哪一次算成功？」
     - kind: speech
       speaker: host
-      text: 「看它下一次還能不能重來。只靈一次的法術，我當它沒成。心也一樣，一次新鮮的熱鬧留不住我，我追的是能反覆要的那種滋味。」
+      text: 「看它下一次還能不能重來。只靈一次的法術，我當它沒成。心也一樣，一次新鮮的熱鬧留不住我，我要的是能一試再試的那種滋味。」
 - topic_id: eolas_sirelwen_home.topic_02
   keyword: 短杖
   label: 短杖
   fallback:
     scene_id: eolas_sirelwen_home.topic_02_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
@@ -41,19 +41,19 @@ topics:
       text: 「它不會替你唸咒，也不會自己生出魔力。可魔力順著杖身走，出手更沉，耗在你身上的力氣也少一些。」
     - kind: speech
       speaker: host
-      text: 「等你把魔力逼到指尖，那股麻從掌心一路竄上胳膊，像有熱水流過骨頭，比空手舒服得多。」
+      text: 「等你把魔力逼到指尖，那股麻從掌心竄上胳膊，像有熱水流過骨頭，比空手舒服得多。」
     - kind: speech
       speaker: actor
       text: 「所以剛開始學的人拿它，是為了少燒壞自己的手？」
     - kind: speech
       speaker: host
-      text: 「對。手燒壞了要養很久，杖燒壞了再削一支就有。」
+      text: 「對。手燒壞了要養很久，杖燒壞了嘛，再削一支就有。」
 - topic_id: eolas_sirelwen_home.topic_03
   keyword: 元素
   label: 元素
   fallback:
     scene_id: eolas_sirelwen_home.topic_03_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
@@ -80,7 +80,7 @@ topics:
   label: 收回
   fallback:
     scene_id: eolas_sirelwen_home.topic_04_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
@@ -96,4 +96,4 @@ topics:
       text: 「如果只是杖頭磨損，還能修嗎？」
     - kind: speech
       speaker: host
-      text: 「磨損的我自己再修一支就好。你手上那支留著用，真不能用了再拿來。」
+      text: 「磨損的我自己再修一支就好，反正我這裡木頭多得是。你手上那支先留著用，真不能用了再拿來。」

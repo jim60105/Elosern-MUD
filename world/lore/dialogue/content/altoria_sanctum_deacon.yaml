@@ -1,96 +1,108 @@
 schema_version: 1
-greeting: 羅海西亞‧芬威克執事把帳頁翻了個面，抬起頭朝你笑：「歡迎喔！是自己用，還是要送人？聖水、禮器、貼身用的都有，價錢都寫在櫃邊的牌子上。聖所那邊要安排，也可以直接問我。」
+greeting: 聖所附設商店的櫃檯後，羅海西亞‧芬威克把帳頁翻了個面，抬頭朝你笑：「來啦。自己用，還是送人？聖水、禮器、貼身用的都有，價錢寫在櫃邊的牌子上。聖所那邊要安排，也可以直接問我，我一起排。」
 topics:
 - topic_id: altoria_sanctum.topic_01
   keyword: 賣什麼
   label: 賣什麼
   fallback:
     scene_id: altoria_sanctum.topic_01_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
-      text: 「這張櫃檯都賣些什麼？架上的東西分幾類？」
+      text: 「這櫃檯上都賣些什麼？我第一次來，看不太懂這些東西怎麼分。」
     - kind: narration
-      text: 羅海西亞‧芬威克把手裡的炭筆擱到帳簿旁，朝身後整齊的木架偏了偏頭。
+      text: 她把手裡的炭筆擱到帳簿旁，朝身後排得整齊的木架偏了偏頭。
     - kind: speech
       speaker: host
-      text: 「分兩邊喔。戴在身上的有花蒂銀夾、暖蜜魔導珠、恆溫魔法卵、尖銳觸感之飾，貼身藏著的有恆振晶，拿來用的有催情浴鹽、女神之吻聖霧、情欲香爐、史萊姆潤滑凝膠、熱吻藥水，還有纏枝魔藤和微電跳蛋糖。」
-    - kind: speech
-      speaker: host
-      text: 「主祭祝聖過的受洗聖水擺在最上層。每樣的用法都寫在籤條上，看中哪樣，拿到櫃上來找我。」
+      text: 「分兩邊。一邊戴在身上過日子，一邊拿來一次用完。戴的那邊有花蒂銀夾、暖蜜魔導珠、尖銳觸感之飾、恆溫魔法卵，還有貼身藏著的恆振晶。每一樣都是讓人整天靜不下來的小東西。」
     - kind: speech
       speaker: actor
-      text: 「價錢怎麼算？買得多，能算便宜些嗎？」
+      text: 「那一次用的呢？」
     - kind: speech
       speaker: host
-      text: 「牌子上的價錢寫得明白，都是公道定價，不二價喔。用得合心意最要緊，拿不定主意就開口問我。」
+      text: 「催情浴鹽丟進浴桶，泡完一整晚皮膚都敏感。女神之吻聖霧往身上一噴就上頭。情欲香爐點著，煙一沾皮膚就酥。還有史萊姆潤滑凝膠、熱吻藥水；纏枝魔藤和微電跳蛋糖，留給敢玩的人。」
+    - kind: speech
+      speaker: host
+      text: 「最上層是主祭祝聖過的受洗聖水，出城帶著防身。每樣的用法都寫在籤條上，看不懂就問我，我講到你聽懂為止。」
+    - kind: speech
+      speaker: actor
+      text: 「那我該從哪樣開始？」
+    - kind: speech
+      speaker: host
+      text: 「先講清楚要自己用，還是送人，我再替你挑。價錢照牌子，不二價。用得順手，比買得多要緊。」
 - topic_id: altoria_sanctum.topic_02
   keyword: 聖水
   label: 聖水
   fallback:
     scene_id: altoria_sanctum.topic_02_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
-      text: 「我想買瓶受洗聖水帶上路。出城要是沾了穢氣，該怎麼用？」
+      text: 「我想買一瓶受洗聖水帶上路。出城要是沾了穢氣，該怎麼用？」
     - kind: narration
-      text: 羅海西亞‧芬威克從架上取下一支細長玻璃瓶，在手心轉了半圈，把瓶標亮給你看。
+      text: 她從架上取下一支細長玻璃瓶，在手心轉了半圈，把瓶標亮給你看。
     - kind: speech
       speaker: host
-      text: 「這瓶聖水由艾莉安娜主祭親自祝禱。沾了穢氣，就拿聖水抹手腕跟額頭，抹過就淨了，用法都寫在瓶標上喔。」
+      text: 「抹手腕和額頭，抹過就乾淨了。這瓶由艾莉安娜主祭親自祝禱，用法寫在瓶標上，照著做就行。」
     - kind: speech
       speaker: actor
-      text: 「這水放久了會失效嗎？路上要特別怎麼保存？」
+      text: 「放久了會失效嗎？路上要怎麼收？」
     - kind: speech
       speaker: host
-      text: 「塞子栓得緊，不拔開就不會走味。行囊裡塞一瓶防身最安心。想當面請主祭祝福，回大殿找她，不收錢；想帶整瓶走，就在我這櫃上結帳。」
+      text: 「塞子栓緊，不拔開就不走味。行囊裡塞一瓶，圖個安心。」
+    - kind: speech
+      speaker: host
+      text: 「想當面請主祭祝福，回大殿找她，不收錢。要帶整瓶走，就在我這裡結帳。兩件事分開算，別排錯隊。」
 - topic_id: altoria_sanctum.topic_03
   keyword: 禮器
   label: 禮器
   fallback:
     scene_id: altoria_sanctum.topic_03_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
-      text: 「架上的香爐和聖霧，平日都怎麼搭配著用？」
+      text: 「架上的香爐和聖霧，平常怎麼搭配著用？」
     - kind: narration
-      text: 羅海西亞‧芬威克順手拎起櫃邊一具銅雕香爐，朝你揚了揚。
+      text: 她順手拎起櫃邊一具銅雕香爐，朝你揚了揚。
     - kind: speech
       speaker: host
-      text: 「情欲香爐跟女神之吻聖霧是禮儀用的東西。信眾買回家自己點，或是送人都很體面。香爐點起來滿室香氣，人跟著鬆下來；聖霧往身上一噴，全身的敏感一下子就提到了頂。」
+      text: 「情欲香爐點起來，滿室都是香氣，人跟著鬆下來。女神之吻聖霧往身上一噴，全身的敏感一下子提到頂。信眾買回家自己用，送人也體面。」
     - kind: speech
       speaker: host
-      text: 「用料都寫在籤上，價錢照牌子。從前在我這兒買的器物，用舊了洗乾淨拿回來，我也按成色折算收回喔。」
+      text: 「籤上寫著用料，價錢照牌子。以前在我這裡買的器物，用舊了洗乾淨拿回來，我按成色折價收回。」
     - kind: speech
       speaker: actor
-      text: 「連用過的也能拿回來換？」
+      text: 「用過的也收？」
     - kind: speech
       speaker: host
-      text: 「收呀。只要沒摔裂砸爛，拿回櫃上，我照價折現錢給你。好東西留給下一個人用，也是一份心意嘛。」
+      text: 「收。只要沒摔裂砸爛，拿回櫃上，我照價折現給你。好東西洗一洗還能用，丟了可惜。」
 - topic_id: altoria_sanctum.topic_04
   keyword: 聖所事務
   label: 聖所事務
   fallback:
     scene_id: altoria_sanctum.topic_04_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
-      text: 「聖所那邊的服事，想安排的話，具體怎麼做？」
+      text: 「聖所那邊的服事，想安排的話，具體要怎麼做？」
     - kind: narration
-      text: 羅海西亞‧芬威克把帳簿闔上，朝通往內院的走廊抬了抬下巴。
+      text: 她把帳簿闔上，朝通往內院的走廊抬了抬下巴。
     - kind: speech
       speaker: host
-      text: 「順著走廊進門左轉，就有修女接待。房間、時段、想要什麼樣的服事，都在那裡當面講好，兩邊都點頭才開始。」
+      text: 「順走廊進門左轉，有修女接待。房間、時段、想要什麼樣的服事，都在那裡當面講清楚，兩邊點頭才開始。聖所的正經事，沒什麼好避諱。」
     - kind: speech
       speaker: host
-      text: 「修女們會用光魔法照料身子、做好避孕，你就放心享受。要祝禱回大殿找艾莉安娜主祭，要挑器物留在我這兒仔細看。」
+      text: 「修女和修士以身體奉獻，是修行的一部分。她們用光魔法照料身子、做好避孕，你放鬆就好。」
     - kind: speech
       speaker: actor
-      text: 「明白了，兩邊各管一邊。」
+      text: 「那要祝禱，或要買東西，也走同一條走廊嗎？」
     - kind: speech
       speaker: host
-      text: 「對呀，各司其職。挑好要帶什麼，再跟我說一聲喔！」
+      text: 「不用。祝禱回大殿找艾莉安娜主祭，買東西留在我這櫃檯。一棟屋子，三個櫃檯，各管各的事。」
+    - kind: speech
+      speaker: host
+      text: 「頭一次來的客人常問這個。問清楚再進去，比進去才問好。」

@@ -1,51 +1,51 @@
 schema_version: 1
-greeting: 織機的聲音停下來，奈拉拉‧弗羅斯特威洛把木梭擱上經線，轉過身。她身上那件白衣薄得能透光，只搭在一邊肩上，涼風穿過時，布面貼出一邊乳房的形狀，她也不去攏。「腳步放輕一點，蛛剛結好新網。」她說，聲音低得像怕驚動什麼，「進屋是想貼一綑絲線，還是想換件白衣？要摸就自己取下來，這料子貼上身子，才曉得合不合你。」
+greeting: 織機停下來，奈拉拉‧弗羅斯特威洛把木梭擱到經線上，轉身看你。她身上那件白衣只搭在一邊肩上，涼風過去，布面貼出胸口的形狀，她也沒去拉。「腳步放輕，蛛剛結好新網。」她說，聲音壓得很低，「進來是想拿一綑絲線，還是想換件白衣？要試就自己脫下來，料子貼著身子，才看得出合不合。」
 topics:
 - topic_id: eolas_naelara_home.topic_01
   keyword: 養蛛
   label: 養蛛
   fallback:
     scene_id: eolas_naelara_home.topic_01_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
-      text: 「林子裡的蛛是你在照顧的嗎？牠們平日吃什麼，又怎麼在這谷裡結出這麼密的網？」
+      text: 「林子裡的蛛都是你在顧的？牠們平日吃什麼，怎麼有辦法在這谷裡結出這麼密的網？」
     - kind: speech
       speaker: host
-      text: 「蛛不吃我給的東西，牠們自己抓林子裡的小蟲。我能做的只有不讓牠們受驚。」
+      text: 「蛛不吃我給的東西，牠們自己抓林子裡的小蟲。我能做的只是別讓牠們受驚。」
     - kind: speech
       speaker: host
-      text: 「腳步重一次，一張網就毀了。去年秋天有人從林子邊跑過去，我少收了一整季的絲。」
+      text: 「腳步重一次，一張網就沒了。去年秋天有人從林子邊跑過去，我少收了一整季的絲。」
     - kind: narration
-      text: 她捻起門邊一根斷絲，舉到光裡，絲線細得幾乎看不見。
+      text: 她捻起門邊一截斷絲，舉到光裡，那線細得幾乎看不見。
     - kind: speech
       speaker: actor
       text: 「一張網要多久才結得回來？」
     - kind: speech
       speaker: host
-      text: 「快的隔一夜，慢的要等牠自己願意。所以我寧可多繞幾步路，也不催牠。母蛛吐絲是為了自己，不為誰催。」
+      text: 「快的隔一夜，慢的要等牠自己願意。所以我寧可多繞幾步路，也不去催。母蛛吐絲是為牠自己，不是為誰催。」
 - topic_id: eolas_naelara_home.topic_02
   keyword: 蛛絲
   label: 蛛絲
   fallback:
     scene_id: eolas_naelara_home.topic_02_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
       text: 「一綑蛛絲能拿來做什麼？為什麼只有這座谷裡收得到這麼多？」
     - kind: speech
       speaker: host
-      text: 「精靈蛛絲韌，拉細了也不斷，縫衣、綁物、做弓弦都合用。谷壁背風，蛛在這裡結網結得密。」
+      text: 「精靈蛛絲韌，拉細了也不斷，縫衣、綁東西、做弓弦都合用。谷壁擋風，蛛在這裡結網結得密。」
     - kind: speech
       speaker: host
-      text: 「我把絲抽成線，線再上機。織衣剩下的線頭我留著補網，一點也不浪費。」
+      text: 「我把絲抽成線，線再上機。織衣剩下的線頭留著補網，一根都不丟。」
     - kind: narration
-      text: 她把一綑絲放到客人面前，絲在光裡泛著很淡的銀色，摸上去涼而滑。
+      text: 她把一綑絲推到你面前，絲在光裡泛著很淡的銀色，摸上去涼而滑。
     - kind: speech
       speaker: host
-      text: 「你伸手碰一下，這股涼會順著指腹爬上手腕。貼身衣裳就該是這觸感，綁在身上，像被涼水裹著。」
+      text: 「你伸手碰一下，那股涼會順著指腹爬上手腕。貼身的衣裳就該是這種觸感，穿上像被涼水裹住。」
     - kind: speech
       speaker: actor
       text: 「帶出山谷，這一綑能換到多少？」
@@ -57,44 +57,44 @@ topics:
   label: 白衣
   fallback:
     scene_id: eolas_naelara_home.topic_03_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
-      text: 「那件白色的精靈傳統服飾薄得幾乎透光，為什麼要織得這麼薄？」
+      text: 「那件白衣薄得幾乎透光，為什麼要織得這麼薄？」
     - kind: narration
       text: 奈拉拉‧弗羅斯特威洛把架上的白衣抖開，就著窗光垂下來，布面薄得能數出對面幾根手指。
     - kind: speech
       speaker: host
-      text: 「谷裡潮，織薄一點，風走得過去，汗也乾得快。可它薄成這樣，為的是讓身子露得出來。」
+      text: 「谷裡潮，織薄一點，風穿得過去，汗也乾得快。可它薄成這樣，就是要讓身子露出來。」
     - kind: speech
       speaker: host
-      text: 「谷裡的人不藏身體，也不藏做愛。做愛像呼吸，口渴了就喝，想要了就彼此要。這衣裳穿在身上像多一層皮膚，脫下來是另一種樂趣，兩種我都不避。」
+      text: 「谷裡的人不藏身體，也不藏做愛。做愛像呼吸，渴了就喝，想要了就要。這衣裳穿在身上像多一層皮膚，脫下來又是另一種樂趣，兩種我都不避。」
     - kind: speech
       speaker: actor
       text: 「外頭來的人，頭一回見了總要嚇一跳吧？」
     - kind: speech
       speaker: host
-      text: 「會。山外的人把自己裹得密不透風，見了這副光景，反而先自個兒臉紅。可住久了還會回頭看，夜裡有人留在我這織機邊，天亮才回自己的石室。」
+      text: 「會。山外的人把自己裹得密不透風，見了這副光景，臉先紅的是他們。住久了還會回頭看，夜裡有人留在我這織機邊，天亮才回自己的岩屋。」
 - topic_id: eolas_naelara_home.topic_04
   keyword: 收回
   label: 收回
   fallback:
     scene_id: eolas_naelara_home.topic_04_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
-      text: 「絲要是用不完，衣裳買了沒穿，能拿回來給你嗎？」
+      text: 「絲用不完，衣裳買了沒穿，能拿回來給你嗎？」
     - kind: speech
       speaker: host
-      text: 「我織的線、我裁的衣，沒用過的都可以拿回來，我收下會算銅幣給你。」
+      text: 「我織的線、我裁的衣，沒用過的都能拿回來，我收下會算銅幣給你。」
     - kind: speech
       speaker: host
-      text: 「它貼過誰的身子，我都認得出來。別處織的布我不收，線怎麼撚、用什麼染，我都摸不透，混進我的線裡只會壞了整架。」
+      text: 「它貼過誰的身子，我認得出來。別處織的布我不收，線怎麼撚、用什麼染，我摸不透，混進我的線裡只會壞了整架。」
     - kind: speech
       speaker: actor
       text: 「外頭帶來的布料，真的一件都不行？」
     - kind: speech
       speaker: host
-      text: 「不行。你留著自己用，或帶回山外處置。谷裡的絲只認谷裡的手。」
+      text: 「不行。你留著自己用，或帶回山外處理。谷裡的絲只認谷裡的手。」

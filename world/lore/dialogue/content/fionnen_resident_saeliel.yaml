@@ -1,76 +1,90 @@
 schema_version: 1
-greeting: 賽莉爾從蜂箱邊蹦過來，手裡舉著一勺蜜：「你嚐嚐？剛搖下來的！」
+greeting: 賽莉爾從蜂箱後探出頭，手裡舉著一柄滴著蜜的木勺：「你來得剛好！這勺還溫著，要不要舔一口？」
 topics:
 - topic_id: fionnen_resident_saeliel.topic_01
   keyword: 採蜜
   label: 採蜜
   fallback:
     scene_id: fionnen_resident_saeliel.topic_01_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「採蜜不怕被蜇嗎？」
+      text: 「你採蜜不怕被蜇嗎？我站這麼遠都覺得蜂在瞪我。」
     - kind: speech
       speaker: host
-      text: 「不怕。手輕點，別驚牠們，牠們就不蜇我。蜇一下也沒啥，嚐到的甜更真。」
+      text: 「不怕。手放輕，別擋住巢門，牠們就自己忙去。」
+    - kind: speech
+      speaker: host
+      text: 「真被蜇一下也沒什麼。腫一塊，過兩天就消。我反而覺得那天的蜜特別甜。」
     - kind: narration
-      text: 她搖了搖手裡的勺，蜜汁在陽光下泛著金。
+      text: 她把手裡的木勺舉高，蜜沿著勺柄往下滴。
     - kind: speech
       speaker: host
-      text: 「這園子的蜂都認我。你要不怕，跟我去看它們釀蜜。」
+      text: 「這園子的蜂都認得我。你要不怕，跟我去看牠們怎麼把花裡的水變成蜜。」
 - topic_id: fionnen_resident_saeliel.topic_02
   keyword: 花
   label: 花
   fallback:
     scene_id: fionnen_resident_saeliel.topic_02_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「這花圃裡，你認得多少花？」
+      text: 「這片花圃，你認得幾種花？」
     - kind: speech
       speaker: host
-      text: 「都認得。哪朵幾時開、哪朵蜜多，我都知道。我打小在花裡鑽，像隻採不夠的蜂。」
+      text: 「都認得。哪朵幾時開、哪朵蜜多，我閉著眼也摸得出來。」
     - kind: speech
       speaker: host
-      text: 「花開花落，一年就過去了。可蜜留得住，甜也留得住。你聞聞，這園子連風都帶甜。」
+      text: 「春天的花蜜清，夏天的花蜜厚。同樣是蜜，顏色和味道都不一樣。」
+    - kind: narration
+      text: 她彎腰湊近一朵花，鼻尖幾乎碰到花瓣。
+    - kind: speech
+      speaker: host
+      text: 「你聞。風從那邊吹過來，整片園子都是甜味。」
 - topic_id: fionnen_resident_saeliel.topic_03
   keyword: 家人
   label: 家人
   fallback:
     scene_id: fionnen_resident_saeliel.topic_03_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「你家裡，都喜歡這園子嗎？」
+      text: 「你們家三個人都喜歡這座蜜園嗎？」
     - kind: speech
       speaker: host
-      text: 「喜歡。娘艾莉斯看蜂，姊姊邁特希斯熬蜜。我採。仨人一回家，滿屋子都是甜味，連做夢都發黏。」
+      text: 「喜歡。娘看蜂，姊姊熬蜜，我採。三個人一回家，滿屋子都是甜味。」
+    - kind: speech
+      speaker: host
+      text: 「姊姊總嫌我吵。可我要是安靜一天，她又要問我是不是病了。」
     - kind: narration
-      text: 她舔了舔指尖的蜜，笑得眉眼彎彎。
+      text: 她舔了舔指尖沾到的蜜，笑得眼睛都瞇起來。
     - kind: speech
       speaker: host
-      text: 「姊姊總說我吵，可沒了我，誰去搖那頭一勺蜜？你來，我帶你嘗最新鮮的一勺。」
+      text: 「我採的蜜最新鮮。你要嚐，我舀一勺給你看，還會冒泡。」
 - topic_id: fionnen_resident_saeliel.topic_04
   keyword: 名字
   label: 名字
   fallback:
     scene_id: fionnen_resident_saeliel.topic_04_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「希爾維爾布魯克，是條銀溪？」
+      text: 「希爾維爾布魯克，是月光下的銀溪？」
     - kind: speech
       speaker: host
-      text: 「銀溪。月光下的林溪，閃得像灑了蜜。這家就認了它。」
+      text: 「銀溪。夜裡月亮照在溪上，整條水亮得像有人灑了東西下去。」
     - kind: narration
-      text: 她踮起腳，朝溪水的方向望。
+      text: 她踮起腳，朝溪水的方向張望。
     - kind: speech
       speaker: host
-      text: 「這名字漂亮。你晚上跟我去溪邊，能瞧見那層銀光。」
+      text: 「有一回我踩滑掉進去，爬起來頭髮上全是水，還在發亮。」
+    - kind: speech
+      speaker: host
+      text: 「這名字好聽。你晚上跟我去溪邊，我指給你看哪裡最亮。」
 - topic_id: fionnen_resident_saeliel.topic_05
   keyword: 私語
   label: 私語
@@ -80,23 +94,29 @@ topics:
   unavailable: locked
   refusal:
     scene_id: fionnen_resident_saeliel.topic_05_refusal
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: host
-      text: 「我話多，可最甜的那句，只留給特別的人。」
+      text: 「我最甜的那句話，要留給幫我舔手指的人。你先別急嘛。」
   fallback:
     scene_id: fionnen_resident_saeliel.topic_05_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「你最開心的時刻，是什麼樣？」
+      text: 「採完蜜滿手黏的時候，你會怎麼辦？」
     - kind: speech
       speaker: host
-      text: 「是採完蜜，滿手黏，有人拉我坐下，替我舔乾淨指縫。她的舌頭又暖又慢，我一邊躲一邊笑，最後癱在她懷裡，甜得說不出話。」
+      text: 「先舔一舔。可指縫裡的舔不到，得有人幫忙。」
+    - kind: speech
+      speaker: host
+      text: 「有人拉我坐下，一根一根替我舔乾淨。她的舌頭又暖又慢，我一邊躲一邊笑。」
     - kind: narration
-      text: 她臉紅到耳根，眼裡卻滿是回味。
+      text: 她臉紅到耳根，眼睛卻亮著。
     - kind: speech
       speaker: host
-      text: 「蜜沾了手，總得有人收。你哪天也沾一沾，就知道多甜了。」
+      text: 「最後我笑到沒力氣，整個人癱在她懷裡。蜜沾了手，總得有人收。」
+    - kind: speech
+      speaker: host
+      text: 「你哪天也沾一沾，就知道有多甜。」

@@ -1,87 +1,92 @@
 schema_version: 1
-greeting: 衛兵駐所的值房裡，托瓦德‧鄧堡正立在窗前，盯著南門拱道下的動靜。聽見腳步聲，他俐落轉過身，鎖子甲在火盆映照下泛著冷光：「從南門進城的？這一帶市街的防務歸我管。問路、治安，我都能交代清楚。只有一樣先說明白，本駐所不發委託，也不貼懸賞，找差事請往冒險者公會去。」
+greeting: 衛兵駐所的門半開著，托瓦德‧鄧堡站在窗邊，正盯著南門拱道底下的人來人往。聽見腳步，他轉過身，鎖子甲上的火光跟著晃了一下：「從南門進來的？這一帶歸我管。問路、問治安，我都答得上。先說明白一件事，駐所不發委託，也不貼懸賞，找差事請去冒險者公會，別在這裡耗。」
 topics:
 - topic_id: altoria_guardhouse.topic_01
   keyword: 進城
   label: 進城
   fallback:
     scene_id: altoria_guardhouse.topic_01_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
-      text: 「衛兵隊長，我頭一回進這王都，城裡主要的路該怎麼認？」
+      text: 「隊長，我頭一回進王都。從南門往北走，主要的路該怎麼認？」
     - kind: narration
-      text: 托瓦德‧鄧堡走到牆邊的羊皮輿圖前，手指沿著南大道的走向一路比劃上去。
+      text: 托瓦德走到牆邊那張羊皮輿圖前，食指從南門的位置往上壓，順著一條粗線一路滑到廣場。
     - kind: speech
       speaker: host
-      text: 「記住這條線。腳下是南大道，朝聖之路的第一段，順著它筆直往北，先到中央廣場。王都的路都從那座廣場向四面張開。」
+      text: 「腳下這條就是南大道，朝聖之路的第一段。你順著它直走，不用拐彎，走到底就是中央廣場。王都的路都從那座廣場散出去，記住這一點，剩下的好辦。」
     - kind: speech
       speaker: host
-      text: 「廣場以東是公會前，冒險者公會的大門開在那兒；市場街沿著舊牆線橫過城裡，是城裡最長的商街。出了廣場再往北，是大道北段；聖階則一路攀到上城，大神殿與王宮都在那上頭。」
+      text: 「廣場往東是公會前，冒險者公會的大門開在那邊。市場街沿著舊牆線橫過城裡，是全王都最長的一條街，買什麼都往那裡找。再往北是大道北段。要往上城，走聖階，大神殿和王宮都在上頭。」
     - kind: speech
       speaker: host
-      text: 「要緊的路口都立著木牌。把這幾處地標記牢，在下城就不會走岔。」
+      text: 「路口都立了木牌。這幾處記牢，下城就繞不丟。我當年守南門十年，頭一個月也走錯過兩回，不丟臉。」
+    - kind: narration
+      text: 他把手收回來，指尖在輿圖上留下一小塊擦痕。
 - topic_id: altoria_guardhouse.topic_02
   keyword: 差事
   label: 差事
   fallback:
     scene_id: altoria_guardhouse.topic_02_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
-      text: 「駐所這裡，有公家派發的討伐或巡守差事能接嗎？」
+      text: 「駐所有沒有公家派下來的討伐或巡守差事？我想接點活。」
     - kind: narration
-      text: 托瓦德‧鄧堡按著腰間佩劍的黃銅劍柄，火光映著他左眉的舊傷。
+      text: 托瓦德按住腰間佩劍的銅柄，火光映到他左眉那道舊傷上，眼神沒有鬆。
     - kind: speech
       speaker: host
-      text: 「沒有。衛兵隊的職責是守城門、維持街面秩序，駐所一概不發委託，往後也不發。」
+      text: 「沒有。衛兵隊守城門、管街面秩序，駐所的職責就到這裡。委託一概不發，以後也一樣。這不是推託，分內分外要先弄清楚。」
     - kind: speech
       speaker: host
-      text: 「要接差事，沿南大道往北到中央廣場，往東一拐就是公會前的冒險者公會。大廳的告示板上列著各級委託，去櫃檯找辦事員登記。」
+      text: 「要接差事，往北走到中央廣場，往東拐進公會前。大廳那面看板釘著各級委託，你看上哪張，去櫃檯找辦事員登記。他們核過，才算數。」
     - kind: speech
       speaker: host
-      text: 「街坊私下拜託的雜活，是市民之間的互助，駐所不過問。公私分明，這座城才走得穩。」
+      text: 「街坊私下拜託的雜活，是市民之間互相幫忙，駐所不管。公私分清楚，這座城才站得穩。」
 - topic_id: altoria_guardhouse.topic_03
   keyword: 治安
   label: 治安
   fallback:
     scene_id: altoria_guardhouse.topic_03_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
-      text: 「南門這一帶治安如何？要是街面上遇到糾紛或是竊案，該找誰？」
+      text: 「南門這一帶治安怎麼樣？街上遇到糾紛或竊案，該找誰？」
     - kind: narration
-      text: 托瓦德‧鄧堡微仰起頭，目光從城門洞下的石板通道冷靜掠過。
+      text: 托瓦德偏過頭，目光掃過門洞下那條石板通道，把今天走過的人數了一遍。
     - kind: speech
       speaker: host
-      text: 「南門一帶由衛兵隊日夜輪值巡邏。遇見竊盜、械鬥或魔獸驚擾，找身穿藍罩袍、胸掛銅牌的執勤衛兵，他們會接手。」
+      text: 「南門由衛兵隊日夜輪值，街上一直有人。遇上竊盜、械鬥，或是魔獸闖進來，找穿藍罩袍、胸前掛銅牌的執勤衛兵，報給他們，他們接手。」
     - kind: speech
       speaker: host
-      text: 「駐所管的是城區安全與公眾秩序。買賣價錢談不攏，或是賭桌上的糾紛，雙方自行了斷，不歸駐所裁斷。」
+      text: 「駐所管的是城區安全和公眾秩序。買賣價錢談不攏，賭桌上輸贏有爭執，那些雙方自己解決，駐所不坐下來替人評理。」
     - kind: speech
       speaker: host
-      text: 「阿爾托利亞王國重騎士精神與律法。安分守己，巡邏的衛兵自然看顧你一路平安。」
+      text: 「我在南門站了十年，什麼樣的糾紛都見過。真動了手，吃虧的通常不是先出手那個。」
+    - kind: speech
+      speaker: host
+      text: 「王國講騎士精神，也講律法。你自己守規矩，巡邏的人自然會多看顧你一眼。」
 - topic_id: altoria_guardhouse.topic_04
   keyword: 過夜
   label: 過夜
   fallback:
     scene_id: altoria_guardhouse.topic_04_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
-      text: 「天快黑了，南門附近哪裡有乾淨又安全的客棧能投宿？」
+      text: 「天快黑了。南門附近哪裡有乾淨、睡得安穩的客棧？」
     - kind: narration
-      text: 托瓦德‧鄧堡朝值房角落兩張擦得光潔的硬木長凳示意。
+      text: 托瓦德朝值房角落兩張硬木長凳點了下頭。
     - kind: speech
       speaker: host
-      text: 「要過夜，趁日落前順南大道往北，拐進客棧巷，那兒有爐火旅店，隔壁是醉月酒館。」
+      text: 「要過夜，趁天還沒全黑，順南大道往北，拐進客棧巷。那裡有爐火旅店，隔壁是醉月酒館，兩間挨著。」
     - kind: speech
       speaker: host
-      text: 「爐火旅店的門閂厚實，床鋪乾爽，收費公道，遠道來的商旅多半落腳那兒。醉月酒館開得晚，只想喝一杯再睡的也方便。」
+      text: 「爐火旅店的門閂厚，床鋪乾爽，價錢公道，跑遠路的商旅多半住那兒。醉月酒館開到很晚，只想喝一杯再睡也方便。」
     - kind: speech
       speaker: host
-      text: 「我這值房只有兩張硬木長凳，沒有棉被，也不留宿。走累了可以坐下歇口氣，天黑了就動身去客棧巷。」
+      text: 「我這值房只有兩張長凳，沒有棉被，不留人過夜。坐著歇口氣可以，天黑之前動身。睡不好，明天上路照樣出事。」

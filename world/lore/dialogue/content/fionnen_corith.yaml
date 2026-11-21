@@ -1,114 +1,114 @@
 schema_version: 1
-greeting: 科瑞斯‧蒙希斯佩爾坐在窗邊，把一枚乳白晶石壓在小臂內側，側耳聽它震動。聽見腳步聲，她笑著抬頭，晶石還貼在皮膚上：「自己摸進來的啊？護腕、晶石，還是牆邊那盆藤，今天想瞧哪一樣？」
+greeting: 科瑞斯‧蒙希斯佩爾坐在窗邊，把一枚乳白晶石壓在小臂內側，側著耳朵聽它震。聽見腳步聲，她笑著抬頭，晶石還貼在皮膚上：「自己摸進來的啊？護腕、晶石，還是牆邊那盆藤，今天想瞧哪一樣？我手上這個還沒削完，邊講邊弄。」
 topics:
 - topic_id: fionnen_corith_home.topic_01
   keyword: 護腕
   label: 護腕
   fallback:
     scene_id: fionnen_corith_home.topic_01_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
-      text: 「這護腕是綁在持弓那隻手上？拉弓的時候它幫得上忙嗎？」
+      text: 「這護腕是綁在持弓那隻手嗎？我拉弦的時候，它真幫得上忙？」
     - kind: narration
-      text: 科瑞斯‧蒙希斯佩爾從凳邊撈起一個雕到一半的護腕，往自己腕上一套，做了個開弓的手勢。
+      text: 她從凳邊撈起一個削到一半的護腕，往自己腕上一套，空手比了個開弓的姿勢，眼睛沒離開手上那塊木頭。
     - kind: speech
       speaker: host
-      text: 「森林射手護腕，照著手臂的弧削出來。那一面缺口正好卡在腕骨，拉滿了弓，手腕不用硬吃那股勁。」
+      text: 「森林射手護腕。照手臂的彎度削，缺口對著腕骨那一點。弦拉滿，勁全壓在手腕上，有這片木頭頂著，骨頭不用硬扛。」
     - kind: speech
       speaker: host
-      text: 「手穩了，箭就穩。它貼著你皮膚磨，日子久了就曉得你腕子的形狀，越戴越合手。」
+      text: 「手一穩，箭就聽話。木頭貼著皮膚磨久了，會照著你腕子的形狀走。頭幾天綁緊一點，之後它自己就合了。」
     - kind: speech
       speaker: actor
-      text: 「木頭整天貼著手腕磨，久了不刮皮嗎？」
+      text: 「木頭整天貼著手腕磨，不會刮破皮嗎？」
     - kind: speech
       speaker: host
-      text: 「內裡我磨到看不見紋，再抹一層蠟。你摸一下這圈邊，順著腕子走，一點不咬人啦。」
+      text: 「內裡我磨到摸不出紋路，再上一層蠟。你摸這圈邊，順著腕子滑下去，一點都不咬人啦。」
 - topic_id: fionnen_corith_home.topic_02
   keyword: 恆振晶
   label: 恆振晶
   fallback:
     scene_id: fionnen_corith_home.topic_02_scene
-    revision: r4
+    revision: r5
     lines:
     - kind: speech
       speaker: actor
-      text: 「你胸前那枚乳白晶石，剛才按在手臂上聽，是在給它調什麼？」
+      text: 「你胸前那枚乳白晶石，剛才壓在手臂上聽。那是在調什麼？」
     - kind: narration
-      text: 她把晶石從頸繩上解下來，擱在掌心，指尖沿著石面那道看不清的細紋走。
+      text: 她把晶石從頸繩上解下來，擱在掌心，指尖順著石面上那道看不清的細紋走了一圈。
     - kind: speech
       speaker: host
-      text: 「恆振晶，裡頭刻著一層極細的振動。我調的是它的拍子，快了刺人，慢了散成一團。」
+      text: 「恆振晶。裡頭刻著一層很細的振動，我調的是它的拍子。調快了扎人，調慢了就散成一團，等於白戴。」
     - kind: speech
       speaker: host
-      text: 「調順了就貼身戴。它往上卡在陰蒂上，整天不停地震。走路時震得最兇，我腿根發軟，只能夾著腿熬。」
+      text: 「調順了就貼身戴。它卡在那個地方，一整天不停地震。走路的時候震得最兇，我腿根發軟，只能夾著腿走。」
     - kind: speech
       speaker: host
-      text: 「我昨兒戴了一整天，夜裡也沒摘。躺下去它還醒著，我濕得腿都夾不攏，手指搗了好幾回才緩過氣來，還是捨不得解。」
+      text: 「昨天戴了一整天，夜裡也沒解。躺下去它還醒著，我濕到腿都合不攏，手指弄了好幾回才緩過來，最後還是捨不得解。」
     - kind: speech
       speaker: actor
       text: 「外頭有人說，人類的學者看不懂上頭的術式？」
     - kind: speech
       speaker: host
-      text: 「他們拿鏡片照了半天，就認出一圈痕。這門道我摸索了好些年，才摸得順手，旁人學不去。」
+      text: 「他們拿鏡片照了半天，就認出一圈刻痕。這東西我摸了好些年，才摸出哪個拍子合用。旁人拿去，大概也調不出來。」
     - kind: speech
       speaker: host
-      text: 「想要就說一聲，我從布上挑給你，貼肉戴才不糟蹋。來，手伸給我，我把它按在你腕子內側，這股麻會順著手臂爬到後頸去。」
+      text: 「想要就講一聲，我從布上挑一個給你，貼著肉戴才有意思。來，手伸給我，我把它按在你腕子內側，這股麻會順著手臂爬到後頸。」
 - topic_id: fionnen_corith_home.topic_03
   keyword: 魔藤
   label: 魔藤
   fallback:
     scene_id: fionnen_corith_home.topic_03_scene
-    revision: r4
+    revision: r5
     lines:
     - kind: speech
       speaker: actor
-      text: 「牆邊那盆藤，剛才動了一下，屋裡又沒風。那也是你養出來的？」
+      text: 「牆邊那盆藤，剛才動了一下。屋裡又沒風，那也是你養出來的？」
     - kind: narration
-      text: 科瑞斯‧蒙希斯佩爾在陶盆邊輕敲兩下，一截藤蔓抬起頭，不緊不慢繞上她的腕子。
+      text: 她在陶盆邊敲了兩下，一截藤蔓抬起頭，繞上她的手腕，像認得她。
     - kind: speech
       speaker: host
-      text: 「纏枝魔藤。平常擱在窗邊曬光，土乾了就澆，你不理它，它自己會長。」
+      text: 「纏枝魔藤。擱窗邊曬光，土乾了就澆水，你不理它，它也自己長。不難養。」
     - kind: speech
       speaker: host
-      text: 「水澆透了它才醒。它順著小腿盤上大腿，鑽進腿縫，繞著陰蒂打轉，再沿著縫往上爬。」
+      text: 「水澆透了它才醒。醒了就順著小腿盤上大腿，鑽進腿縫，繞著陰蒂打轉，再往裡爬。」
     - kind: speech
       speaker: host
-      text: 「乳頭它用尖端繞，繞到你硬得發疼才鬆開；腰上它越收越緊，勒得你只能靠著牆喘。」
+      text: 「它用尖端繞乳頭，繞到你硬得發疼才肯鬆開；腰上越收越緊，勒得你只能靠著牆喘。」
     - kind: speech
       speaker: host
-      text: 「玩夠了它自己縮回盆裡睡，等下一次水再醒。」
+      text: 「玩夠了它自己縮回盆裡睡。等下回你澆水，它再醒。」
     - kind: speech
       speaker: actor
       text: 「養這種東西，費不費事？」
     - kind: speech
       speaker: host
-      text: 「不費事。土別乾透，光別斷，冷了搬進屋。村裡一半人家的窗台上都擺著一盆，全是我這幾盆分出去的枝。」
+      text: 「不費事。土別讓它乾透，光別斷，天冷了搬進屋。村裡一半人家的窗台都擺著一盆，全是我這幾盆分出去的枝。」
 - topic_id: fionnen_corith_home.topic_04
   keyword: 收回
   label: 收回
   fallback:
     scene_id: fionnen_corith_home.topic_04_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
-      text: 「護腕要是戴裂了，或者晶石哪天不震了，能拿回來給你嗎？」
+      text: 「護腕戴裂了，或者晶石哪天不震了，能拿回來給你嗎？」
     - kind: speech
       speaker: host
-      text: 「凡是我削出來、調出來、養出來的東西，都能拿回來。擱著用不上就送回我這兒，我看過成色算銅幣給你；木料、晶石、盆裡的藤，我都留著再使。」
+      text: 「我親手削的、調的、養的東西，都能拿回來。用不上就送回我這兒，我看過成色，算銅幣給你。木料、晶石、盆裡的藤，我都留著再用。」
     - kind: speech
       speaker: host
-      text: 「自己做得出來的東西，捨不得看它爛在箱底。」
+      text: 「自己做得出來的東西，看它爛在箱底，我心裡過不去。」
     - kind: speech
       speaker: actor
-      text: 「那從山外買來的晶石跟護腕呢？能勞你瞧一眼嗎？」
+      text: 「那從山外買來的晶石跟護腕呢？也能勞你瞧一眼嗎？」
     - kind: narration
-      text: 她把恆振晶收回頸繩，搖了搖手。
+      text: 她把恆振晶掛回頸繩，搖了搖手。
     - kind: speech
       speaker: host
-      text: 「外頭的活我不接。刻法不是一路，我手一按就散架，賠不起嘛。」
+      text: 「外頭的活我不接。刻法不是一路，我手一按就散，賠不起嘛。」
     - kind: speech
       speaker: host
-      text: 「你留著自己用，或帶回山外找人。這屋裡的活，只認我這雙手。」
+      text: 「你留著自己用，或帶回山外找人看。這屋裡的東西，只認我這雙手。」

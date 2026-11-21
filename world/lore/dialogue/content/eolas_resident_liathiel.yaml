@@ -1,30 +1,30 @@
 schema_version: 1
-greeting: 莉亞特希爾把一綹絲在指間繞了半圈，抬起眼：「你是想問絲，還是到谷裡來探路？」
+greeting: 莉亞特希爾把一綹絲在指間繞了半圈，抬起眼。「你是想問絲，還是到谷裡來探路？」
 topics:
 - topic_id: eolas_resident_liathiel.topic_01
   keyword: 絲
   label: 絲
   fallback:
     scene_id: eolas_resident_liathiel.topic_01_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
       text: 「這谷裡的絲是怎麼來的？」
     - kind: speech
       speaker: host
-      text: 「蛛結網，谷裡人收。蛛林那幾棵樹上，網一結一整片；收的時辰要挑得準，早了絲短，晚了絲脆。」
+      text: 「蛛結網，谷裡人收。蛛林那幾棵樹上，網一結就是一整片；收的時辰要挑得準，早了絲短，晚了絲脆。」
     - kind: narration
-      text: 她把指間的絲一截截放長，又收了回來。
+      text: 她把指間的絲放長，再繞回指根。
     - kind: speech
       speaker: host
-      text: 「一根好絲，扯到斷之前會先繃緊，再脆響。你懂這一句，就曉得這谷裡的活計了。」
+      text: 「一根好絲，扯到斷之前會先繃緊，然後脆響一聲。你摸過一次，就曉得這谷裡的活計了。」
 - topic_id: eolas_resident_liathiel.topic_02
   keyword: 白衣
   label: 白衣
   fallback:
     scene_id: eolas_resident_liathiel.topic_02_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
@@ -40,14 +40,14 @@ topics:
   label: 家人
   fallback:
     scene_id: eolas_resident_liathiel.topic_03_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
       text: 「這屋裡還住了誰？」
     - kind: speech
       speaker: host
-      text: 「兩個女兒。大的芬林餵蛛，林子裡每窩蛛的脾氣她都摸得透；小的布倫內爾運絲，一捆一捆往谷底背。」
+      text: 「兩個女兒。大的芬林餵蛛，林子裡每窩蛛的脾氣她都摸得透；小的布倫內爾運絲，把絲捆好背回谷底。」
     - kind: narration
       text: 她朝林子的方向抬了抬下巴，聲音放得又低了些。
     - kind: speech
@@ -58,14 +58,14 @@ topics:
   label: 名字
   fallback:
     scene_id: eolas_resident_liathiel.topic_04_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
       text: 「『沙多瓦勒』這個姓，是什麼意思？」
     - kind: speech
       speaker: host
-      text: 「就是影谷。幽月谷月亮起來的時候，谷壁的影子順著溪水疊成一道，這家就住在那一帶。」
+      text: 「就是影谷。幽月谷的月亮一升上來，谷壁的影子順著溪水疊成一道，這家就住在那一帶。」
     - kind: narration
       text: 她伸手比了比谷壁的方向，指尖在半空停了一下。
     - kind: speech
@@ -76,7 +76,7 @@ topics:
   label: 收絲
   fallback:
     scene_id: eolas_resident_liathiel.topic_05_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
@@ -96,14 +96,14 @@ topics:
   unavailable: locked
   refusal:
     scene_id: eolas_resident_liathiel.topic_06_refusal
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: host
-      text: 「這種體己話，我只對交過心的人講。你再多來幾回，再說。」
+      text: 「這種貼心的話，我只跟交過心的人講。你再多來幾回，等我知道你是誰了，再說。」
   fallback:
     scene_id: eolas_resident_liathiel.topic_06_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor

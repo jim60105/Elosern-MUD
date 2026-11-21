@@ -1,5 +1,5 @@
 schema_version: 1
-greeting: 浴場櫃檯後頭，伊莎貝爾‧葦沼正把剛烘熱的布巾逐條撫平。聽見門檻外有動靜，她抱著整疊布巾快步迎上來：「新來的吧？進來把一路的塵土洗掉就對啦。男左女右，兩道門簾各自進去，裡頭一道厚石牆隔得嚴實。水用城外河水，燒得滾燙。規矩就這麼一條，有話爽快問，我後頭還有一大疊布巾等著摺呢！」
+greeting: 浴場櫃檯後頭，伊莎貝爾‧葦沼正把剛烘熱的布巾一條一條撫平。聽見門檻外有動靜，她抱著整疊布巾快步迎上來：「新來的吧？進來把一路的塵土洗掉就對啦。男左女右，兩道門簾各自進去，裡頭一道厚石牆隔得嚴實。水用城外河水，燒得滾燙。規矩就這麼一條，有話爽快問，我後頭還有一大疊布巾等著摺呢！」
 topics:
 - topic_id: altoria_bathhouse.topic_01
   keyword: 規矩
@@ -12,7 +12,7 @@ topics:
       race_key: elf
     scene:
       scene_id: altoria_bathhouse.topic_01_scene_elf
-      revision: r3
+      revision: r4
       lines:
       - kind: speech
         speaker: actor
@@ -27,7 +27,7 @@ topics:
         text: 「你怎麼自在就怎麼來。人類跟獸人習慣把身子裹得嚴實，見你袒著身子，心裡只有敬畏，會低著頭把視線讓開，沒人敢多嘴半句。」
       - kind: speech
         speaker: host
-        text: 「要是嫌那道石牆礙事，挑個午後人少的時辰來，池子寬敞清靜，泡個痛快。」
+        text: 「要是嫌那道石牆礙事，挑個午後人少的時辰來，池子寬敞清靜，泡個痛快。我一講到這個就停不下來，你別嫌我碎嘴。」
   - variant_id: high_exposure
     priority: 10
     when:
@@ -35,13 +35,13 @@ topics:
       minimum: 3
     scene:
       scene_id: altoria_bathhouse.topic_01_scene_exposed
-      revision: r4
+      revision: r5
       lines:
       - kind: speech
         speaker: actor
         text: 「進浴場更衣有什麼講究？我這身衣裳該擱在哪兒？」
       - kind: narration
-        text: 伊莎貝爾‧葦沼抬眼一瞧，俐落抽出一條寬大厚實的長布巾遞過來。
+        text: 伊莎貝爾‧葦沼抬眼一瞧，俐落抽出一條寬大厚實的長布巾遞過來，布還帶著烘過的暖氣。
       - kind: speech
         speaker: host
         text: 「哎唷，穿這麼單薄就進來了。先把這條乾布巾圍上，免得門縫透進來的涼風吹得你打噴嚏。」
@@ -50,29 +50,32 @@ topics:
         text: 「在大街上露著肌膚，城門衛兵瞧見要攔下盤問。進了這扇門就沒人管你，男左女右，更衣間一整排木櫃，脫了衣裳快下池子泡透。」
   fallback:
     scene_id: altoria_bathhouse.topic_01_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
       text: 「老闆娘，我頭一回來，進你們這浴場有什麼規矩要先知道？」
     - kind: narration
-      text: 伊莎貝爾‧葦沼把懷裡的布巾往臂彎一托，抬手指向深處兩道厚布門簾。
+      text: 伊莎貝爾‧葦沼把懷裡的布巾往臂彎一托，抬手指向深處兩道厚布門簾，簾子被水氣蒸得顏色發深。
     - kind: speech
       speaker: host
       text: 「就一條，男左女右，中央一道厚石牆把兩邊隔得嚴實，各走各的門。我守這櫃檯二十年，沒讓誰走岔過。」
     - kind: speech
       speaker: host
       text: 「更衣間一整排木櫃，鞋襪外衣都擱進去。先把外頭沾的泥洗掉再下池，別把泥水帶進池裡。」
+    - kind: speech
+      speaker: host
+      text: 「今天已經叫回來三個走錯邊的人，我嗓門大，喊起來整條廊都聽得到。你記清左右，省得我也喊你一回。」
 - topic_id: altoria_bathhouse.topic_02
   keyword: 精靈
   label: 精靈
   fallback:
     scene_id: altoria_bathhouse.topic_02_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
-      text: 「聽說你們這兒偶爾有精靈來泡湯？他們沐浴的規矩有什麼不同？」
+      text: 「聽說你們這兒偶爾有精靈來泡湯？精靈沐浴的規矩，跟人類有什麼不同？」
     - kind: narration
       text: 伊莎貝爾‧葦沼拉過矮木凳坐下，嗓音放柔，眼裡全是興致。
     - kind: speech
@@ -83,40 +86,46 @@ topics:
       text: 「人類跟獸人脫衣裳，得拿布巾遮著、低著頭，怕失了禮數。精靈把身子看得跟呼吸、吹風一樣尋常，半點羞臊都沒有。旁人見了只有敬畏，哪敢議論。」
     - kind: speech
       speaker: host
-      text: 「誰高誰低我守了二十年也說不準。進了池子各泡各邊，相安無事，這就最好啦。」
+      text: 「誰高誰低我守了二十年也說不準。進了池子各泡各邊，相安無事，這就最好啦。好奇歸好奇，我可從不多問人家一句。」
 - topic_id: altoria_bathhouse.topic_03
   keyword: 泡湯
   label: 泡湯
   fallback:
     scene_id: altoria_bathhouse.topic_03_scene
-    revision: r4
+    revision: r5
     lines:
     - kind: speech
       speaker: actor
       text: 「你這池水泡起來如何？都說泡湯能治百病，真有這回事嗎？」
     - kind: narration
-      text: 伊莎貝爾‧葦沼拍了拍手邊擦得鋥亮的木桶，下巴一揚。
+      text: 伊莎貝爾‧葦沼拍了一下手邊擦得鋥亮的木桶，下巴一揚，桶裡的水晃了晃。
     - kind: speech
       speaker: host
       text: 「水從城外河裡引進來，燒得滾燙，池底鋪滿洗淨的圓卵石。泡到額頭沁汗再起來，舀一瓢涼水澆下，筋骨裡的痠脹能鬆開大半。」
     - kind: speech
       speaker: host
       text: 「治百病那是胡謅，我聽了就上火。真受了刀傷劍傷，往東市去，找鍊金坊的希碧拉買瓶治療藥水。我這池子只暖身子，不長肉。」
+    - kind: speech
+      speaker: host
+      text: 「泡完覺得骨頭輕了，那是熱水把你這一天的累泡軟了，可不是病被治好了。這句話我一天要說上好幾遍。」
 - topic_id: altoria_bathhouse.topic_04
   keyword: 歇息
   label: 歇息
   fallback:
     scene_id: altoria_bathhouse.topic_04_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
       text: 「泡完之後，這裡有長凳或通鋪能躺下歇一會嗎？」
     - kind: narration
-      text: 伊莎貝爾‧葦沼指向前堂兩排磨得光滑的長靠椅，順手遞上一杯清水。
+      text: 伊莎貝爾‧葦沼指向前堂兩排磨得光滑的長靠椅，順手遞上一杯清水，杯沿還掛著水珠。
     - kind: speech
       speaker: host
       text: 「前堂有兩排長靠椅，擦乾身子坐在那兒迎風喝水，通體舒坦。屋裡水氣重，坐久了眼皮難免發沉。」
     - kind: speech
       speaker: host
       text: 「想睡個整夜，就順著客棧巷走幾步，那兒有爐火旅店。老闆娘溫弗蕾德的鵝絨被曬得蓬鬆，在那兒躺下才算真正歇透。」
+    - kind: speech
+      speaker: host
+      text: 「我這兒只讓人把身上洗乾淨，睡的事還是交給有床的人。你別在長椅上睡著，著涼了我可賠不起。」

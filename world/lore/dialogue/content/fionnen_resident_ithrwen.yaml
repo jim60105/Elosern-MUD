@@ -1,76 +1,90 @@
 schema_version: 1
-greeting: 伊斯爾溫放下木桶，直起身：「要水，還是問菜？我手上還濕著。」
+greeting: 伊斯爾溫把木桶擱在畦邊，手在衣襬上抹了兩下：「要問水，還是問菜？我這手還濕著，先講沒關係。」
 topics:
 - topic_id: fionnen_resident_ithrwen.topic_01
   keyword: 澆水
   label: 澆水
   fallback:
     scene_id: fionnen_resident_ithrwen.topic_01_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「這菜圃的水，是怎麼引來的？」
+      text: 「這菜圃的水從哪兒來？渠底的石頭都長青苔了。」
     - kind: speech
       speaker: host
-      text: 「打林溪來。渠我常清，哪段淤了、哪段漏了，一看便知。水順了，菜才綠。」
+      text: 「從林溪引過來。上游那段落差夠，水自己會往下走，我只在中途開幾個缺口，把水放進每一畦。」
     - kind: narration
-      text: 她舀起一瓢，勻勻地澆在菜根上。
+      text: 她蹲下去，指尖插進土裡，捏起一撮，又鬆手讓土散回畦面。
     - kind: speech
       speaker: host
-      text: 「水不能多，多了爛根；也不能少，少了蔫葉。我天天探土，比誰都清楚。」
+      text: 「像這畦，今天不澆。土還涼，捏得成團，底下就還有水。等土一散，我才開缺口。」
+    - kind: speech
+      speaker: host
+      text: 「菜不會喊渴。葉子垂了、土面裂了，都是它在講。看久了，手一摸就知道。」
 - topic_id: fionnen_resident_ithrwen.topic_02
   keyword: 看渠
   label: 看渠
   fallback:
     scene_id: fionnen_resident_ithrwen.topic_02_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「看渠這活，累不累？」
+      text: 「渠堵住的時候，你一個人清得完嗎？」
     - kind: speech
       speaker: host
-      text: 「不累，就是磨性子。旱了要引，澇了要排，一場雨都得盯著。可看著菜喝足了水，心裡就踏實。」
+      text: 「清得完。堵的多半是落葉和細枝，我拿長柄的耙子從上游往下刮，刮到水聲順了才停。」
     - kind: speech
       speaker: host
-      text: 「谷裡人靠這圃子吃，我不盯著，誰盯。你哪天見我在渠邊發呆，那是在看水。」
+      text: 「要是石頭被水沖鬆，就得搬回來，用腳踩實。渠壁一歪，水就往別處跑，菜圃那頭就乾了。」
+    - kind: narration
+      text: 她把木桶提起來，桶底滴下的水在腳邊積成一小窪。
+    - kind: speech
+      speaker: host
+      text: 「我一天走兩趟。早上看水位，傍晚看缺口有沒有被草塞住。這活不重，就是不能斷。」
 - topic_id: fionnen_resident_ithrwen.topic_03
   keyword: 家人
   label: 家人
   fallback:
     scene_id: fionnen_resident_ithrwen.topic_03_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「你家裡，你最掛心誰？」
+      text: 「你們家三個人，平常都待在圃裡？」
     - kind: speech
       speaker: host
-      text: 「掛心妹妹米拉拉。她採菜總忘喝水，曬得臉通紅。我澆水時，總留一瓢給她也澆一澆。」
+      text: 「差不多。娘種，我澆，妹妹採。誰先忙完就去幫另一個。」
+    - kind: speech
+      speaker: host
+      text: 「我話少，跟土相處比跟人久。妹妹米拉拉不一樣，她一邊摘菜一邊唱歌，整片圃子都聽得見。」
     - kind: narration
-      text: 她說著笑了，語氣裡盡是疼惜。
+      text: 她朝菜圃另一頭望了一眼，嘴角抬起來。
     - kind: speech
       speaker: host
-      text: 「娘種，我澆，妹妹採。一家人，一瓢水都要分著用。」
+      text: 「娘常說，一家人做事不用分得太清楚。水澆到哪裡，菜就長到哪裡，人也一樣。」
 - topic_id: fionnen_resident_ithrwen.topic_04
   keyword: 名字
   label: 名字
   fallback:
     scene_id: fionnen_resident_ithrwen.topic_04_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「孫希斯佩爾，是日頭的低語？」
+      text: 「孫希斯佩爾，是日光在低聲說話的意思嗎？」
     - kind: speech
       speaker: host
-      text: 「日語。午後的光穿過樹葉，細細碎碎，像在囑咐什麼。這家守著那光，就取了它。」
+      text: 「是。午後的日頭穿過樹冠，光斑落在菜葉上，一動一動。我娘說那是光在講話，就取了這個姓。」
     - kind: narration
-      text: 她仰起臉，任光斑落在她頰上。
+      text: 她抬手擋了一下落在眼前的光，指縫間漏出幾條亮線。
     - kind: speech
       speaker: host
-      text: 「光會說話，只是要靜下心聽。你常來，也聽得見。」
+      text: 「我倒沒聽出什麼話。只是光落在土上，土就暖，菜就長得好，這樣就夠了。」
+    - kind: speech
+      speaker: host
+      text: 「你要聽，等下午再來。那時光斜，話最多。」
 - topic_id: fionnen_resident_ithrwen.topic_05
   keyword: 私語
   label: 私語
@@ -80,23 +94,26 @@ topics:
   unavailable: locked
   refusal:
     scene_id: fionnen_resident_ithrwen.topic_05_refusal
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: host
-      text: 「水渠邊的話，只跟澆過同一畦菜的人說。」
+      text: 「我還沒跟你熟到那個地步。圃裡的事我什麼都能講，心裡的事先擺著。」
   fallback:
     scene_id: fionnen_resident_ithrwen.topic_05_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「你最想要的陪伴，是什麼樣？」
+      text: 「忙完一整片圃，你最想有人陪你做什麼？」
     - kind: speech
       speaker: host
-      text: 「是澆完水，日頭正毒，有個人把我拉進樹蔭，替我擦去脖頸上的汗，再把我的手貼在她涼涼的頰上。那一刻，暑氣都散了。」
+      text: 「澆完最後一畦，日頭還高，我坐在樹蔭下不想動。有人替我把脖子上的汗擦掉，再把我的手貼在她臉上。」
     - kind: narration
-      text: 她撫了撫自己的手，像在回味那份涼。
+      text: 她攤開手掌看了看，指尖在自己的掌心壓了一下。
     - kind: speech
       speaker: host
-      text: 「澆水的人，也盼著被誰滋養。你懂水，就懂我。」
+      text: 「我這雙手整天泡在水裡，摸什麼都粗。她的臉很軟，一貼上去，我才覺得自己也鬆了下來。」
+    - kind: speech
+      speaker: host
+      text: 「我一個人也能把菜圃顧好。可有個人願意等我收工，那條渠走起來就不一樣。」

@@ -1,99 +1,99 @@
 schema_version: 1
-greeting: 箭釘進靶心外緣。埃倫溫‧斯威夫塔羅放下弓，轉過身，日頭照在她光裸的肩背上，身上除了左臂那條護腕和一隻箭袋，什麼也沒披。她先看你的站姿，才朝門邊一排弓抬了抬下巴，「自己挑一把。站到線後面，先射幾支，我看你的腰怎麼使力。」
+greeting: 箭釘進靶心外緣。埃倫溫‧斯威夫塔羅放下弓，轉過身，日頭照在她的肩上，身上除了左臂那條護腕和一隻箭袋，什麼也沒披。她先看你的站姿，才朝門邊一排弓抬了抬下巴：「自己挑一把。站到線後面，先射幾支。我看你的腰。」
 topics:
 - topic_id: fionnen_elunwen_home.topic_01
   keyword: 箭術
   label: 箭術
   fallback:
     scene_id: fionnen_elunwen_home.topic_01_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
       text: 「剛摸弓的人，第一件該學的是什麼？」
     - kind: narration
-      text: 她把自己的弓靠回靶架，走到你側面，低眼看你的腳，再順著往上看你的腰。
+      text: 她把弓靠回靶架，走到你側面，低頭看你的腳，再往上看你的腰。
     - kind: speech
       speaker: host
-      text: 「站。腳踩穩，胯別歪，肩膀放平。勁從腳底一路拔到肩，弓才吃得下你全身的力。姿勢一散，氣就浮。」
+      text: 「站。腳踩穩，胯別歪，肩膀放平。勁從腳底上來，一路到肩。姿勢散了，力就漏掉。」
     - kind: speech
       speaker: host
-      text: 「拉滿別憋氣，吐到一半再放。那一下的抖從腰裡竄上胸，你壓不住，得讓它順著身子自己走完。」
+      text: 「拉滿別憋氣，吐到一半再放。那一下會抖，從腰竄上胸口。你壓不住，讓它走完就好。」
     - kind: speech
       speaker: actor
       text: 「所以要練到身子自己記得？」
     - kind: speech
       speaker: host
-      text: 「對。我這身子拉過太多回弓，腳一踩進地裡，腰和肩自己就找對了。你練到閉著眼也放得開手，就成。」
+      text: 「對。我拉過太多回，腳一踩進土裡，腰跟肩自己就找對位置。你練到閉著眼也放得開手，就行。」
 - topic_id: fionnen_elunwen_home.topic_02
   keyword: 靶道
   label: 靶道
   fallback:
     scene_id: fionnen_elunwen_home.topic_02_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
       text: 「這條道上的靶，是怎麼排的？」
     - kind: narration
-      text: 她朝林子裡一指，最遠那幾片木牌在枝葉間晃。
+      text: 她朝林子裡一指。最遠那幾片木牌掛在枝葉間，風一過就晃。
     - kind: speech
       speaker: host
-      text: 「近的靶釘在樹幹上，給手還沒熟的人用。遠處的靶掛在繩上，風一吹就盪，你得先瞧準它擺到哪，再放。」
+      text: 「近的釘在樹幹上，給手還沒熟的人。遠的掛在繩上，風一吹就盪。你得先看準它擺到哪，再放箭。」
     - kind: speech
       speaker: host
-      text: 「道日夜都開著，誰想射就來，箭自備。我在這道上只裹護腕和箭袋，太陽把背曬得發燙，風順著皮肉過，手眼倒更利索。靶皮磨穿了，換塊新的上去。」
+      text: 「這條道日夜都開，誰想射就來，箭自己帶。我在道上只綁護腕、背箭袋。太陽曬著背，風從皮膚上過，手眼反而更利。靶皮磨穿了就換一片。」
     - kind: speech
       speaker: actor
       text: 「木牌也是你掛的嗎？」
     - kind: speech
       speaker: host
-      text: 「每天清早走一趟，歪了就重繫。風大，隔夜總有幾片要再綁正。」
+      text: 「每天清早走一趟。歪了就重綁。風大，隔夜總有幾片要再綁正。」
 - topic_id: fionnen_elunwen_home.topic_03
   keyword: 光魔法
   label: 光魔法
   fallback:
     scene_id: fionnen_elunwen_home.topic_03_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
       text: 「靶道上除了射箭，也練光魔法嗎？」
     - kind: narration
-      text: 她攤開空著的手，一團白光從掌心浮起，落在最近那片靶上。
+      text: 她攤開空著的那隻手，一團白光浮在掌心，落在最近的靶上，亮了一下就收。
     - kind: speech
       speaker: host
-      text: 「同一條道。箭要準，光也要準，手都得穩。箭偏了釘進木頭，光偏了就散，連個印子也不留。」
+      text: 「同一條道。箭要準，光也要準，手都得穩。箭偏了釘進木頭，光偏了就散，連印子都不留。」
     - kind: speech
       speaker: host
-      text: 「村裡跟光親的人多。孩子先在這兒把光收到掌心，再學著把它送遠。呼吸一個長短，光就貼著你的身子一起定。」
+      text: 「村裡跟光親的人多。小孩先在這兒把光收到掌心，再學著送遠。呼吸一個長短，光就貼著身子一起定。」
     - kind: speech
       speaker: actor
-      text: 「兩樣一起練，不會互相礙著？」
+      text: 「兩樣一起練，不會互相妨礙嗎？」
     - kind: speech
       speaker: host
-      text: 「不會。眼盯著靶，呼吸跟手裡的光就一起定下來了。」
+      text: 「不會。眼睛盯著靶，呼吸跟手裡的光一起定下來。」
 - topic_id: fionnen_elunwen_home.topic_04
   keyword: 比試
   label: 比試
   fallback:
     scene_id: fionnen_elunwen_home.topic_04_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「要不要比一場？各挑十支箭，看誰中得多。」
     - kind: narration
-      text: 她剛放下的弓又靠回靶架，搖了頭，沒接話。
+      text: 她把弓靠回靶架，搖了搖頭，沒接話。
     - kind: speech
       speaker: host
       text: 「不比。這條道上，每個人只管自己的準頭。」
     - kind: speech
       speaker: host
-      text: 「你要比，就拿今天跟昨天比。今天手比昨天穩，就是你贏了。」
+      text: 「你要比，就拿今天跟昨天比。今天手比昨天穩，就是你贏。」
     - kind: speech
       speaker: actor
-      text: 「那總得有個對手，靶又不能還手。」
+      text: 「那總要有個對手吧？靶又不會還手。」
     - kind: speech
       speaker: host
-      text: 「靶不還手，也不讓步，正好。門邊那些空弓，你挑一把，去射它幾箭。」
+      text: 「靶不還手，也不讓步，正好。門邊那些空弓，挑一把，去射幾箭。」

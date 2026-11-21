@@ -1,27 +1,27 @@
 schema_version: 1
-greeting: 織機規律地響著，維特希爾‧威爾德布瑞亞爾停下木梭，從經線之間轉過身來。她上身什麼也沒穿，深紫的長髮被木梭挽起，胸口的汗被織房的暖氣蒸得發亮，她也不在意你落在她身上的目光，反倒迎著你笑：「來了。墨黑、月白，還是山谷晨霧那樣的淡綠，你偏愛哪個色？架上的衣裳隨便看，瞧中哪件，我取下來，讓你貼著身子摸料子。」
+greeting: 織機規律地響著，維特希爾‧威爾德布瑞亞爾停下木梭，從經線之間轉過身來。她上身什麼也沒穿，深紫的長髮用木梭挽起，胸口的汗被織房的暖氣蒸得發亮。她不在意你落在她身上的目光，反倒迎著你笑：「來了。墨黑、月白，還是山谷晨霧那樣的淡綠，你偏愛哪個顏色？架上的衣裳隨便看，瞧中哪件，我取下來，讓你貼著身子摸料子。」
 topics:
 - topic_id: ciaran_vethiel_home.topic_01
   keyword: 織衣
   label: 織衣
   fallback:
     scene_id: ciaran_vethiel_home.topic_01_scene
-    revision: r5
+    revision: r6
     lines:
     - kind: speech
       speaker: actor
-      text: 「這屋裡的經緯線排得真齊。你成天守著織機，都織些什麼衣裳？」
+      text: 「這屋裡的經緯線排得真齊。你整天守著織機，都織些什麼衣裳？」
     - kind: narration
-      text: 維特希爾‧威爾德布瑞亞爾伸手把垂下的經線理順，指腹沿著線抹過去。
+      text: 她伸手把垂下的經線理順，指腹沿著線抹過去。
     - kind: speech
       speaker: host
-      text: 「經線我自己漿，緯線我自己採草木的汁液浸染。一塊布，我能從天剛亮織到星光落進窗，熱了就光著，汗滴上經線也不躲。」
+      text: 「經線我自己漿，緯線我自己採草木的汁液浸染。一塊布，我能從天剛亮織到星光落進窗。熱了就光著，汗滴上經線也不躲。」
     - kind: speech
       speaker: host
       text: 「架上掛的是族裡常穿的兩套。貼身俐落的是精靈短袍傳統服飾，進林子活動方便的是精靈戰鬥服飾。布都先染過谷裡的植物，你瞧中哪件，換去穿就是。」
     - kind: speech
       speaker: actor
-      text: 「每件的織紋和顏色都不一樣，挑的時候該怎麼看？」
+      text: 「每件的織紋和顏色都不一樣。挑的時候該怎麼看？」
     - kind: speech
       speaker: host
       text: 「別只用眼睛。伸手摸，絞得緊的擋風，織得疏朗的透氣。衣裳合不合身，要貼上身子才曉得。我的胸、我的腰，自己都穿過摸過，才敢掛上去。」
@@ -30,13 +30,13 @@ topics:
   label: 戰衣
   fallback:
     scene_id: ciaran_vethiel_home.topic_02_scene
-    revision: r4
+    revision: r5
     lines:
     - kind: speech
       speaker: actor
       text: 「架上那件墨黑的精靈戰鬥服飾，剪裁真俐落。穿去林地狩獵合適嗎？」
     - kind: narration
-      text: 維特希爾‧威爾德布瑞亞爾把那襲黑衣從架上取下來，雙手一展平鋪，掌心順著腰線的縫路滑過去。
+      text: 她把那襲黑衣從架上取下來，雙手一展平鋪，掌心順著腰線的縫路滑過去。
     - kind: speech
       speaker: host
       text: 「合適。通體墨黑，線條貼著筋骨走，人一伏進樹影裡就看不見。腰胯和關節我都留了空，跑跳翻躍不會被料子扯住。」
@@ -48,25 +48,25 @@ topics:
       text: 「料子摸起來又輕又韌，穿過灌木叢也不容易被枝條勾破吧？」
     - kind: speech
       speaker: host
-      text: 「緯線裡絞了山裡耐扯的草纖維，耐磨。我也有個老相好，總穿它進林子，拎著獵物喘著氣回來，我替她鬆背上的釦。衣裳合不合身，脫下來那一刻，手比眼睛先知道。」
+      text: 「緯線裡絞了山裡耐扯的草纖維，耐磨。我有個老相好，總穿它進林子，拎著獵物喘著氣回來，我替她鬆背上的釦。衣裳合不合身，脫下來那一刻，手比眼睛先知道。」
 - topic_id: ciaran_vethiel_home.topic_03
   keyword: 禮袍
   label: 禮袍
   fallback:
     scene_id: ciaran_vethiel_home.topic_03_scene
-    revision: r5
+    revision: r6
     lines:
     - kind: speech
       speaker: actor
-      text: 「那件墨黑的精靈短袍傳統服飾，剪裁和族裡平日穿的差很多，是祭禮穿的嗎？」
+      text: 「那件墨黑的精靈短袍傳統服飾，剪裁和族裡平日穿的差很多。是祭禮穿的嗎？」
     - kind: narration
-      text: 維特希爾‧威爾德布瑞亞爾把短袍取下來，手腕一抖，布料順著她赤裸的手臂滑開。
+      text: 她把短袍取下來，手腕一抖，布料順著她赤裸的手臂滑開。
     - kind: speech
       speaker: host
       text: 「祭禮不穿它，這是基亞蘭族自己的衣裳。領口和腰收得貼身，下襬卻放開，走動、練刀都不礙事。」
     - kind: speech
       speaker: host
-      text: 「身子本來就該露得自在。我在谷裡這樣光著上身，沒人會多瞧一眼；山外的人頭一回見，老把眼睛挪開，住幾天也就習慣了，有的還會回頭偷看。」
+      text: 「身子本來就該露得自在。我在谷裡這樣光著上身，沒人會多瞧一眼。山外的人頭一回見，老把眼睛挪開，住幾天也就習慣了，有的還會回頭偷看。」
     - kind: speech
       speaker: actor
       text: 「那件白色的蛛絲長袍，還有晨霧一樣的輕紗，也是你織的嗎？」
@@ -78,13 +78,13 @@ topics:
   label: 舊衣
   fallback:
     scene_id: ciaran_vethiel_home.topic_04_scene
-    revision: r5
+    revision: r6
     lines:
     - kind: speech
       speaker: actor
       text: 「從你這兒換走的衣裳穿舊了、破了，還能帶回這座織房嗎？」
     - kind: narration
-      text: 維特希爾‧威爾德布瑞亞爾抽出一支骨製挑針，在腳邊的舊線簍裡挑了挑。
+      text: 她抽出一支骨製挑針，在腳邊的舊線簍裡挑了挑。
     - kind: speech
       speaker: host
       text: 「只要是我這架機子織出來的精靈短袍傳統服飾、精靈戰鬥服飾，穿舊了穿破了，隨時拿回來。」

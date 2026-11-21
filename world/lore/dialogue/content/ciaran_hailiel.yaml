@@ -1,5 +1,5 @@
 schema_version: 1
-greeting: 海莉爾‧斯塔爾法爾把剛從水裡提起來的刀坯擱上鐵砧，甩掉指間的水珠，回頭先看你的手。爐火把她的影子拉得又長又穩，額上的布帶被汗水浸溼了。「進來吧。窗外的練刀場成天有人揮刀，你想看刀就到砧邊來。把手伸給我瞧一眼，握得穩不穩，我一眼就知道該不該讓你碰這對刀。」
+greeting: 海莉爾‧斯塔爾法爾把剛從水裡提上來的刀坯擱到鐵砧上，甩掉指間的水珠，回頭先看你的手。爐火把她的影子拉得又長又穩，額上的布帶被汗水浸溼。「進來吧。窗外的練刀場整天有人揮刀，你想看刀就到砧邊來。把手伸給我瞧一眼，握得穩不穩，我一眼就知道該不該讓你碰這對刀。」
 topics:
 - topic_id: ciaran_hailiel_home.topic_01
   keyword: 鍛刀
@@ -12,43 +12,43 @@ topics:
       race_key: human
     scene:
       scene_id: ciaran_hailiel_home.topic_01_human
-      revision: r4
+      revision: r5
       lines:
       - kind: speech
         speaker: actor
-        text: 「久聞精靈刀藝天下少有，我特地循著山徑前來，想當面向閣下請教暗影鋼刀的鍛造之法。」
+        text: 「我在山外聽人說，這裡打的刀跟別處不一樣。這種刀挑不挑人？」
       - kind: narration
-        text: 海莉爾‧斯塔爾法爾沒有立刻回話，先打量對方弓著的身子一眼，才在石凳上坐下。
+        text: 海莉爾沒有馬上回話，先把你從肩膀看到手腕，才在石凳上坐下。
       - kind: speech
         speaker: host
-        text: 「腰挺直了說話。暗影谷底沒有宮殿裡那一套禮數，你這樣弓著身子，我倒不知該看你的手，還是聽你的話。」
+        text: 「你站著說話就好，腰挺直。谷底沒有宮殿裡那一套禮數，你弓著身子，我倒不知道該看你的手，還是聽你的話。」
       - kind: speech
         speaker: host
-        text: 「打暗影鋼的鐵砂，我一鏟一鏟從谷底淘來。砂子性子烈，要反覆折疊捶打，火候差一線，整塊鋼就廢了。」
+        text: 「打暗影鋼的鐵砂，我一鏟一鏟從谷底溪灘淘來。砂子性子烈，要反覆折疊捶打，火候差一線，整塊鋼就廢了。」
       - kind: speech
         speaker: actor
-        text: 「我原以為這等寶刀是天成，不想也要一錘一錘敲出來。」
+        text: 「我本來以為這種刀天生就是那個樣子，原來也要一錘一錘敲出來。」
       - kind: speech
         speaker: host
-        text: 「天成這兩個字，外頭的人瞎編。刀打出來就是給人使。砧邊那對剛收工，你想掂分量就自己去拿，腰站穩了，再論刀好不好使。」
+        text: 「天生這兩個字，外頭的人自己編。刀打出來就是給人使。砧邊那對剛收工，你想掂分量就自己去拿，腰站穩了，再論刀合不合手。」
   fallback:
     scene_id: ciaran_hailiel_home.topic_01_scene
-    revision: r4
+    revision: r5
     lines:
     - kind: speech
       speaker: actor
-      text: 「你屋裡的爐火成天不熄，我想知道，暗影鋼刀到底要怎麼打出來？」
+      text: 「你屋裡的爐火整天不熄。我想知道，暗影鋼刀到底是怎麼打出來的？」
     - kind: narration
-      text: 海莉爾‧斯塔爾法爾放下鐵鉗，拇指抹過鐵砧上的錘痕，汗順著她的小臂往下淌。
+      text: 她放下鐵鉗，拇指抹過鐵砧上的錘痕，汗順著小臂往下淌。
     - kind: speech
       speaker: host
-      text: 「先得從谷底淘鐵砂。砂子雜質多，性子烈，得一錘一錘折疊捶打，火候差一點，鋼心就斷。」
+      text: 「先得從谷底淘鐵砂。砂子雜質多，性子烈，要一錘一錘折疊捶打。火候差一點，鋼心就斷。」
     - kind: speech
       speaker: host
-      text: 「打成形，再浸進冷水淬透，刃身才泛起那層暗沉的光。淬火的火候全在手上，慢了快了都不成。我一站就是大半天，汗浸透圍裙，也不想離開爐邊。」
+      text: 「打成形，再浸進冷水淬透，刃身才泛起那層暗沉的光。淬火的分寸全在手上，慢了快了都不成。我一站就是大半天，汗浸透圍裙，也不想離開爐邊。」
     - kind: speech
       speaker: actor
-      text: 「原來成色全都捏在手上。我能先握一握，試一下重心嗎？」
+      text: 「原來成色全捏在手上。我能先握一握，試一下重心嗎？」
     - kind: speech
       speaker: host
       text: 「拿。先別急著揮，掂一掂重心在不在腕前。你的手我瞄過了，握得實，我就放心讓你碰它。」
@@ -57,43 +57,43 @@ topics:
   label: 影刀
   fallback:
     scene_id: ciaran_hailiel_home.topic_02_scene
-    revision: r4
+    revision: r5
     lines:
     - kind: speech
       speaker: actor
-      text: 「砧旁那兩柄刀一長一短，長的我認得，短的那柄是什麼講究？」
+      text: 「砧旁那兩柄刀一長一短。長的我認得，短的那柄有什麼講究？」
     - kind: narration
-      text: 海莉爾‧斯塔爾法爾拈起短刀，指腹沿著墨黑的刀脊一路抹下去。
+      text: 她拈起短刀，指腹沿著墨黑的刀脊一路抹下去。
     - kind: speech
       speaker: host
-      text: 「這是副手影刀，暗影鋼刀‧影。主手刀和它向來成對打，一次只出一對，我不拆開。」
+      text: 「這是副手影刀，暗影鋼刀‧影。主手刀跟它向來成對打，一次只出一對，我不拆開。」
     - kind: speech
       speaker: host
-      text: 「它淬的不是普通的水。谷底入冬結的第一場霜，還掛在泉眼上的時候，我把刀浸進去。那層影子就是那時候有了。」
+      text: 「它淬的不是普通的水。谷底入冬結的第一場霜還掛在泉眼上的時候，我把刀浸進去。那層影子從那時起就沒退過。」
     - kind: speech
       speaker: actor
-      text: 「一長一短配著使，在山裡遇敵也比較轉得開。」
+      text: 「一長一短配著使，在山裡遇上麻煩也比較轉得開。」
     - kind: speech
       speaker: host
-      text: 「主手主攻，副手引開對手的刀勢，兩把配得好，步調才穩。要帶就整對帶走，留一把在架上，這刀就失了本來的用處。」
+      text: 「主手主攻，副手引開對手的刀勢。兩把配得好，步調才穩。要帶就整對帶走，留一把在架上，這刀就失了本來的用處。」
 - topic_id: ciaran_hailiel_home.topic_03
   keyword: 鐵料
   label: 鐵料
   fallback:
     scene_id: ciaran_hailiel_home.topic_03_scene
-    revision: r4
+    revision: r5
     lines:
     - kind: speech
       speaker: actor
-      text: 「打暗影鋼要不少好料吧？我從外頭帶些粗鐵或礦石過來，你收不收？」
+      text: 「打暗影鋼要用不少好料吧？我從外頭帶些粗鐵或礦石過來，你收不收？」
     - kind: narration
-      text: 海莉爾‧斯塔爾法爾搖了搖頭，目光落在牆角那幾袋烏黑的砂粒上。
+      text: 她搖了搖頭，目光落在牆角那幾袋烏黑的砂粒上。
     - kind: speech
       speaker: host
-      text: 「不收。外頭來的鐵，性子我摸不準。我打刀用的鐵砂，全是我自己拿鐵鏟去谷底溪灘淘來。」
+      text: 「不收。外頭來的鐵，性子我摸不準。我打刀用的鐵砂，全是我自己拿鐵鏟去谷底溪灘淘回來。」
     - kind: speech
       speaker: host
-      text: 「這片山谷養出來的砂，我摸了好幾百年，它進爐的火候我閉著眼都記得。外來的料混進去，一整槽鋼就報廢了。」
+      text: 「這片山谷養出來的砂，我摸了好些年，它進爐的火候我閉著眼都記得。外來的料混進去，一整槽鋼就報廢。」
     - kind: speech
       speaker: actor
       text: 「那要是我先前換走的刀磨損了，或是不想用了，能怎麼處理？」
@@ -105,19 +105,19 @@ topics:
   label: 用刀
   fallback:
     scene_id: ciaran_hailiel_home.topic_04_scene
-    revision: r4
+    revision: r5
     lines:
     - kind: speech
       speaker: actor
-      text: 「窗外練刀場成天有刀破風的聲響。你在這裡打刀這麼久，對用刀有什麼看法？」
+      text: 「窗外練刀場整天有刀破風的聲響。你在這裡打刀這麼久，對用刀有什麼看法？」
     - kind: narration
-      text: 海莉爾‧斯塔爾法爾朝窗外瞥了一眼，神色緩了下來，指腹在刀柄的麻繩纏紋上摩挲。
+      text: 她朝窗外瞥了一眼，神色緩下來，指腹在刀柄的麻繩纏紋上摩挲。
     - kind: speech
       speaker: host
-      text: 「隔壁的泰莉爾守著場子，一把刀合不合手，她說了算。她試刀常拉我過去瞧，看得多了就明白，刀使得好不好，全看身形紮不紮實，腰腿吃不吃得住勁。」
+      text: 「隔壁的泰莉爾守著場子，一把刀合不合手，她說了算。她試刀常拉我過去瞧。看久了就明白，刀使得好不好，全看身形紮不紮實，腰腿吃不吃得住勁。」
     - kind: speech
       speaker: host
-      text: 「她一揮刀，腰往下沉，大腿繃緊，喘一聲就劈出去。我打一輩子的刀，也就愛她那副身子被刀帶著走的樣子，看多少年也看不夠。」
+      text: 「她一揮刀，腰往下沉，大腿繃緊，喘一聲就劈出去。我打一輩子刀，也就愛看她那副身子被刀帶著走的樣子，看多少年也看不夠。」
     - kind: speech
       speaker: actor
       text: 「聽你這麼說，刀不趁手，反而容易傷到自己。」

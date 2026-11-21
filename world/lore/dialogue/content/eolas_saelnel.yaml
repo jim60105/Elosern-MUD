@@ -1,65 +1,65 @@
 schema_version: 1
-greeting: 賽爾內爾‧妮格汀加勒坐在窗邊的矮桌前，指尖夾在書頁間，記著自己讀到哪裡，抬起頭來：「來了就坐。書看到一半，正好歇一歇。」她把攤開的書推向桌角，空出一塊桌面。「孩子，你想問山谷，還是想聽點舊事？」
+greeting: 賽爾內爾‧妮格汀加勒坐在窗邊的矮桌前，指尖夾在書頁間，記著自己讀到哪裡，才抬起頭。「來了就坐，書看到一半，正好歇一歇。」她把攤開的書推到桌角，空出一塊桌面。「孩子，你想問山谷，還是想聽點舊事？」
 topics:
 - topic_id: eolas_saelnel_home.topic_01
   keyword: 山谷
   label: 山谷
   fallback:
     scene_id: eolas_saelnel_home.topic_01_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
-      text: 「這座山谷是怎麼養活村裡的？吃的東西和穿的東西，都從谷裡來嗎？」
+      text: 「這座山谷是怎麼養活村裡的？吃的東西和穿的東西，都從谷裡自己來嗎？」
     - kind: speech
       speaker: host
-      text: 「谷壁的坡砌成石階菜畦，塊根、豆子與香草都種在那裡。往西是蛛絲林，絲抽成線，織成村人身上這件白衣。」
+      text: 「吃的從坡上來。我記得剛搬土上來那年，谷壁的坡沿著石層砌出菜畦，塊根、豆子、香草都種在那裡，土不夠肥，就靠溪水帶下來的泥。」
     - kind: speech
       speaker: host
-      text: 「窯場的土取自溪邊，燒出來的碗和玻璃夠全村用；溪源的水一路淌下來，喝、洗、澆菜都靠它。」
+      text: 「穿的就往西邊的蛛絲林去。蛛結網，我們收絲，抽成線再織成身上這件白衣。窯場的土從溪邊挖，燒出來的碗和玻璃，夠全村用。」
     - kind: speech
       speaker: actor
       text: 「那洗身子的地方呢？」
     - kind: speech
       speaker: host
-      text: 「溫泉浴場在谷壁底下。熱水從岩縫裡冒出來，池邊沒有隔間，也沒有人守著。洗身、洗衣、交歡，都在同一池水裡。誰也不避誰，山外來的客人起先拘謹，脫了衣裳就不記得自己先前彆扭了。」
+      text: 「谷壁底下有溫泉浴場，熱水從岩縫裡冒出來。池邊沒有隔間，也沒有人守著。洗身、洗衣、交歡，都在同一池水裡，誰也不避誰。山外來的客人頭幾回裹得嚴實，泡過幾夜，自己就鬆了。」
 - topic_id: eolas_saelnel_home.topic_02
   keyword: 圖書館
   label: 圖書館
   fallback:
     scene_id: eolas_saelnel_home.topic_02_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
-      text: 「聽說村裡有一座圖書館，是誰在管的？」
+      text: 「聽說村裡有一間圖書館，是誰在管的？」
     - kind: speech
       speaker: host
-      text: 「沒有人管。谷底那一間石室，架上的筆記由族人自己寫下，誰讀完就放回去，誰想抄就抄。」
+      text: 「沒有人管。谷底那間石室，門也不鎖，架上全是族人自己寫下來的筆記，誰讀完就放回去，想抄就抄。」
     - kind: speech
       speaker: host
-      text: 「有人試一種法術試了整個季節，就把每一次的結果寫下來。後頭的人不必從頭再試一次。」
+      text: 「有人試一種法術試了一整個季節，每一次的結果都寫下來，連哪一天手抖了都記。後頭的人翻到那頁，就不必從頭再試一次。」
     - kind: narration
-      text: 她用指節敲了敲桌上那本翻開的書，紙頁邊角已經磨軟。
+      text: 她用指節敲了敲桌上那本翻開的書，紙頁邊角已經磨得發軟。
     - kind: speech
       speaker: host
-      text: 「身體的事也有人寫。哪種歡好最盡興、哪種姿勢到了哪一步會疼、該往哪兒用力，都一筆一筆記在架上。孩子，要找什麼，說一聲，我指給你它在哪一排。」
+      text: 「身體的事也有人寫。哪種歡好最盡興、到哪一步會疼、該往哪兒使力，都記在架上。孩子，你要找哪一種，說一聲，我指給你在哪一排。」
 - topic_id: eolas_saelnel_home.topic_03
   keyword: 外人
   label: 外人
   fallback:
     scene_id: eolas_saelnel_home.topic_03_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
-      text: 「村子裡的人，怎麼看待從山外進來的人？」
+      text: 「村裡的人，怎麼看待從山外進來的人？」
     - kind: speech
       speaker: host
-      text: 「不特別提防，也不特別歡喜。你走進來，就是走進來了；要待多久，看你自己的意思。」
+      text: 「不特別提防，也不特別歡喜。你走進來就是走進來了，要待多久，看你自己。」
     - kind: speech
       speaker: host
-      text: 「谷裡的日子照常過。白天做事，晚上就享受彼此的身子，這是族裡本來的樣子，有客人來也一樣。你留在溫泉浴場看，也不會有人來問你。」
+      text: 「谷裡的日子照常過。白天做事，晚上想跟誰湊一塊就湊一塊，這是族裡本來的樣子，有客人來也一樣。你留在溫泉浴場看，也不會有人來問你。」
     - kind: speech
       speaker: actor
       text: 「那客人想在這裡住下呢？」
@@ -74,19 +74,19 @@ topics:
   disclosure: pure_chain
   fallback:
     scene_id: eolas_saelnel_home.topic_04_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「你剛說谷裡的日子，從前也是這樣過的嗎？」
     - kind: speech
       speaker: host
-      text: 「差不多就是這樣。我記得窯場剛砌好的那年，火一點起來，全村的人都圍過去看。有人說這窯燒不出玻璃，泰莉斯‧恩貝爾莉夫那時還沒開始燒窯，聽了就把手伸進火門裡探。」
+      text: 「差不多就是這樣。我記得窯場剛砌好的那年，火一點起來，全村的人都圍過去看。有人說這窯燒不出玻璃。泰莉斯那時還沒開始燒窯，聽了就把手伸進火門裡探。」
     - kind: narration
       text: 她笑了一下，把書往桌角推得更遠些。
     - kind: speech
       speaker: host
-      text: 「枕邊的人換了又換，幾百年裡也數不清。我記得的是那些願意在夜裡留到天亮、又肯說聲再會的人。蛛絲林後來才種起來。種樹那年，我身邊躺的還是另一個。」
+      text: 「身邊的人換了又換，我也數不清了。我記得的是那些願意在夜裡留到天亮、又肯說聲再會的人。蛛絲林後來才種起來，種樹那年，我身邊躺的還是另一個。」
     - kind: speech
       speaker: actor
       text: 「聽起來，那時候的谷裡也很熱鬧。」

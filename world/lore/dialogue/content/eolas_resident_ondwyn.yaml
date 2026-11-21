@@ -1,76 +1,90 @@
 schema_version: 1
-greeting: 翁德溫正把一株草湊近鼻尖，聞了聞，才轉向你：「你聞見了嗎？這是香草。」
+greeting: 翁德溫把一株草湊到鼻尖，聞了聞，才抬眼。「你聞見了嗎？這株的味道很衝。你剛要問什麼，我大概沒聽清。」
 topics:
 - topic_id: eolas_resident_ondwyn.topic_01
   keyword: 香草
   label: 香草
   fallback:
     scene_id: eolas_resident_ondwyn.topic_01_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「石階菜畦那幾樣香草，各是什麼味？」
+      text: 「石階菜畦那幾樣香草，聞起來都不一樣嗎？」
     - kind: speech
       speaker: host
-      text: 「有的清涼，有的發苦，還有的聞著甜、入口卻辛。我不用看，湊近一嗅就知道是哪株。」
+      text: 「不一樣。有的清涼，有的發苦，有的聞著甜，放進嘴裡卻辣舌頭。」
     - kind: narration
-      text: 她撕下一小片草葉，在指尖搓了搓，遞到你鼻前。
+      text: 她撕下一小片葉子，在指腹搓開，抬手遞到你鼻前。
     - kind: speech
       speaker: host
-      text: 「草不會說話，味就是它的話。你靜下心聞，比聽誰報名字都清楚。」
+      text: 「我不用低頭找，湊近一聞，就知道是哪一株，長在哪一階。」
+    - kind: speech
+      speaker: host
+      text: 「草不會講話，味道就是它的話。你靜下來聞，比聽誰報名字都準。」
 - topic_id: eolas_resident_ondwyn.topic_02
   keyword: 採集
   label: 採集
   fallback:
     scene_id: eolas_resident_ondwyn.topic_02_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「採草要挑時辰嗎？」
+      text: 「採草要挑時辰嗎？還是看見就摘？」
     - kind: speech
       speaker: host
-      text: 「要。晨露沒散，草頭最鮮；過了正午就蔫。我專挑天剛亮那陣上山，一縷一縷摘，不連根拔。」
+      text: 「要挑。晨露還沒散，草頭最飽；日頭過正午，葉子就垂。我天剛亮上山，揀嫩的掐，不連根拔。」
     - kind: speech
       speaker: host
-      text: 「摘回來的倒掛在樑下，風乾了封好。別嫌費工，草要是存壞了，就是一捧枯柴。」
+      text: 「採回來倒掛在樑下，讓風從葉縫穿過去。乾透了才收，收晚了會悶壞。」
+    - kind: narration
+      text: 她抬手比了比頭頂那排草束，指間還留著草汁的顏色。
+    - kind: speech
+      speaker: host
+      text: 「草壞了只能當柴燒。費這點工，留住的是它整年的氣味。」
 - topic_id: eolas_resident_ondwyn.topic_03
   keyword: 家人
   label: 家人
   fallback:
     scene_id: eolas_resident_ondwyn.topic_03_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「你一個人在這兒，家人呢？」
+      text: 「你一個人蹲在這兒，家裡人都不來嗎？」
     - kind: speech
       speaker: host
-      text: 「娘布瑞米爾在菜畦，姊姊阿拉瑞斯翻土。我管草。仨人各忙一頭，到飯點才碰頭。」
+      text: 「娘在菜畦那頭，姊姊阿拉瑞斯翻土。我管草。三個人各忙一攤，飯點才碰頭。」
     - kind: narration
-      text: 她目光還落在手裡的草上，語氣心不在焉。
+      text: 她說話時眼睛還黏在手裡那株草上，拇指捻著葉柄。
     - kind: speech
       speaker: host
-      text: 「姊姊總說我拔草能拔出神。其實我是在跟草說話，它扭一扭，我聽見了。」
+      text: 「姊姊說我拔草能拔出神。我就是這樣，蹲下去就忘了站起來。」
+    - kind: speech
+      speaker: host
+      text: 「其實我在聽草。它往哪邊扭，我就知道這階的土太濕。」
 - topic_id: eolas_resident_ondwyn.topic_04
   keyword: 名字
   label: 名字
   fallback:
     scene_id: eolas_resident_ondwyn.topic_04_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「『格林拉德』是這坡的名字？」
+      text: 「『格林拉德』是這片坡的名字嗎？」
     - kind: speech
       speaker: host
-      text: 「綠穀。春來坡上一片青，像一條綠色的穀子流下去。這家的姓，就長在那片青裡。」
+      text: 「綠穀。春天一到，坡上的青從上頭往下鋪，遠看整條坡都在流。」
     - kind: narration
-      text: 她閉了閉眼，像在聞那時的風。
+      text: 她閉了閉眼，鼻尖抽動，跟著風向偏了偏頭。
     - kind: speech
       speaker: host
-      text: 「我喜歡這姓。它讓我想起草還短、葉還嫩的年頭。」
+      text: 「這姓就長在那片青裡。報上姓，人家就知道我從哪條坡來。」
+    - kind: speech
+      speaker: host
+      text: 「我喜歡這姓。念一遍，嘴裡都是草味。」
 - topic_id: eolas_resident_ondwyn.topic_05
   keyword: 私語
   label: 私語
@@ -80,23 +94,26 @@ topics:
   unavailable: locked
   refusal:
     scene_id: eolas_resident_ondwyn.topic_05_refusal
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: host
-      text: 「草的心事我肯說，我的心事，得等我把你當草一樣認了。」
+      text: 「草的事我肯講，我的事得先把你當成自己人。你再來幾回，等我把你認熟了。」
   fallback:
     scene_id: eolas_resident_ondwyn.topic_05_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
       text: 「採回來的香草，你最中意哪一株？」
     - kind: speech
       speaker: host
-      text: 「是把採回的香草熬成一鍋，熱氣漫天的時候，解了衣裳泡進去。草香貼著皮膚，滲到骨裡，像被整片菜畦抱住了。」
+      text: 「都中意。真要挑，我會抓幾把丟進鍋裡煮，等熱氣起來，脫了衣裳坐進去。」
     - kind: narration
-      text: 她眼底亮了一下，轉瞬又埋進草叢裡。
+      text: 她眼底亮了一下，隨即又低下去看手裡的草。
     - kind: speech
       speaker: host
-      text: 「身子裹著草香，比裹著誰都安穩。你試過，便曉得這癮戒不掉。」
+      text: 「草香貼在皮膚上，洗過還留著。半夜翻個身，聞到的還是它。」
+    - kind: speech
+      speaker: host
+      text: 「身子泡在草湯裡，比裹著被子還安穩。你試過一次，大概會跟我一樣上癮。」

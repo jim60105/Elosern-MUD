@@ -1,18 +1,18 @@
 schema_version: 1
-greeting: 校場的伊沃‧高丘從練習樁那頭走回來，拍掉袖口的泥點：「看熱鬧，還是真打算下場？醜話說前頭，我這兒沒有捷徑，只有這片泥地、那排木樁，還有幾句老實話。」
+greeting: 校場的伊沃‧高丘從練習樁那頭走回來，拍掉袖口的泥點：「看熱鬧，還是真打算下場？醜話說前頭，我這兒沒有捷徑，只有這片泥地、那排木樁，還有幾句老實話。我嘴笨，講不出好聽話，你要練就留下。」
 topics:
 - topic_id: altoria_drill_yard.topic_01
   keyword: 修煉
   label: 修煉
   fallback:
     scene_id: altoria_drill_yard.topic_01_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
-      text: 「想在校場練練身手，這裡有規矩或時段限制嗎？」
+      text: 「想在校場練身手，這裡有規矩或時段限制嗎？」
     - kind: narration
-      text: 伊沃‧高丘拿木棍敲了敲腳邊夯實的泥地，咧嘴一笑。
+      text: 伊沃‧高丘拿木棍敲了敲腳邊夯實的泥地，咧嘴一笑，露出缺了一角的那顆牙。
     - kind: speech
       speaker: host
       text: 「場地開著、木樁立著，誰來了都能練，哪來那麼多規矩啦。」
@@ -22,18 +22,21 @@ topics:
     - kind: speech
       speaker: host
       text: 「手腳痠了就上長凳歇口氣，喘勻了再摸起傢伙。偷懶可換不來真力氣哪。」
+    - kind: speech
+      speaker: host
+      text: 「天沒亮我先把場地耙平，木樁一根一根摸過，有裂的就換。你踩上來的這塊地，我比自個兒的床還熟。」
 - topic_id: altoria_drill_yard.topic_02
   keyword: 考核
   label: 考核
   fallback:
     scene_id: altoria_drill_yard.topic_02_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
       text: 「冒險者想評階、升位階，校場這裡管考核嗎？」
     - kind: narration
-      text: 伊沃‧高丘搖搖頭，把木棍往胳肢窩下一夾。
+      text: 伊沃‧高丘搖了搖頭，把木棍往胳肢窩下一夾，棍尾在泥地上拖出一道淺痕。
     - kind: speech
       speaker: host
       text: 「升階是冒險者公會的事啦。考官自個兒會查你的功績、掂你的能耐。」
@@ -43,12 +46,15 @@ topics:
     - kind: speech
       speaker: host
       text: 「先把底子磨紮實，別站到考官跟前三兩下就被撂倒，那才丟臉哪。」
+    - kind: speech
+      speaker: host
+      text: 「看場子看了十年，最怕有人問我能不能替他講句話。那句話我講了也沒用，考官看的是你手上的東西。」
 - topic_id: altoria_drill_yard.topic_03
   keyword: 切磋
   label: 切磋
   fallback:
     scene_id: altoria_drill_yard.topic_03_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
@@ -64,18 +70,21 @@ topics:
     - kind: speech
       speaker: host
       text: 「這片泥地最大的好處，是摔倒了頂多沾一身泥，總比跌在石板街上磕破腦門強哪。」
+    - kind: speech
+      speaker: host
+      text: 「我這隻耳朵，是年輕時跟人較勁削掉一角。那時候覺得自己不怕，現在下雨天還會癢。」
 - topic_id: altoria_drill_yard.topic_04
   keyword: 教頭
   label: 教頭
   fallback:
     scene_id: altoria_drill_yard.topic_04_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
       text: 「你當校場教頭，平日會教步伐、指點發力的門道嗎？」
     - kind: narration
-      text: 伊沃‧高丘蹲下身，拿木棍在泥地上劃了兩道步線。
+      text: 伊沃‧高丘蹲下身，拿木棍在泥地上劃了兩道步線，線與線之間留得比常人肩寬。
     - kind: speech
       speaker: host
       text: 「教頭哪，說穿了就是替大夥看場子、除草。」
@@ -85,3 +94,6 @@ topics:
     - kind: speech
       speaker: host
       text: 「光站在旁邊盯木樁上的深痕沒用。老實揮劍，揮到手麻，手勁自己就長出來啦。」
+    - kind: speech
+      speaker: host
+      text: 「真要我指點，我就蹲在這兒，用棍子在地上畫你的步法給你看。看完了，還是得你自己走。」

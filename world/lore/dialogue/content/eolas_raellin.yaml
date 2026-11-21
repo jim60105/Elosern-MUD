@@ -1,25 +1,25 @@
 schema_version: 1
-greeting: 雷林‧莉特弗特從窯邊回來，籃裡的豆餅還冒著熱氣。她把最上面那張掰成兩半，一半遞過來，衣袖挽到肩頭，額上還帶著窯火的紅。「先吃。吃飽了才有力氣上路。」她笑著看過來，眼睛裡都是亮光，「是往獸徑上去，還是剛從外頭回來？夜裡外頭冷，我也不想一個人躺著，邊吃邊說嘛。」
+greeting: 雷林‧莉特弗特從窯邊回來，籃裡的豆餅還冒著熱氣。她把最上面那張掰成兩半，一半遞過來，衣袖挽到肩頭，額上還留著窯火的紅。「先吃。吃飽了才有力氣上路。」她笑著看你，「是往獸徑上去，還是剛從外頭回來？夜裡外頭冷，我也不想一個人躺，邊吃邊講嘛。」
 topics:
 - topic_id: eolas_raellin_home.topic_01
   keyword: 豆餅
   label: 豆餅
   fallback:
     scene_id: eolas_raellin_home.topic_01_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
       text: 「幽月窯烤豆餅是怎麼做的？聞起來和城裡賣的餅不一樣。」
     - kind: speech
       speaker: host
-      text: 「豆子種在石階菜畦；泡軟、磨成泥，再和貯存的麥粉揉成麵團。麵團發好，等窯燒完那一爐，壁還熱就貼進去。」
+      text: 「豆子種在石階菜畦，泡軟、磨成泥，再和貯存的麥粉揉成麵團。麵團發好，等窯燒完那一爐，壁還熱就貼進去。」
     - kind: speech
       speaker: host
       text: 「火太旺會焦，太涼又不熟。我守在火門邊聽聲音，餅皮一響就翻面。」
     - kind: speech
       speaker: host
-      text: 「出爐的餅掰開要冒氣，才算剛好。放涼了也還軟，帶上獸徑走一天不會硬。你走累了，這口熱的就是我疼你的方式，吃進肚子裡暖得起來。」
+      text: 「出爐的餅掰開要冒氣，才算剛好。放涼了也還軟，帶上獸徑走一天不會硬。這一張熱餅留給你，吃進肚子裡暖得起來。」
     - kind: speech
       speaker: actor
       text: 「所以這餅是跟著別人的窯一起烤的？」
@@ -31,7 +31,7 @@ topics:
   label: 菜畦
   fallback:
     scene_id: eolas_raellin_home.topic_02_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor
@@ -55,7 +55,7 @@ topics:
   label: 共食
   fallback:
     scene_id: eolas_raellin_home.topic_03_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
@@ -80,7 +80,7 @@ topics:
   label: 收回
   fallback:
     scene_id: eolas_raellin_home.topic_04_scene
-    revision: r2
+    revision: r3
     lines:
     - kind: speech
       speaker: actor

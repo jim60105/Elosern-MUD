@@ -1,90 +1,111 @@
 schema_version: 1
-greeting: 泰林把額前被蒸汽蒸得貼住的髮往耳後一別，笑著迎上來：「是要泡泉，還是問池子的事？我帶路。」
+greeting: 泰林把貼在額角的濕髮撥開，笑著迎上來。「要泡泉？還是問池子？我帶你去，省得你踩滑。」
 topics:
 - topic_id: eolas_resident_taellin.topic_01
   keyword: 溫泉
   label: 溫泉
   fallback:
     scene_id: eolas_resident_taellin.topic_01_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「哪口池子最適合頭一次來的人？」
+      text: 「哪口池子適合頭一次來的人？」
     - kind: speech
       speaker: host
-      text: 「外頭那口最溫，先坐進去把身子焐軟。裡頭那口能把人燙得直叫喚，我勸你別一頭栽進去，對不對？」
+      text: 「外頭那口最溫，先坐進去，把腳泡熱了再說。裡頭那口燙得人直叫，你別一頭栽進去，對不對？」
     - kind: narration
-      text: 她伸腳在池邊試了試水面，再朝你招手。
+      text: 她伸腳在池邊試了試水，回頭朝你招手。
     - kind: speech
       speaker: host
-      text: 「泡到腳心發熱再往裡換。放心，谷裡沒人笑你，大夥都一樣脫個乾淨。」
+      text: 「腳心熱了再往裡換，中間隔著石階，踩穩了挪過去。」
+    - kind: speech
+      speaker: host
+      text: 「放心，谷裡沒人笑你。大夥都脫得乾淨，誰也不看誰。」
 - topic_id: eolas_resident_taellin.topic_02
   keyword: 布巾
   label: 布巾
   fallback:
     scene_id: eolas_resident_taellin.topic_02_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
       text: 「你在這兒都忙些什麼？」
     - kind: speech
       speaker: host
-      text: 「遞布、添柴、撈落葉。誰泡完澡手一伸，乾淨的布就送到他跟前。我幹這活，一天看遍谷裡光著的身子。」
+      text: 「遞布、添柴、撈落葉。誰泡完手一伸，乾淨的布就送到他手上。」
     - kind: speech
       speaker: host
-      text: 「看久了就知道，誰愛先暖腳、誰一進水就閉眼。身子軟了，人心也軟，講的話都像從水裡浮起來。」
+      text: 「一天看下來，誰愛先暖腳、誰一下水就閉眼，我心裡都有數。」
+    - kind: narration
+      text: 她把一疊布巾往石台上一放，順手壓平邊角。
+    - kind: speech
+      speaker: host
+      text: 「身子泡軟了，話也跟著軟。池邊聽見的閒話，比屋裡多。」
 - topic_id: eolas_resident_taellin.topic_03
   keyword: 姊妹
   label: 姊妹
   fallback:
     scene_id: eolas_resident_taellin.topic_03_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「你家裡還有別的人嗎？」
+      text: 「你家裡還有別人嗎？」
     - kind: speech
       speaker: host
-      text: 「我娘佩倫林顧著池子，我妹妹伊倫林老泡在最燙那口，喊都喊不動。一家三口白天各忙一頭，夜裡在池邊才算齊。」
+      text: 「娘佩倫林顧著池子，我妹妹伊倫林老泡在最燙那口，喊都喊不動。」
+    - kind: narration
+      text: 她往裡頭那口池子抬了抬下巴，水氣後面有個人影靠著石壁。
     - kind: speech
       speaker: host
-      text: 「我妹妹那性子，你要是泡著泡著想瞇一覺，就跟去她那口，她一整個下午不挪窩，安靜得像池子裡養出來的水草。」
+      text: 「白天各忙一頭，夜裡在池邊才湊齊。誰先到就先佔位置。」
+    - kind: speech
+      speaker: host
+      text: 「你想安靜瞇一下，就去我妹妹那口。她一下午不挪窩，比石頭還穩。」
 - topic_id: eolas_resident_taellin.topic_04
   keyword: 谷裡
   label: 谷裡
   fallback:
     scene_id: eolas_resident_taellin.topic_04_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「谷裡晚上也這麼靜嗎？」
+      text: 「谷裡的晚上，也這麼安靜嗎？」
     - kind: speech
       speaker: host
-      text: 「才不。夜裡才是熱鬧的開始，泉邊人聲、水聲、聽不出誰跟誰的喘息攪在一塊。谷裡的夜不藏著，你待一夜就曉得。」
+      text: 「才不。夜裡才熱鬧。泉邊人聲、水聲，還有聽不出誰跟誰的喘氣，全攪在一塊。」
     - kind: speech
       speaker: host
-      text: 「有些人家做完愛就泡進池裡，再接著說第二天的活。這裡沒有見不得人的事，只有燙熨得身子更軟。」
+      text: 「有的人摟完就下水，泡著泡著又講起明天要做的活。」
+    - kind: narration
+      text: 她笑了笑，拿布巾擦了擦石階上的水。
+    - kind: speech
+      speaker: host
+      text: 「這裡沒有見不得人的事。水一燙，人就鬆，話也好講。」
 - topic_id: eolas_resident_taellin.topic_05
   keyword: 名字
   label: 名字
   fallback:
     scene_id: eolas_resident_taellin.topic_05_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
       text: 「你們家怎麼就叫溫德松？」
     - kind: speech
       speaker: host
-      text: 「我娘說，泉眼冒出的白氣像林裡的風，吹過松針會唱。這家守著水，也守著那陣歌聲，就成了溫德松。」
+      text: 「我娘說，泉眼冒的白氣讓風一吹，繞過松林會哼。這家守著水，也守著那聲音，就叫溫德松。」
     - kind: narration
-      text: 她伸手接了一捧水汽，攤開掌心給你看，又任它散掉。
+      text: 她伸手接了一捧水氣，攤開掌心，又任它散掉。
     - kind: speech
       speaker: host
-      text: 「名字這東西說不清，像這霧。你在谷裡住久了，也就懂了。」
+      text: 「名字這種東西，抓不住。你喊久了，它自己就長出意思。」
+    - kind: speech
+      speaker: host
+      text: 「你在谷裡住一陣，聽見風吹松針，大概就懂。」
 - topic_id: eolas_resident_taellin.topic_06
   keyword: 私事
   label: 私事
@@ -94,23 +115,26 @@ topics:
   unavailable: locked
   refusal:
     scene_id: eolas_resident_taellin.topic_06_refusal
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: host
-      text: 「這是我心裡的小事，等哪天你在池邊跟我坐熟了，我再說。」
+      text: 「這是我自己留著的小事，不隨便講。等你在池邊跟我坐熟了，我再說。」
   fallback:
     scene_id: eolas_resident_taellin.topic_06_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「你有沒有只屬於自己的小喜好？」
+      text: 「你有沒有只屬於自己的小習慣？」
     - kind: speech
       speaker: host
-      text: 「有。我喜歡剛洗完、身子還滾燙的時候，一個人裹著半濕的布站在池邊，讓夜風吹乾。風貼著紅透的皮，一涼一熱，人都站不穩。」
+      text: 「有。剛洗完，身上還燙，我就裹著半濕的布站在池邊，讓夜風吹乾。」
     - kind: narration
-      text: 她說得眉飛色舞，酒窩漾開，像是正享受那陣風。
+      text: 她說得起勁，嘴角的窩都笑出來。
     - kind: speech
       speaker: host
-      text: 「這種舒服只有自己知道夠不夠。」
+      text: 「風貼著發熱的皮，一涼一熱，人站都站不穩。那種舒服，只有自己知道夠不夠。」
+    - kind: speech
+      speaker: host
+      text: 「你哪天試一回，別急著穿衣裳。」

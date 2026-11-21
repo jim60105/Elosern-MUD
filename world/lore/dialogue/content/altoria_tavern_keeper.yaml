@@ -1,5 +1,5 @@
 schema_version: 1
-greeting: 醉月酒館的門一開，暖意和酒氣就裹了過來。老闆娘蘿溫‧古橡把抹布往右肩一甩，耳垂的小銅鈴便叮噹作響，她靠著吧台朝你挑了挑眉：「唷，新面孔。先說清楚，我這屋裡只有一條規矩，桌上說的話，出了門就爛在肚子裡，誰也別拿去嚼舌根。想打聽什麼，得靠你自己張嘴去問；真遇上聊得來的人，多喝兩杯再談結伴。光坐著發呆，可沒人替你開口。」
+greeting: 醉月酒館的門一開，暖氣和酒味就撲過來。蘿溫‧古橡把抹布往肩上一甩，耳垂的小銅鈴跟著響。她靠著吧台朝你挑了挑眉：「唷，新面孔。屋裡只有一條規矩，在桌上講過什麼，出了門就爛在肚子裡。想打聽什麼，自己張嘴問；遇上聊得來的人，多喝兩杯再談結伴。光坐著，可沒人替你開口。」
 topics:
 - topic_id: altoria_tavern.topic_01
   keyword: 傳聞
@@ -13,40 +13,43 @@ topics:
       source_key: violet_altoria
     scene:
       scene_id: altoria_tavern.topic_01_scene_violet
-      revision: r4
+      revision: r5
       lines:
       - kind: speech
         speaker: actor
-        text: 「老闆娘，最近城裡有什麼風聲？我陪人出來，順便打聽點動靜。」
+        text: 「老闆娘，最近城裡有什麼動靜？我陪人出門，坐下來順便問兩句。」
       - kind: narration
-        text: 蘿溫的目光在你身旁的同伴身上停了停，又轉回你臉上，接著手背在吧台上輕叩了兩下。
+        text: 蘿溫的目光在你身旁的同伴身上停了停，又轉回你臉上，手背在吧台上輕叩了兩下。
       - kind: speech
         speaker: host
-        text: 「唷，帶著貴客出門呢。我這屋裡的常客眼睛都毒，誰一身貴氣，藏也藏不住。別擔心，進來這兒的都想喝兩杯，沒人會為難你。」
+        text: 「唷，今天帶了伴呢。我這屋裡的常客眼睛都毒，誰不常來這種地方，一眼就看得出來。不過你放心，進來這兒的都想喝兩杯，沒人會為難你們。」
       - kind: speech
         speaker: actor
-        text: 「我們只是歇個腳，喝點東西，順便問路。」
+        text: 「我們就是歇一歇，喝點東西，順便問個路。」
       - kind: speech
         speaker: host
-        text: 「路況這種事最乾淨，我這兒誰都能聊。西邊那桌有幾個剛從西部丘陵探路回來，你湊過去搭句話，比問我管用。我這兒只管看顧規矩。」
+        text: 「問路最乾淨，我這兒誰都能聊。西邊那桌有幾個剛從丘陵探路回來，你湊過去搭句話，比問我管用。我只管看顧規矩。」
   fallback:
     scene_id: altoria_tavern.topic_01_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
-      text: 「老闆娘，這陣子城裡城外有什麼風聲？我想知道哪兒能撈到活、哪兒又出了麻煩。」
+      text: 「老闆娘，這陣子城裡城外有什麼風聲？哪兒有活可接，哪兒又出了麻煩？」
     - kind: narration
-      text: 蘿溫提起銅壺，斟滿一只木杯推到吧台邊，下巴朝熱鬧的桌子一努。
+      text: 蘿溫拎起銅壺，倒了滿杯推到你手邊，下巴朝最吵的那桌一抬。
     - kind: speech
       speaker: host
-      text: 「風聲都在那些杯子後頭的嘴裡。誰剛從迷宮底爬出來，哪條商道上撞見了魔獸，你坐過去，先請人喝一杯，話匣子自然開。我這兒只賣酒，不賣消息。」
+      text: 「風聲都在那些杯子後頭的嘴裡。誰剛從迷宮底爬出來，哪條商道上撞了魔獸，你坐過去，先請人喝一杯，話匣子自己就開了。我這兒只賣酒，不賣消息。」
+    - kind: speech
+      speaker: host
+      text: 「前幾天還有人在我這兒講得天花亂墜，說自己清過整層迷宮，隔天卻在東市買止血藥草。這種話你聽一半就好。」
     - kind: speech
       speaker: actor
-      text: 「那要跟不認識的人起頭，怎麼開口才不算唐突？」
+      text: 「那跟不認識的人起頭，怎麼開口才不唐突？」
     - kind: speech
       speaker: host
-      text: 「先點杯酒擱那兒，等人先開腔。聊路況、聊收成，都有人接。別一開口就問人兜裡幾枚銀子，踩了線，我可要請他出去吹冷風。」
+      text: 「先點杯酒擱著，等人先開口。聊路況、聊收成，都有人接。別一開口就問人家兜裡有幾枚銀子，踩到線，我請他出去吹冷風。」
 - topic_id: altoria_tavern.topic_02
   keyword: 同伴
   label: 同伴
@@ -55,61 +58,73 @@ topics:
   disclosure: pure_chain
   fallback:
     scene_id: altoria_tavern.topic_02_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
-      text: 「在酒館裡想結識一起出城的人，怎麼看才靠得住？」
+      text: 「在酒館裡想找一起出城的人，怎麼看才靠得住？」
     - kind: narration
-      text: 蘿溫斂起調侃，指節在橡木吧台上敲兩下。
+      text: 蘿溫收起調侃，指節在橡木吧台上敲了兩下。
     - kind: speech
       speaker: host
-      text: 「找同伴不是買菜，光看臉不成。同桌喝酒聊得再熱，進了迷宮會不會把後背交給你，是另一回事。先看那人遇事時的眼神沉不沉。」
+      text: 「找同伴不是挑菜，光看臉不行。同桌喝酒聊得再熱，進了迷宮會不會把後背交給你，是另一回事。」
     - kind: speech
       speaker: host
-      text: 「這店我接了十年，看過太多人湊成一對，沒出巷口就散了，也有睡過一床、天亮各走各路。兩個人摸清對方脾氣，才談得上把命交給彼此。急不得。」
+      text: 「先看那人遇上事的時候，眼神沉不沉。我這店接了十年，看過太多人湊成一對，沒出巷口就散了。」
+    - kind: speech
+      speaker: host
+      text: 「也有人睡過一床，天亮各走各的路。摸清對方脾氣，才談得上把命交給彼此。急不得。」
     - kind: speech
       speaker: actor
-      text: 「所以得處久些，把人看清了再定。」
+      text: 「那你自己怎麼看人？」
+    - kind: speech
+      speaker: host
+      text: 「我啊，看人先看他怎麼對待上酒慢的那桌。等得不耐煩，出了事也等不了你。」
 - topic_id: altoria_tavern.topic_03
   keyword: 委託
   label: 委託
   fallback:
     scene_id: altoria_tavern.topic_03_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
-      text: 「你這兒有商隊還是領主託下來的差事能接嗎？我想找點正經活幹。」
+      text: 「這裡有沒有商隊或領主留下來的差事？我想找點正經活做。」
     - kind: narration
-      text: 她把一只擦淨的玻璃杯倒扣上架，朝巷口方向揚了揚下巴。
+      text: 她把擦好的玻璃杯倒扣在架上，下巴朝巷口那邊抬了抬。
     - kind: speech
       speaker: host
-      text: 「正經差事去冒險者公會，大廳看板上的單子才有法度保障。我這兒是喝酒的地方，不替官府也不替商會派活。」
+      text: 「正經差事去冒險者公會，大廳看板上的單子才有保障。我這兒是喝酒的地方，不替官府派活，也不替商會招人。」
     - kind: speech
       speaker: actor
-      text: 「那我到公會接了單，再回來你這兒找人搭夥？」
+      text: 「那我到公會接了單，再回來你這兒找人搭夥，行嗎？」
     - kind: speech
       speaker: host
-      text: 「這路數對。看板上挑好討伐還是護衛的活，回頭拉幾個人，圍著壁爐把分工講透，路上才少吃虧。酒桌上說清的事，進了林子才不會亂。」
+      text: 「這路數對。看板上挑好討伐還是護衛的活，回頭拉幾個人，圍著火塘把分工講透，路上才少吃虧。」
+    - kind: speech
+      speaker: host
+      text: 「酒桌上講清楚的事，進了林子才不會亂。這句我免費送你，下一杯要收錢。」
 - topic_id: altoria_tavern.topic_04
   keyword: 歇腳
   label: 歇腳
   fallback:
     scene_id: altoria_tavern.topic_04_scene
-    revision: r3
+    revision: r4
     lines:
     - kind: speech
       speaker: actor
-      text: 「天都黑透了，這巷子裡哪兒能踏實睡一覺？」
+      text: 「天色都黑透了，這條巷子裡哪裡能睡個安穩覺？」
     - kind: narration
-      text: 蘿溫指了指酒館跟隔壁共用的那道厚石牆，語氣軟下來。
+      text: 蘿溫指了指酒館和隔壁共用的那道厚石牆，語氣軟下來。
     - kind: speech
       speaker: host
-      text: 「只想坐著取暖，我這火塘邊的長凳隨便坐。真想闔眼睡沉，隔壁就是爐火旅店，溫弗蕾德在管。她那兒的被褥勤洗勤曬，房門閂也結實，牆厚，隔音。」
+      text: 「只想坐著取暖，火塘邊的長凳隨便坐。真想睡沉，隔壁就是爐火旅店，溫弗蕾德在管。她那兒被褥常洗常曬，房門閂結實，牆也厚，睡得安穩。」
     - kind: speech
       speaker: host
-      text: 「喝完這杯就過去，別等熄燈了才敲門，她上了樓可不會再下來。」
+      text: 「喝完這杯就過去，別等熄燈才敲門。她上了樓，可不會再下來。」
     - kind: speech
       speaker: actor
-      text: 「知道了，我這杯喝完就過去。」
+      text: 「那我把這杯喝完再過去，還來得及嗎？」
+    - kind: speech
+      speaker: host
+      text: 「來得及。喝太快，白糟蹋酒，也糟蹋睡覺的心情。」

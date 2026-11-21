@@ -1,76 +1,90 @@
 schema_version: 1
-greeting: 翁德斯閉著眼站在風口，好一會才轉向你：「風正吹過。你找我有事？」
+greeting: 翁德斯側著頭聽了一會，才睜開眼：「你踩到枯枝的時候，我就聽見了。」
 topics:
 - topic_id: fionnen_resident_ondeth.topic_01
   keyword: 聽風
   label: 聽風
   fallback:
     scene_id: fionnen_resident_ondeth.topic_01_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「風有什麼好聽的？」
+      text: 「風有什麼好聽的？我聽到的都一樣。」
     - kind: speech
       speaker: host
-      text: 「風裡有葉、有鳥、有遠方的雲。它拂過哪棵樹，我都聽得出來。聽久了，林子就跟你說話。」
+      text: 「不一樣。葉子翻面是一種聲音，鳥被驚起是另一種。風把林子裡的事一樣一樣送過來。」
     - kind: narration
-      text: 她側過耳，像在辨認一陣極細的動靜。
+      text: 她側過耳朵，停了一下，林子那頭還沒有動靜。
     - kind: speech
       speaker: host
-      text: 「你靜下來，也能聽見。這林子的心跳，就藏在風裡。」
+      text: 「你閉上眼聽。樹頂那邊現在有隻鳥在換枝，腳抓得不太穩。」
+    - kind: speech
+      speaker: host
+      text: 「我不用看。聽久了，林子會自己告訴我。」
 - topic_id: fionnen_resident_ondeth.topic_02
   keyword: 動靜
   label: 動靜
   fallback:
     scene_id: fionnen_resident_ondeth.topic_02_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「林子裡有什麼動靜，都逃不過你的耳朵？」
+      text: 「林子裡有什麼動靜，你都能先知道？」
     - kind: speech
       speaker: host
-      text: 「大多逃不過。鳥驚了，葉動了，獸踩斷了枯枝，我都先知道。所以谷裡人叫我這家的耳朵。」
+      text: 「大多能。獸踩斷枯枝、鳥突然不叫、溪水聲音變悶，都是有東西經過。」
     - kind: speech
       speaker: host
-      text: 「夜深了，林子也不靜。交纏的喘息、翻身的響，都順著風來。我聽得見，只是不去驚。」
+      text: 「夜裡林子也不安靜。有人笑、有人喘，順著風都聽得見。我聽見了就翻身，不去打擾。」
+    - kind: narration
+      text: 她垂下眼，手指在膝上敲了一下又停。
+    - kind: speech
+      speaker: host
+      text: 「村裡人叫我這家的耳朵。其實我不愛聽太多，聽多了睡不好。」
 - topic_id: fionnen_resident_ondeth.topic_03
   keyword: 家人
   label: 家人
   fallback:
     scene_id: fionnen_resident_ondeth.topic_03_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「你家裡，就你耳朵最靈？」
+      text: 「你們家三個人，各管一片林子？」
     - kind: speech
       speaker: host
-      text: 「娘貝瑞娜拉看天，姊姊洛爾內爾爬樹。我聽風。仨人一個看、一個爬、一個聽，把這片林護得周全。」
+      text: 「娘貝瑞娜拉看天，姊姊洛爾內爾爬樹。我聽風。三個方向，剛好把村子圍起來。」
     - kind: narration
-      text: 她語氣很輕，像怕吵到什麼。
+      text: 她說話很輕，像怕吵到遠處什麼。
     - kind: speech
       speaker: host
-      text: 「我話少，姊姊話多。一家人裡，我常是那個先發現事的人。」
+      text: 「姊姊在高處看，我在下面聽。她有時候報下來的事，我早就聽見了。」
+    - kind: speech
+      speaker: host
+      text: 「我們不爭這個。她看她的天，我聽我的風，回家的時候再對一對。」
 - topic_id: fionnen_resident_ondeth.topic_04
   keyword: 名字
   label: 名字
   fallback:
     scene_id: fionnen_resident_ondeth.topic_04_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「蒙斯哈德，是月光下的影？」
+      text: 「蒙斯哈德，是月影的意思？」
     - kind: speech
       speaker: host
-      text: 「月影。夜裡月影挪動，沒有聲音，可我聽得見它壓過草葉。這家就認了這片靜。」
+      text: 「月影。夜裡月影挪過草葉，沒有聲音。我聽不見，只能看著它動。」
     - kind: narration
-      text: 她低頭，看腳下那片月光慢慢移。
+      text: 她低頭看腳邊，那裡的樹影正被風推著晃。
     - kind: speech
       speaker: host
-      text: 「名靜，我也靜。你往後夜裡想靜一靜，就來找我。」
+      text: 「娘說這名字給家裡最靜的人。我話少，就落到我頭上。」
+    - kind: speech
+      speaker: host
+      text: 「名字靜，人也靜。這樣也好，省得跟人搶話講。」
 - topic_id: fionnen_resident_ondeth.topic_05
   keyword: 私語
   label: 私語
@@ -80,23 +94,29 @@ topics:
   unavailable: locked
   refusal:
     scene_id: fionnen_resident_ondeth.topic_05_refusal
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: host
-      text: 「風裡的話，我只跟一起靜過的人說。」
+      text: 「風裡的話，我只講給一起靜下來的人聽。你現在還沒靜。」
   fallback:
     scene_id: fionnen_resident_ondeth.topic_05_scene
-    revision: r1
+    revision: r2
     lines:
     - kind: speech
       speaker: actor
-      text: 「你最想要的時刻，是什麼樣？」
+      text: 「一個人聽了一整天的風，晚上你最想聽什麼？」
     - kind: speech
       speaker: host
-      text: 「是夜半無風，林子靜得能聽見自己的心跳。有個人躺在我身邊，用指尖順著我的耳廓，一下一下。她的呼吸貼著我，比什麼聲音都清楚。那一刻，我只聽得見她。」
+      text: 「心跳。夜半無風的時候，林子靜得嚇人，自己的心跳反而最大聲。」
+    - kind: speech
+      speaker: host
+      text: 「有個人躺在我旁邊，呼吸貼著我的耳朵。我不必聽風，就知道她在。」
     - kind: narration
-      text: 她眼睫輕顫，像還沉在那片靜裡。
+      text: 她的眼睫動了一下，像從很遠的地方回來。
     - kind: speech
       speaker: host
-      text: 「聽了一輩子風，最想聽一個人的心跳。你懂了，就懂我。」
+      text: 「她的手指順著我的耳廓走，一下一下。我那時什麼都聽不見，只聽見她。」
+    - kind: speech
+      speaker: host
+      text: 「聽風聽久了，會想知道有誰是真的在我身邊。你要留下來，就別出聲。」
