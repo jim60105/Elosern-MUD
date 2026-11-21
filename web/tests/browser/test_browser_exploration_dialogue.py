@@ -116,11 +116,14 @@ def _scene_frame(page) -> dict:
           return {
             scene: win && win.getAttribute('data-scene'),
             speaker: win && win.getAttribute('data-scene-speaker'),
+            sceneLine: win && win.getAttribute('data-scene-line'),
+            sceneLines: win && win.getAttribute('data-scene-lines'),
             typing: win && win.getAttribute('data-typing'),
             readingComplete: win && win.getAttribute('data-reading-complete'),
             text: surface ? surface.innerText.trim() : null,
             page: surface && surface.getAttribute('data-page'),
             pages: surface && surface.getAttribute('data-pages'),
+            layoutCurrent: surface && surface.getAttribute('data-layout-current'),
             plate: plate ? plate.textContent : null,
             spacer: !!document.querySelector('[data-testid="message-plate-spacer"]'),
             actor: speaking('actor-left'),
@@ -130,6 +133,68 @@ def _scene_frame(page) -> dict:
             focusOnPage: document.activeElement === surface,
           };
         }"""
+    )
+
+
+def _wait_scene_layout(page) -> None:
+    """Wait until a playing scene's pages belong to the line on screen.
+
+    A scene line's page list is re-measured asynchronously once its glyphs
+    load; an activation in that window is dropped by the page owner. Journeys
+    wait for the laid-out page before they read or activate it.
+    """
+    page.wait_for_function(
+        """() => {
+          const win = document.querySelector('[data-testid="message-window"]');
+          const surface = document.querySelector('[data-testid="message-page"]');
+          if (!win || !surface) { return false; }
+          return win.getAttribute('data-scene') !== 'true'
+            || surface.getAttribute('data-layout-current') === 'true';
+        }""",
+        timeout=30000,
+    )
+
+
+def _wait_scene_settled(page, previous: dict) -> None:
+    """Wait for the laid-out frame one activation produced after ``previous``.
+
+    The scene's line position, speaker, page and typing state identify one
+    rendered frame; the choice list appearing is the finished scene, which
+    must also be laid out and reported as read.
+    """
+    page.wait_for_function(
+        """(previous) => {
+          const win = document.querySelector('[data-testid="message-window"]');
+          const surface = document.querySelector('[data-testid="message-page"]');
+          if (!win || !surface) { return false; }
+          const choices = document.querySelector(
+            '[data-anchor="choices"] [data-testid="dialogue-choices"]');
+          const current = surface.getAttribute('data-layout-current') === 'true';
+          if (choices) {
+            return current && win.getAttribute('data-reading-complete') === 'true';
+          }
+          if (!current) { return false; }
+          const now = [
+            win.getAttribute('data-scene-line'),
+            win.getAttribute('data-scene-speaker'),
+            surface.getAttribute('data-page'),
+            surface.getAttribute('data-pages'),
+            win.getAttribute('data-typing'),
+          ].join('|');
+          const was = [
+            previous.sceneLine,
+            previous.speaker,
+            previous.page,
+            previous.pages,
+            previous.typing,
+          ].join('|');
+          return now !== was;
+        }""",
+        arg={
+            key: previous[key]
+            for key in ("sceneLine", "speaker", "page", "pages", "typing")
+        },
+        timeout=30000,
     )
 
 
@@ -994,12 +1059,15 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         wait_scene_line("說個故事吧。")
         log_length = narrative_log_length(page)
 
+        _wait_scene_layout(page)
         frames = [_scene_frame(page)]
         for _ in range(12):
             if frames[-1]["choices"]:
                 break
+            _wait_scene_layout(page)
             page.locator('[data-testid="message-page"]').focus()
             _press(page, "Enter", wait_ms=120)
+            _wait_scene_settled(page, frames[-1])
             frames.append(_scene_frame(page))
         steps = [
             (f["speaker"], f["plate"], f["actor"], f["host"], f["page"], f["pages"])
@@ -1105,6 +1173,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         )
         # Worth the same as every other host: no private package/role payload.
         self.assertNotIn("package_id", json.dumps(panel))
+        _wait_scene_layout(page)
         first = _scene_frame(page)
         self.assertEqual(
             (first["speaker"], first["actor"], first["host"]),
@@ -1113,8 +1182,10 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         for _ in range(8):
             if _scene_frame(page)["choices"]:
                 break
+            _wait_scene_layout(page)
             page.locator('[data-testid="message-page"]').focus()
             _press(page, "Enter", wait_ms=120)
+        _wait_scene_layout(page)
         self.assertTrue(_scene_frame(page)["choices"])
         self.assertEqual(sent_action_count(page, "explore.talk_scripted"), 1)
 
@@ -1161,7 +1232,9 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         delivery = store_state(page)["panels"]["dialogue"]["delivery"]
         for _ in range(14):
             if _scene_frame(page)["choices"]:
+                _wait_scene_layout(page)
                 return delivery["topic_id"]
+            _wait_scene_layout(page)
             page.locator('[data-testid="message-page"]').focus()
             _press(page, "Enter", wait_ms=120)
         raise AssertionError("the authored scene never reached its explicit finish")
@@ -1200,7 +1273,18 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             "the failed attempt never crossed the wire",
         )
         self.assertEqual(sent_action_count(page, "explore.talk_scripted"), 1)
-        read_text = page.locator('[data-testid="message-page"]').inner_text()
+        # The finished scene's screen position is logic, not prose: its pages
+        # belong to the line on screen, that line is the delivered scene's
+        # last one, its last page is shown, and the scene reports itself read.
+        played = _scene_frame(page)
+        self.assertEqual(
+            (played["scene"], played["layoutCurrent"]), ("true", "true")
+        )
+        self.assertEqual(played["readingComplete"], "true")
+        self.assertEqual(played["page"], played["pages"])
+        delivery = store_state(page)["panels"]["dialogue"]["delivery"]
+        self.assertEqual(played["sceneLine"], str(len(delivery["lines"])))
+        delivery_id = delivery["delivery_id"]
 
         page.locator('[data-testid="dialogue-reading-retry"]').click()
         wait_for_store_state(
@@ -1213,9 +1297,29 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             lambda s: topic_id
             in (((s.get("panels") or {}).get("dialogue") or {}).get("completed_topic_ids") or []),
         )
+        _wait_scene_layout(page)
+        after = _scene_frame(page)
         self.assertEqual(
-            page.locator('[data-testid="message-page"]').inner_text(),
-            read_text,
+            (
+                store_state(page)["panels"]["dialogue"]["delivery"]["delivery_id"],
+                after["scene"],
+                after["layoutCurrent"],
+                after["readingComplete"],
+                after["sceneLine"],
+                after["speaker"],
+                after["page"],
+                after["pages"],
+            ),
+            (
+                delivery_id,
+                "true",
+                "true",
+                "true",
+                played["sceneLine"],
+                played["speaker"],
+                played["page"],
+                played["pages"],
+            ),
             "the retry never replays or re-reads the scene",
         )
         self.assertEqual(
@@ -1386,12 +1490,15 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             "dialogue",
             lambda p: ((p.get("delivery") or {}).get("kind")) == "formal",
         )
+        _wait_scene_layout(page)
         frames = [_scene_frame(page)]
         for _ in range(6):
             if frames[-1]["speaker"] == "host":
                 break
+            _wait_scene_layout(page)
             page.locator('[data-testid="message-page"]').focus()
             _press(page, "Enter", wait_ms=120)
+            _wait_scene_settled(page, frames[-1])
             frames.append(_scene_frame(page))
         self.assertEqual(frames[0]["speaker"], "actor")
         self.assertEqual(frames[0]["plate"], companion["display_name"])
@@ -1427,12 +1534,15 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                 == "t_synth_conditioned.attire_variant_scene"
             ),
         )
+        _wait_scene_layout(page)
         frames = [_scene_frame(page)]
         for _ in range(6):
             if frames[-1]["speaker"] == "host":
                 break
+            _wait_scene_layout(page)
             page.locator('[data-testid="message-page"]').focus()
             _press(page, "Enter", wait_ms=120)
+            _wait_scene_settled(page, frames[-1])
             frames.append(_scene_frame(page))
         self.assertEqual(frames[-1]["speaker"], "host")
         self.assertIn(exposure_variant_line, frames[-1]["text"])
@@ -1557,14 +1667,17 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             "dialogue",
             lambda p: ((p.get("delivery") or {}).get("kind")) == "refusal",
         )
+        _wait_scene_layout(page)
         frames = [_scene_frame(page)]
         kinds = set()
         for _ in range(10):
             if frames[-1]["choices"]:
                 break
             kinds.add((store_state(page)["panels"]["dialogue"].get("delivery") or {}).get("kind"))
+            _wait_scene_layout(page)
             page.locator('[data-testid="message-page"]').focus()
             _press(page, "Enter", wait_ms=120)
+            _wait_scene_settled(page, frames[-1])
             frames.append(_scene_frame(page))
         self.assertEqual(kinds, {"refusal"})
         speakers = [f["speaker"] for f in frames if not f["choices"]]
@@ -2043,6 +2156,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         for _ in range(12):
             if _scene_frame(page)["choices"]:
                 break
+            _wait_scene_layout(page)
             page.locator('[data-testid="message-page"]').focus()
             _press(page, "Enter", wait_ms=150)
         self.assertTrue(_scene_frame(page)["choices"])
