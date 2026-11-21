@@ -100,6 +100,13 @@ MID_COLON_RE = re.compile(rf"[{CJK}][^，。！？：]*：(?![「『])")
 REDUPLICATION_RE = re.compile(rf"([{CJK}])\1")
 # Ordinary AA verb forms and the 分會會長 compound; 疊字 such as 慢慢 stay flagged.
 REDUPLICATION_OK = {"謝", "會", "談", "說"}
+# A host answer to a spoken question that opens with a one-to-four character
+# sentence (「收。」「踏昏。」「先看爪座。」) reads as a written heading rather than
+# speech. A spoken opening carries a particle (「收啊」「膩啊」) or folds into the
+# next clause; the lint prompts for that rewrite.
+BARE_OPENER_RE = re.compile(r"^「([^」。]{1,4})。")
+SPOKEN_OPENINGS = frozenset("啊呀喔嘛啦吧呢")
+INTERJECTION_OPENINGS = frozenset("嗯欸唉哦噢哈哼咳")
 BRACKETS = {"「": "」", "『": "』", "（": "）", "《": "》"}
 
 PLACE_SUFFIXES = (
@@ -300,7 +307,7 @@ class Lint:
         return None
 
     def _check_root(self, document: dict) -> None:
-        allowed = {"schema_version", "greeting", "topics"}
+        allowed = {"schema_version", "greeting", "topics", "services"}
         extra = sorted(str(key) for key in set(document) - allowed)
         if extra:
             self.error("<root>", "keys", "root-keys", f"unexpected root keys: {', '.join(extra)}")
@@ -501,6 +508,8 @@ class Lint:
             if len(text) > 2000:
                 self.error(topic_label, where, "line", f"{len(text)} code points exceeds 2000")
             self._check_text(text, topic_label, f"{where} {spot}")
+            if kind == "speech" and line.get("speaker") == "host":
+                self._check_bare_opener(text, topic_label, f"{where} {spot}", lines, index)
         if "host" not in speakers and where != "refusal":
             self.warn(topic_label, where, "length", "no host response in this scene")
 
@@ -657,6 +666,36 @@ class Lint:
             self.error(topic, where, "brackets", "unbalanced or crossed 「」『』（）《》")
         if not plain and self.check_places:
             self._check_places(text, topic, where)
+
+    def _check_bare_opener(self, text: str, topic: str, where: str, lines: list, index: int) -> None:
+        match = BARE_OPENER_RE.match(text)
+        if not match:
+            return
+        question = next(
+            (
+                previous.get("text")
+                for previous in reversed(lines[:index])
+                if isinstance(previous, dict)
+                and previous.get("kind") == "speech"
+                and previous.get("speaker") == "actor"
+            ),
+            None,
+        )
+        if not isinstance(question, str):
+            return
+        question = question.strip()
+        if not (question.endswith("？」") or question.endswith("？")):
+            return
+        clause = match.group(1)
+        if clause[-1] in SPOKEN_OPENINGS or clause[0] in INTERJECTION_OPENINGS:
+            return
+        self.warn(
+            topic,
+            where,
+            "bare-opener",
+            f"host answers the actor question with the {len(clause)}-character "
+            f"sentence 「{clause}。」; fold it into the next clause or add a spoken particle",
+        )
 
     @staticmethod
     def _brackets_balanced(text: str) -> bool:

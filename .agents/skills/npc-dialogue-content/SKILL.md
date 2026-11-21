@@ -47,6 +47,16 @@ to these traps, which generic fantasy gets wrong:
 | 光明教會 as generic church | Its god is the 斐歐恩 (forest elf) ancestral deity; church-run 聖所 are brothels staffed by nuns and priests as a form of worship, and church vestments follow that doctrine. |
 | 中式武俠 vocabulary | This is JRPG 劍與魔法奇幻. No 江湖, 客官, 過招, 劍招, 招式, 祕技, 拜師, 功夫, 掌門. |
 
+### Hidden settings (裏設定)
+
+A few facts are true in the source and must never appear in published prose.
+Record them here so an author does not invent a contradiction, and keep every
+scene silent about them.
+
+| Term | Fact | What it forbids |
+|---|---|---|
+| 幻童 (Eolas) | The name is a transliteration of *phantom*, not a description of appearance. Eolas elves are adult-bodied and adult-looking. The source line 「外表永遠停留在10歲樣貌」 means the body reaches its final adult form by age ten and does not change afterwards; it is not a child's appearance. | Never write an Eolas elf as a child, small, young-looking or child-bodied. Never state any character's age or apparent age in dialogue or narration. |
+
 ## Where the content lives
 
 - `world/lore/dialogue/content/<NpcProfile.key>.yaml` — the static scene dialogue.
@@ -72,6 +82,11 @@ Exact YAML keys, condition vocabulary, limits and a worked example:
 
 ## Prose standard
 
+For a directory-wide restyle or any voice pass, follow
+`references/writestyle-request.md` (the normative voice brief) and
+`references/spoken-restyle.md` (that brief mapped onto this scene format, with
+the decompression table, the tic caps, and the structural proof).
+
 A scene is a conversation, not a menu echo. Read one already-accepted scene
 (`world/lore/dialogue/content/altoria_merchant.yaml` is the reviewed reference
 for a sharp shopkeeper) and match its density before writing your own. The
@@ -82,6 +97,11 @@ prices, stock or promises into your scene.
    either disappears or becomes a reason-bearing closing line.
    - weak: `「要出城還是剛回王都？架上的燈與羅盤自己挑。」`
    - better: `「準備出城，還是剛回王都啊？要出城的話，架上的魔法燈和羅盤可以仔細挑；要是剛回來，帶了什麼素材就先放上秤，我替你估個價。」`
+   - A host answer never opens with a bare verdict sentence: fold it into the
+     next clause, or keep the spoken particle that makes it speech.
+     - weak: `「收。新鮮的獸肉、野味，都放上檯面過磅。」`
+     - better: `「新鮮的獸肉、野味我都收，放上檯面過磅。」`
+     - spoken: `「收啊，新鮮的獸肉、野味都放上檯面過磅。」`
 2. **Actor lines are real spoken questions with a follow-through**, not a
    one-clause prompt that reads like a menu click.
    - weak: `「請問店裡都備了些什麼行頭？」`
@@ -244,6 +264,10 @@ slice that is:
   (reviewed date, greeting, responses, service-semantics, disposition);
 - the slice's own `openspec/changes/<change>/tasks.md` checkboxes.
 
+A whole-directory restyle also refreshes that row for every affected source:
+same row, same key, new disposition naming the file's current per-scene
+revision map. The row count stays equal to the number of live dialogue keys.
+
 Not yours: runtime code, profiles, place bindings, another slice's YAML, the
 loader, or any shared registration list. **Add no test module and no manifest
 entry**: content is authored data, not logic, so a test would only pin prose and
@@ -259,10 +283,11 @@ Editorial quality is carried by the review document, not by an assertion.
    names file, profile and dialogue key.
 2. Run the mechanical lint over your files, using the script in **this** checkout:
    `uv run --locked python .agents/skills/npc-dialogue-content/scripts/npc_content_lint.py world/lore/dialogue/content/<host>.yaml`,
-   from the worktree root. It reports OOC and 武俠 tokens, backticks, ASCII
-   commands, 您, sentence-final 的, CJK–Latin spacing, half-width punctuation,
-   calques, unbalanced 「」, scene shape and condition operands that do not exist
-   in the registries. It resolves the registries from the checkout that contains
+   from the worktree root. It reports OOC and 武俠 tokens, bare-conclusion
+   openers (`「收。」`), backticks, ASCII commands, 您, sentence-final 的, CJK–Latin
+   spacing, half-width punctuation, calques, unbalanced 「」, scene shape and
+   condition operands that do not exist in the registries. It resolves the
+   registries from the checkout that contains
    the target file (`--repo` overrides). Do not copy the script out of
    `.agents/skills/` and do not run another checkout's copy: the worktree gate
    blocks it, and the copy also drifts from the skill revision that worktree
@@ -272,13 +297,16 @@ Editorial quality is carried by the review document, not by an assertion.
    `places*.py` (warnings there are prompts, not verdicts). Persona card prose
    uses the same script with `--profiles world/lore/npc_profiles/<slice>.py`,
    which lints every card and voice leaf of that slice.
+
 3. Read the lint's WARN lines, then sweep every proper noun by hand and resolve
    it to a registry row (see *Nothing invented*). The lint cannot detect an
    invented title, fee, commission type or institution.
 4. Read each line asking "could this character know this?" Anything about
    skills, ticks, stats, exposure bands, or the UI fails.
 5. Check register against the setting, then the banned-pattern list: no 您, no
-   sentence-final 的, no mid-sentence colon, no 疊字 such as 慢慢／輕輕, no
+   sentence-final 的, no bare-conclusion opener (a host answer to a question
+   whose first sentence is a ≤4-character sentence such as `「收。」`), no
+   mid-sentence colon, no 疊字 such as 慢慢／輕輕, no
    half-width punctuation beside Chinese, single space between CJK and
    alphanumerics, no English calques (折入／賦能／拉齊, and 回填／深潛／落地 when
    used as calques rather than literally), no 中式武俠 vocabulary, and no clause
