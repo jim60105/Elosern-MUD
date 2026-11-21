@@ -9,7 +9,7 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it } from "vitest";
 import { nextTick } from "vue";
 import MessageWindow from "../components/MessageWindow.vue";
@@ -407,6 +407,56 @@ describe("MessageWindow presenting an authored scene line", () => {
     expect(pageEl().text()).toBe("灰婆婆說：北岸大道最近不太平。");
     expect(wrapper.get('[data-testid="message-window"]').attributes("data-typing")).toBe("false");
     expect(wrapper.get('[data-testid="message-live"]').text()).toBe("");
+  });
+
+  it("never acts on a page laid out for a line the display already left", async () => {
+    mountScene(line(), { pageFit: undefined, textSpeed: "instant" });
+    await nextTick();
+    await nextTick();
+    expect(pageEl().text()).toBe("北岸大道最近不太平。");
+    // The next line's glyphs are still loading: the surface keeps the
+    // previous line's pages while the scene has already moved on. An
+    // activation must not advance or finish the line the reader cannot see.
+    const fontsDescriptor = Object.getOwnPropertyDescriptor(document, "fonts");
+    const pending = [];
+    Object.defineProperty(document, "fonts", {
+      configurable: true,
+      value: {
+        load: () => new Promise((resolve) => pending.push(resolve)),
+        ready: Promise.resolve(),
+      },
+    });
+    try {
+      await wrapper.setProps({
+        scene: line({
+          lineIndex: 1,
+          kind: "narration",
+          speaker: null,
+          speakerName: null,
+          bondStage: null,
+          text: "風聲。",
+        }),
+      });
+      await nextTick();
+      expect(pageEl().attributes("data-layout-current")).toBe("false");
+      expect(pageEl().text()).toBe("北岸大道最近不太平。");
+      expect(pending).toHaveLength(2);
+      await enter();
+      expect(wrapper.emitted("scene-advance")).toBeUndefined();
+      pending.forEach((resolve) => resolve());
+      await flushPromises();
+      expect(pageEl().attributes("data-layout-current")).toBe("true");
+      expect(pageEl().text()).toBe("風聲。");
+      // The new line's own last activation belongs to the line owner once.
+      await enter();
+      expect(wrapper.emitted("scene-advance")).toHaveLength(1);
+    } finally {
+      if (fontsDescriptor) {
+        Object.defineProperty(document, "fonts", fontsDescriptor);
+      } else {
+        delete document.fonts;
+      }
+    }
   });
 });
 

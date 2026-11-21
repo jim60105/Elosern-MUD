@@ -757,6 +757,14 @@ export default {
       if (provisional.value) {
         return false;
       }
+      if (!layoutCurrent.value) {
+        // The page list was laid out for a line or response the display has
+        // already left: its re-page is waiting on the glyphs the new text
+        // needs. Acting on those pages would advance or finish a line the
+        // reader has not seen, so the activation is dropped; the next press
+        // lands on the laid-out page.
+        return false;
+      }
       if (typing.value) {
         // A press while typing shows the page in full.
         typewriter.complete();
@@ -1097,6 +1105,8 @@ export default {
           "data-typing": isTyping ? "true" : "false",
           "data-scene": scene ? "true" : null,
           "data-scene-speaker": scene ? scene.speaker || "narration" : null,
+          "data-scene-line": scene ? String(scene.lineIndex + 1) : null,
+          "data-scene-lines": scene ? String(scene.lineCount) : null,
           onClick,
           onWheel,
         },
@@ -1170,6 +1180,7 @@ export default {
                 "data-oversize": page && page.oversize ? "true" : "false",
                 "data-page": total > 0 ? String(pageIndex.value + 1) : "0",
                 "data-pages": String(total),
+                "data-layout-current": layoutCurrent.value ? "true" : "false",
                 tabindex: "0",
                 "aria-label": "訊息",
                 "aria-describedby": pageLabelId,
